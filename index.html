@@ -94,12 +94,22 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .row { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto 28px 28px; align-items: start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .grip { cursor: grab; color: var(--sub); opacity: .3; font-size: 15px; line-height: 24px; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; }
 .row:hover .grip { opacity: 1; }
-.meta { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.meta { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
 .tm { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--sub); font-variant-numeric: tabular-nums; }
 .tm b { font-weight: 600; color: var(--text); }
+.qb { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--text); font-variant-numeric: tabular-nums; }
+.qb.empty { color: var(--sub); }
+.pop { position: fixed; z-index: 40; width: 236px; padding: 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.pop h4 { margin: 0 0 8px; font-size: 13px; color: var(--sub); font-weight: 600; }
+.pop .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.pop .grid button { padding: 7px 0; border-radius: 8px; background: var(--hover); border: 1px solid var(--line); font-size: 14px; }
+.pop .grid button:hover { border-color: var(--accent); }
+.pop .grid button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pop .own { display: flex; gap: 6px; margin-top: 8px; }
+.pop .own input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+.pop .clear { margin-top: 8px; width: 100%; padding: 6px 0; color: var(--red); font-size: 13px; }
 .tm.run { background: var(--green); border-color: var(--green); color: #fff; } .tm.run b { color: #fff; }
 .tm.over { background: var(--red); border-color: var(--red); color: #fff; } .tm.over b { color: #fff; }
-.row:not(:hover) .tm.none { opacity: 0; }
 .drag-ghost { position: fixed; z-index: 50; pointer-events: none; max-width: 300px; padding: 6px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.45); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dragging { opacity: .35; }
 .day.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 6px; }
@@ -124,7 +134,8 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .chip.over { color: #fff; background: var(--red); border-color: var(--red); }
 .chip.fin { text-decoration: line-through; }
 .chip .log { opacity: .85; margin-left: 4px; }
-.row:not(:hover) .chip.none { opacity: 0; }
+.chip.none, .tm.none, .qb.empty { opacity: .4; border-color: transparent; padding: 1px 4px; }
+.row:hover .chip.none, .row:hover .tm.none, .row:hover .qb.empty { opacity: 1; border-color: var(--line); }
 .add { color: var(--sub); padding: 6px 8px; width: 100%; text-align: left; border-radius: 6px; }
 .add:hover { background: var(--hover); }
 
@@ -191,8 +202,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   .row .star { grid-column: 4; grid-row: 1; opacity: .55; }
   .row .more { grid-column: 5; grid-row: 1; }
   .grip { opacity: .6; font-size: 17px; }
-  .row:not(:hover) .tm.none { opacity: .55; }
-  .row .chip.none { display: none; }
+  .chip.none, .tm.none, .qb.empty { opacity: .6; }
+  .meta { gap: 8px; }
+  .meta .qb, .meta .tm, .meta .chip { min-height: 30px; min-width: 34px; padding: 3px 8px; }
   #me { display: none; }
   .mview { padding: 10px 8px 80px; }
   .mview .mh h1 { font-size: 24px; }
@@ -282,6 +294,8 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <option value="180">3시간 전</option>
     <option value="1440">1일 전</option>
   </select>
+  <label for="sStart">업무 시작시간</label>
+  <input type="time" id="sStart">
   <label for="sEst">예상 소요시간 (분)</label>
   <input type="number" id="sEst" min="1" inputmode="numeric" placeholder="예: 30">
   <div class="quick" id="sEstQ">
@@ -299,6 +313,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   </div>
 </dialog>
 
+<div id="pop" class="pop hidden"></div>
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
@@ -423,10 +438,10 @@ function renderMonth(byDay, dlByDay, hm) {
     const d = W.parse(day), out = d.getMonth() + 1 !== cal.m;
     const dls = (dlByDay[day] ?? []).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     const list = (byDay[day] ?? []).filter((t) => t.title)
-      .sort((a, b) => a.done - b.done || b.must_do - a.must_do || b.important - a.important); // 꼭·중요 먼저
+      .sort((a, b) => a.done - b.done || b.must_do - a.must_do || b.important - a.important || (a.start_time ?? "99").localeCompare(b.start_time ?? "99")); // 꼭·중요 먼저, 그다음 시작시간 순
     const pills = [
       ...dls.map((t) => `<button class="pill dl ${W.due(t.deadline).cls}" data-id="${t.id}">⏰${hm(t.deadline)} ${esc(t.title) || "(제목 없음)"}</button>`),
-      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && (t.must_do || t.important) ? "hot" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${esc(t.title)}</button>`),
+      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && (t.must_do || t.important) ? "hot" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${t.start_time ? t.start_time.slice(0, 5) + " " : ""}${esc(t.title)}</button>`),
     ];
     const il = `<span class="il">일</span>`; // 폰에선 숫자만 (아이폰 캘린더처럼)
     const num = day === today() ? `<b>${d.getDate()}</b>${il}` : d.getDate() === 1 ? `<span class="il">${d.getMonth() + 1}월 </span>1${il}` : `${d.getDate()}${il}`;
@@ -469,7 +484,7 @@ $("#weekList").onclick = (e) => {
 };
 
 function chip(t) {
-  if (!t.deadline) return `<button class="chip none" data-act="dl">+ 데드라인</button>`;
+  if (!t.deadline) return `<button class="chip none" data-act="dl" title="데드라인">📅</button>`;
   const d = W.due(t.deadline), n = (t.deadline_log || []).length;
   const cls = t.done ? "chip fin" : "chip " + d.cls;
   return `<button class="${cls}" data-act="dl" title="데드라인 재설정">📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + d.text}${n ? `<span class="log">↻${n}</span>` : ""}</button>`;
@@ -480,11 +495,54 @@ const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - n
 function hms(sec, withSec) { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return withSec ? `${h}:${pad(m)}:${pad(sec % 60)}` : `${h}:${pad(m)}`; }
 function timeBtn(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
-  if (t.done && !sec && !est) return "";
-  if (!run && !sec && !est) return `<button class="tm none" data-act="timer" title="타이머 시작">▶ 0:00</button>`;
+  if (t.done && !sec) return "";
+  if (!run && !sec) return `<button class="tm none" data-act="timer" title="타이머 시작">▶</button>`;
   const over = est && sec > est * 60;
-  return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}">${t.done ? "⏱" : run ? "⏸" : "▶"} <b>${hms(sec, run)}</b>${est ? ` / ${hms(est * 60)}` : ""}</button>`;
+  return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}">${t.done ? "⏱" : run ? "⏸" : "▶"} <b>${hms(sec, run)}</b></button>`;
 }
+// 시작시간·예상시간 버튼 (누르면 작은 선택창)
+const minLabel = (m) => m < 60 ? `${m}분` : m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`;
+function quickBtns(t) {
+  const st = t.start_time?.slice(0, 5), est = t.estimate_min;
+  if (t.done && !st && !est) return "";
+  return `<button class="qb ${st ? "" : "empty"}" data-act="start" title="업무 시작시간">🕐${st ? " " + st : ""}</button>`
+    + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">⏳${est ? " " + minLabel(est) : ""}</button>`;
+}
+let popFor = null;
+function openPop(anchor, t, kind) {
+  const pop = $("#pop"), now = new Date();
+  if (kind === "est") {
+    pop.innerHTML = `<h4>⏳ 예상 소요시간</h4><div class="grid">${[15, 30, 45, 60, 90, 120, 180, 240, 480].map((m) =>
+      `<button data-v="${m}" class="${t.estimate_min === m ? "on" : ""}">${minLabel(m)}</button>`).join("")}</div>
+      <div class="own"><input type="number" min="1" inputmode="numeric" placeholder="직접 (분)"><button class="btn" data-own>확인</button></div>
+      ${t.estimate_min ? `<button class="clear" data-v="">지우기</button>` : ""}`;
+  } else {
+    const nowHm = `${pad(now.getHours())}:${pad(Math.floor(now.getMinutes() / 5) * 5)}`;
+    pop.innerHTML = `<h4>🕐 업무 시작시간</h4><div class="grid"><button data-v="${nowHm}">지금</button>${["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "18:00"].map((h) =>
+      `<button data-v="${h}" class="${t.start_time?.slice(0, 5) === h ? "on" : ""}">${h}</button>`).join("")}</div>
+      <div class="own"><input type="time" value="${t.start_time?.slice(0, 5) ?? ""}"><button class="btn" data-own>확인</button></div>
+      ${t.start_time ? `<button class="clear" data-v="">지우기</button>` : ""}`;
+  }
+  pop.classList.remove("hidden");
+  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+  pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+  popFor = { t, kind, at: Date.now() };
+}
+const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
+$("#pop").onclick = async (e) => {
+  if (!popFor) return;
+  const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
+  let v = b.dataset.v;
+  if (b.dataset.own !== undefined) v = $("#pop input").value;
+  if (v === undefined) return;
+  const patch = kind === "est" ? { estimate_min: +v > 0 ? Math.round(+v) : null } : { start_time: v || null };
+  closePop();
+  if (await save(t.id, patch)) renderWeek();
+};
+document.addEventListener("pointerdown", (e) => { if (popFor && !e.target.closest("#pop, [data-act=est], [data-act=start]")) closePop(); });
+document.addEventListener("keydown", (e) => e.key === "Escape" && closePop());
+addEventListener("scroll", () => popFor && Date.now() - popFor.at > 400 && closePop(), { passive: true });
 // 1초마다 도는 타이머만 숫자 갱신
 setInterval(() => {
   document.querySelectorAll(".tm.run").forEach((el) => {
@@ -511,7 +569,7 @@ function rowHtml(t) {
     <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
     <textarea rows="1" placeholder="할 일 입력">${esc(t.title)}</textarea>
-    <div class="meta">${marks(t)}${timeBtn(t)}${chip(t)}</div>
+    <div class="meta">${marks(t)}${quickBtns(t)}${timeBtn(t)}${chip(t)}</div>
     <button class="star ${t.important ? "on" : ""}" data-act="star" aria-label="${t.important ? "중요 끄기" : "중요 표시"}" title="중요">${t.important ? "★" : "☆"}</button>
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
 }
@@ -582,6 +640,7 @@ $("#days").addEventListener("click", async (e) => {
   }
   if (act === "open" || act === "dl") openSheet(taskOf(e.target), act === "dl");
   if (act === "timer") toggleTimer(taskOf(e.target));
+  if (act === "est" || act === "start") { const b = e.target.closest("[data-act]"); popFor?.t.id === taskOf(b).id && popFor.kind === act ? closePop() : openPop(b, taskOf(b), act); }
   if (act === "star") { const t = taskOf(e.target); if (await save(t.id, { important: !t.important })) renderWeek(); }
 });
 $("#days").addEventListener("change", async (e) => {
@@ -711,6 +770,7 @@ function openSheet(t, focusDl) {
   $("#sRemind").value = t.remind_min ?? "";
   $("#sNote").value = t.note;
   $("#sEst").value = t.estimate_min ?? "";
+  $("#sStart").value = t.start_time?.slice(0, 5) ?? "";
   document.querySelectorAll("#sMarks button").forEach((b) => b.classList.toggle("on", !!t[b.dataset.mk]));
   $("#sSpent").textContent = hms(elapsed(t), true);
   $("#sTimer").textContent = t.started_at ? "⏸ 정지" : "▶ 시작";
@@ -728,6 +788,7 @@ async function sheetSave(patch) {
 $("#sTitle").onchange = () => sheetSave({ title: $("#sTitle").value.trim() });
 $("#sDone").onchange = () => sheetSave({ done: $("#sDone").checked }).then(bumpStats);
 $("#sNote").onchange = () => sheetSave({ note: $("#sNote").value });
+$("#sStart").onchange = () => sheetSave({ start_time: $("#sStart").value || null });
 $("#sEst").onchange = () => sheetSave({ estimate_min: +$("#sEst").value > 0 ? Math.round(+$("#sEst").value) : null });
 $("#sEstQ").onclick = (e) => { if (e.target.dataset.m === undefined) return; $("#sEst").value = e.target.dataset.m; $("#sEst").onchange(); };
 $("#sTimer").onclick = () => toggleTimer(cur());
