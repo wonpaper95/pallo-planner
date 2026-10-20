@@ -102,7 +102,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
 body.mv .layout { display: none; }
-body:not(.mv) .mview { display: none; }
+body:not(.mv) #monthView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
 .mh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .mh h1 { margin: 0; font-size: 36px; font-weight: 800; letter-spacing: -.02em; }
@@ -122,11 +122,16 @@ body:not(.mv) .mview { display: none; }
 .mgrid .pill.dl { background: color-mix(in srgb, #ff453a 32%, transparent); color: #ff8a80; }
 .mgrid .pill.dl.soon { background: color-mix(in srgb, #ff9f0a 32%, transparent); color: #ffc46b; }
 .mgrid .pill.x { background: color-mix(in srgb, var(--sub) 18%, transparent); color: var(--sub); text-decoration: line-through; }
-.mgrid .more { font-size: 12px; color: var(--sub); padding-left: 6px; }
+.mgrid .more { font-size: 12px; color: var(--sub); padding-left: 6px; white-space: nowrap; }
 @media (prefers-color-scheme: light) {
   .mgrid .pill { color: #4b2fa8; } .mgrid .pill.dl { color: #c4281c; } .mgrid .pill.dl.soon { color: #a35a00; }
 }
-.review textarea { width: 100%; min-height: 90px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+/* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
+.mview.wcal { display: block; padding: 8px 0 0; margin-top: 10px; border-top: 1px solid var(--line); }
+.wcal .mh h1 { font-size: 26px; }
+.wcal .mgrid .dc { min-height: 110px; }
+.wcal .mgrid .dn { font-size: 16px; }
+.wcal .mgrid .dn b { width: 28px; height: 28px; }
 
 /* 상세 시트 */
 dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); width: min(480px, calc(100vw - 24px)); padding: 18px; }
@@ -158,6 +163,8 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   .mgrid .dn { font-size: 13px; }
   .mgrid .dn b { width: 24px; height: 24px; }
   .mgrid .il { display: none; }
+  .wcal .mgrid .dc { min-height: 76px; }
+  .wcal .mh h1 { font-size: 22px; }
   .mgrid .pill { font-size: 10.5px; padding: 1px 3px; }
   .mgrid .dow { font-size: 13px; }
   header { gap: 6px; }
@@ -203,10 +210,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
       <details id="duebox" open><summary>⏰ 데드라인 <span id="dueCount"></span></summary><div id="dueList"></div></details>
       <div id="days"></div>
-      <section class="review">
-        <h3>이번 주는 어땠어?</h3>
-        <textarea id="review" placeholder="한 주 돌아보기"></textarea>
-      </section>
+      <section class="mview wcal" id="weekCal"></section>
     </main>
   </div>
   <section class="mview" id="monthView"></section>
@@ -302,18 +306,16 @@ $("#outBtn").onclick = async () => { await sb.auth.signOut({ scope: "local" }); 
 async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
-  const [t, d, s, r] = await Promise.all([
+  const [t, d, s] = await Promise.all([
     sb.from("tasks").select("*").gte("day", monday).lte("day", sun).order("sort").order("id"),
     sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
     sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
-    sb.from("weeks").select("review").eq("start", monday).maybeSingle(),
   ]);
-  if (fail(t.error || d.error || s.error || r.error)) return;
+  if (fail(t.error || d.error || s.error)) return;
   tasks = t.data; dues = d.data;
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
-  if (document.activeElement !== $("#review")) $("#review").value = r.data?.review ?? "";
   const thu = W.parse(W.add(monday, 3)); // 주가 걸친 달은 목요일 기준
   if (!cal || cal.wk !== monday) cal = { y: thu.getFullYear(), m: thu.getMonth() + 1, wk: monday };
   await loadCal();
@@ -332,7 +334,7 @@ async function loadCal() {
 // 다른 기기에서 바꾸면 바로 반영 (입력 중이면 끝난 뒤)
 let reloadT;
 function softReload() {
-  if (document.activeElement?.closest(".row, dialog, .review") || $("#sheet").open) { dirty = true; return; }
+  if (document.activeElement?.closest(".row, dialog") || $("#sheet").open) { dirty = true; return; }
   clearTimeout(reloadT); reloadT = setTimeout(() => loadAll(false), 300);
 }
 function listen() {
@@ -378,12 +380,13 @@ function renderMonth(byDay, dlByDay, hm) {
     const il = `<span class="il">일</span>`; // 폰에선 숫자만 (아이폰 캘린더처럼)
     const num = day === today() ? `<b>${d.getDate()}</b>${il}` : d.getDate() === 1 ? `<span class="il">${d.getMonth() + 1}월 </span>1${il}` : `${d.getDate()}${il}`;
     return `<div class="dc ${out ? "out" : ""} ${d.getDay() % 6 === 0 ? "wkend" : ""}" data-day="${day}"><div class="dn">${num}</div>
-      ${pills.slice(0, max).join("")}${pills.length > max ? `<div class="more">+${pills.length - max}개 더</div>` : ""}</div>`;
+      ${pills.slice(0, max).join("")}${pills.length > max ? `<div class="more">+${pills.length - max}<span class="il">개 더</span></div>` : ""}</div>`;
   }).join("");
-  $("#monthView").innerHTML = `<div class="mh"><h1>${cal.y}년 ${cal.m}월</h1><div class="navs"><button data-cal="-1" aria-label="이전 달">‹</button><button data-cal="0">오늘</button><button data-cal="1" aria-label="다음 달">›</button></div></div>
+  const html = `<div class="mh"><h1>${cal.y}년 ${cal.m}월</h1><div class="navs"><button data-cal="-1" aria-label="이전 달">‹</button><button data-cal="0">오늘</button><button data-cal="1" aria-label="다음 달">›</button></div></div>
     <div class="mgrid">${["일", "월", "화", "수", "목", "금", "토"].map((x) => `<div class="dow">${x}</div>`).join("")}${cells}</div>`;
+  $("#monthView").innerHTML = html; $("#weekCal").innerHTML = html;
 }
-$("#monthView").onclick = async (e) => {
+$("#monthView").onclick = $("#weekCal").onclick = async (e) => {
   const nav = e.target.closest("[data-cal]");
   if (nav) {
     if (nav.dataset.cal === "0") { const t = W.parse(today()); cal = { ...cal, y: t.getFullYear(), m: t.getMonth() + 1 }; }
@@ -568,11 +571,6 @@ $("#sheet").addEventListener("close", async () => {
   if (dirty) { dirty = false; softReload(); }
 });
 
-// ── 회고 ──
-$("#review").onchange = async () => {
-  const { error } = await sb.from("weeks").upsert({ user_id: me.id, start: monday, review: $("#review").value });
-  if (!fail(error)) toast("저장했어요");
-};
 
 // ── 주 이동 ──
 $("#prevW").onclick = () => { monday = W.add(monday, -7); year = W.isoWeek(monday).year; loadAll(); };
