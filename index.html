@@ -62,12 +62,24 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .rate { display: flex; align-items: center; gap: 10px; color: var(--sub); font-size: 14px; margin: 6px 0 18px; }
 .rate .bar { flex: 1; max-width: 240px; margin: 0; height: 6px; }
 
+/* 표시: 🔥 꼭 / ⭐ 중요 / 우선순위 */
+.mk { font-size: 12px; padding: 1px 7px; border-radius: 99px; white-space: nowrap; cursor: pointer; border: 1px solid var(--line); color: var(--sub); }
+.mk.must { color: #fff; background: #ff4d4f; border-color: #ff4d4f; }
+.mk.must.late { background: #8f1d21; border-color: #ff6b6b; }
+.mk.imp { color: #fff; background: #ff4d4f; border-color: #ff4d4f; }
+.row.done .mk { opacity: .45; }
+/* 중요·오늘 꼭 → 밝은 빨간색 */
+.row.hot:not(.done) { box-shadow: inset 3px 0 #ff4d4f; background: color-mix(in srgb, #ff4d4f 9%, transparent); }
+.row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
+.quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mgrid .pill.hot { background: color-mix(in srgb, #ff4d4f 30%, transparent); color: #ff6b6b; font-weight: 700; }
 /* 데드라인 모아보기 */
-#duebox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
-#duebox summary { cursor: pointer; font-weight: 600; }
-#duebox .dl-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; }
-#duebox .dl-item:first-of-type { border-top: 0; }
-#duebox .dl-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mustbox, #duebox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
+#mustbox { border-color: #e5484d66; margin-bottom: 10px; }
+#mustbox summary, #duebox summary { cursor: pointer; font-weight: 600; }
+#mustbox .dl-item, #duebox .dl-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; }
+#mustbox .dl-item:first-of-type, #duebox .dl-item:first-of-type { border-top: 0; }
+#mustbox .dl-item span:first-child, #duebox .dl-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 요일 칸 (노션 MON~SUN) */
 .day { margin-bottom: 26px; scroll-margin-top: 112px; }
@@ -79,9 +91,25 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .day.sat h3 > span:first-child { color: var(--blue); } .day.sun h3 > span:first-child { color: var(--red); }
 .day.today h3 .pill { background: var(--accent); color: #fff; }
 .rows { border-top: 1px solid var(--line); }
-.row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 28px; align-items: start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto 28px; align-items: start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.grip { cursor: grab; color: var(--sub); opacity: .3; font-size: 15px; line-height: 24px; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; }
+.row:hover .grip { opacity: 1; }
+.meta { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.tm { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--sub); font-variant-numeric: tabular-nums; }
+.tm b { font-weight: 600; color: var(--text); }
+.tm.run { background: var(--green); border-color: var(--green); color: #fff; } .tm.run b { color: #fff; }
+.tm.over { background: var(--red); border-color: var(--red); color: #fff; } .tm.over b { color: #fff; }
+.row:not(:hover) .tm.none { opacity: 0; }
+.drag-ghost { position: fixed; z-index: 50; pointer-events: none; max-width: 300px; padding: 6px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.45); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dragging { opacity: .35; }
+.day.drop { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: 6px; }
+.mgrid .dc.drop { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.drop-line { height: 3px; margin: -2px 0; background: var(--accent); border-radius: 2px; }
+.timerline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.timerline b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.timerline input { width: 130px !important; }
 .row:hover { background: var(--hover); }
-.row input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0 6px; accent-color: var(--blue); cursor: pointer; }
+.row input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0 2px; accent-color: var(--blue); cursor: pointer; }
 .row textarea { width: 100%; resize: none; border: 0; background: transparent; padding: 0; line-height: 1.5; overflow: hidden; outline: none; min-height: 22px; }
 .row.done textarea { color: var(--sub); }
 .row .more { color: var(--sub); font-size: 18px; line-height: 22px; border-radius: 4px; }
@@ -119,7 +147,7 @@ body:not(.mv) #monthView { display: none; }
 .mgrid .dn { text-align: right; font-size: 20px; font-weight: 600; padding: 0 4px 2px; }
 .mgrid .dc.out .dn { color: var(--sub); opacity: .7; }
 .mgrid .dn b { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #ff3b30; color: #fff; }
-.mgrid .pill { display: block; width: 100%; text-align: left; font-size: 13px; line-height: 1.35; padding: 2px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.mgrid .pill { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: block; width: 100%; text-align: left; font-size: 13px; line-height: 1.35; padding: 2px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   background: color-mix(in srgb, #8b6fd6 38%, transparent); color: color-mix(in srgb, #c9b8ff 80%, var(--text)); }
 .mgrid .pill.dl { background: color-mix(in srgb, #ff453a 32%, transparent); color: #ff8a80; }
 .mgrid .pill.dl.soon { background: color-mix(in srgb, #ff9f0a 32%, transparent); color: #ffc46b; }
@@ -154,9 +182,11 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   aside { position: fixed; inset: 106px 0 0 0; height: auto; z-index: 6; background: var(--bg); border: 0; }
   main { padding: 14px 16px 120px; }
   .weekhead h1 { font-size: 24px; }
-  .row { grid-template-columns: 30px minmax(0, 1fr) 28px; }
-  .row .chip { grid-column: 2; grid-row: 2; justify-self: start; }
-  .row .more { grid-column: 3; grid-row: 1; }
+  .row { grid-template-columns: 18px 24px minmax(0, 1fr) 28px; }
+  .row .meta { grid-column: 3; grid-row: 2; justify-content: flex-start; }
+  .row .more { grid-column: 4; grid-row: 1; }
+  .grip { opacity: .6; font-size: 17px; }
+  .row:not(:hover) .tm.none { opacity: .55; }
   .row .chip.none { display: none; }
   #me { display: none; }
   .mview { padding: 10px 8px 80px; }
@@ -210,6 +240,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <span class="range" id="wkRange"></span>
       </div>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
+      <details id="mustbox" open class="hidden"><summary>🔥 꼭 끝낼 일 <span id="mustCount"></span></summary><div id="mustList"></div></details>
       <details id="duebox" open><summary>⏰ 데드라인 <span id="dueCount"></span></summary><div id="dueList"></div></details>
       <div id="days"></div>
       <section class="mview wcal" id="weekCal"></section>
@@ -221,6 +252,8 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <dialog id="sheet">
   <input class="ttl" id="sTitle" placeholder="할 일">
   <label><input type="checkbox" id="sDone"> 완료</label>
+  <label>표시</label>
+  <div class="quick" id="sMarks"><button data-mk="must_do">🔥 그날 꼭 끝내기</button><button data-mk="important">⭐ 중요</button></div>
   <label for="sDay">날짜 (다른 날로 옮기기)</label>
   <input type="date" id="sDay">
   <label for="sDl" id="sDlLabel">데드라인</label>
@@ -244,6 +277,15 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <option value="180">3시간 전</option>
     <option value="1440">1일 전</option>
   </select>
+  <label for="sEst">예상 소요시간 (분)</label>
+  <input type="number" id="sEst" min="1" inputmode="numeric" placeholder="예: 30">
+  <div class="quick" id="sEstQ">
+    <button data-m="15">15분</button><button data-m="30">30분</button><button data-m="60">1시간</button>
+    <button data-m="120">2시간</button><button data-m="180">3시간</button><button data-m="">지우기</button>
+  </div>
+  <label>업무 수행시간</label>
+  <div class="timerline"><b id="sSpent">0:00:00</b><button class="btn ghost" id="sTimer">▶ 시작</button>
+    <input type="number" id="sSpentEdit" min="0" inputmode="numeric" placeholder="분으로 직접 고치기"></div>
   <label for="sNote">메모</label>
   <textarea id="sNote" rows="4"></textarea>
   <div class="sheet-foot">
@@ -266,7 +308,7 @@ const KDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
-let tasks = [], dues = [], openId = null, dirty = false;
+let tasks = [], dues = [], musts = [], openId = null, dirty = false;
 let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
@@ -308,14 +350,15 @@ $("#outBtn").onclick = async () => { await sb.auth.signOut({ scope: "local" }); 
 async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
-  const [t, d, s] = await Promise.all([
+  const [t, d, s, m] = await Promise.all([
     sb.from("tasks").select("*").gte("day", monday).lte("day", sun).order("sort").order("id"),
     sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
     sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
+    sb.from("tasks").select("id, day, title").eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
   ]);
-  if (fail(t.error || d.error || s.error)) return;
-  tasks = t.data; dues = d.data;
+  if (fail(t.error || d.error || s.error || m.error)) return;
+  tasks = t.data; dues = d.data; musts = m.data;
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
   const thu = W.parse(W.add(monday, 3)); // 주가 걸친 달은 목요일 기준
@@ -374,10 +417,11 @@ function renderMonth(byDay, dlByDay, hm) {
   const cells = g.map((day) => {
     const d = W.parse(day), out = d.getMonth() + 1 !== cal.m;
     const dls = (dlByDay[day] ?? []).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-    const list = (byDay[day] ?? []).filter((t) => t.title).sort((a, b) => a.done - b.done);
+    const list = (byDay[day] ?? []).filter((t) => t.title)
+      .sort((a, b) => a.done - b.done || b.must_do - a.must_do || b.important - a.important); // 꼭·중요 먼저
     const pills = [
       ...dls.map((t) => `<button class="pill dl ${W.due(t.deadline).cls}" data-id="${t.id}">⏰${hm(t.deadline)} ${esc(t.title) || "(제목 없음)"}</button>`),
-      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""}" data-id="${t.id}">${esc(t.title)}</button>`),
+      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && (t.must_do || t.important) ? "hot" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${esc(t.title)}</button>`),
     ];
     const il = `<span class="il">일</span>`; // 폰에선 숫자만 (아이폰 캘린더처럼)
     const num = day === today() ? `<b>${d.getDate()}</b>${il}` : d.getDate() === 1 ? `<span class="il">${d.getMonth() + 1}월 </span>1${il}` : `${d.getDate()}${il}`;
@@ -425,11 +469,45 @@ function chip(t) {
   const cls = t.done ? "chip fin" : "chip " + d.cls;
   return `<button class="${cls}" data-act="dl" title="데드라인 재설정">📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + d.text}${n ? `<span class="log">↻${n}</span>` : ""}</button>`;
 }
+// ── 수행시간 / 예상시간 ──
+const pad = (n) => String(n).padStart(2, "0");
+const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
+function hms(sec, withSec) { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return withSec ? `${h}:${pad(m)}:${pad(sec % 60)}` : `${h}:${pad(m)}`; }
+function timeBtn(t) {
+  const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
+  if (t.done && !sec && !est) return "";
+  if (!run && !sec && !est) return `<button class="tm none" data-act="timer" title="타이머 시작">▶ 0:00</button>`;
+  const over = est && sec > est * 60;
+  return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}">${t.done ? "⏱" : run ? "⏸" : "▶"} <b>${hms(sec, run)}</b>${est ? ` / ${hms(est * 60)}` : ""}</button>`;
+}
+// 1초마다 도는 타이머만 숫자 갱신
+setInterval(() => {
+  document.querySelectorAll(".tm.run").forEach((el) => {
+    const t = tasks.find((x) => x.id == el.dataset.tid); if (!t) return;
+    el.querySelector("b").textContent = hms(elapsed(t), true);
+    el.classList.toggle("over", !!(t.estimate_min && elapsed(t) > t.estimate_min * 60));
+  });
+  const t = openId && cur(); if (t && $("#sheet").open) $("#sSpent").textContent = hms(elapsed(t), true);
+}, 1000);
+async function toggleTimer(t) {
+  if (t.done) return toast("완료한 일이에요");
+  const { error } = await sb.rpc("timer", { p_id: t.id, p_on: !t.started_at });
+  if (fail(error)) return;
+  await loadAll();
+  if ($("#sheet").open && openId === t.id) openSheet(cur());
+}
+function marks(t) {
+  let h = "";
+  if (t.must_do) h += `<span class="mk must ${!t.done && t.day < today() ? "late" : ""}" data-act="open" title="그날 꼭 끝내기">🔥 ${t.day === today() ? "오늘 꼭" : !t.done && t.day < today() ? "못 끝냄" : "꼭"}</span>`;
+  if (t.important) h += `<span class="mk imp" data-act="open" title="중요">⭐ 중요</span>`;
+  return h;
+}
 function rowHtml(t) {
-  return `<div class="row ${t.done ? "done" : ""}" data-id="${t.id}">
+  return `<div class="row ${t.done ? "done" : ""} ${t.important || t.must_do ? "hot" : ""}" data-id="${t.id}">
+    <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
     <textarea rows="1" placeholder="할 일 입력">${esc(t.title)}</textarea>
-    ${chip(t)}
+    <div class="meta">${marks(t)}${timeBtn(t)}${chip(t)}</div>
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
 }
 // 요일 옆 완료율 (주 목록 막대와 같은 모양)
@@ -457,6 +535,9 @@ function renderWeek() {
   renderDue();
 }
 function renderDue() {
+  $("#mustbox").classList.toggle("hidden", !musts.length);
+  $("#mustCount").textContent = `(${musts.length})`;
+  $("#mustList").innerHTML = musts.map((t) => `<div class="dl-item" data-day="${t.day}"><span>${esc(t.title) || "(제목 없음)"}</span><span class="mk must ${t.day < today() ? "late" : ""}">${t.day === today() ? "오늘" : md(t.day) + " 못 끝냄"}</span></div>`).join("");
   $("#dueCount").textContent = dues.length ? `(${dues.length})` : "";
   $("#dueList").innerHTML = dues.length
     ? dues.map((t) => { const d = W.due(t.deadline); return `<div class="dl-item" data-id="${t.id}" data-day="${t.day}"><span>${esc(t.title) || "(제목 없음)"}</span><span class="chip ${d.cls}">${fmtDl(t.deadline)} · ${d.text}</span></div>`; }).join("")
@@ -474,6 +555,8 @@ async function save(id, patch) {
   Object.assign(tasks.find((t) => t.id === id) ?? {}, data);
   Object.assign(calTasks.find((t) => t.id === id) ?? {}, data);
   if (cal) renderCal();
+  musts = musts.filter((t) => t.id !== id);
+  if (data.must_do && !data.done && data.day <= today()) { musts.push(data); musts.sort((a, b) => a.day.localeCompare(b.day)); }
   const di = dues.findIndex((t) => t.id === id);
   const inDue = !data.done && data.deadline && new Date(data.deadline) <= Date.now() + 7 * 86400000;
   if (di >= 0 && !inDue) dues.splice(di, 1);
@@ -493,6 +576,7 @@ $("#days").addEventListener("click", async (e) => {
     e.target.closest(".day").querySelector(".row:last-child textarea").focus();
   }
   if (act === "open" || act === "dl") openSheet(taskOf(e.target), act === "dl");
+  if (act === "timer") toggleTimer(taskOf(e.target));
 });
 $("#days").addEventListener("change", async (e) => {
   if (e.target.type !== "checkbox") return;
@@ -517,13 +601,100 @@ async function bumpStats() { // 주 목록 % 만 다시
   const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) });
   if (data) renderWeeks(Object.fromEntries(data.map((x) => [x.start, x])));
 }
-$("#dueList").onclick = (e) => {
+$("#mustList").onclick = $("#dueList").onclick = (e) => {
   const it = e.target.closest(".dl-item"); if (!it) return;
   const m = W.monday(it.dataset.day);
   const go = () => document.getElementById("d-" + it.dataset.day)?.scrollIntoView({ behavior: "smooth" });
   if (m === monday) return go();
   monday = m; year = W.isoWeek(m).year; loadAll().then(go);
 };
+
+// ── 끌어서 날짜 옮기기 (마우스·터치 공통 pointer 이벤트) ──
+// 주간: 줄 왼쪽 ⠿ 손잡이를 잡고 다른 요일/같은 날 다른 위치로. 월간: 알약을 끌어 다른 날짜 칸으로(폰은 꾹 누른 뒤).
+let drag = null, dragSuppressClick = false;
+function dragStart(e, t, src) {
+  document.activeElement?.blur();
+  const ghost = document.createElement("div");
+  ghost.className = "drag-ghost"; ghost.textContent = t.title || "(제목 없음)";
+  document.body.append(ghost);
+  src.classList.add("dragging");
+  drag = { t, src, ghost, x: e.clientX, y: e.clientY, target: null, line: null };
+  dragMove(e); requestAnimationFrame(autoScroll);
+  navigator.vibrate?.(15);
+}
+function dragMove(e) {
+  if (!drag) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  drag.ghost.style.left = drag.x + 12 + "px"; drag.ghost.style.top = drag.y + 8 + "px";
+  document.querySelectorAll(".drop").forEach((el) => el.classList.remove("drop"));
+  drag.line?.remove(); drag.line = null;
+  const under = document.elementFromPoint(drag.x, drag.y);
+  const day = under?.closest(".day"), cell = under?.closest(".dc");
+  drag.target = day || cell || null;
+  if (!drag.target) return;
+  drag.target.classList.add("drop");
+  if (day) { // 같은 날 안의 위치 표시선
+    const rows = [...day.querySelectorAll(".row")].filter((r) => r !== drag.src);
+    const before = rows.find((r) => { const b = r.getBoundingClientRect(); return drag.y < b.top + b.height / 2; });
+    drag.line = Object.assign(document.createElement("div"), { className: "drop-line" });
+    before ? before.before(drag.line) : day.querySelector(".rows").append(drag.line);
+    drag.before = before ? +before.dataset.id : null;
+  }
+}
+function autoScroll() {
+  if (!drag) return;
+  const edge = 70, top = 110;
+  if (drag.y < top + edge) window.scrollBy(0, -12); else if (drag.y > innerHeight - edge) window.scrollBy(0, 12);
+  requestAnimationFrame(autoScroll);
+}
+async function dragEnd() {
+  if (!drag) return;
+  const { t, src, ghost, target, before } = drag;
+  ghost.remove(); drag.line?.remove(); src.classList.remove("dragging");
+  document.querySelectorAll(".drop").forEach((el) => el.classList.remove("drop"));
+  drag = null; dragSuppressClick = true; setTimeout(() => (dragSuppressClick = false), 50);
+  if (!target) return;
+  const day = target.dataset.day, patch = {};
+  if (day !== t.day) patch.day = day;
+  if (target.classList.contains("day")) { // 순서: 앞뒤 줄 sort 의 중간값
+    const list = tasks.filter((x) => x.day === day && x.id !== t.id);
+    const i = before == null ? list.length : list.findIndex((x) => x.id === before);
+    const prev = list[i - 1], next = list[i];
+    const sort = prev && next ? (prev.sort + next.sort) / 2 : prev ? prev.sort + 1 : next ? next.sort - 1 : t.sort;
+    if (sort !== t.sort) patch.sort = sort;
+  }
+  if (!Object.keys(patch).length) return;
+  if (await save(t.id, patch)) { await loadAll(); bumpStats(); if (patch.day) toast(`${md(day)}(${KDAY[W.parse(day).getDay()]})로 옮겼어요`); }
+}
+document.addEventListener("pointermove", dragMove);
+document.addEventListener("pointerup", dragEnd);
+document.addEventListener("pointercancel", dragEnd);
+document.addEventListener("touchmove", (e) => drag && e.preventDefault(), { passive: false }); // 끄는 동안 화면 스크롤 막기
+document.addEventListener("click", (e) => { if (dragSuppressClick) { e.stopPropagation(); e.preventDefault(); } }, true);
+// 주간: 손잡이 잡으면 바로 시작
+$("#days").addEventListener("pointerdown", (e) => {
+  const g = e.target.closest(".grip"); if (!g) return;
+  e.preventDefault(); g.releasePointerCapture?.(e.pointerId);
+  dragStart(e, taskOf(g), g.closest(".row"));
+});
+// 월간: 마우스는 5px 움직이면, 터치는 0.35초 꾹 누르면 시작
+function pillDown(e) {
+  const pill = e.target.closest(".pill"); if (!pill) return;
+  const t = calTasks.find((x) => x.id == pill.dataset.id); if (!t) return;
+  const x0 = e.clientX, y0 = e.clientY;
+  let timer = e.pointerType === "mouse" ? null : setTimeout(() => { cleanup(); dragStart(e, t, pill); }, 350);
+  const mv = (ev) => {
+    const d = Math.hypot(ev.clientX - x0, ev.clientY - y0);
+    if (e.pointerType === "mouse" && d > 5) { cleanup(); dragStart(ev, t, pill); }
+    else if (timer && d > 8) cleanup(); // 터치로 스크롤하는 중
+  };
+  const cleanup = () => { clearTimeout(timer); timer = null; removeEventListener("pointermove", mv); removeEventListener("pointerup", cleanup); removeEventListener("pointercancel", cleanup); };
+  addEventListener("pointermove", mv); addEventListener("pointerup", cleanup); addEventListener("pointercancel", cleanup);
+}
+$("#monthView").addEventListener("pointerdown", pillDown);
+$("#weekCal").addEventListener("pointerdown", pillDown);
+$("#monthView").addEventListener("contextmenu", (e) => e.target.closest(".pill") && e.preventDefault());
+$("#weekCal").addEventListener("contextmenu", (e) => e.target.closest(".pill") && e.preventDefault());
 
 // ── 상세 시트: 데드라인 설정·재설정·알람 ──
 function openSheet(t, focusDl) {
@@ -533,6 +704,11 @@ function openSheet(t, focusDl) {
   $("#sDlLabel").textContent = t.deadline ? "데드라인 재설정" : "데드라인 (아직 없음 — 시간을 고르면 설정돼요)";
   $("#sRemind").value = t.remind_min ?? "";
   $("#sNote").value = t.note;
+  $("#sEst").value = t.estimate_min ?? "";
+  document.querySelectorAll("#sMarks button").forEach((b) => b.classList.toggle("on", !!t[b.dataset.mk]));
+  $("#sSpent").textContent = hms(elapsed(t), true);
+  $("#sTimer").textContent = t.started_at ? "⏸ 정지" : "▶ 시작";
+  $("#sSpentEdit").value = "";
   $("#sLog").innerHTML = (t.deadline_log || []).slice().reverse().map((l) =>
     `<li>${fmtDl(l.from)} → ${l.to ? fmtDl(l.to) : "없음"} <span style="opacity:.7">(${fmtDl(l.at)} 변경)</span></li>`).join("");
   $("#sheet").showModal();
@@ -546,6 +722,14 @@ async function sheetSave(patch) {
 $("#sTitle").onchange = () => sheetSave({ title: $("#sTitle").value.trim() });
 $("#sDone").onchange = () => sheetSave({ done: $("#sDone").checked }).then(bumpStats);
 $("#sNote").onchange = () => sheetSave({ note: $("#sNote").value });
+$("#sEst").onchange = () => sheetSave({ estimate_min: +$("#sEst").value > 0 ? Math.round(+$("#sEst").value) : null });
+$("#sEstQ").onclick = (e) => { if (e.target.dataset.m === undefined) return; $("#sEst").value = e.target.dataset.m; $("#sEst").onchange(); };
+$("#sTimer").onclick = () => toggleTimer(cur());
+$("#sMarks").onclick = (e) => { const k = e.target.dataset.mk; if (k) sheetSave({ [k]: !cur()[k] }); };
+$("#sSpentEdit").onchange = () => { // 타이머 깜빡했을 때 직접 고치기 (도는 중이면 멈춤)
+  const m = +$("#sSpentEdit").value; if (!(m >= 0)) return;
+  sheetSave({ spent_sec: Math.round(m * 60), started_at: null });
+};
 $("#sRemind").onchange = () => sheetSave({ remind_min: $("#sRemind").value === "" ? null : +$("#sRemind").value });
 $("#sDl").onchange = () => sheetSave({ deadline: $("#sDl").value ? new Date($("#sDl").value).toISOString() : null });
 $("#sDay").onchange = async () => {
