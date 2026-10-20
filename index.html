@@ -73,6 +73,24 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
 .quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mgrid .pill.hot { background: color-mix(in srgb, #ff4d4f 30%, transparent); color: #ff6b6b; font-weight: 700; }
+/* 📨 업무 배정 */
+#assignbox { display: none; border: 1px solid color-mix(in srgb, #2383e2 50%, var(--line)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
+body.is-admin #assignbox { display: block; }
+#assignbox summary { cursor: pointer; font-weight: 600; } #assignbox summary small { color: var(--sub); font-weight: 400; }
+#asgText { width: 100%; margin-top: 8px; padding: 9px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); resize: vertical; }
+.asgbar { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; } .asgbar small { color: var(--sub); }
+.acard { display: grid; grid-template-columns: 120px minmax(0, 1fr) 140px 100px 28px; gap: 6px; margin-top: 8px; align-items: center; }
+.acard select, .acard input { width: 100%; padding: 6px 8px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+.acard select.bad { border-color: var(--red); }
+#asgList { margin-top: 12px; font-size: 14px; }
+#asgList h4 { margin: 0 0 4px; font-size: 13px; color: var(--sub); }
+.aitem { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-top: 1px solid var(--line); }
+.aitem .who { font-weight: 600; white-space: nowrap; } .aitem .t { flex: 1; min-width: 0; }
+.aitem.ok .t { color: var(--sub); text-decoration: line-through; } .aitem .why { display: block; color: #e9a23b; font-size: 12px; }
+.aitem button { color: var(--sub); font-size: 12px; }
+.mk.asg { color: #fff; background: #2383e2; border-color: #2383e2; }
+.asgnote { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #2383e2 15%, transparent); font-size: 13px; line-height: 1.6; }
+@media (max-width: 860px) { .acard { grid-template-columns: 1fr 1fr 28px; } .acard .ti { grid-column: 1 / 4; grid-row: 1; } }
 /* 🧠 오늘 브리핑 */
 #briefbox { margin-bottom: 12px; }
 #briefBtn { background: linear-gradient(90deg, #6b4fd1, #8b6fd6); }
@@ -273,6 +291,12 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <span class="range" id="wkRange"></span>
       </div>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
+      <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
+        <textarea id="asgText" rows="2" placeholder="예) 김예원 매니저님 금요일 6시까지 환불 리스트 정리해 주세요"></textarea>
+        <div class="asgbar"><button id="asgParse" class="btn">AI로 정리하기</button><small>정리된 카드를 확인하고 [보내기]를 눌러야 들어가요</small></div>
+        <div id="asgCards"></div>
+        <div id="asgList"></div>
+      </details>
       <section id="briefbox"><button id="briefBtn" class="btn">🧠 오늘 브리핑 받기 <small>(하루 1회)</small></button><div id="briefText" class="hidden"></div></section>
       <details id="mustbox" open class="hidden"><summary>🔥 꼭 끝낼 일 <span id="mustCount"></span></summary><div id="mustList"></div></details>
       <details id="duebox" open><summary>⏰ 데드라인 <span id="dueCount"></span></summary><div id="dueList"></div></details>
@@ -285,6 +309,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 
 <dialog id="sheet">
   <input class="ttl" id="sTitle" placeholder="할 일">
+  <div id="sAsg" class="asgnote hidden"></div>
   <label><input type="checkbox" id="sDone"> 완료</label>
   <label>표시</label>
   <div class="quick" id="sMarks"><button data-mk="must_do">🔥 그날 꼭 끝내기</button><button data-mk="important">⭐ 중요</button></div>
@@ -354,6 +379,22 @@ const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDat
 function fmtDl(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}(${KDAY[d.getDay()]}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
 const toLocalInput = (iso) => { const d = new Date(iso); return `${W.ymd(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
+// ── 이름·역할 (대표만 업무 배정) ──
+let myRole = "manager";
+async function loadProfile() {
+  let { data } = await sb.from("profiles").select("name, role").eq("user_id", me.id).maybeSingle();
+  while (!data) {
+    const name = (prompt("처음 오셨네요! 이름을 적어 주세요 (대표님이 업무를 배정할 때 이 이름으로 찾아요)\n예) 김예원") || "").trim();
+    if (!name) continue;
+    const r = await sb.from("profiles").insert({ name }).select("name, role").single();
+    if (!fail(r.error)) data = r.data;
+  }
+  myRole = data.role; $("#me").textContent = `${data.name} · ${me.email}`;
+  document.body.classList.toggle("is-admin", myRole === "admin");
+  if (myRole === "admin") loadAssigned();
+}
+const assignedToMe = (t) => t.assigned_by && t.assigned_by !== me.id;
+
 // ── 로그인 ──
 async function boot() {
   const { data: { session } } = await sb.auth.getSession();
@@ -363,6 +404,7 @@ async function boot() {
   if (!me) return;
   $("#me").textContent = me.email;
   applyPrefs();
+  await loadProfile();
   await loadAll(true);
   listen();
   pushButton();
@@ -390,11 +432,11 @@ async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
   const [t, d, s, m] = await Promise.all([
-    sb.from("tasks").select("*").gte("day", monday).lte("day", sun).order("sort").order("id"),
-    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("done", false).not("deadline", "is", null)
+    sb.from("tasks").select("*").eq("user_id", me.id).gte("day", monday).lte("day", sun).order("sort").order("id"),
+    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", me.id).eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
     sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
-    sb.from("tasks").select("id, day, title").eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
+    sb.from("tasks").select("id, day, title").eq("user_id", me.id).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
   ]);
   if (fail(t.error || d.error || s.error || m.error)) return;
   tasks = t.data; dues = d.data; musts = m.data;
@@ -405,6 +447,57 @@ async function loadAll(scrollToday) {
   await loadCal();
   if (scrollToday) document.getElementById("d-" + today())?.scrollIntoView({ block: "start" });
 }
+// ── 📨 업무 배정 (대표) ──
+let asgDraft = [], managers = [];
+async function loadAssigned() {
+  const [m, a] = await Promise.all([sb.rpc("manager_list"), sb.from("tasks").select("id, user_id, day, title, done, deadline, assign_log")
+    .eq("assigned_by", me.id).gte("day", W.add(today(), -14)).order("done").order("day").limit(60)]);
+  if (fail(m.error || a.error)) return;
+  managers = m.data;
+  const nameOf = (id) => managers.find((x) => x.user_id === id)?.name ?? "?";
+  $("#asgList").innerHTML = a.data.length ? `<h4>배정한 일 (최근 2주 · ${a.data.filter((t) => t.done).length}/${a.data.length} 완료)</h4>` + a.data.map((t) =>
+    `<div class="aitem ${t.done ? "ok" : ""}"><span>${t.done ? "✅" : "⬜"}</span><span class="who">${esc(nameOf(t.user_id))}</span>
+     <span class="t">${md(t.day)} ${esc(t.title)}${t.deadline ? ` · ${fmtDl(t.deadline)}까지` : ""}${(t.assign_log || []).map((l) => `<span class="why">↻ ${md(l.from)}→${md(l.to)} ${esc(l.reason)}</span>`).join("")}</span>
+     <button data-cancel="${t.id}" title="배정 취소">취소</button></div>`).join("") : "";
+}
+function renderDraft() {
+  $("#asgCards").innerHTML = asgDraft.map((d, i) => `<div class="acard" data-i="${i}">
+    <select data-f="manager_id" class="${d.manager_id ? "" : "bad"}"><option value="">매니저 선택</option>${managers.map((m) => `<option value="${m.user_id}" ${m.user_id === d.manager_id ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>
+    <input class="ti" data-f="title" value="${esc(d.title)}">
+    <input type="date" data-f="day" value="${d.day}"><input type="time" data-f="deadline_time" value="${d.deadline_time}" title="마감 시각(선택)">
+    <button data-del="${i}" title="빼기">✕</button></div>`).join("")
+    + (asgDraft.length ? `<div class="asgbar"><button id="asgSend" class="btn">📨 ${asgDraft.length}건 보내기</button></div>` : "");
+}
+$("#asgParse").onclick = async () => {
+  const text = $("#asgText").value.trim(); if (!text) return;
+  const b = $("#asgParse"); b.disabled = true; b.textContent = "정리하는 중…";
+  const { data, error } = await sb.functions.invoke("planner-assign", { body: { text } });
+  b.disabled = false; b.textContent = "AI로 정리하기";
+  if (error) { let m = "정리하지 못했어요"; try { m = (await error.context.json()).error || m; } catch {} return toast(m); }
+  managers = data.managers.map((m) => ({ user_id: m.id, name: m.name }));
+  asgDraft = data.items; renderDraft();
+};
+$("#asgCards").addEventListener("input", (e) => {
+  const c = e.target.closest(".acard"), f = e.target.dataset.f; if (!c || !f) return;
+  asgDraft[c.dataset.i][f] = e.target.value; if (f === "manager_id") e.target.classList.toggle("bad", !e.target.value);
+});
+$("#asgCards").addEventListener("click", async (e) => {
+  if (e.target.dataset.del !== undefined) { asgDraft.splice(+e.target.dataset.del, 1); return renderDraft(); }
+  if (e.target.id !== "asgSend") return;
+  if (asgDraft.some((d) => !d.manager_id || !d.title.trim() || !d.day)) return toast("매니저·제목·날짜를 모두 채워 주세요");
+  const rows = asgDraft.map((d) => ({ user_id: d.manager_id, assigned_by: me.id, title: d.title.trim(), day: d.day,
+    deadline: d.deadline_time ? new Date(`${d.day}T${d.deadline_time}`).toISOString() : null }));
+  const { error } = await sb.from("tasks").insert(rows);
+  if (fail(error)) return;
+  toast(`📨 ${rows.length}건 보냈어요. 매니저 폰으로 알림이 가요`);
+  asgDraft = []; $("#asgText").value = ""; renderDraft(); loadAssigned();
+});
+$("#asgList").addEventListener("click", async (e) => {
+  const id = e.target.dataset.cancel; if (!id || !confirm("이 배정을 취소할까요? 매니저 플래너에서도 지워져요")) return;
+  const { error } = await sb.from("tasks").delete().eq("id", id);
+  if (!fail(error)) loadAssigned();
+});
+
 // ── 🧠 오늘 브리핑 (하루 1회, 서버 함수 planner-brief → Claude Haiku) ──
 function showBrief(b) {
   const html = esc(b.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
@@ -433,7 +526,7 @@ $("#briefBtn").onclick = async () => {
 
 async function loadCal() {
   const d1 = `${cal.y}-${String(cal.m).padStart(2, "0")}-01`, a = W.add(d1, -7), b = W.add(d1, 43); // 월·일요일 시작 칸 둘 다 덮음
-  const { data, error } = await sb.from("tasks").select("*")
+  const { data, error } = await sb.from("tasks").select("*").eq("user_id", me.id)
     .or(`and(day.gte.${a},day.lte.${b}),and(deadline.gte."${W.parse(a).toISOString()}",deadline.lt."${W.parse(b).toISOString()}")`)
     .order("sort").order("id").limit(2000);
   if (fail(error)) return;
@@ -449,6 +542,8 @@ function softReload() {
 }
 function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
+  if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
+    sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => loadAssigned()).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신
 }
@@ -628,7 +723,7 @@ async function toggleTimer(t) {
   if ($("#sheet").open && openId === t.id) openSheet(cur());
 }
 function marks(t) {
-  let h = "";
+  let h = assignedToMe(t) ? `<span class="mk asg" data-act="open" title="대표님이 배정한 일">📨 배정${t.assign_log?.length ? ` ↻${t.assign_log.length}` : ""}</span>` : "";
   if (t.must_do) h += `<span class="mk must ${!t.done && t.day < today() ? "late" : ""}" data-act="open" title="그날 꼭 끝내기">🔥 ${t.day === today() ? "오늘 꼭" : !t.done && t.day < today() ? "못 끝냄" : "꼭"}</span>`;
   return h;
 }
@@ -636,7 +731,7 @@ function rowHtml(t) {
   return `<div class="row ${t.done ? "done" : ""} ${t.important || t.must_do ? "hot" : ""}" data-id="${t.id}">
     <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
-    <textarea rows="1" placeholder="할 일 입력">${esc(t.title)}</textarea>
+    <textarea rows="1" placeholder="할 일 입력" ${assignedToMe(t) ? "readonly" : ""}>${esc(t.title)}</textarea>
     <div class="meta">${marks(t)}${quickBtns(t)}${timeBtn(t)}${chip(t)}</div>
     <button class="star ${t.important ? "on" : ""}" data-act="star" aria-label="${t.important ? "중요 끄기" : "중요 표시"}" title="중요">${t.important ? "★" : "☆"}</button>
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
@@ -797,6 +892,7 @@ async function dragEnd() {
     if (sort !== t.sort) patch.sort = sort;
   }
   if (!Object.keys(patch).length) return;
+  if (patch.day && assignedToMe(t)) { if (!(await moveAssigned(t, patch.day))) return; delete patch.day; if (!patch.sort) return; }
   if (await save(t.id, patch)) { await loadAll(); bumpStats(); if (patch.day) toast(`${md(day)}(${KDAY[W.parse(day).getDay()]})로 옮겼어요`); }
 }
 document.addEventListener("pointermove", dragMove);
@@ -845,8 +941,14 @@ function openSheet(t, focusDl) {
   $("#sSpentEdit").value = "";
   $("#sLog").innerHTML = (t.deadline_log || []).slice().reverse().map((l) =>
     `<li>${fmtDl(l.from)} → ${l.to ? fmtDl(l.to) : "없음"} <span style="opacity:.7">(${fmtDl(l.at)} 변경)</span></li>`).join("");
+  const locked = assignedToMe(t);
+  for (const id of ["#sTitle", "#sDl", "#sNote"]) $(id).disabled = locked;
+  $("#sQuick").classList.toggle("hidden", locked); $("#sDel").classList.toggle("hidden", locked);
+  $("#sAsg").classList.toggle("hidden", !locked);
+  $("#sAsg").innerHTML = locked ? `📨 대표님이 배정한 일이에요. 완료 체크만 할 수 있고, 날짜는 사유를 적어야 바꿀 수 있어요.`
+    + (t.assign_log || []).map((l) => `<br>↻ ${md(l.from)} → ${md(l.to)} : ${esc(l.reason)}`).join("") : "";
   $("#sheet").showModal();
-  if (focusDl) $("#sDl").focus();
+  if (focusDl && !locked) $("#sDl").focus();
 }
 const cur = () => tasks.find((t) => t.id === openId) ?? calTasks.find((t) => t.id === openId) ?? dues.find((t) => t.id === openId);
 async function sheetSave(patch) {
@@ -867,8 +969,20 @@ $("#sSpentEdit").onchange = () => { // 타이머 깜빡했을 때 직접 고치�
 };
 $("#sRemind").onchange = () => sheetSave({ remind_min: $("#sRemind").value === "" ? null : +$("#sRemind").value });
 $("#sDl").onchange = () => sheetSave({ deadline: $("#sDl").value ? new Date($("#sDl").value).toISOString() : null });
+async function moveAssigned(t, day) {
+  const reason = (prompt(`📨 대표님이 배정한 일이에요.\n${md(t.day)} → ${md(day)}로 옮기는 사유를 적어 주세요`) || "").trim();
+  if (reason.length < 2) { toast("사유가 있어야 날짜를 바꿀 수 있어요"); return false; }
+  const { error } = await sb.rpc("move_assigned", { p_id: t.id, p_day: day, p_reason: reason });
+  if (fail(error)) return false;
+  toast(`${md(day)}로 옮기고 사유를 남겼어요`); return true;
+}
 $("#sDay").onchange = async () => {
   if (!$("#sDay").value) return;
+  const t = cur();
+  if (assignedToMe(t)) {
+    if (await moveAssigned(t, $("#sDay").value)) { $("#sheet").close(); loadAll(); bumpStats(); } else $("#sDay").value = t.day;
+    return;
+  }
   const d = await save(openId, { day: $("#sDay").value });
   if (d) { $("#sheet").close(); loadAll(); bumpStats(); toast(`${md(d.day)}로 옮겼어요`); }
 };
