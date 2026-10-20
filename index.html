@@ -91,7 +91,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .day.sat h3 > span:first-child { color: var(--blue); } .day.sun h3 > span:first-child { color: var(--red); }
 .day.today h3 .pill { background: var(--accent); color: #fff; }
 .rows { border-top: 1px solid var(--line); }
-.row { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto 28px; align-items: start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto 28px 28px; align-items: start; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .grip { cursor: grab; color: var(--sub); opacity: .3; font-size: 15px; line-height: 24px; text-align: center; touch-action: none; user-select: none; -webkit-user-select: none; }
 .row:hover .grip { opacity: 1; }
 .meta { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
@@ -112,6 +112,10 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .row input[type=checkbox] { width: 18px; height: 18px; margin: 3px 0 0 2px; accent-color: var(--blue); cursor: pointer; }
 .row textarea { width: 100%; resize: none; border: 0; background: transparent; padding: 0; line-height: 1.5; overflow: hidden; outline: none; min-height: 22px; }
 .row.done textarea { color: var(--sub); }
+.row .star { font-size: 17px; line-height: 22px; border-radius: 4px; color: var(--sub); opacity: .35; }
+.row .star:hover { background: var(--line); opacity: 1; }
+.row:hover .star { opacity: .8; }
+.row .star.on { opacity: 1; color: #ff4d4f; }
 .row .more { color: var(--sub); font-size: 18px; line-height: 22px; border-radius: 4px; }
 .row .more:hover { background: var(--line); }
 .chip { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--sub); }
@@ -182,9 +186,10 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   aside { position: fixed; inset: 106px 0 0 0; height: auto; z-index: 6; background: var(--bg); border: 0; }
   main { padding: 14px 16px 120px; }
   .weekhead h1 { font-size: 24px; }
-  .row { grid-template-columns: 18px 24px minmax(0, 1fr) 28px; }
+  .row { grid-template-columns: 18px 24px minmax(0, 1fr) 28px 28px; }
   .row .meta { grid-column: 3; grid-row: 2; justify-content: flex-start; }
-  .row .more { grid-column: 4; grid-row: 1; }
+  .row .star { grid-column: 4; grid-row: 1; opacity: .55; }
+  .row .more { grid-column: 5; grid-row: 1; }
   .grip { opacity: .6; font-size: 17px; }
   .row:not(:hover) .tm.none { opacity: .55; }
   .row .chip.none { display: none; }
@@ -499,7 +504,6 @@ async function toggleTimer(t) {
 function marks(t) {
   let h = "";
   if (t.must_do) h += `<span class="mk must ${!t.done && t.day < today() ? "late" : ""}" data-act="open" title="그날 꼭 끝내기">🔥 ${t.day === today() ? "오늘 꼭" : !t.done && t.day < today() ? "못 끝냄" : "꼭"}</span>`;
-  if (t.important) h += `<span class="mk imp" data-act="open" title="중요">⭐ 중요</span>`;
   return h;
 }
 function rowHtml(t) {
@@ -508,6 +512,7 @@ function rowHtml(t) {
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
     <textarea rows="1" placeholder="할 일 입력">${esc(t.title)}</textarea>
     <div class="meta">${marks(t)}${timeBtn(t)}${chip(t)}</div>
+    <button class="star ${t.important ? "on" : ""}" data-act="star" aria-label="${t.important ? "중요 끄기" : "중요 표시"}" title="중요">${t.important ? "★" : "☆"}</button>
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
 }
 // 요일 옆 완료율 (주 목록 막대와 같은 모양)
@@ -577,6 +582,7 @@ $("#days").addEventListener("click", async (e) => {
   }
   if (act === "open" || act === "dl") openSheet(taskOf(e.target), act === "dl");
   if (act === "timer") toggleTimer(taskOf(e.target));
+  if (act === "star") { const t = taskOf(e.target); if (await save(t.id, { important: !t.important })) renderWeek(); }
 });
 $("#days").addEventListener("change", async (e) => {
   if (e.target.type !== "checkbox") return;
