@@ -44,7 +44,7 @@ header .btn { padding: 6px 10px; font-size: 14px; white-space: nowrap; }
 #me { color: var(--sub); font-size: 13px; }
 
 .layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; }
-aside { border-right: 1px solid var(--line); padding: 16px 12px; height: calc(100vh - 53px); position: sticky; top: 53px; overflow: auto; }
+aside { border-right: 1px solid var(--line); padding: 16px 12px; height: calc(100vh - 106px); position: sticky; top: 106px; overflow: auto; }
 aside .yr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
 aside .yr button { padding: 2px 8px; color: var(--sub); }
 .wk { display: block; width: 100%; text-align: left; padding: 6px 8px; border-radius: 6px; }
@@ -70,7 +70,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 #duebox .dl-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 요일 칸 (노션 MON~SUN) */
-.day { margin-bottom: 26px; scroll-margin-top: 64px; }
+.day { margin-bottom: 26px; scroll-margin-top: 112px; }
 .day h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 20px; letter-spacing: .02em; }
 .day h3 .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--hover); color: var(--text); font-weight: 600; }
 .day h3 small { color: var(--sub); font-size: 13px; font-weight: 400; }
@@ -94,6 +94,38 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .add { color: var(--sub); padding: 6px 8px; width: 100%; text-align: left; border-radius: 6px; }
 .add:hover { background: var(--hover); }
 
+/* 월 달력 */
+/* 주간 | 월간 전환 탭 */
+.seg { position: sticky; top: 53px; z-index: 4; display: flex; justify-content: center; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
+.seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+/* 월간 보기 (애플 캘린더 모양) */
+body.mv .layout { display: none; }
+body:not(.mv) .mview { display: none; }
+.mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
+.mh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mh h1 { margin: 0; font-size: 36px; font-weight: 800; letter-spacing: -.02em; }
+.mh .navs { display: flex; gap: 8px; }
+.mh .navs button { min-width: 36px; height: 36px; padding: 0 14px; border-radius: 99px; background: var(--hover); font-size: 15px; }
+.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.mgrid .dow { text-align: center; font-size: 16px; color: var(--sub); padding: 6px 0 10px; border-bottom: 1px solid var(--line); }
+.mgrid .dc { min-height: max(120px, calc((100vh - 190px) / 6)); border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 4px 4px; min-width: 0; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+.mgrid .dc:nth-child(7n) { border-right: 0; }
+.mgrid .dc:hover { background: color-mix(in srgb, var(--hover) 60%, transparent); }
+.mgrid .dc.wkend { background: color-mix(in srgb, var(--panel) 70%, transparent); }
+.mgrid .dn { text-align: right; font-size: 20px; font-weight: 600; padding: 0 4px 2px; }
+.mgrid .dc.out .dn { color: var(--sub); opacity: .7; }
+.mgrid .dn b { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #ff3b30; color: #fff; }
+.mgrid .pill { display: block; width: 100%; text-align: left; font-size: 13px; line-height: 1.35; padding: 2px 6px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: color-mix(in srgb, #8b6fd6 38%, transparent); color: color-mix(in srgb, #c9b8ff 80%, var(--text)); }
+.mgrid .pill.dl { background: color-mix(in srgb, #ff453a 32%, transparent); color: #ff8a80; }
+.mgrid .pill.dl.soon { background: color-mix(in srgb, #ff9f0a 32%, transparent); color: #ffc46b; }
+.mgrid .pill.x { background: color-mix(in srgb, var(--sub) 18%, transparent); color: var(--sub); text-decoration: line-through; }
+.mgrid .more { font-size: 12px; color: var(--sub); padding-left: 6px; }
+@media (prefers-color-scheme: light) {
+  .mgrid .pill { color: #4b2fa8; } .mgrid .pill.dl { color: #c4281c; } .mgrid .pill.dl.soon { color: #a35a00; }
+}
 .review textarea { width: 100%; min-height: 90px; padding: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
 
 /* 상세 시트 */
@@ -112,7 +144,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 /* 폰 */
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
-  aside { position: fixed; inset: 53px 0 0 0; height: auto; z-index: 6; background: var(--bg); border: 0; }
+  aside { position: fixed; inset: 106px 0 0 0; height: auto; z-index: 6; background: var(--bg); border: 0; }
   main { padding: 14px 16px 120px; }
   .weekhead h1 { font-size: 24px; }
   .row { grid-template-columns: 30px minmax(0, 1fr) 28px; }
@@ -120,6 +152,14 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   .row .more { grid-column: 3; grid-row: 1; }
   .row .chip.none { display: none; }
   #me { display: none; }
+  .mview { padding: 10px 8px 80px; }
+  .mview .mh h1 { font-size: 24px; }
+  .mgrid .dc { min-height: 92px; padding: 3px 2px; }
+  .mgrid .dn { font-size: 13px; }
+  .mgrid .dn b { width: 24px; height: 24px; }
+  .mgrid .il { display: none; }
+  .mgrid .pill { font-size: 10.5px; padding: 1px 3px; }
+  .mgrid .dow { font-size: 13px; }
   header { gap: 6px; }
   header .logo { font-size: 0; }
   header .btn { padding: 6px 9px; font-size: 13px; }
@@ -150,8 +190,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button></div></nav>
   <div class="layout">
-    <aside id="weeks" class="hidden-m"></aside>
+    <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
       <div class="weekhead">
         <button class="nav" id="prevW" aria-label="지난주">‹</button>
@@ -168,6 +209,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
       </section>
     </main>
   </div>
+  <section class="mview" id="monthView"></section>
 </div>
 
 <dialog id="sheet">
@@ -219,6 +261,7 @@ const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
 let tasks = [], dues = [], openId = null, dirty = false;
+let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
 function fail(error) { if (error) { console.error(error); toast("저장 실패: " + (error.message || error)); return true; } }
@@ -271,7 +314,19 @@ async function loadAll(scrollToday) {
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
   if (document.activeElement !== $("#review")) $("#review").value = r.data?.review ?? "";
+  const thu = W.parse(W.add(monday, 3)); // 주가 걸친 달은 목요일 기준
+  if (!cal || cal.wk !== monday) cal = { y: thu.getFullYear(), m: thu.getMonth() + 1, wk: monday };
+  await loadCal();
   if (scrollToday) document.getElementById("d-" + today())?.scrollIntoView({ block: "start" });
+}
+async function loadCal() {
+  const d1 = `${cal.y}-${String(cal.m).padStart(2, "0")}-01`, a = W.add(d1, -7), b = W.add(d1, 43); // 월·일요일 시작 칸 둘 다 덮음
+  const { data, error } = await sb.from("tasks").select("*")
+    .or(`and(day.gte.${a},day.lte.${b}),and(deadline.gte."${W.parse(a).toISOString()}",deadline.lt."${W.parse(b).toISOString()}")`)
+    .order("sort").order("id").limit(2000);
+  if (fail(error)) return;
+  calTasks = data;
+  renderCal();
 }
 
 // 다른 기기에서 바꾸면 바로 반영 (입력 중이면 끝난 뒤)
@@ -289,15 +344,70 @@ function listen() {
 // ── 화면 ──
 function renderWeeks(stats) {
   const cur = W.isoWeek(today());
-  $("#weeks").innerHTML = `<div class="yr"><button id="py">‹</button>${year}<button id="ny">›</button></div>` +
+  $("#weekList").innerHTML = `<div class="yr"><button id="py">‹</button>${year}<button id="ny">›</button></div>` +
     W.weeksOf(year).map((m) => {
       const s = stats[m], pct = s?.total ? Math.round((s.done / s.total) * 100) : 0, w = W.isoWeek(m).week;
       const now = cur.year === year && cur.week === w ? " ●" : "";
       return `<button class="wk ${m === monday ? "on" : ""}" data-m="${m}"><b>Week ${String(w).padStart(2, "0")}${now}</b><small>${md(m)}–${md(W.add(m, 6))}${s?.total ? ` · ${pct}%` : ""}</small><div class="bar"><i style="width:${pct}%"></i></div></button>`;
     }).join("");
-  $("#weeks").querySelector(".on")?.scrollIntoView({ block: "nearest" });
+  $("#weekList").querySelector(".on")?.scrollIntoView({ block: "nearest" });
 }
-$("#weeks").onclick = (e) => {
+
+// 월간 달력용으로 날짜별 할 일·데드라인 모으기
+function renderCal() {
+  const byDay = {}, dlByDay = {};
+  for (const t of calTasks) {
+    (byDay[t.day] ??= []).push(t);
+    if (t.deadline && !t.done) (dlByDay[W.ymd(new Date(t.deadline))] ??= []).push(t);
+  }
+  const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  renderMonth(byDay, dlByDay, hm);
+}
+
+// 월간 보기: 일요일 시작, 칸마다 알약(할 일 보라 / ⏰데드라인 빨강·주황 / 완료 회색). 알약 = 상세, 빈 곳 = 그날 새 할 일
+function renderMonth(byDay, dlByDay, hm) {
+  const g = W.monthGrid(cal.y, cal.m, true), max = matchMedia("(max-width: 860px)").matches ? 3 : 4;
+  const cells = g.map((day) => {
+    const d = W.parse(day), out = d.getMonth() + 1 !== cal.m;
+    const dls = (dlByDay[day] ?? []).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    const list = (byDay[day] ?? []).filter((t) => t.title).sort((a, b) => a.done - b.done);
+    const pills = [
+      ...dls.map((t) => `<button class="pill dl ${W.due(t.deadline).cls}" data-id="${t.id}">⏰${hm(t.deadline)} ${esc(t.title) || "(제목 없음)"}</button>`),
+      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""}" data-id="${t.id}">${esc(t.title)}</button>`),
+    ];
+    const il = `<span class="il">일</span>`; // 폰에선 숫자만 (아이폰 캘린더처럼)
+    const num = day === today() ? `<b>${d.getDate()}</b>${il}` : d.getDate() === 1 ? `<span class="il">${d.getMonth() + 1}월 </span>1${il}` : `${d.getDate()}${il}`;
+    return `<div class="dc ${out ? "out" : ""} ${d.getDay() % 6 === 0 ? "wkend" : ""}" data-day="${day}"><div class="dn">${num}</div>
+      ${pills.slice(0, max).join("")}${pills.length > max ? `<div class="more">+${pills.length - max}개 더</div>` : ""}</div>`;
+  }).join("");
+  $("#monthView").innerHTML = `<div class="mh"><h1>${cal.y}년 ${cal.m}월</h1><div class="navs"><button data-cal="-1" aria-label="이전 달">‹</button><button data-cal="0">오늘</button><button data-cal="1" aria-label="다음 달">›</button></div></div>
+    <div class="mgrid">${["일", "월", "화", "수", "목", "금", "토"].map((x) => `<div class="dow">${x}</div>`).join("")}${cells}</div>`;
+}
+$("#monthView").onclick = async (e) => {
+  const nav = e.target.closest("[data-cal]");
+  if (nav) {
+    if (nav.dataset.cal === "0") { const t = W.parse(today()); cal = { ...cal, y: t.getFullYear(), m: t.getMonth() + 1 }; }
+    else { const m = cal.m + +nav.dataset.cal; cal = { ...cal, y: cal.y + Math.floor((m - 1) / 12), m: ((m + 11) % 12) + 1 }; }
+    return loadCal();
+  }
+  const pill = e.target.closest(".pill");
+  if (pill) return openSheet(calTasks.find((t) => t.id == pill.dataset.id));
+  const c = e.target.closest(".dc"); if (!c) return;
+  const { data, error } = await sb.from("tasks").insert({ day: c.dataset.day }).select().single();
+  if (fail(error)) return;
+  calTasks.push(data); openSheet(data); $("#sTitle").focus();
+};
+let view = "week";
+try { view = localStorage.getItem("planner-view") || "week"; } catch {}
+function setView(v) {
+  view = v; document.body.classList.toggle("mv", v === "month");
+  document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+  try { localStorage.setItem("planner-view", v); } catch {}
+  window.scrollTo(0, 0);
+}
+document.querySelector(".seg").onclick = (e) => e.target.dataset.v && setView(e.target.dataset.v);
+setView(view);
+$("#weekList").onclick = (e) => {
   if (e.target.id === "py" || e.target.id === "ny") { year += e.target.id === "py" ? -1 : 1; monday = W.weeksOf(year)[0]; return loadAll(); }
   const b = e.target.closest(".wk"); if (!b) return;
   monday = b.dataset.m; if (matchMedia("(max-width: 860px)").matches) $("#weeks").classList.add("hidden-m");
@@ -351,6 +461,8 @@ async function save(id, patch) {
   const { data, error } = await sb.from("tasks").update(patch).eq("id", id).select().single();
   if (fail(error)) return;
   Object.assign(tasks.find((t) => t.id === id) ?? {}, data);
+  Object.assign(calTasks.find((t) => t.id === id) ?? {}, data);
+  if (cal) renderCal();
   const di = dues.findIndex((t) => t.id === id);
   const inDue = !data.done && data.deadline && new Date(data.deadline) <= Date.now() + 7 * 86400000;
   if (di >= 0 && !inDue) dues.splice(di, 1);
@@ -406,8 +518,8 @@ $("#dueList").onclick = (e) => {
 function openSheet(t, focusDl) {
   openId = t.id;
   $("#sTitle").value = t.title; $("#sDone").checked = t.done; $("#sDay").value = t.day;
-  $("#sDl").value = t.deadline ? toLocalInput(t.deadline) : "";
-  $("#sDlLabel").textContent = t.deadline ? "데드라인 재설정" : "데드라인";
+  $("#sDl").value = toLocalInput(t.deadline ?? new Date()); // 없으면 연 시점부터 고르게
+  $("#sDlLabel").textContent = t.deadline ? "데드라인 재설정" : "데드라인 (아직 없음 — 시간을 고르면 설정돼요)";
   $("#sRemind").value = t.remind_min ?? "";
   $("#sNote").value = t.note;
   $("#sLog").innerHTML = (t.deadline_log || []).slice().reverse().map((l) =>
@@ -415,7 +527,7 @@ function openSheet(t, focusDl) {
   $("#sheet").showModal();
   if (focusDl) $("#sDl").focus();
 }
-const cur = () => tasks.find((t) => t.id === openId) ?? dues.find((t) => t.id === openId);
+const cur = () => tasks.find((t) => t.id === openId) ?? calTasks.find((t) => t.id === openId) ?? dues.find((t) => t.id === openId);
 async function sheetSave(patch) {
   const d = await save(openId, patch);
   if (d) { openSheet(d); renderWeek(); }
@@ -442,11 +554,19 @@ $("#sDel").onclick = async () => {
   if (!confirm("이 할 일을 삭제할까요?")) return;
   const { error } = await sb.from("tasks").delete().eq("id", openId);
   if (fail(error)) return;
-  tasks = tasks.filter((t) => t.id !== openId); dues = dues.filter((t) => t.id !== openId);
-  $("#sheet").close(); renderWeek(); bumpStats();
+  tasks = tasks.filter((t) => t.id !== openId); dues = dues.filter((t) => t.id !== openId); calTasks = calTasks.filter((t) => t.id !== openId);
+  $("#sheet").close(); renderWeek(); renderCal(); bumpStats();
 };
 $("#sClose").onclick = () => $("#sheet").close();
-$("#sheet").addEventListener("close", () => { openId = null; if (dirty) { dirty = false; softReload(); } });
+$("#sheet").addEventListener("close", async () => {
+  const t = cur(); openId = null;
+  if (t && !$("#sTitle").value.trim() && !t.deadline && !$("#sNote").value.trim()) { // 월간에서 만들고 제목 없이 닫으면 지움
+    await sb.from("tasks").delete().eq("id", t.id);
+    tasks = tasks.filter((x) => x !== t); calTasks = calTasks.filter((x) => x !== t);
+  }
+  renderWeek(); renderCal();
+  if (dirty) { dirty = false; softReload(); }
+});
 
 // ── 회고 ──
 $("#review").onchange = async () => {
@@ -457,7 +577,9 @@ $("#review").onchange = async () => {
 // ── 주 이동 ──
 $("#prevW").onclick = () => { monday = W.add(monday, -7); year = W.isoWeek(monday).year; loadAll(); };
 $("#nextW").onclick = () => { monday = W.add(monday, 7); year = W.isoWeek(monday).year; loadAll(); };
-$("#todayBtn").onclick = () => { monday = W.monday(today()); year = W.isoWeek(today()).year; loadAll(true); };
+$("#todayBtn").onclick = () => {
+  if (view === "month") { const t = W.parse(today()); cal = { ...cal, y: t.getFullYear(), m: t.getMonth() + 1 }; return loadCal(); }
+  monday = W.monday(today()); year = W.isoWeek(today()).year; loadAll(true); };
 $("#weeksBtn").onclick = () => { $("#weeks").classList.toggle("hidden-m"); $("#weeks .on")?.scrollIntoView({ block: "center" }); };
 const hideM = document.createElement("style"); hideM.textContent = "@media (max-width:860px){.hidden-m{display:none}}"; document.head.append(hideM);
 

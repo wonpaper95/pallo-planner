@@ -16,6 +16,12 @@ const W = {
     for (let m = W.monday(`${year}-01-04`); W.isoWeek(m).year === year; m = W.add(m, 7)) out.push(m);
     return out;
   },
+  // 달력 6주 칸. 기본 월요일 시작(노션 MON~SUN), sun=true 면 일요일 시작(애플 캘린더). m 은 1~12
+  monthGrid(y, m, sun = false) {
+    const d1 = `${y}-${String(m).padStart(2, "0")}-01`;
+    const first = sun ? W.add(d1, -W.parse(d1).getDay()) : W.monday(d1);
+    return Array.from({ length: 42 }, (_, i) => W.add(first, i));
+  },
   // 데드라인 상태: over(지남) / soon(24시간 안) / ok
   due(deadline, now = new Date()) {
     const ms = new Date(deadline) - now, h = Math.abs(ms) / 3600000;
