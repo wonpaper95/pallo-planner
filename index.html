@@ -74,6 +74,8 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .day h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 20px; letter-spacing: .02em; }
 .day h3 .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--hover); color: var(--text); font-weight: 600; }
 .day h3 small { color: var(--sub); font-size: 13px; font-weight: 400; }
+.day h3 .dbar { width: 90px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.day h3 .dbar i { display: block; height: 100%; background: var(--green); }
 .day.sat h3 > span:first-child { color: var(--blue); } .day.sun h3 > span:first-child { color: var(--red); }
 .day.today h3 .pill { background: var(--accent); color: #fff; }
 .rows { border-top: 1px solid var(--line); }
@@ -430,6 +432,12 @@ function rowHtml(t) {
     ${chip(t)}
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
 }
+// 요일 옆 완료율 (주 목록 막대와 같은 모양)
+function dayRate(list) {
+  if (!list.length) return "";
+  const done = list.filter((t) => t.done).length, pct = Math.round((done / list.length) * 100);
+  return `<span class="dbar"><i style="width:${pct}%"></i></span><small>${pct}% (${done}/${list.length})</small>`;
+}
 function renderWeek() {
   const wk = W.isoWeek(monday);
   $("#wkTitle").textContent = `Week ${String(wk.week).padStart(2, "0")}`;
@@ -441,7 +449,7 @@ function renderWeek() {
     const day = W.add(monday, i), list = tasks.filter((t) => t.day === day);
     const cls = ["day", i === 5 ? "sat" : i === 6 ? "sun" : "", day === today() ? "today" : ""].join(" ");
     return `<section class="${cls}" id="d-${day}" data-day="${day}">
-      <h3><span>${name}</span><span class="pill">${md(day)}</span>${list.length ? `<small>${list.filter((t) => t.done).length}/${list.length}</small>` : ""}</h3>
+      <h3><span>${name}</span><span class="pill">${md(day)}</span>${dayRate(list)}</h3>
       <div class="rows">${list.map(rowHtml).join("")}</div>
       <button class="add" data-act="add">+ 새로 만들기</button></section>`;
   }).join("");
