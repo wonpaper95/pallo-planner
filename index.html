@@ -73,6 +73,13 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
 .quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mgrid .pill.hot { background: color-mix(in srgb, #ff4d4f 30%, transparent); color: #ff6b6b; font-weight: 700; }
+/* 🧠 오늘 브리핑 */
+#briefbox { margin-bottom: 12px; }
+#briefBtn { background: linear-gradient(90deg, #6b4fd1, #8b6fd6); }
+#briefBtn small { opacity: .8; font-weight: 400; }
+#briefBtn:disabled { opacity: .6; }
+#briefText { margin-top: 10px; padding: 14px 16px; border-radius: 10px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); white-space: pre-wrap; line-height: 1.65; font-size: 14.5px; }
+#briefText .at { display: block; color: var(--sub); font-size: 12px; margin-top: 8px; }
 /* 데드라인 모아보기 */
 #mustbox, #duebox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
 #mustbox { border-color: #e5484d66; margin-bottom: 10px; }
@@ -101,7 +108,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
 body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm, body.off-dl .row .chip,
-body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
+body.off-brief #briefbox, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -266,6 +273,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <span class="range" id="wkRange"></span>
       </div>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
+      <section id="briefbox"><button id="briefBtn" class="btn">🧠 오늘 브리핑 받기 <small>(하루 1회)</small></button><div id="briefText" class="hidden"></div></section>
       <details id="mustbox" open class="hidden"><summary>🔥 꼭 끝낼 일 <span id="mustCount"></span></summary><div id="mustList"></div></details>
       <details id="duebox" open><summary>⏰ 데드라인 <span id="dueCount"></span></summary><div id="dueList"></div></details>
       <div id="days"></div>
@@ -358,6 +366,7 @@ async function boot() {
   await loadAll(true);
   listen();
   pushButton();
+  loadBrief();
 }
 $("#authForm").onsubmit = async (e) => {
   e.preventDefault();
@@ -396,6 +405,32 @@ async function loadAll(scrollToday) {
   await loadCal();
   if (scrollToday) document.getElementById("d-" + today())?.scrollIntoView({ block: "start" });
 }
+// ── 🧠 오늘 브리핑 (하루 1회, 서버 함수 planner-brief → Claude Haiku) ──
+function showBrief(b) {
+  const html = esc(b.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  const at = new Date(b.created_at);
+  $("#briefText").innerHTML = html + `<span class="at">${pad(at.getHours())}:${pad(at.getMinutes())}에 받은 오늘 브리핑 · 내일 다시 받을 수 있어요</span>`;
+  $("#briefText").classList.remove("hidden");
+  $("#briefBtn").innerHTML = "🧠 오늘 브리핑 접기";
+}
+async function loadBrief() {
+  const { data } = await sb.from("briefs").select("text, created_at").eq("day", today()).maybeSingle();
+  if (data) { showBrief(data); $("#briefText").classList.add("hidden"); $("#briefBtn").innerHTML = "🧠 오늘 브리핑 보기"; }
+}
+$("#briefBtn").onclick = async () => {
+  const box = $("#briefText"), btn = $("#briefBtn");
+  if (box.innerHTML && !box.classList.contains("hidden")) { box.classList.add("hidden"); btn.innerHTML = "🧠 오늘 브리핑 보기"; return; }
+  if (box.innerHTML) { box.classList.remove("hidden"); btn.innerHTML = "🧠 오늘 브리핑 접기"; return; }
+  btn.disabled = true; btn.innerHTML = "🧠 정리하는 중… (10~20초)";
+  const { data, error } = await sb.functions.invoke("planner-brief", { body: {} });
+  btn.disabled = false;
+  if (error) {
+    let m = "브리핑을 만들지 못했어요"; try { m = (await error.context.json()).error || m; } catch {}
+    btn.innerHTML = "🧠 오늘 브리핑 받기 <small>(하루 1회)</small>"; return toast(m);
+  }
+  showBrief(data);
+};
+
 async function loadCal() {
   const d1 = `${cal.y}-${String(cal.m).padStart(2, "0")}-01`, a = W.add(d1, -7), b = W.add(d1, 43); // 월·일요일 시작 칸 둘 다 덮음
   const { data, error } = await sb.from("tasks").select("*")
@@ -540,7 +575,7 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
+const FEATURES = [["brief", "🧠 오늘 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
 function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
