@@ -73,6 +73,46 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
 .quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mgrid .pill.hot { background: color-mix(in srgb, #ff4d4f 30%, transparent); color: #ff6b6b; font-weight: 700; }
+/* 📌 고정업무 */
+#routinebox { border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
+#routinebox summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+#routinebox summary #rtCount { color: var(--sub); font-weight: 400; font-size: 14px; margin-right: auto; }
+.adminonly { display: none; } body.is-admin .adminonly { display: inline-block; }
+#rtEdit { padding: 3px 10px; font-size: 13px; }
+.rtbar { height: 6px; margin: 8px 0 4px; } .rtbar i { background: var(--green); }
+.rt { display: flex; gap: 10px; align-items: flex-start; padding: 6px 6px; border-bottom: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.rt input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); flex: none; }
+.rt.done span { color: var(--sub); text-decoration: line-through; }
+.rt.red { background: color-mix(in srgb, #ff4d4f 13%, transparent); } .rt.green { background: color-mix(in srgb, var(--green) 13%, transparent); }
+.rt.yellow { background: color-mix(in srgb, #e9c23b 18%, transparent); font-weight: 600; }
+.rtdone { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--green) 22%, transparent); font-weight: 600; }
+#rtStatus table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+#rtStatus td { padding: 5px 4px; border-bottom: 1px solid var(--line); } #rtStatus td.n { white-space: nowrap; color: var(--sub); }
+#rtStatus .bar { margin: 0; width: 120px; height: 6px; }
+dialog.wide { width: min(860px, calc(100vw - 24px)); }
+.rthead small { color: var(--sub); margin-left: 6px; }
+.rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.rtrow input[type=text] { width: 100%; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.rtrow select { padding: 5px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.dows { display: flex; gap: 2px; } .dows button { width: 24px; height: 26px; border-radius: 5px; font-size: 12px; background: var(--hover); border: 1px solid var(--line); color: var(--sub); }
+.dows button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rtrow .mv { display: flex; flex-direction: column; } .rtrow .mv button { font-size: 10px; line-height: 12px; color: var(--sub); }
+@media (max-width: 860px) { .rtrow { grid-template-columns: 22px minmax(0, 1fr) 26px; } .rtrow .t { grid-column: 2 / 4; } .rtrow .dows, .rtrow select { grid-column: 2 / 4; } }
+/* 👥 팀 */
+#teamView { max-width: 960px; margin: 0 auto; padding: 16px 20px 100px; }
+#teamView h2 { margin: 6px 0 12px; } #teamView h3 { margin: 22px 0 8px; font-size: 16px; }
+.tcard { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--panel); }
+.tcard b { margin-right: 8px; } .chipname { display: inline-block; padding: 2px 9px; margin: 3px 4px 0 0; border-radius: 99px; background: var(--hover); font-size: 13px; }
+.tform { display: grid; grid-template-columns: 150px minmax(0, 1fr) 140px 100px auto; gap: 6px; }
+.tform select, .tform input, .tmem select { padding: 7px 8px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); width: 100%; }
+.titem { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); }
+.titem input { width: 18px; height: 18px; accent-color: var(--green); } .titem .t { flex: 1; min-width: 0; } .titem.done .t { color: var(--sub); text-decoration: line-through; }
+.titem .who { font-size: 12px; color: var(--green); white-space: nowrap; } .titem button { color: var(--sub); font-size: 12px; }
+.tmem { display: grid; grid-template-columns: 1fr 160px; gap: 6px; align-items: center; padding: 4px 0; }
+.mk.team { color: #fff; background: #0f9d76; border-color: #0f9d76; }
+.row.teamrow textarea, .row.teamrow .ttl { color: var(--text); } .row.teamrow.done .ttl { color: var(--sub); text-decoration: line-through; }
+.row .ttl { line-height: 1.5; padding-top: 1px; }
+@media (max-width: 860px) { .tform { grid-template-columns: 1fr 1fr; } .tform .ti { grid-column: 1 / 3; } }
 /* 📨 업무 배정 */
 #assignbox { display: none; border: 1px solid color-mix(in srgb, #2383e2 50%, var(--line)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
 body.is-admin #assignbox { display: block; }
@@ -126,7 +166,7 @@ body.is-admin #assignbox { display: block; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
 body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm, body.off-dl .row .chip,
-body.off-brief #briefbox, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
+body.off-routine #routinebox, body.off-teamrow .teamrow, body.off-brief #briefbox, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -179,8 +219,9 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout { display: none; }
+body.mv .layout, body.tv .layout { display: none; }
 body:not(.mv) #monthView { display: none; }
+body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
 .mh { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .mh h1 { margin: 0; font-size: 36px; font-weight: 800; letter-spacing: -.02em; }
@@ -280,7 +321,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -291,6 +332,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <span class="range" id="wkRange"></span>
       </div>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
+      <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span>
+          <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
+        <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div></details>
       <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
         <textarea id="asgText" rows="2" placeholder="예) 김예원 매니저님 금요일 6시까지 환불 리스트 정리해 주세요"></textarea>
         <div class="asgbar"><button id="asgParse" class="btn">AI로 정리하기</button><small>정리된 카드를 확인하고 [보내기]를 눌러야 들어가요</small></div>
@@ -305,6 +349,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     </main>
   </div>
   <section class="mview" id="monthView"></section>
+  <section id="teamView"></section>
 </div>
 
 <dialog id="sheet">
@@ -355,6 +400,12 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   </div>
 </dialog>
 
+<dialog id="rtDialog" class="wide">
+  <div class="rthead"><b>📌 고정업무 편집</b> <small>순서대로 매니저 화면에 나와요 · 대표만 편집</small></div>
+  <div id="rtRows"></div>
+  <div class="quick"><button data-add="weekday">+ 평일(월~목) 업무</button><button data-add="weekend">+ 주말(토·일) 업무</button></div>
+  <div class="sheet-foot"><span></span><button class="btn" id="rtClose">닫기</button></div>
+</dialog>
 <div id="pop" class="pop hidden"></div>
 <div id="toast" class="hidden"></div>
 
@@ -371,6 +422,7 @@ const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
 let tasks = [], dues = [], musts = [], openId = null, dirty = false;
+let teamTasks = [], routine = [], routineChecks = new Set();
 let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
@@ -431,15 +483,17 @@ $("#outBtn").onclick = async () => { await sb.auth.signOut({ scope: "local" }); 
 async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
-  const [t, d, s, m] = await Promise.all([
+  const [t, d, s, m, tt] = await Promise.all([
     sb.from("tasks").select("*").eq("user_id", me.id).gte("day", monday).lte("day", sun).order("sort").order("id"),
     sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", me.id).eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
     sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
     sb.from("tasks").select("id, day, title").eq("user_id", me.id).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
+    myRole === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: monday, p_to: sun }),
   ]);
-  if (fail(t.error || d.error || s.error || m.error)) return;
-  tasks = t.data; dues = d.data; musts = m.data;
+  if (fail(t.error || d.error || s.error || m.error || tt.error)) return;
+  tasks = t.data; dues = d.data; musts = m.data; teamTasks = tt.data;
+  loadRoutine();
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
   const thu = W.parse(W.add(monday, 3)); // 주가 걸친 달은 목요일 기준
@@ -447,6 +501,134 @@ async function loadAll(scrollToday) {
   await loadCal();
   if (scrollToday) document.getElementById("d-" + today())?.scrollIntoView({ block: "start" });
 }
+// ── 📌 고정업무: 대표가 정한 목록 중 오늘 요일·주차에 해당하는 것만, 순서대로 ──
+const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
+async function loadRoutine() {
+  const day = today();
+  const [r, c] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
+    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.from("routine_checks").select("item_id").eq("user_id", me.id).eq("day", day)]);
+  if (fail(r.error || c.error)) return;
+  routine = r.data;
+  const mine = routine.filter((it) => applies(it, day)), dw = W.parse(day).getDay();
+  $("#rtTitle").textContent = `오늘(${DOW[dw]}) 고정업무`;
+  if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
+    $("#rtCount").textContent = `${mine.length}개 · 매니저별 현황`;
+    $("#rtBar").parentElement.classList.add("hidden"); $("#rtList").innerHTML = "";
+    $("#rtStatus").innerHTML = c.data.length ? `<table>${c.data.map((x) => { const pct = x.total ? Math.round((x.done / x.total) * 100) : 0;
+      return `<tr><td><b>${esc(x.name)}</b> <span style="color:var(--sub)">${esc(x.team ?? "팀 없음")}</span></td><td><div class="bar"><i style="width:${pct}%"></i></div></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉 퇴근 가능" : ""}</td></tr>`; }).join("")}</table>`
+      : `<div style="color:var(--sub);font-size:14px">아직 가입한 매니저가 없어요</div>`;
+    return;
+  }
+  routineChecks = new Set(c.data.map((x) => x.item_id));
+  const done = mine.filter((it) => routineChecks.has(it.id)).length;
+  $("#routinebox").classList.toggle("hidden", !mine.length);
+  $("#rtCount").textContent = `${done}/${mine.length}`;
+  $("#rtBar").style.width = (mine.length ? Math.round((done / mine.length) * 100) : 0) + "%";
+  $("#rtList").innerHTML = mine.map((it) => `<label class="rt ${it.color} ${routineChecks.has(it.id) ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${routineChecks.has(it.id) ? "checked" : ""}><span>${esc(it.title)}</span></label>`).join("")
+    + (mine.length && done === mine.length ? `<div class="rtdone">🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요</div>` : "");
+  $("#rtStatus").innerHTML = "";
+}
+$("#rtList").addEventListener("change", async (e) => {
+  const id = +e.target.dataset.rt; if (!id) return;
+  const q = e.target.checked ? sb.from("routine_checks").insert({ item_id: id, day: today() })
+    : sb.from("routine_checks").delete().eq("user_id", me.id).eq("item_id", id).eq("day", today());
+  const { error } = await q; if (!fail(error)) loadRoutine();
+});
+// 대표: 고정업무 편집기
+const WEEKS = [["", "매주"], ["1,3", "1·3주차"], ["2,4", "2·4주차"], ["1", "1주차"], ["2", "2주차"], ["3", "3주차"], ["4", "4주차"]];
+function renderRtEditor() {
+  $("#rtRows").innerHTML = routine.map((it, i) => `<div class="rtrow" data-id="${it.id}">
+    <div class="mv"><button data-mv="-1" ${i ? "" : "disabled"}>▲</button><button data-mv="1" ${i < routine.length - 1 ? "" : "disabled"}>▼</button></div>
+    <input type="text" class="t" value="${esc(it.title)}" data-f="title">
+    <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
+    <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <button data-rm title="삭제">✕</button></div>`).join("");
+}
+async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
+$("#rtEdit").onclick = async (e) => { e.preventDefault(); await loadRoutine(); renderRtEditor(); $("#rtDialog").showModal(); };
+$("#rtClose").onclick = () => $("#rtDialog").close();
+$("#rtRows").addEventListener("change", (e) => {
+  const row = e.target.closest(".rtrow"), f = e.target.dataset.f; if (!row || !f) return;
+  const v = e.target.value;
+  rtSave(+row.dataset.id, f === "weeks" ? { weeks: v ? v.split(",").map(Number) : null } : f === "title" ? { title: v.trim() || "(제목 없음)" } : { [f]: v });
+});
+$("#rtRows").addEventListener("click", async (e) => {
+  const row = e.target.closest(".rtrow"); if (!row) return;
+  const id = +row.dataset.id, it = routine.find((x) => x.id === id), i = routine.indexOf(it);
+  if (e.target.dataset.dow !== undefined) {
+    const d = +e.target.dataset.dow, days = it.days.includes(d) ? it.days.filter((x) => x !== d) : [...it.days, d];
+    if (!days.length) return toast("요일을 하나 이상 골라 주세요");
+    return rtSave(id, { days });
+  }
+  if (e.target.dataset.mv) { // 위·아래 이웃과 sort 교환
+    const o = routine[i + +e.target.dataset.mv]; if (!o) return;
+    await sb.from("routine_items").update({ sort: o.sort }).eq("id", it.id);
+    return rtSave(o.id, { sort: it.sort });
+  }
+  if (e.target.dataset.rm !== undefined && confirm(`"${it.title}" 고정업무를 지울까요?`)) {
+    const { error } = await sb.from("routine_items").delete().eq("id", id);
+    if (!fail(error)) { await loadRoutine(); renderRtEditor(); }
+  }
+});
+$("#rtDialog").querySelector(".quick").onclick = async (e) => {
+  const k = e.target.dataset.add; if (!k) return;
+  const { error } = await sb.from("routine_items").insert({ title: "새 고정업무", days: k === "weekend" ? [6, 0] : [1, 2, 3, 4], sort: (routine.at(-1)?.sort ?? 0) + 1 });
+  if (fail(error)) return;
+  await loadRoutine(); renderRtEditor();
+  $("#rtRows").lastElementChild?.querySelector(".t").select();
+};
+
+// ── 👥 팀 화면 ──
+let teams = [], people = [];
+async function loadTeam() {
+  const from = W.add(today(), -7), to = W.add(today(), 45);
+  const [t, p, k] = await Promise.all([sb.from("teams").select("*").order("sort"), sb.rpc("team_people"), sb.rpc("team_tasks_between", { p_from: from, p_to: to })]);
+  if (fail(t.error || p.error || k.error)) return;
+  teams = t.data; people = p.data;
+  const admin = myRole === "admin", my = people.find((x) => x.user_id === me.id);
+  const mgrs = people.filter((x) => x.role === "manager");
+  const list = k.data.map((x) => `<div class="titem ${x.done_by ? "done" : ""}"><input type="checkbox" data-tt="${x.id}" ${x.done_by ? "checked" : ""}>
+    <span class="t">${md(x.day)}(${DOW[W.parse(x.day).getDay()]}) ${admin ? `<span class="mk team">${esc(x.team)}</span> ` : ""}${esc(x.title)}${x.deadline ? ` · ${fmtDl(x.deadline)}까지` : ""}</span>
+    ${x.done_by ? `<span class="who">✅ ${esc(x.done_name ?? "")} ${new Date(x.done_at).getHours()}:${pad(new Date(x.done_at).getMinutes())}</span>` : ""}
+    ${admin ? `<button data-rmtt="${x.id}">삭제</button>` : ""}</div>`).join("") || `<div style="color:var(--sub)">팀 업무가 없어요</div>`;
+  $("#teamView").innerHTML = admin ? `<h2>👥 팀</h2>
+    <h3>팀 업무 넣기 — 팀원 모두의 하루 일정에 뜨고, 한 명이 끝내면 팀 전체 완료</h3>
+    <div class="tform"><select id="ttTeam"><option value="all">모든 팀</option>${teams.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select>
+      <input id="ttTitle" class="ti" placeholder="예) 이번주 전단지 50장 비치하기"><input id="ttDay" type="date" value="${today()}"><input id="ttTime" type="time" title="마감 시각(선택)">
+      <button id="ttAdd" class="btn">넣기</button></div>
+    <h3>팀 업무 (지난 1주 ~ 앞으로)</h3>${list}
+    <h3>팀 구성 — 매니저가 가입하면 여기서 팀을 정해 주세요</h3>
+    ${teams.map((x) => `<div class="tcard"><b>${esc(x.name)}</b>${mgrs.filter((m) => m.team_id === x.id).map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("") || `<span style="color:var(--sub)">아직 없음</span>`}</div>`).join("")}
+    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
+    : my?.team_id ? `<h2>👥 ${esc(teams.find((x) => x.id === my.team_id)?.name ?? "")}</h2>
+      <div class="tcard">${people.map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("")}</div>
+      <h3>우리 팀 업무 — 누가 끝내도 팀 전체 완료</h3>${list}`
+    : `<h2>👥 팀</h2><div class="tcard">아직 팀이 정해지지 않았어요. 대표님이 팀을 정해 주시면 팀 업무가 보여요.</div>`;
+}
+$("#teamView").addEventListener("change", async (e) => {
+  if (e.target.dataset.tt) return toggleTeamTask(+e.target.dataset.tt, e.target.checked);
+  if (e.target.dataset.member !== undefined) {
+    const { error } = await sb.from("profiles").update({ team_id: e.target.value ? +e.target.value : null }).eq("user_id", e.target.dataset.member);
+    if (!fail(error)) { toast("팀을 바꿨어요"); loadTeam(); }
+  }
+});
+$("#teamView").addEventListener("click", async (e) => {
+  if (e.target.id === "ttAdd") {
+    const title = $("#ttTitle").value.trim(), day = $("#ttDay").value, tm = $("#ttTime").value, team = $("#ttTeam").value;
+    if (!title || !day) return toast("제목과 날짜를 넣어 주세요");
+    const ids = team === "all" ? teams.map((x) => x.id) : [+team];
+    const { error } = await sb.from("team_tasks").insert(ids.map((team_id) => ({ team_id, day, title, deadline: tm ? new Date(`${day}T${tm}`).toISOString() : null })));
+    if (fail(error)) return;
+    toast(`👥 ${ids.length}개 팀에 넣었어요. 팀원 폰으로 알림이 가요`); loadTeam();
+  }
+  if (e.target.dataset.rmtt && confirm("이 팀 업무를 지울까요? 팀원 화면에서도 사라져요")) {
+    const { error } = await sb.from("team_tasks").delete().eq("id", e.target.dataset.rmtt);
+    if (!fail(error)) loadTeam();
+  }
+});
+
 // ── 📨 업무 배정 (대표) ──
 let asgDraft = [], managers = [];
 async function loadAssigned() {
@@ -544,6 +726,7 @@ function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => loadAssigned()).subscribe();
+  sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => (view === "team" ? loadTeam() : softReload())).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신
 }
@@ -609,7 +792,8 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team");
+  if (v === "team" && me) loadTeam();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
@@ -670,7 +854,7 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["brief", "🧠 오늘 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
+const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 오늘 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
 function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
@@ -727,6 +911,20 @@ function marks(t) {
   if (t.must_do) h += `<span class="mk must ${!t.done && t.day < today() ? "late" : ""}" data-act="open" title="그날 꼭 끝내기">🔥 ${t.day === today() ? "오늘 꼭" : !t.done && t.day < today() ? "못 끝냄" : "꼭"}</span>`;
   return h;
 }
+// 👥 팀 태스크 줄: 누가 끝내도 팀 전체 완료
+function teamRowHtml(k) {
+  return `<div class="row teamrow ${k.done_by ? "done" : ""}" data-team="${k.id}">
+    <span></span><input type="checkbox" ${k.done_by ? "checked" : ""} aria-label="팀 업무 완료">
+    <div class="ttl">${esc(k.title)}</div>
+    <div class="meta"><span class="mk team">👥 ${esc(k.team)}</span>${k.done_by ? `<span class="mk">✅ ${esc(k.done_name ?? "")} 완료</span>` : ""}${k.deadline ? `<span class="chip">📅 ${fmtDl(k.deadline)}</span>` : ""}</div>
+    <span></span><span></span></div>`;
+}
+async function toggleTeamTask(id, done) {
+  const { error } = await sb.rpc("set_team_task_done", { p_id: id, p_done: done });
+  if (fail(error)) return;
+  toast(done ? "👥 팀 업무 완료! 팀원 화면에도 완료로 보여요" : "완료를 취소했어요");
+  view === "team" ? loadTeam() : loadAll();
+}
 function rowHtml(t) {
   return `<div class="row ${t.done ? "done" : ""} ${t.important || t.must_do ? "hot" : ""}" data-id="${t.id}">
     <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
@@ -750,11 +948,11 @@ function renderWeek() {
   $("#rateBar").style.width = pct + "%";
   $("#rateTxt").textContent = `이번주 완료율 ${pct}% (${done}/${tasks.length})`;
   $("#days").innerHTML = DAYS.map((name, i) => {
-    const day = W.add(monday, i), list = tasks.filter((t) => t.day === day);
+    const day = W.add(monday, i), list = tasks.filter((t) => t.day === day), tlist = teamTasks.filter((k) => k.day === day);
     const cls = ["day", i === 5 ? "sat" : i === 6 ? "sun" : "", day === today() ? "today" : ""].join(" ");
     return `<section class="${cls}" id="d-${day}" data-day="${day}">
-      <h3><span>${name}</span><span class="pill">${md(day)}</span>${dayRate(list)}</h3>
-      <div class="rows">${list.map(rowHtml).join("")}</div>
+      <h3><span>${name}</span><span class="pill">${md(day)}</span>${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}</h3>
+      <div class="rows">${list.map(rowHtml).join("")}${tlist.map(teamRowHtml).join("")}</div>
       <button class="add" data-act="add">+ 새로 만들기</button></section>`;
   }).join("");
   document.querySelectorAll(".row textarea").forEach(grow);
@@ -808,6 +1006,7 @@ $("#days").addEventListener("click", async (e) => {
 });
 $("#days").addEventListener("change", async (e) => {
   if (e.target.type !== "checkbox") return;
+  const tr = e.target.closest("[data-team]"); if (tr) return toggleTeamTask(+tr.dataset.team, e.target.checked);
   const t = taskOf(e.target);
   if (await save(t.id, { done: e.target.checked })) { renderWeek(); bumpStats(); }
 });
