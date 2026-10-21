@@ -64,9 +64,9 @@ function render() {
   $("#tdN").textContent = `${doneN}/${rows.length}`;
   $("#tdList").innerHTML = rows.map(({ k, t }) => k === "team"
     ? `<label class="it ${t.done_by ? "done" : ""}"><input type="checkbox" data-team="${t.id}" ${t.done_by ? "checked" : ""}><span class="t">${esc(t.title)}<span class="tag team">👥 ${esc(t.team)}</span>${t.done_by ? `<span class="tag">✅ ${esc(t.done_name ?? "")}</span>` : ""}</span></label>`
-    : `<label class="it ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""}"><input type="checkbox" data-task="${t.id}" ${t.done ? "checked" : ""}><span class="t">${t.must_do ? "🔥" : ""}${t.important ? "★" : ""}${t.start_time ? `<b>${t.start_time.slice(0, 5)}</b> ` : ""}${esc(t.title)}`
+    : `<label class="it ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""}"><input type="checkbox" data-task="${t.id}" ${t.done ? "checked" : ""}><span class="t">${t.must_do ? "🔥" : ""}${t.important ? "★" : ""}${t.start_time ? `<b>${t.start_time.slice(0, 5)}(시작!)</b> ` : ""}${esc(t.title)}`
       + `${t.assigned_by && t.assigned_by !== me.id ? `<span class="tag asg">📨</span>` : ""}${t.started_at ? `<span class="tag run" data-run="${t.id}">⏸ ${hms(elapsed(t))}</span>` : ""}`
-      + `${t.estimate_min ? `<span class="tag">⏳${t.estimate_min}분</span>` : ""}${t.deadline && !t.done ? `<span class="tag ${W.due(t.deadline).cls}">${hm(t.deadline)}</span>` : ""}</span></label>`).join("")
+      + `${t.estimate_min ? `<span class="tag">⏳${t.estimate_min}분 해결목표</span>` : ""}${t.deadline && !t.done ? `<span class="tag ${W.due(t.deadline).cls}">${hm(t.deadline)}</span>` : ""}</span></label>`).join("")
     || `<div class="empty">오늘 할 일이 없어요</div>`;
   // ⏰ 데드라인 48시간 (오늘 것 포함, 지난 것도)
   $("#dueList").innerHTML = dues.map((t) => { const u = W.due(t.deadline); return `<div class="it"><span class="t">${esc(t.title)}</span><span class="tag ${u.cls}">${u.text}</span></div>`; }).join("") || `<div class="empty">48시간 안 마감 없음</div>`;

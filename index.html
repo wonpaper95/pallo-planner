@@ -175,6 +175,8 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
 .pop label.tg:first-of-type { border-top: 0; }
 .pop label.tg input { width: 18px; height: 18px; accent-color: var(--accent); }
+.pop.dlpop { width: 300px; } .pop.dlpop .grid { grid-template-columns: repeat(3, 1fr); } .pop.dlpop .grid button { font-size: 13px; }
+.pop.inline { position: static; width: auto; padding: 0; border: 0; box-shadow: none; background: none; }
 .pop { position: fixed; z-index: 40; width: 236px; padding: 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
 .pop h4 { margin: 0 0 8px; font-size: 13px; color: var(--sub); font-weight: 600; }
 .pop .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -384,7 +386,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <option value="1440">1일 전</option>
   </select>
   <label for="sStart">업무 시작시간</label>
-  <input type="time" id="sStart">
+  <div class="pop inline" id="sStart"></div>
   <label for="sEst">예상 소요시간 (분)</label>
   <input type="number" id="sEst" min="1" inputmode="numeric" placeholder="예: 30">
   <div class="quick" id="sEstQ">
@@ -837,8 +839,24 @@ const minLabel = (m) => m < 60 ? `${m}분` : m % 60 ? `${Math.floor(m / 60)}시�
 function quickBtns(t) {
   const st = t.start_time?.slice(0, 5), est = t.estimate_min;
   if (t.done && !st && !est) return "";
-  return `<button class="qb ${st ? "" : "empty"}" data-act="start" title="업무 시작시간">🕐${st ? " " + st : ""}</button>`
-    + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">⏳${est ? " " + minLabel(est) : ""}</button>`;
+  return `<button class="qb ${st ? "" : "empty"}" data-act="start" title="업무 시작시간">🕐${st ? ` ${st}(시작!)` : ""}</button>`
+    + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">⏳${est ? ` ${minLabel(est)} 해결목표` : ""}</button>`;
+}
+// 🕐 시작시간 고르기: 추천 9개 + 아래 시간칸은 처음부터 '오후 02:30'처럼 채워둠(정해진 시각, 없으면 지금에서 가까운 30분)
+function startPickHtml(t) {
+  const now = new Date(), nowHm = `${pad(now.getHours())}:${pad(Math.floor(now.getMinutes() / 5) * 5)}`;
+  const half = new Date(Math.ceil(now.getTime() / 1800000) * 1800000), def = t.start_time?.slice(0, 5) ?? `${pad(half.getHours())}:${pad(half.getMinutes())}`;
+  return `<div class="grid"><button data-v="${nowHm}">지금</button>${["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "18:00"].map((h) =>
+    `<button data-v="${h}" class="${t.start_time?.slice(0, 5) === h ? "on" : ""}">${h}</button>`).join("")}</div>
+    <div class="own"><input type="time" value="${def}"><button class="btn" data-own>확인</button></div>
+    ${t.start_time ? `<button class="clear" data-v="">지우기</button>` : ""}`;
+}
+// 데드라인 빠른 선택 (상세 창·📅 작은 창 공용). clear 면 null
+function quickDl(t, q) {
+  const at = (day, h) => { const d = W.parse(day); d.setHours(h, 0, 0, 0); return d; };
+  const base = t.deadline ? new Date(t.deadline) : at(t.day, 18);
+  return q === "today18" ? at(today(), 18) : q === "tom9" ? at(W.add(today(), 1), 9) : q === "tom18" ? at(W.add(today(), 1), 18)
+    : q === "+1d" ? new Date(base.getTime() + 86400000) : q === "+1w" ? new Date(base.getTime() + 7 * 86400000) : null;
 }
 let popFor = null;
 function openPop(anchor, t, kind) {
@@ -848,13 +866,15 @@ function openPop(anchor, t, kind) {
       `<button data-v="${m}" class="${t.estimate_min === m ? "on" : ""}">${minLabel(m)}</button>`).join("")}</div>
       <div class="own"><input type="number" min="1" inputmode="numeric" placeholder="직접 (분)"><button class="btn" data-own>확인</button></div>
       ${t.estimate_min ? `<button class="clear" data-v="">지우기</button>` : ""}`;
-  } else {
-    const nowHm = `${pad(now.getHours())}:${pad(Math.floor(now.getMinutes() / 5) * 5)}`;
-    pop.innerHTML = `<h4>🕐 업무 시작시간</h4><div class="grid"><button data-v="${nowHm}">지금</button>${["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "18:00"].map((h) =>
-      `<button data-v="${h}" class="${t.start_time?.slice(0, 5) === h ? "on" : ""}">${h}</button>`).join("")}</div>
-      <div class="own"><input type="time" value="${t.start_time?.slice(0, 5) ?? ""}"><button class="btn" data-own>확인</button></div>
-      ${t.start_time ? `<button class="clear" data-v="">지우기</button>` : ""}`;
-  }
+  } else if (kind === "dl") {
+    pop.innerHTML = assignedToMe(t) ? `<h4>📅 데드라인</h4><div style="font-size:13px">대표님이 정한 데드라인이라 바꿀 수 없어요${t.deadline ? `<br><b>${fmtDl(t.deadline)}</b>` : ""}</div>`
+      : `<h4>📅 ${t.deadline ? "데드라인 재설정" : "데드라인 (고르면 설정돼요)"}</h4>
+      <div class="own"><input type="datetime-local" value="${toLocalInput(t.deadline ?? new Date())}"><button class="btn" data-own>확인</button></div>
+      <div class="grid" style="margin-top:6px">${[["today18", "오늘 18:00"], ["tom9", "내일 09:00"], ["tom18", "내일 18:00"], ["+1d", "+1일"], ["+1w", "+1주"]].map(([q, l]) => `<button data-q="${q}">${l}</button>`).join("")}</div>
+      ${t.deadline ? `<button class="clear" data-q="clear">지우기</button>` : ""}
+      ${(t.deadline_log || []).length ? `<div style="font-size:12px;color:var(--sub);margin-top:6px">↻ 재설정 ${t.deadline_log.length}회 · 마지막 ${fmtDl(t.deadline_log.at(-1).from)} → ${t.deadline ? fmtDl(t.deadline) : "없음"}</div>` : ""}`;
+  } else pop.innerHTML = `<h4>🕐 업무 시작시간</h4>` + startPickHtml(t);
+  pop.classList.toggle("dlpop", kind === "dl");
   pop.classList.remove("hidden");
   const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
   pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
@@ -899,12 +919,19 @@ $("#pop").onclick = async (e) => {
   const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
   let v = b.dataset.v;
   if (b.dataset.own !== undefined) v = $("#pop input").value;
+  if (kind === "dl") { // 📅 작은 창
+    const d = b.dataset.q ? quickDl(t, b.dataset.q) : b.dataset.own !== undefined && v ? new Date(v) : undefined;
+    if (d === undefined) return;
+    closePop();
+    if (await save(t.id, { deadline: d ? d.toISOString() : null })) { renderWeek(); toast(d ? `📅 ${fmtDl(d.toISOString())}까지` : "데드라인을 지웠어요"); }
+    return;
+  }
   if (v === undefined) return;
   const patch = kind === "est" ? { estimate_min: +v > 0 ? Math.round(+v) : null } : { start_time: v || null };
   closePop();
   if (await save(t.id, patch)) renderWeek();
 };
-document.addEventListener("pointerdown", (e) => { if (popFor && !e.target.closest("#pop, [data-act=est], [data-act=start], #prefBtn")) closePop(); });
+document.addEventListener("pointerdown", (e) => { if (popFor && !e.target.closest("#pop, [data-act=est], [data-act=start], [data-act=dl], #prefBtn")) closePop(); });
 document.addEventListener("keydown", (e) => e.key === "Escape" && closePop());
 addEventListener("scroll", () => popFor && Date.now() - popFor.at > 400 && closePop(), { passive: true });
 // 1초마다 도는 타이머만 숫자 갱신
@@ -1017,7 +1044,8 @@ $("#days").addEventListener("click", async (e) => {
     e.target.closest(".day").querySelector(".rows").insertAdjacentHTML("beforeend", rowHtml(data));
     e.target.closest(".day").querySelector(".row:last-child textarea").focus();
   }
-  if (act === "open" || act === "dl") openSheet(taskOf(e.target), act === "dl");
+  if (act === "open") openSheet(taskOf(e.target));
+  if (act === "dl") { const b = e.target.closest("[data-act]"); popFor?.t?.id === taskOf(b).id && popFor.kind === "dl" ? closePop() : openPop(b, taskOf(b), "dl"); }
   if (act === "brief") return briefClick();
   if (act === "timer") toggleTimer(taskOf(e.target));
   if (act === "est" || act === "start") { const b = e.target.closest("[data-act]"); popFor?.t.id === taskOf(b).id && popFor.kind === act ? closePop() : openPop(b, taskOf(b), act); }
@@ -1152,7 +1180,7 @@ function openSheet(t, focusDl) {
   $("#sRemind").value = t.remind_min ?? "";
   $("#sNote").value = t.note;
   $("#sEst").value = t.estimate_min ?? "";
-  $("#sStart").value = t.start_time?.slice(0, 5) ?? "";
+  $("#sStart").innerHTML = startPickHtml(t);
   document.querySelectorAll("#sMarks button").forEach((b) => b.classList.toggle("on", !!t[b.dataset.mk]));
   $("#sSpent").textContent = hms(elapsed(t), true);
   $("#sTimer").textContent = t.started_at ? "⏸ 정지" : "▶ 시작";
@@ -1176,7 +1204,11 @@ async function sheetSave(patch) {
 $("#sTitle").onchange = () => sheetSave({ title: $("#sTitle").value.trim() });
 $("#sDone").onchange = () => sheetSave({ done: $("#sDone").checked }).then(bumpStats);
 $("#sNote").onchange = () => sheetSave({ note: $("#sNote").value });
-$("#sStart").onchange = () => sheetSave({ start_time: $("#sStart").value || null });
+$("#sStart").onclick = (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  const v = b.dataset.own !== undefined ? $("#sStart input").value : b.dataset.v;
+  if (v !== undefined) sheetSave({ start_time: v || null });
+};
 $("#sEst").onchange = () => sheetSave({ estimate_min: +$("#sEst").value > 0 ? Math.round(+$("#sEst").value) : null });
 $("#sEstQ").onclick = (e) => { if (e.target.dataset.m === undefined) return; $("#sEst").value = e.target.dataset.m; $("#sEst").onchange(); };
 $("#sTimer").onclick = () => toggleTimer(cur());
@@ -1206,11 +1238,7 @@ $("#sDay").onchange = async () => {
 };
 $("#sQuick").onclick = (e) => {
   const q = e.target.dataset.q; if (!q) return;
-  const t = cur(), at = (day, h) => { const d = W.parse(day); d.setHours(h, 0, 0, 0); return d; };
-  const base = t.deadline ? new Date(t.deadline) : at(t.day, 18);
-  const v = q === "today18" ? at(today(), 18) : q === "tom9" ? at(W.add(today(), 1), 9) : q === "tom18" ? at(W.add(today(), 1), 18)
-    : q === "+1d" ? new Date(base.getTime() + 86400000) : q === "+1w" ? new Date(base.getTime() + 7 * 86400000) : null;
-  sheetSave({ deadline: v ? v.toISOString() : null });
+  const v = quickDl(cur(), q); sheetSave({ deadline: v ? v.toISOString() : null });
 };
 $("#sDel").onclick = async () => {
   if (!confirm("이 할 일을 삭제할까요?")) return;
