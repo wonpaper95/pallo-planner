@@ -97,7 +97,8 @@ main { padding: 20px 24px 120px; min-width: 0; }
 #rtStatus .bar { margin: 0; width: 120px; height: 6px; }
 dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .rthead small { color: var(--sub); margin-left: 6px; }
-.rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.rt .carry { color: var(--orange); font-size: 12.5px; } .rt .needlink { color: var(--sub); } .rt .rtlink { flex: none; font-size: 12.5px; color: var(--accent); text-decoration: none; }
+.rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .rtrow input[type=text] { width: 100%; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
 .rtrow select { padding: 5px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
 .dows { display: flex; gap: 2px; } .dows button { width: 24px; height: 26px; border-radius: 5px; font-size: 12px; background: var(--hover); border: 1px solid var(--line); color: var(--sub); }
@@ -584,9 +585,10 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
 async function loadRoutine() {
   const day = today();
-  const [r, c] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
-    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day, p_team: previewTeam })]);
-  if (fail(r.error || c.error)) return;
+  const [r, c, k] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
+    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day, p_team: previewTeam }),
+    myRole === "admin" ? { data: [] } : sb.rpc("routine_carry", { p_day: day, p_team: previewTeam })]); // ↪ 전에 못 끝낸 '넘김' 일
+  if (fail(r.error || c.error || k.error)) return;
   routine = r.data;
   const mine = routine.filter((it) => applies(it, day)), dw = W.parse(day).getDay();
   $("#rtTitle").textContent = `오늘(${DOW[dw]}) 고정업무`;
@@ -600,17 +602,27 @@ async function loadRoutine() {
   }
   routineChecks = new Map(c.data.map((x) => [x.item_id, x])); // 지점 공용: 누가 언제 했는지
   const done = mine.filter((it) => routineChecks.has(it.id)).length;
-  $("#routinebox").classList.toggle("hidden", !mine.length);
+  const carried = k.data.map((x) => ({ it: routine.find((i) => i.id === x.item_id), from: x.from_day })).filter((x) => x.it);
+  $("#routinebox").classList.toggle("hidden", !mine.length && !carried.length);
   $("#rtCount").textContent = `${done}/${mine.length}`;
   $("#rtBar").style.width = (mine.length ? Math.round((done / mine.length) * 100) : 0) + "%";
-  $("#rtList").innerHTML = mine.map((it) => { const ck = routineChecks.get(it.id), at = ck && new Date(ck.done_at);
-    return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${ck ? "checked" : ""}>${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}<span>${esc(it.title)}</span></label>`; }).join("")
+  const row = (it, ck, from) => { const at = ck && new Date(ck.done_at);
+    return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${from ? `data-day="${from}"` : ""} ${ck ? "checked" : ""}>`
+      + `${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}`
+      + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : ""}</span>`
+      + `${ck?.link ? `<a class="rtlink" href="${esc(ck.link)}" target="_blank" rel="noopener">🔗 링크</a>` : ""}</label>`; };
+  $("#rtList").innerHTML = carried.map((x) => row(x.it, null, x.from)).join("") + mine.map((it) => row(it, routineChecks.get(it.id))).join("")
     + (mine.length && done === mine.length ? `<div class="rtdone">🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요</div>` : "");
   $("#rtStatus").innerHTML = "";
 }
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
-  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: today(), p_done: e.target.checked, p_team: previewTeam });
+  let link = null;
+  if (e.target.checked && routine.find((x) => x.id === id)?.need_link) { // 🔗 링크를 올려야 완료 (예: 네이버 블로그)
+    link = (prompt("작성한 글의 링크를 붙여넣어 주세요\n(예: https://blog.naver.com/...)") || "").trim();
+    if (!/^https?:\/\/\S+$/i.test(link)) { e.target.checked = false; return toast(link ? "https:// 로 시작하는 주소를 넣어 주세요" : "링크를 올려야 완료돼요"); }
+  }
+  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: e.target.checked, p_team: previewTeam, p_link: link });
   if (fail(error)) e.target.checked = !e.target.checked;
   loadRoutine();
 });
@@ -623,6 +635,7 @@ function renderRtEditor() {
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button></div>
     <button data-rm title="삭제">✕</button></div>`).join("");
 }
 async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
@@ -641,6 +654,7 @@ $("#rtRows").addEventListener("click", async (e) => {
     if (!days.length) return toast("요일을 하나 이상 골라 주세요");
     return rtSave(id, { days });
   }
+  if (e.target.dataset.tg) return rtSave(id, { [e.target.dataset.tg]: !it[e.target.dataset.tg] }); // ↪ 넘김 · 🔗 링크 필수
   if (e.target.dataset.mv) { // 위·아래 이웃과 sort 교환
     const o = routine[i + +e.target.dataset.mv]; if (!o) return;
     await sb.from("routine_items").update({ sort: o.sort }).eq("id", it.id);

@@ -10,7 +10,7 @@ const hm = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pa
 const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
 const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
 const hms = (s) => { s = Math.floor(s); return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; };
-let me = null, role = "manager", day = today(), state = { tasks: [], team: [], routine: [], checks: new Set(), status: [], dues: [] };
+let me = null, role = "manager", day = today(), state = { tasks: [], team: [], routine: [], all: [], carried: [], checks: new Map(), status: [], dues: [] };
 
 // 접어둔 칸은 이 기기에서 기억
 const closed = new Set((() => { try { return JSON.parse(localStorage.getItem("widget-closed") || "[]"); } catch { return []; } })());
@@ -25,15 +25,17 @@ document.addEventListener("click", (e) => {
 async function load() {
   day = today();
   const soon = new Date(Date.now() + 48 * 3600000).toISOString();
-  const [t, k, r, c, d] = await Promise.all([
+  const [t, k, r, c, d, cy] = await Promise.all([
     sb.from("tasks").select("*").eq("user_id", me.id).eq("day", day).neq("title", "").order("sort").order("id"),
     role === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: day, p_to: day }),
     sb.from("routine_items").select("*").order("sort").order("id"),
     role === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day }),
     sb.from("tasks").select("id, title, deadline, day").eq("user_id", me.id).eq("done", false).not("deadline", "is", null).lte("deadline", soon).order("deadline").limit(10),
+    role === "admin" ? { data: [] } : sb.rpc("routine_carry", { p_day: day }), // ↪ 전에 못 끝낸 '넘김' 일
   ]);
-  if (t.error || k.error || r.error || c.error || d.error) { $("#foot").textContent = "불러오지 못했어요 — 잠시 후 다시 시도"; return; }
-  state = { tasks: t.data, team: k.data, routine: r.data.filter((it) => applies(it, day)), dues: d.data,
+  if (t.error || k.error || r.error || c.error || d.error || cy.error) { $("#foot").textContent = "불러오지 못했어요 — 잠시 후 다시 시도"; return; }
+  state = { tasks: t.data, team: k.data, routine: r.data.filter((it) => applies(it, day)), all: r.data, dues: d.data,
+    carried: cy.data.map((x) => ({ it: r.data.find((i) => i.id === x.item_id), from: x.from_day })).filter((x) => x.it),
     checks: new Map(role === "admin" ? [] : c.data.map((x) => [x.item_id, x])), status: role === "admin" ? c.data : [] }; // checks: 지점 공용, 누가 언제
   render();
 }
@@ -49,11 +51,13 @@ function render() {
     $("#rtList").innerHTML = status.length ? `<table>${status.map((x) => `<tr><td>${esc(x.team)} <span style="color:var(--sub)">${esc(x.members ?? "매니저 없음")}</span></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉" : ""}</td></tr>`).join("")}</table>` : `<div class="empty">지점이 없어요</div>`;
   } else {
     const n = routine.filter((it) => checks.has(it.id)).length;
-    $("#sRoutine").classList.toggle("hidden", !routine.length);
+    $("#sRoutine").classList.toggle("hidden", !routine.length && !state.carried.length);
     $("#rtN").textContent = `${n}/${routine.length}`;
     $("#rtBar").style.width = (routine.length ? (n / routine.length) * 100 : 0) + "%";
-    $("#rtList").innerHTML = routine.map((it) => { const ck = checks.get(it.id);
-      return `<label class="it ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${ck ? "checked" : ""}>${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${esc(it.title)}</span></label>`; }).join("")
+    const row = (it, ck, from) => `<label class="it ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${from ? `data-day="${from}"` : ""} ${ck ? "checked" : ""}>`
+      + `${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${from ? `<b style="color:var(--orange)">↪ ${from.slice(5).replace("-", "/")} 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_link && !ck ? ` <small style="color:var(--sub)">🔗 링크</small>` : ""}</span>`
+      + `${ck?.link ? `<a href="${esc(ck.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">🔗</a>` : ""}</label>`;
+    $("#rtList").innerHTML = state.carried.map((x) => row(x.it, null, x.from)).join("") + routine.map((it) => row(it, checks.get(it.id))).join("")
       + (routine.length && n === routine.length ? `<div class="done-all">🎉 고정업무 끝! 보고하고 퇴근하세요</div>` : "");
   }
   // ✅ 오늘 할 일 (+ 👥 팀): 안 끝난 것 먼저, 그다음 🔥·⭐, 시작시간
@@ -119,7 +123,14 @@ document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && clos
 // 체크하면 플래너와 같은 DB 에 바로 저장
 document.addEventListener("change", async (e) => {
   const el = e.target, on = el.checked; let r;
-  if (el.dataset.rt) r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: day, p_done: on });
+  if (el.dataset.rt) {
+    let link = null;
+    if (on && state.all.find((x) => x.id === +el.dataset.rt)?.need_link) { // 🔗 링크를 올려야 완료
+      link = (prompt("작성한 글의 링크를 붙여넣어 주세요 (https://...)") || "").trim();
+      if (!/^https?:\/\/\S+$/i.test(link)) { el.checked = false; $("#foot").textContent = "링크를 올려야 완료돼요"; return; }
+    }
+    r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: el.dataset.day || day, p_done: on, p_link: link });
+  }
   else if (el.dataset.task) r = await sb.from("tasks").update({ done: on }).eq("id", +el.dataset.task);
   else if (el.dataset.team) r = await sb.rpc("set_team_task_done", { p_id: +el.dataset.team, p_done: on });
   else return;
