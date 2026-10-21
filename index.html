@@ -229,7 +229,23 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout { display: none; }
+body:not(.bv) #boardView { display: none; }
+/* 📊 지점 현황판 (대표) */
+#boardView { max-width: 1400px; margin: 0 auto; padding: 16px 20px 100px; }
+#boardView .bhead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; } #boardView .bhead small { color: var(--sub); }
+.bgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.bcard { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 14px 16px; }
+.bcard.ok { border-color: var(--green); }
+.bcard .bh { display: flex; align-items: baseline; gap: 8px; } .bcard .bh b { font-size: 18px; } .bcard .bh .mem { color: var(--sub); font-size: 13px; flex: 1; }
+.bcard .bh .pct { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; } .bcard.ok .bh .pct { color: var(--green); }
+.bcard .bar { margin: 8px 0 4px; } .bcard .bsub { color: var(--sub); font-size: 12.5px; }
+.bcard h5 { margin: 12px 0 4px; font-size: 13px; color: var(--sub); font-weight: 600; }
+.bcard ul { margin: 0; padding: 0; list-style: none; } .bcard li { font-size: 13.5px; padding: 3px 0; border-top: 1px solid var(--line); display: flex; gap: 6px; align-items: baseline; }
+.bcard li:first-child { border-top: 0; } .bcard li .w { color: var(--green); white-space: nowrap; font-size: 12.5px; } .bcard li.no { color: var(--text); } .bcard li.no::before { content: "☐"; color: var(--sub); }
+.bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+.bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
+@media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -337,7 +353,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -365,6 +381,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   </div>
   <section class="mview" id="monthView"></section>
   <section id="teamView"></section>
+  <section id="boardView"></section>
 </div>
 
 <dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p id="pwNote" style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
@@ -509,6 +526,7 @@ async function boot() {
   await loadProfile();
   await loadAll(true);
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
+  if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
     history.replaceState(null, "", location.pathname);
@@ -672,6 +690,47 @@ $("#rtDialog").querySelector(".quick").onclick = async (e) => {
   await loadRoutine(); renderRtEditor();
   $("#rtRows").lastElementChild?.querySelector(".t").select();
 };
+
+// ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
+let boardT;
+const boardSoon = () => { if (view !== "board") return; clearTimeout(boardT); boardT = setTimeout(loadBoard, 400); };
+setInterval(() => view === "board" && document.visibilityState === "visible" && loadBoard(), 60000); // 실시간이 끊겨도 1분마다
+async function loadBoard() {
+  if (myRole !== "admin") return;
+  const day = today();
+  const [t, p, k, a, r] = await Promise.all([sb.from("teams").select("*").order("sort"), sb.rpc("team_people"),
+    sb.rpc("team_tasks_between", { p_from: day, p_to: day }),
+    sb.from("tasks").select("id, user_id, title, done").eq("assigned_by", me.id).eq("day", day).order("id"),
+    sb.from("routine_items").select("*").order("sort").order("id")]);
+  if (fail(t.error || p.error || k.error || a.error || r.error)) return;
+  const items = r.data, todays = items.filter((it) => applies(it, day)), name = (id) => items.find((i) => i.id === id);
+  const per = await Promise.all(t.data.map(async (tm) => {
+    const [c, cy] = await Promise.all([sb.rpc("team_routine_checks_on", { p_day: day, p_team: tm.id }), sb.rpc("routine_carry", { p_day: day, p_team: tm.id })]);
+    return { tm, checks: new Map((c.data ?? []).map((x) => [x.item_id, x])), carry: cy.data ?? [] };
+  }));
+  const hhmm = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const cards = per.map(({ tm, checks, carry }) => {
+    const mem = p.data.filter((x) => x.team_id === tm.id && x.role === "manager"), ids = new Set(mem.map((x) => x.user_id));
+    const done = todays.filter((it) => checks.has(it.id)), left = todays.filter((it) => !checks.has(it.id));
+    const last = [...checks.values()].sort((x, y) => new Date(y.done_at) - new Date(x.done_at))[0];
+    const all = todays.length && !left.length, pct = todays.length ? Math.round((done.length / todays.length) * 100) : 0;
+    const tt = k.data.filter((x) => x.team_id === tm.id), asg = a.data.filter((x) => ids.has(x.user_id));
+    const who = (uid) => mem.find((m) => m.user_id === uid)?.name ?? "";
+    return `<div class="bcard ${all ? "ok" : ""}">
+      <div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(mem.map((m) => m.name).join("·") || "매니저 없음")}</span><span class="pct">${all ? "🎉 " : ""}${done.length}/${todays.length}</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="bsub">${last ? `마지막 체크 ${esc(last.done_name ?? "")} ${hhmm(last.done_at)}` : "아직 체크 없음"}${all ? " · 오늘 고정업무 끝" : ""}</div>
+      ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}</li>`).join("")}</ul>` : ""}
+      ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
+      ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
+      ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
+      ${done.length ? `<details><summary>완료한 고정업무 ${done.length}개 보기</summary><ul>${done.map((it) => { const ck = checks.get(it.id);
+        return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)}${ck.link ? ` <a href="${esc(ck.link)}" target="_blank" rel="noopener">🔗 링크</a>` : ""}</li>`; }).join("")}</ul></details>` : ""}
+    </div>`;
+  });
+  const d = W.parse(day);
+  $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><small>${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]}) · 실시간 · ${hhmm(new Date().toISOString())} 기준</small></div><div class="bgrid">${cards.join("")}</div>`;
+}
 
 // ── 👥 팀 화면 ──
 let teams = [], people = [], roster = [];
@@ -859,9 +918,9 @@ function softReload() {
 function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
-    sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => loadAssigned()).subscribe();
-  sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => loadRoutine()).subscribe(); // 팀원이 체크하면 바로
-  sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => (view === "team" ? loadTeam() : softReload())).subscribe();
+    sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
+  sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
+  sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신
 }
@@ -927,8 +986,9 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board");
   if (v === "team" && me) loadTeam();
+  if (v === "board" && me) loadBoard();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
