@@ -144,8 +144,8 @@ body.is-admin #assignbox { display: block; }
 /* 오늘 날짜 옆 🧠 버튼 */
 .briefBtn { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 99px; color: #fff; background: linear-gradient(90deg, #6b4fd1, #8b6fd6); letter-spacing: 0; }
 .briefBtn.ask { background: #e9a23b; } .briefBtn:disabled { opacity: .6; }
-#briefText { margin: 4px 0 10px; margin-top: 10px; padding: 14px 16px; border-radius: 10px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); white-space: pre-wrap; line-height: 1.65; font-size: 14.5px; }
-#briefText .at { display: block; color: var(--sub); font-size: 12px; margin-top: 8px; }
+#briefText, .briefText { margin: 4px 0 10px; margin-top: 10px; padding: 14px 16px; border-radius: 10px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); white-space: pre-wrap; line-height: 1.65; font-size: 14.5px; }
+#briefText .at, .briefText .at { display: block; color: var(--sub); font-size: 12px; margin-top: 8px; }
 /* 데드라인 모아보기 */
 #mustbox, #duebox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
 #mustbox { border-color: #e5484d66; margin-bottom: 10px; }
@@ -174,7 +174,7 @@ body.is-admin #assignbox { display: block; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
 body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm, body.off-dl .row .chip,
-body.off-routine #routinebox, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief #briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
+body.off-routine #routinebox, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -520,7 +520,6 @@ async function boot() {
   }
   listen();
   pushButton();
-  loadBrief();
 }
 $("#authForm").onsubmit = async (e) => {
   e.preventDefault();
@@ -575,6 +574,7 @@ async function loadAll(scrollToday) {
   loadRoutine();
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
+  loadBrief(); // 보이는 주의 브리핑
   const thu = W.parse(W.add(monday, 3)); // 주가 걸친 달은 목요일 기준
   if (!cal || cal.wk !== monday) cal = { y: thu.getFullYear(), m: thu.getMonth() + 1, wk: monday };
   await loadCal();
@@ -804,35 +804,40 @@ $("#asgList").addEventListener("click", async (e) => {
   if (!fail(error)) loadAssigned();
 });
 
-// ── 🧠 오늘 브리핑 (하루 1회, 서버 함수 planner-brief → Claude Haiku) — 오늘 날짜 옆 버튼 ──
+// ── 🧠 브리핑 (날짜마다 1회, 서버 함수 planner-brief → Claude Haiku) — 오늘부터 앞으로의 날짜 옆 버튼 ──
 // 처음 누르면 "시뮬레이션 다 돌려보았나요?" 확인 → 한 번 더 누르면 받기. 받은 뒤엔 펼치기/접기
-const brief = { data: null, open: false, ask: false, busy: false };
-function briefBtnHtml() {
-  const label = brief.busy ? "🧠 정리하는 중… (10~20초)" : brief.data ? (brief.open ? "🧠 브리핑 접기" : "🧠 오늘 브리핑 보기")
-    : brief.ask ? "오늘 일정 시뮬레이션 다 돌려보았나요? 👉 네, 브리핑 받기" : "🧠 오늘 브리핑 받기";
-  return `<button class="briefBtn ${brief.ask && !brief.data ? "ask" : ""}" data-act="brief" ${brief.busy ? "disabled" : ""}>${label}</button>`;
+const briefs = {}; // day → { data, open, ask, busy }
+const bOf = (day) => (briefs[day] ??= { data: null, open: false, ask: false, busy: false });
+function briefBtnHtml(day) {
+  if (day < today()) return "";
+  const b = bOf(day), d = day === today() ? "오늘" : "이날";
+  const label = b.busy ? "🧠 정리하는 중… (10~20초)" : b.data ? (b.open ? "🧠 브리핑 접기" : `🧠 ${d} 브리핑 보기`)
+    : b.ask ? `${d} 일정 시뮬레이션 다 돌려보았나요? 👉 네, 브리핑 받기` : `🧠 ${d} 브리핑 받기`;
+  return `<button class="briefBtn ${b.ask && !b.data ? "ask" : ""}" data-act="brief" ${b.busy ? "disabled" : ""}>${label}</button>`;
 }
-function briefPanelHtml() {
-  const at = new Date(brief.data.created_at);
-  return `<div id="briefText">${esc(brief.data.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}<span class="at">${pad(at.getHours())}:${pad(at.getMinutes())}에 받은 오늘 브리핑 · 내일 다시 받을 수 있어요</span></div>`;
+function briefPanelHtml(day) {
+  const b = bOf(day); if (!b.data || !b.open) return "";
+  const at = new Date(b.data.created_at);
+  return `<div class="briefText">${esc(b.data.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}<span class="at">${md(W.ymd(at))} ${pad(at.getHours())}:${pad(at.getMinutes())}에 받은 ${md(day)} 브리핑 · 날짜마다 한 번</span></div>`;
 }
-async function loadBrief() {
-  const { data } = await sb.from("briefs").select("text, created_at").eq("day", today()).maybeSingle();
-  brief.data = data; renderWeek();
+async function loadBrief() { // 보이는 주의 브리핑
+  const { data } = await sb.from("briefs").select("day, text, created_at").gte("day", monday).lte("day", W.add(monday, 6));
+  for (const r of data ?? []) bOf(r.day).data = r;
+  renderWeek();
 }
-let askT;
-async function briefClick() {
-  if (brief.data) { brief.open = !brief.open; return renderWeek(); }
-  if (!brief.ask) { // 1번째: 확인 질문 (8초 지나면 원래대로)
-    brief.ask = true; renderWeek();
-    clearTimeout(askT); askT = setTimeout(() => { brief.ask = false; renderWeek(); }, 8000);
+async function briefClick(day) {
+  const b = bOf(day);
+  if (b.data) { b.open = !b.open; return renderWeek(); }
+  if (!b.ask) { // 1번째: 확인 질문 (8초 지나면 원래대로)
+    b.ask = true; renderWeek();
+    clearTimeout(b.t); b.t = setTimeout(() => { b.ask = false; renderWeek(); }, 8000);
     return;
   }
-  clearTimeout(askT); brief.ask = false; brief.busy = true; renderWeek();
-  const { data, error } = await sb.functions.invoke("planner-brief", { body: {} });
-  brief.busy = false;
+  clearTimeout(b.t); b.ask = false; b.busy = true; renderWeek();
+  const { data, error } = await sb.functions.invoke("planner-brief", { body: { day } });
+  b.busy = false;
   if (error) { let m = "브리핑을 만들지 못했어요"; try { m = (await error.context.json()).error || m; } catch {} renderWeek(); return toast(m); }
-  brief.data = data; brief.open = true; renderWeek();
+  b.data = data; b.open = true; renderWeek();
 }
 
 async function loadCal() {
@@ -970,7 +975,7 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 오늘 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
+const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
 function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
@@ -1101,8 +1106,8 @@ function renderWeek() {
     const day = W.add(monday, i), list = tasks.filter((t) => t.day === day), tlist = teamTasks.filter((k) => k.day === day);
     const cls = ["day", i === 5 ? "sat" : i === 6 ? "sun" : "", day === today() ? "today" : ""].join(" ");
     return `<section class="${cls}" id="d-${day}" data-day="${day}">
-      <h3><span>${name}</span><span class="pill">${md(day)}</span>${day === today() ? briefBtnHtml() : ""}${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}</h3>
-      ${day === today() && brief.data && brief.open ? briefPanelHtml() : ""}
+      <h3><span>${name}</span><span class="pill">${md(day)}</span>${briefBtnHtml(day)}${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}</h3>
+      ${briefPanelHtml(day)}
       <div class="rows">${list.map(rowHtml).join("")}${tlist.map(teamRowHtml).join("")}</div>
       <button class="add" data-act="add">+ 새로 만들기</button></section>`;
   }).join("");
@@ -1152,7 +1157,7 @@ $("#days").addEventListener("click", async (e) => {
   }
   if (act === "open") openSheet(taskOf(e.target));
   if (act === "dl") { const b = e.target.closest("[data-act]"); popFor?.t?.id === taskOf(b).id && popFor.kind === "dl" ? closePop() : openPop(b, taskOf(b), "dl"); }
-  if (act === "brief") return briefClick();
+  if (act === "brief") return briefClick(e.target.closest(".day").dataset.day);
   if (act === "timer") toggleTimer(taskOf(e.target));
   if (act === "est" || act === "start") { const b = e.target.closest("[data-act]"); popFor?.t.id === taskOf(b).id && popFor.kind === act ? closePop() : openPop(b, taskOf(b), act); }
   if (act === "star") { const t = taskOf(e.target); if (await save(t.id, { important: !t.important })) renderWeek(); }
