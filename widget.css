@@ -1,0 +1,34 @@
+:root { --bg: #161616; --panel: #1f1f1f; --line: #2c2c2c; --text: #e8e8e8; --sub: #9b9b9b; --green: #4dab9a; --red: #ff4d4f; --orange: #e9a23b; --blue: #2383e2; --accent: #8b6fd6; color-scheme: dark; }
+@media (prefers-color-scheme: light) { :root { --bg: #fafaf9; --panel: #fff; --line: #e9e9e7; --text: #37352f; --sub: #787774; color-scheme: light; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 13.5px/1.45 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.hidden { display: none !important; }
+header { position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 8px; padding: 10px 12px 8px; background: var(--bg); border-bottom: 1px solid var(--line); }
+header b { font-size: 16px; } header .clock { color: var(--sub); font-variant-numeric: tabular-nums; margin-right: auto; }
+header a { color: var(--sub); font-size: 12px; text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; }
+.sum { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px 2px; }
+.sum span { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); }
+.sum .hot { background: var(--red); border-color: var(--red); color: #fff; } .sum .ok { background: var(--green); border-color: var(--green); color: #fff; }
+section { margin: 8px 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); }
+section h2 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 13px; cursor: pointer; user-select: none; }
+section h2 small { color: var(--sub); font-weight: 400; margin-left: auto; }
+section.closed .list { display: none; }
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin: 2px 0 6px; } .bar i { display: block; height: 100%; background: var(--green); }
+.it { display: flex; gap: 8px; align-items: flex-start; padding: 4px 2px; border-top: 1px solid var(--line); }
+.it:first-child { border-top: 0; }
+.it input { width: 15px; height: 15px; margin: 2px 0 0; flex: none; accent-color: var(--green); }
+.it .t { flex: 1; min-width: 0; } .it.done .t { color: var(--sub); text-decoration: line-through; }
+.it.hot:not(.done) .t { color: var(--red); font-weight: 700; }
+.it.red { background: color-mix(in srgb, #ff4d4f 12%, transparent); } .it.green { background: color-mix(in srgb, var(--green) 12%, transparent); } .it.yellow { background: color-mix(in srgb, #e9c23b 16%, transparent); }
+.tag { font-size: 11px; padding: 0 6px; border-radius: 5px; white-space: nowrap; border: 1px solid var(--line); color: var(--sub); margin-left: 4px; }
+.tag.soon { background: var(--orange); border-color: var(--orange); color: #fff; } .tag.over { background: var(--red); border-color: var(--red); color: #fff; }
+.tag.run { background: var(--green); border-color: var(--green); color: #fff; font-variant-numeric: tabular-nums; } .tag.team { background: #0f9d76; border-color: #0f9d76; color: #fff; } .tag.asg { background: var(--blue); border-color: var(--blue); color: #fff; }
+.empty { color: var(--sub); font-size: 12px; padding: 2px; }
+.done-all { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--green) 22%, transparent); font-weight: 600; font-size: 12.5px; }
+table { width: 100%; border-collapse: collapse; } td { padding: 3px 2px; border-top: 1px solid var(--line); font-size: 12.5px; } td.n { text-align: right; color: var(--sub); white-space: nowrap; }
+#login { padding: 24px 16px; text-align: center; color: var(--sub); } #login a { color: var(--accent); }
+#login b { color: var(--text); font-size: 15px; } #login form { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+#login input { padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; }
+.lbtn { padding: 9px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; } #lmsg { color: var(--red); font-size: 12px; min-height: 16px; }
+footer { color: var(--sub); font-size: 11px; text-align: center; padding: 4px 0 12px; }
