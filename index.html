@@ -431,6 +431,7 @@ const toLocalInput = (iso) => { const d = new Date(iso); return `${W.ymd(d)}T${S
 
 // ── 이름·역할 (대표만 업무 배정) ──
 let myRole = "manager", myPhone = "";
+const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
   let { data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).maybeSingle();
   while (!data) {
@@ -599,7 +600,7 @@ async function loadTeam() {
     <h3>팀 업무 (지난 1주 ~ 앞으로)</h3>${list}
     <h3>팀 구성 — 매니저가 가입하면 여기서 팀을 정해 주세요</h3>
     ${teams.map((x) => `<div class="tcard"><b>${esc(x.name)}</b>${mgrs.filter((m) => m.team_id === x.id).map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("") || `<span style="color:var(--sub)">아직 없음</span>`}</div>`).join("")}
-    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
+    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${!KAKAO ? "" : m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
     : my?.team_id ? `<h2>👥 ${esc(teams.find((x) => x.id === my.team_id)?.name ?? "")}</h2>
       <div class="tcard">${people.map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("")}</div>
       <h3>우리 팀 업무 — 누가 끝내도 팀 전체 완료</h3>${list}`
@@ -865,7 +866,7 @@ function openPrefs(anchor) {
   const pop = $("#pop");
   pop.innerHTML = `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
-    + `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`
+    + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
     + `<a class="tg" href="widget.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">💻 맥북 위젯 열기 ↗</a>`;
   pop.classList.remove("hidden");
   const r = anchor.getBoundingClientRect();
