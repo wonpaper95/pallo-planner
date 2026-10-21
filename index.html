@@ -324,6 +324,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <header>
     <button id="weeksBtn" class="btn ghost" title="주 목록">☰</button>
     <span class="logo">팔로 플래너</span>
+    <span id="previewBar" class="hidden" style="padding:2px 10px;border-radius:99px;background:var(--orange);color:#fff;font-size:12px;font-weight:600;cursor:pointer" title="누르면 대표 화면으로">👀 매니저 화면 미리보기 중 · 끄기</span>
     <span id="me"></span>
     <button id="todayBtn" class="btn ghost">오늘</button>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
@@ -442,15 +443,22 @@ function fail(error) { if (error) { console.error(error); toast("저장 실패: 
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager", myPhone = "";
+let myRole = "manager", myPhone = "", isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
+const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
   let { data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).maybeSingle();
   if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).single()); }
-  myRole = data.role; myPhone = data.phone ?? ""; $("#me").textContent = `${data.name} · ${me.email}`;
+  isBoss = data.role === "admin";
+  try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; } catch {}
+  myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
+  if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
+  $("#previewBar").classList.toggle("hidden", !previewTeam);
+  if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
 }
+$("#previewBar").onclick = () => { try { localStorage.removeItem("planner-preview"); } catch {} location.reload(); };
 // 처음 가입: 명단에서 내 이름 고르기 → 지점 팀까지 자동 (직접 입력 없음)
 function pickName() {
   return new Promise((done) => {
@@ -488,6 +496,7 @@ async function boot() {
   applyPrefs();
   await loadProfile();
   await loadAll(true);
+  if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
   listen();
   pushButton();
   loadBrief();
@@ -522,7 +531,7 @@ async function loadAll(scrollToday) {
     myRole === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: monday, p_to: sun }),
   ]);
   if (fail(t.error || d.error || s.error || m.error || tt.error)) return;
-  tasks = t.data; dues = d.data; musts = m.data; teamTasks = tt.data;
+  tasks = t.data; dues = d.data; musts = m.data; teamTasks = inTeam(tt.data);
   loadRoutine();
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
@@ -617,8 +626,8 @@ async function loadTeam() {
   const [t, p, k, r] = await Promise.all([sb.from("teams").select("*").order("sort"), sb.rpc("team_people"), sb.rpc("team_tasks_between", { p_from: from, p_to: to }),
     myRole === "admin" ? sb.rpc("roster_names") : { data: [] }]);
   if (fail(t.error || p.error || k.error || r.error)) return;
-  teams = t.data; people = p.data; roster = r.data;
-  const admin = myRole === "admin", my = people.find((x) => x.user_id === me.id);
+  teams = t.data; people = inTeam(p.data); roster = r.data; k.data = inTeam(k.data);
+  const admin = myRole === "admin", my = previewTeam ? { team_id: previewTeam } : people.find((x) => x.user_id === me.id);
   const mgrs = people.filter((x) => x.role === "manager");
   const list = k.data.map((x) => `<div class="titem ${x.done_by ? "done" : ""}"><input type="checkbox" data-tt="${x.id}" ${x.done_by ? "checked" : ""}>
     <span class="t">${md(x.day)}(${DOW[W.parse(x.day).getDay()]}) ${admin ? `<span class="mk team">${esc(x.team)}</span> ` : ""}${esc(x.title)}${x.deadline ? ` · ${fmtDl(x.deadline)}까지` : ""}</span>
@@ -897,6 +906,7 @@ function openPrefs(anchor) {
   pop.innerHTML = `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
+    + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option>${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</select></label>`)
     + `<a class="tg" href="widget.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">💻 맥북 위젯 열기 ↗</a>`;
   pop.classList.remove("hidden");
   const r = anchor.getBoundingClientRect();
@@ -906,6 +916,7 @@ function openPrefs(anchor) {
 }
 $("#prefBtn").onclick = (e) => popFor?.kind === "prefs" ? closePop() : openPrefs(e.currentTarget);
 $("#pop").addEventListener("change", async (e) => {
+  if (e.target.id === "previewSel") { try { localStorage.setItem("planner-preview", e.target.value); } catch {} return location.reload(); }
   if (e.target.id === "myPhone") { // 카톡 알림톡 받을 번호
     const v = e.target.value.replace(/\D/g, "");
     if (v && !/^01\d{8,9}$/.test(v)) return toast("휴대폰 번호를 확인해 주세요 (예: 01012345678)");
