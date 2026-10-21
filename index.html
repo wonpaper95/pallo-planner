@@ -114,7 +114,8 @@ dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .titem { display: flex; gap: 10px; align-items: center; padding: 7px 4px; border-bottom: 1px solid var(--line); }
 .titem input { width: 18px; height: 18px; accent-color: var(--green); } .titem .t { flex: 1; min-width: 0; } .titem.done .t { color: var(--sub); text-decoration: line-through; }
 .titem .who { font-size: 12px; color: var(--green); white-space: nowrap; } .titem button { color: var(--sub); font-size: 12px; }
-.tmem { display: grid; grid-template-columns: 1fr 160px; gap: 6px; align-items: center; padding: 4px 0; }
+.tmem { display: grid; grid-template-columns: 1fr 160px auto; gap: 6px; align-items: center; padding: 4px 0; }
+.tmem [data-temppw] { font-size: 12.5px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); white-space: nowrap; }
 .mk.team { color: #fff; background: #0f9d76; border-color: #0f9d76; }
 .row.teamrow textarea, .row.teamrow .ttl { color: var(--text); } .row.teamrow.done .ttl { color: var(--sub); text-decoration: line-through; }
 .row .ttl { line-height: 1.5; padding-top: 1px; }
@@ -365,7 +366,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="teamView"></section>
 </div>
 
-<dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
+<dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p id="pwNote" style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
   <form id="pwForm"><input id="pw1" type="password" minlength="6" autocomplete="new-password" placeholder="새 비밀번호" required style="margin-top:10px">
   <input id="pw2" type="password" minlength="6" autocomplete="new-password" placeholder="한 번 더" required style="margin-top:8px"><div class="msg" id="pwMsg" style="color:var(--red);font-size:13px;min-height:18px;margin-top:6px"></div>
   <button class="btn" type="submit" style="width:100%">바꾸기</button><button class="btn ghost" type="button" id="pwCancel" style="width:100%;margin-top:6px">닫기</button></form></dialog>
@@ -434,7 +435,6 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <script src="week.js"></script>
 <script src="pick.js"></script>
 <script>
-const RECOVERY = /type=recovery/.test(location.hash); // 비밀번호 재설정 메일 링크로 들어옴 (supabase 가 주소를 지우기 전에 기억)
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -456,8 +456,9 @@ let myRole = "manager", myPhone = "", myName = "", isBoss = false, previewTeam =
 const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
-  let { data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).maybeSingle();
-  if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).single()); }
+  let { data } = await sb.from("profiles").select("name, role, phone, temp_pw").eq("user_id", me.id).maybeSingle();
+  if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone, temp_pw").eq("user_id", me.id).single()); }
+  if (data.temp_pw) openPwDlg(true);
   isBoss = data.role === "admin";
   try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; } catch {}
   myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
@@ -503,7 +504,6 @@ async function boot() {
   if (!me) return;
   $("#me").textContent = me.email;
   applyPrefs();
-  if (RECOVERY) openPwDlg();
   await loadProfile();
   await loadAll(true);
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
@@ -526,22 +526,23 @@ $("#signup").onclick = async () => {
   if (!data.session) return ($("#authMsg").textContent = "가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요");
   boot();
 };
-// 🔑 비밀번호: 잊었으면 메일 링크로 → 새 비밀번호 창, 로그인 중이면 ⚙️에서 바로
-$("#forgot").onclick = async () => {
-  const email = $("#email").value.trim();
-  if (!email) return ($("#authMsg").textContent = "위 칸에 가입한 이메일을 먼저 적어 주세요");
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
-  $("#authMsg").style.color = error ? "" : "var(--green)";
-  $("#authMsg").textContent = error ? (/rate|seconds/i.test(error.message) ? "방금 보냈어요. 잠시 후 다시 눌러 주세요" : error.message)
-    : "📧 재설정 메일을 보냈어요. 메일의 링크를 누르면 새 비밀번호를 정할 수 있어요 (안 보이면 스팸함 확인)";
-};
-function openPwDlg() { if ($("#pwDlg").open) return; $("#pwForm").reset(); $("#pwMsg").textContent = ""; $("#pwDlg").showModal(); }
+// 🔑 비밀번호: 잊었으면 대표님이 [팀] 탭에서 임시 비밀번호 발급 → 그걸로 로그인하면 새 비밀번호 창(꼭 바꿔야 닫힘). 로그인 중이면 ⚙️에서 바로
+$("#forgot").onclick = () => { $("#authMsg").style.color = "var(--text)"; $("#authMsg").textContent = "🔑 대표님께 임시 비밀번호를 받아 로그인하세요. 로그인하면 바로 새 비밀번호를 정할 수 있어요"; };
+let pwForced = false;
+function openPwDlg(forced = false) {
+  if ($("#pwDlg").open) return;
+  pwForced = forced; $("#pwForm").reset(); $("#pwMsg").textContent = "";
+  $("#pwNote").textContent = forced ? "임시 비밀번호로 들어오셨어요. 앞으로 쓸 비밀번호를 정해 주세요 (6자 이상)" : "6자 이상으로 정해 주세요";
+  $("#pwCancel").classList.toggle("hidden", forced); $("#pwDlg").showModal();
+}
+$("#pwDlg").oncancel = (e) => pwForced && e.preventDefault(); // 임시 비밀번호면 Esc 로 못 닫게
 $("#pwCancel").onclick = () => $("#pwDlg").close();
 $("#pwForm").onsubmit = async (e) => {
   e.preventDefault();
   if ($("#pw1").value !== $("#pw2").value) return ($("#pwMsg").textContent = "두 칸이 달라요");
   const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
   if (error) return ($("#pwMsg").textContent = /different/i.test(error.message) ? "예전과 다른 비밀번호로 정해 주세요" : error.message);
+  if (pwForced) await sb.rpc("clear_temp_pw");
   $("#pwDlg").close(); toast("🔑 비밀번호를 바꿨어요. 다음부터 새 비밀번호로 로그인하세요");
 };
 $("#outBtn").onclick = async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); };
@@ -673,7 +674,8 @@ async function loadTeam() {
     <div class="tform"><input id="rsName" class="ti" placeholder="새 매니저 이름" maxlength="30"><select id="rsTeam">${teams.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select><button id="rsAdd" class="btn">명단에 추가</button></div>
     <h3>팀 구성 — 이름을 고르면 자동으로 들어가요. 바꿀 때만 여기서</h3>
     ${teams.map((x) => `<div class="tcard"><b>${esc(x.name)}</b>${mgrs.filter((m) => m.team_id === x.id).map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("") || `<span style="color:var(--sub)">아직 없음</span>`}</div>`).join("")}
-    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${!KAKAO ? "" : m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
+    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${!KAKAO ? "" : m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select>
+      <button data-temppw="${m.user_id}" data-name="${esc(m.name)}" title="비밀번호 잊은 매니저에게 임시 비밀번호 발급">🔑 임시 비밀번호</button></div>`).join("")}`
     : my?.team_id ? `<h2>👥 ${esc(teams.find((x) => x.id === my.team_id)?.name ?? "")}</h2>
       <div class="tcard">${people.map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("")}</div>
       <h3>우리 팀 업무 — 누가 끝내도 팀 전체 완료</h3>${list}`
@@ -694,6 +696,14 @@ $("#teamView").addEventListener("click", async (e) => {
     const { error } = await sb.from("team_tasks").insert(ids.map((team_id) => ({ team_id, day, title, deadline: tm ? new Date(`${day}T${tm}`).toISOString() : null })));
     if (fail(error)) return;
     toast(`👥 ${ids.length}개 팀에 넣었어요. 팀원 폰으로 알림이 가요`); loadTeam();
+  }
+  if (e.target.dataset.temppw) {
+    const name = e.target.dataset.name;
+    if (!confirm(`${name} 님 비밀번호를 임시 비밀번호로 바꿀까요?\n(지금 비밀번호는 더 이상 안 돼요)`)) return;
+    const { data, error } = await sb.rpc("admin_temp_password", { p_user: e.target.dataset.temppw });
+    if (fail(error)) return;
+    prompt(`${name} 님 임시 비밀번호예요. 복사해서 전달해 주세요.\n로그인하면 바로 새 비밀번호를 정하게 돼요.`, data);
+    return;
   }
   if (e.target.id === "rsAdd") {
     const name = $("#rsName").value.trim(); if (!name) return toast("이름을 적어 주세요");
@@ -1354,7 +1364,7 @@ $("#pushBtn").onclick = async () => {
 };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") location.reload(); if (ev === "PASSWORD_RECOVERY") setTimeout(openPwDlg, 0); }); // 콜백 안에서 auth 부르면 멈춤 → 한 박자 뒤
+sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
 </body>
