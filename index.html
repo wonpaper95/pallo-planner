@@ -452,7 +452,7 @@ function fail(error) { if (error) { console.error(error); toast("저장 실패: 
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager", myPhone = "", myName = "", isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
+let myRole = "manager", myPhone = "", myName = "", kakaoMe = false, isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
 const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
@@ -465,6 +465,7 @@ async function loadProfile() {
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
+  if (isBoss) kakaoMe = !!(await sb.rpc("kakao_linked")).data; // 💬 카톡 '나에게 보내기' 연결됐는지
   $("#previewBar").classList.toggle("hidden", !previewTeam);
   if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
 }
@@ -507,6 +508,12 @@ async function boot() {
   await loadProfile();
   await loadAll(true);
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
+  const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
+  if (kk) {
+    history.replaceState(null, "", location.pathname);
+    toast({ ok: "💬 카카오톡 연결 완료! '나와의 채팅'에 확인 메시지를 보냈어요", nomsg: "💬 연결은 됐는데 확인 메시지를 못 보냈어요. 카카오 앱 설정을 확인해 주세요",
+      cancel: "카카오 연결을 취소했어요", expired: "시간이 지나서 다시 눌러 주세요" }[kk] ?? "카카오 연결에 실패했어요. 다시 시도해 주세요");
+  }
   listen();
   pushButton();
   loadBrief();
@@ -956,6 +963,9 @@ function openPrefs(anchor) {
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
     + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option>${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</select></label>`)
+    + (!isBoss ? "" : `<div class="tg" style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">💬 카톡으로도 받기${kakaoMe
+      ? `<span style="color:var(--green)">연결됨 ✓ <button id="kakaoOff" style="color:var(--sub);font-size:12px;margin-left:6px">끊기</button></span>`
+      : `<button id="kakaoOn" style="color:var(--accent);font-weight:600">연결하기</button>`}</div>`)
     + `<label class="tg">✏️ 내 이름<input id="myName" value="${esc(myName)}" maxlength="30" style="width:130px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`
     + `<button id="pwBtn" class="tg" style="display:block;width:100%;text-align:left;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">🔑 비밀번호 바꾸기</button>`
     + `<a class="tg" href="widget.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">💻 맥북 위젯 열기 ↗</a>`;
@@ -990,6 +1000,13 @@ $("#pop").addEventListener("change", async (e) => {
 const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
 $("#pop").onclick = async (e) => {
   if (e.target.id === "pwBtn") { closePop(); return openPwDlg(); }
+  if (e.target.id === "kakaoOn" || e.target.id === "kakaoOff") { // 💬 카카오 로그인 다녀오면 ?kakao=ok 로 돌아옴
+    if (e.target.id === "kakaoOff" && !confirm("카카오톡 알림을 끊을까요? (푸시 알림은 그대로 와요)")) return;
+    const { data, error } = await sb.functions.invoke("planner-kakao", { body: { action: e.target.id === "kakaoOn" ? "start" : "unlink" } });
+    if (error) { let m = "연결하지 못했어요"; try { m = (await error.context.json()).error || m; } catch {} return toast(m); }
+    if (data.url) return (location.href = data.url);
+    kakaoMe = false; closePop(); return toast("카카오톡 알림을 끊었어요");
+  }
   if (!popFor || popFor.kind === "prefs") return;
   const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
   const patch = pickPatch(t, kind, b, $("#pop")); if (!patch) return;
