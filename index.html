@@ -259,6 +259,10 @@ body:not(.tv) #teamView { display: none; }
 
 /* 상세 시트 */
 dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); width: min(480px, calc(100vw - 24px)); padding: 18px; }
+.nteam { margin: 10px 0 0; } .nteam b { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; font-weight: 600; }
+.nbtn { padding: 8px 16px; margin: 0 6px 6px 0; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; }
+.nbtn:hover:not(:disabled) { border-color: var(--accent); } .nbtn:disabled { opacity: .4; cursor: default; }
+.chipname [data-rmname] { margin-left: 4px; color: var(--sub); } .chipname small { color: var(--sub); }
 dialog::backdrop { background: rgba(0,0,0,.5); }
 dialog label { display: block; font-size: 13px; color: var(--sub); margin: 14px 0 4px; }
 dialog input:not([type=checkbox]), dialog select, dialog textarea { width: 100%; padding: 9px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
@@ -356,6 +360,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="teamView"></section>
 </div>
 
+<dialog id="nameDlg"><h3 style="margin:0 0 4px">👋 내 이름을 골라 주세요</h3>
+  <p style="color:var(--sub);font-size:13px;margin:0 0 6px">고르면 지점 팀도 자동으로 정해져요. 명단에 없으면 대표님께 말씀해 주세요.</p>
+  <div id="nameList"></div><button class="btn ghost" id="nameOut" style="margin-top:12px;width:100%">다른 계정으로 로그인</button></dialog>
 <dialog id="sheet">
   <input class="ttl" id="sTitle" placeholder="할 일">
   <div id="sAsg" class="asgnote hidden"></div>
@@ -439,15 +446,34 @@ let myRole = "manager", myPhone = "";
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
   let { data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).maybeSingle();
-  while (!data) {
-    const name = (prompt("처음 오셨네요! 이름을 적어 주세요 (대표님이 업무를 배정할 때 이 이름으로 찾아요)\n예) 김예원") || "").trim();
-    if (!name) continue;
-    const r = await sb.from("profiles").insert({ name }).select("name, role, phone").single();
-    if (!fail(r.error)) data = r.data;
-  }
+  if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).single()); }
   myRole = data.role; myPhone = data.phone ?? ""; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
+}
+// 처음 가입: 명단에서 내 이름 고르기 → 지점 팀까지 자동 (직접 입력 없음)
+function pickName() {
+  return new Promise((done) => {
+    const dlg = $("#nameDlg");
+    const draw = async () => {
+      const { data, error } = await sb.rpc("roster_names");
+      if (fail(error)) return;
+      const by = {}; for (const r of data) (by[r.team ?? "지점 없음"] ??= []).push(r);
+      $("#nameList").innerHTML = Object.entries(by).map(([tm, rs]) => `<div class="nteam"><b>${esc(tm)}</b>${rs.map((r) =>
+        `<button class="nbtn" data-name="${esc(r.name)}" ${r.taken ? "disabled title=\"이미 가입했어요\"" : ""}>${esc(r.name)}${r.taken ? " ✓" : ""}</button>`).join("")}</div>`).join("")
+        || `<div style="color:var(--sub)">명단이 비어 있어요 — 대표님께 말씀해 주세요</div>`;
+    };
+    $("#nameList").onclick = async (e) => {
+      const b = e.target.closest("[data-name]"); if (!b) return;
+      if (!confirm(`'${b.dataset.name}' 님으로 가입할까요?\n(나중에 바꾸려면 대표님께 말씀해야 해요)`)) return;
+      const { error } = await sb.rpc("claim_name", { p_name: b.dataset.name });
+      if (fail(error)) return draw();
+      dlg.close(); done();
+    };
+    $("#nameOut").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+    dlg.oncancel = (e) => e.preventDefault(); // Esc 로 못 닫게
+    draw(); dlg.showModal();
+  });
 }
 const assignedToMe = (t) => t.assigned_by && t.assigned_by !== me.id;
 
@@ -585,12 +611,13 @@ $("#rtDialog").querySelector(".quick").onclick = async (e) => {
 };
 
 // ── 👥 팀 화면 ──
-let teams = [], people = [];
+let teams = [], people = [], roster = [];
 async function loadTeam() {
   const from = W.add(today(), -7), to = W.add(today(), 45);
-  const [t, p, k] = await Promise.all([sb.from("teams").select("*").order("sort"), sb.rpc("team_people"), sb.rpc("team_tasks_between", { p_from: from, p_to: to })]);
-  if (fail(t.error || p.error || k.error)) return;
-  teams = t.data; people = p.data;
+  const [t, p, k, r] = await Promise.all([sb.from("teams").select("*").order("sort"), sb.rpc("team_people"), sb.rpc("team_tasks_between", { p_from: from, p_to: to }),
+    myRole === "admin" ? sb.rpc("roster_names") : { data: [] }]);
+  if (fail(t.error || p.error || k.error || r.error)) return;
+  teams = t.data; people = p.data; roster = r.data;
   const admin = myRole === "admin", my = people.find((x) => x.user_id === me.id);
   const mgrs = people.filter((x) => x.role === "manager");
   const list = k.data.map((x) => `<div class="titem ${x.done_by ? "done" : ""}"><input type="checkbox" data-tt="${x.id}" ${x.done_by ? "checked" : ""}>
@@ -603,7 +630,10 @@ async function loadTeam() {
       <input id="ttTitle" class="ti" placeholder="예) 이번주 전단지 50장 비치하기"><input id="ttDay" type="date" value="${today()}"><input id="ttTime" type="time" title="마감 시각(선택)">
       <button id="ttAdd" class="btn">넣기</button></div>
     <h3>팀 업무 (지난 1주 ~ 앞으로)</h3>${list}
-    <h3>팀 구성 — 매니저가 가입하면 여기서 팀을 정해 주세요</h3>
+    <h3>가입 명단 — 매니저는 가입할 때 여기서 자기 이름을 골라요 (✓ = 가입함, 팀은 자동)</h3>
+    <div class="tcard">${roster.map((x) => `<span class="chipname">${esc(x.name)} <small>${esc(x.team ?? "")}</small>${x.taken ? " ✓" : `<button data-rmname="${esc(x.name)}" title="명단에서 빼기">×</button>`}</span>`).join("") || `<span style="color:var(--sub)">비어 있음</span>`}</div>
+    <div class="tform"><input id="rsName" class="ti" placeholder="새 매니저 이름" maxlength="30"><select id="rsTeam">${teams.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select><button id="rsAdd" class="btn">명단에 추가</button></div>
+    <h3>팀 구성 — 이름을 고르면 자동으로 들어가요. 바꿀 때만 여기서</h3>
     ${teams.map((x) => `<div class="tcard"><b>${esc(x.name)}</b>${mgrs.filter((m) => m.team_id === x.id).map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("") || `<span style="color:var(--sub)">아직 없음</span>`}</div>`).join("")}
     ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${!KAKAO ? "" : m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
     : my?.team_id ? `<h2>👥 ${esc(teams.find((x) => x.id === my.team_id)?.name ?? "")}</h2>
@@ -626,6 +656,15 @@ $("#teamView").addEventListener("click", async (e) => {
     const { error } = await sb.from("team_tasks").insert(ids.map((team_id) => ({ team_id, day, title, deadline: tm ? new Date(`${day}T${tm}`).toISOString() : null })));
     if (fail(error)) return;
     toast(`👥 ${ids.length}개 팀에 넣었어요. 팀원 폰으로 알림이 가요`); loadTeam();
+  }
+  if (e.target.id === "rsAdd") {
+    const name = $("#rsName").value.trim(); if (!name) return toast("이름을 적어 주세요");
+    const { error } = await sb.from("roster").insert({ name, team_id: +$("#rsTeam").value });
+    if (!fail(error)) { toast(`'${name}' 님을 명단에 넣었어요`); loadTeam(); }
+  }
+  if (e.target.dataset.rmname && confirm(`'${e.target.dataset.rmname}' 님을 명단에서 뺄까요?`)) {
+    const { error } = await sb.from("roster").delete().eq("name", e.target.dataset.rmname);
+    if (!fail(error)) loadTeam();
   }
   if (e.target.dataset.rmtt && confirm("이 팀 업무를 지울까요? 팀원 화면에서도 사라져요")) {
     const { error } = await sb.from("team_tasks").delete().eq("id", e.target.dataset.rmtt);
