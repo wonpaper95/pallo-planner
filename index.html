@@ -320,6 +320,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <div class="msg" id="authMsg"></div>
     <button class="btn" type="submit">로그인</button>
     <button class="btn ghost" type="button" id="signup">처음이에요 — 이 이메일로 가입</button>
+    <button type="button" id="forgot" style="margin-top:10px;color:var(--sub);font-size:13px;text-decoration:underline">비밀번호를 잊었어요</button>
   </form>
 </div>
 
@@ -364,6 +365,10 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="teamView"></section>
 </div>
 
+<dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
+  <form id="pwForm"><input id="pw1" type="password" minlength="6" autocomplete="new-password" placeholder="새 비밀번호" required style="margin-top:10px">
+  <input id="pw2" type="password" minlength="6" autocomplete="new-password" placeholder="한 번 더" required style="margin-top:8px"><div class="msg" id="pwMsg" style="color:var(--red);font-size:13px;min-height:18px;margin-top:6px"></div>
+  <button class="btn" type="submit" style="width:100%">바꾸기</button><button class="btn ghost" type="button" id="pwCancel" style="width:100%;margin-top:6px">닫기</button></form></dialog>
 <dialog id="nameDlg"><h3 style="margin:0 0 4px">👋 내 이름을 골라 주세요</h3>
   <p style="color:var(--sub);font-size:13px;margin:0 0 6px">고르면 지점 팀도 자동으로 정해져요. 명단에 없으면 대표님께 말씀해 주세요.</p>
   <div id="nameList"></div><button class="btn ghost" id="nameOut" style="margin-top:12px;width:100%">다른 계정으로 로그인</button></dialog>
@@ -429,6 +434,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <script src="week.js"></script>
 <script src="pick.js"></script>
 <script>
+const RECOVERY = /type=recovery/.test(location.hash); // 비밀번호 재설정 메일 링크로 들어옴 (supabase 가 주소를 지우기 전에 기억)
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -446,7 +452,7 @@ function fail(error) { if (error) { console.error(error); toast("저장 실패: 
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager", myPhone = "", isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
+let myRole = "manager", myPhone = "", myName = "", isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
 const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
@@ -454,7 +460,7 @@ async function loadProfile() {
   if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).single()); }
   isBoss = data.role === "admin";
   try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; } catch {}
-  myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; $("#me").textContent = `${data.name} · ${me.email}`;
+  myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
@@ -497,6 +503,7 @@ async function boot() {
   if (!me) return;
   $("#me").textContent = me.email;
   applyPrefs();
+  if (RECOVERY) openPwDlg();
   await loadProfile();
   await loadAll(true);
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
@@ -518,6 +525,24 @@ $("#signup").onclick = async () => {
   if (error) return ($("#authMsg").textContent = error.message.includes("registered") ? "이미 가입된 이메일이에요. 로그인해 주세요" : error.message);
   if (!data.session) return ($("#authMsg").textContent = "가입 확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요");
   boot();
+};
+// 🔑 비밀번호: 잊었으면 메일 링크로 → 새 비밀번호 창, 로그인 중이면 ⚙️에서 바로
+$("#forgot").onclick = async () => {
+  const email = $("#email").value.trim();
+  if (!email) return ($("#authMsg").textContent = "위 칸에 가입한 이메일을 먼저 적어 주세요");
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $("#authMsg").style.color = error ? "" : "var(--green)";
+  $("#authMsg").textContent = error ? (/rate|seconds/i.test(error.message) ? "방금 보냈어요. 잠시 후 다시 눌러 주세요" : error.message)
+    : "📧 재설정 메일을 보냈어요. 메일의 링크를 누르면 새 비밀번호를 정할 수 있어요 (안 보이면 스팸함 확인)";
+};
+function openPwDlg() { if ($("#pwDlg").open) return; $("#pwForm").reset(); $("#pwMsg").textContent = ""; $("#pwDlg").showModal(); }
+$("#pwCancel").onclick = () => $("#pwDlg").close();
+$("#pwForm").onsubmit = async (e) => {
+  e.preventDefault();
+  if ($("#pw1").value !== $("#pw2").value) return ($("#pwMsg").textContent = "두 칸이 달라요");
+  const { error } = await sb.auth.updateUser({ password: $("#pw1").value });
+  if (error) return ($("#pwMsg").textContent = /different/i.test(error.message) ? "예전과 다른 비밀번호로 정해 주세요" : error.message);
+  $("#pwDlg").close(); toast("🔑 비밀번호를 바꿨어요. 다음부터 새 비밀번호로 로그인하세요");
 };
 $("#outBtn").onclick = async () => { await sb.auth.signOut({ scope: "local" }); location.reload(); };
 
@@ -921,6 +946,8 @@ function openPrefs(anchor) {
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
     + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option>${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</select></label>`)
+    + `<label class="tg">✏️ 내 이름<input id="myName" value="${esc(myName)}" maxlength="30" style="width:130px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`
+    + `<button id="pwBtn" class="tg" style="display:block;width:100%;text-align:left;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">🔑 비밀번호 바꾸기</button>`
     + `<a class="tg" href="widget.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">💻 맥북 위젯 열기 ↗</a>`;
   pop.classList.remove("hidden");
   const r = anchor.getBoundingClientRect();
@@ -930,6 +957,12 @@ function openPrefs(anchor) {
 }
 $("#prefBtn").onclick = (e) => popFor?.kind === "prefs" ? closePop() : openPrefs(e.currentTarget);
 $("#pop").addEventListener("change", async (e) => {
+  if (e.target.id === "myName") {
+    const { error } = await sb.rpc("rename_me", { p_name: e.target.value });
+    if (fail(error)) { e.target.value = myName; return; }
+    myName = e.target.value.trim(); $("#me").textContent = `${myName} · ${me.email}`; toast("✏️ 이름을 바꿨어요");
+    return;
+  }
   if (e.target.id === "previewSel") { try { localStorage.setItem("planner-preview", e.target.value); } catch {} return location.reload(); }
   if (e.target.id === "myPhone") { // 카톡 알림톡 받을 번호
     const v = e.target.value.replace(/\D/g, "");
@@ -946,6 +979,7 @@ $("#pop").addEventListener("change", async (e) => {
 });
 const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
 $("#pop").onclick = async (e) => {
+  if (e.target.id === "pwBtn") { closePop(); return openPwDlg(); }
   if (!popFor || popFor.kind === "prefs") return;
   const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
   const patch = pickPatch(t, kind, b, $("#pop")); if (!patch) return;
@@ -1320,7 +1354,7 @@ $("#pushBtn").onclick = async () => {
 };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
+sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT") location.reload(); if (ev === "PASSWORD_RECOVERY") setTimeout(openPwDlg, 0); }); // 콜백 안에서 auth 부르면 멈춤 → 한 박자 뒤
 boot();
 </script>
 </body>
