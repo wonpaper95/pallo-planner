@@ -64,9 +64,9 @@ function render() {
   $("#tdN").textContent = `${doneN}/${rows.length}`;
   $("#tdList").innerHTML = rows.map(({ k, t }) => k === "team"
     ? `<label class="it ${t.done_by ? "done" : ""}"><input type="checkbox" data-team="${t.id}" ${t.done_by ? "checked" : ""}><span class="t">${esc(t.title)}<span class="tag team">👥 ${esc(t.team)}</span>${t.done_by ? `<span class="tag">✅ ${esc(t.done_name ?? "")}</span>` : ""}</span></label>`
-    : `<label class="it ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""}"><input type="checkbox" data-task="${t.id}" ${t.done ? "checked" : ""}><span class="t">${t.must_do ? "🔥" : ""}${t.important ? "★" : ""}${t.start_time ? `<b>${t.start_time.slice(0, 5)}(시작!)</b> ` : ""}${esc(t.title)}`
-      + `${t.assigned_by && t.assigned_by !== me.id ? `<span class="tag asg">📨</span>` : ""}${t.started_at ? `<span class="tag run" data-run="${t.id}">⏸ ${hms(elapsed(t))}</span>` : ""}`
-      + `${t.estimate_min ? `<span class="tag">⏳${t.estimate_min}분 해결목표</span>` : ""}${t.deadline && !t.done ? `<span class="tag ${W.due(t.deadline).cls}">${hm(t.deadline)}</span>` : ""}</span></label>`).join("")
+    : `<div class="it task ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""}"><input type="checkbox" id="ck${t.id}" data-task="${t.id}" ${t.done ? "checked" : ""}>`
+      + `<div class="t"><label for="ck${t.id}">${t.must_do ? "🔥" : ""}${esc(t.title)}${t.assigned_by && t.assigned_by !== me.id ? `<span class="tag asg">📨</span>` : ""}</label><div class="meta">${qbtns(t)}</div></div>`
+      + `<button class="star ${t.important ? "on" : ""}" data-act="star" data-id="${t.id}" title="중요">${t.important ? "★" : "☆"}</button></div>`).join("")
     || `<div class="empty">오늘 할 일이 없어요</div>`;
   // ⏰ 데드라인 48시간 (오늘 것 포함, 지난 것도)
   $("#dueList").innerHTML = dues.map((t) => { const u = W.due(t.deadline); return `<div class="it"><span class="t">${esc(t.title)}</span><span class="tag ${u.cls}">${u.text}</span></div>`; }).join("") || `<div class="empty">48시간 안 마감 없음</div>`;
@@ -78,6 +78,42 @@ function render() {
   $("#foot").textContent = `실시간 연결됨 · ${hm(new Date().toISOString())} 갱신`;
   if (globalThis.chrome?.runtime?.id) chrome.runtime.sendMessage("badge").catch(() => {}); // 확장 배지
 }
+
+// 줄 버튼: 플래너와 같은 🕐 시작 · ⏳ 예상 · ▶ 타이머 · 📅 데드라인 (끝낸 일은 값 있는 것만)
+function qbtns(t) {
+  const st = t.start_time?.slice(0, 5), est = t.estimate_min, sec = elapsed(t), run = !!t.started_at;
+  const b = (act, on, label, cls = "", extra = "") => t.done && !on ? "" : `<button class="qb ${on ? "" : "empty"} ${cls}" data-act="${act}" data-id="${t.id}" ${extra}>${label}</button>`;
+  return b("start", st, `🕐${st ? ` ${st}(시작!)` : ""}`)
+    + b("est", est, `⏳${est ? ` ${minLabel(est)} 해결목표` : ""}`)
+    + b("timer", sec, run ? `⏸ ${hms(sec)}` : sec ? `${t.done ? "⏱" : "▶"} ${hms(sec)}` : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
+    + b("dl", t.deadline, t.deadline ? `📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + W.due(t.deadline).text}` : "📅", t.deadline && !t.done ? W.due(t.deadline).cls : "");
+}
+async function save(id, patch) {
+  const { error } = await sb.from("tasks").update(patch).eq("id", id);
+  if (error) $("#foot").textContent = "저장 실패: " + error.message;
+  load();
+}
+let popFor = null;
+const pop = $("#pop"), closePop = () => { pop.classList.add("hidden"); popFor = null; };
+document.addEventListener("click", async (e) => {
+  const pb = e.target.closest("#pop button");
+  if (pb && popFor) { const patch = pickPatch(popFor.t, popFor.kind, pb, pop); if (patch) { const id = popFor.t.id; closePop(); save(id, patch); } return; }
+  const b = e.target.closest("#tdList [data-act]"); if (!b) return;
+  const t = state.tasks.find((x) => x.id == b.dataset.id), act = b.dataset.act; if (!t) return;
+  if (act === "star") return save(t.id, { important: !t.important });
+  if (act === "timer") {
+    if (t.done) return;
+    const { error } = await sb.rpc("timer", { p_id: t.id, p_on: !t.started_at });
+    if (error) $("#foot").textContent = "저장 실패: " + error.message;
+    return load();
+  }
+  if (popFor?.t.id === t.id && popFor.kind === act) return closePop();
+  pop.innerHTML = pickHtml(t, act, t.assigned_by && t.assigned_by !== me.id);
+  pop.classList.toggle("dlpop", act === "dl");
+  placePop(pop, b); popFor = { t, kind: act };
+});
+document.addEventListener("pointerdown", (e) => popFor && !e.target.closest("#pop, #tdList [data-act]") && closePop());
+document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && closePop());
 
 // 체크하면 플래너와 같은 DB 에 바로 저장
 document.addEventListener("change", async (e) => {
@@ -119,6 +155,7 @@ async function boot() {
   if (!me) return;
   const { data: p } = await sb.from("profiles").select("role").eq("user_id", me.id).maybeSingle();
   role = p?.role ?? "manager";
+  for (const [k, v] of Object.entries(me.user_metadata?.prefs ?? {})) document.body.classList.toggle("off-" + k, v === false); // 플래너 ⚙️ 보기 설정 그대로
   if (role === "admin") $("#sRoutine h2").firstChild.textContent = "📌 매니저 고정업무 ";
   await load();
   sb.channel("w-tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, soft).subscribe();

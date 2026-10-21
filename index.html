@@ -416,6 +416,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="week.js"></script>
+<script src="pick.js"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -432,8 +433,6 @@ let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
 function fail(error) { if (error) { console.error(error); toast("저장 실패: " + (error.message || error)); return true; } }
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
-function fmtDl(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.getDate()}(${KDAY[d.getDay()]}) ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
-const toLocalInput = (iso) => { const d = new Date(iso); return `${W.ymd(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
 let myRole = "manager", myPhone = "";
@@ -835,50 +834,18 @@ function timeBtn(t) {
   return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}">${t.done ? "⏱" : run ? "⏸" : "▶"} <b>${hms(sec, run)}</b></button>`;
 }
 // 시작시간·예상시간 버튼 (누르면 작은 선택창)
-const minLabel = (m) => m < 60 ? `${m}분` : m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`;
 function quickBtns(t) {
   const st = t.start_time?.slice(0, 5), est = t.estimate_min;
   if (t.done && !st && !est) return "";
   return `<button class="qb ${st ? "" : "empty"}" data-act="start" title="업무 시작시간">🕐${st ? ` ${st}(시작!)` : ""}</button>`
     + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">⏳${est ? ` ${minLabel(est)} 해결목표` : ""}</button>`;
 }
-// 🕐 시작시간 고르기: 추천 9개 + 아래 시간칸은 처음부터 '오후 02:30'처럼 채워둠(정해진 시각, 없으면 지금에서 가까운 30분)
-function startPickHtml(t) {
-  const now = new Date(), nowHm = `${pad(now.getHours())}:${pad(Math.floor(now.getMinutes() / 5) * 5)}`;
-  const half = new Date(Math.ceil(now.getTime() / 1800000) * 1800000), def = t.start_time?.slice(0, 5) ?? `${pad(half.getHours())}:${pad(half.getMinutes())}`;
-  return `<div class="grid"><button data-v="${nowHm}">지금</button>${["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "18:00"].map((h) =>
-    `<button data-v="${h}" class="${t.start_time?.slice(0, 5) === h ? "on" : ""}">${h}</button>`).join("")}</div>
-    <div class="own"><input type="time" value="${def}"><button class="btn" data-own>확인</button></div>
-    ${t.start_time ? `<button class="clear" data-v="">지우기</button>` : ""}`;
-}
-// 데드라인 빠른 선택 (상세 창·📅 작은 창 공용). clear 면 null
-function quickDl(t, q) {
-  const at = (day, h) => { const d = W.parse(day); d.setHours(h, 0, 0, 0); return d; };
-  const base = t.deadline ? new Date(t.deadline) : at(t.day, 18);
-  return q === "today18" ? at(today(), 18) : q === "tom9" ? at(W.add(today(), 1), 9) : q === "tom18" ? at(W.add(today(), 1), 18)
-    : q === "+1d" ? new Date(base.getTime() + 86400000) : q === "+1w" ? new Date(base.getTime() + 7 * 86400000) : null;
-}
 let popFor = null;
 function openPop(anchor, t, kind) {
-  const pop = $("#pop"), now = new Date();
-  if (kind === "est") {
-    pop.innerHTML = `<h4>⏳ 예상 소요시간</h4><div class="grid">${[15, 30, 45, 60, 90, 120, 180, 240, 480].map((m) =>
-      `<button data-v="${m}" class="${t.estimate_min === m ? "on" : ""}">${minLabel(m)}</button>`).join("")}</div>
-      <div class="own"><input type="number" min="1" inputmode="numeric" placeholder="직접 (분)"><button class="btn" data-own>확인</button></div>
-      ${t.estimate_min ? `<button class="clear" data-v="">지우기</button>` : ""}`;
-  } else if (kind === "dl") {
-    pop.innerHTML = assignedToMe(t) ? `<h4>📅 데드라인</h4><div style="font-size:13px">대표님이 정한 데드라인이라 바꿀 수 없어요${t.deadline ? `<br><b>${fmtDl(t.deadline)}</b>` : ""}</div>`
-      : `<h4>📅 ${t.deadline ? "데드라인 재설정" : "데드라인 (고르면 설정돼요)"}</h4>
-      <div class="own"><input type="datetime-local" value="${toLocalInput(t.deadline ?? new Date())}"><button class="btn" data-own>확인</button></div>
-      <div class="grid" style="margin-top:6px">${[["today18", "오늘 18:00"], ["tom9", "내일 09:00"], ["tom18", "내일 18:00"], ["+1d", "+1일"], ["+1w", "+1주"]].map(([q, l]) => `<button data-q="${q}">${l}</button>`).join("")}</div>
-      ${t.deadline ? `<button class="clear" data-q="clear">지우기</button>` : ""}
-      ${(t.deadline_log || []).length ? `<div style="font-size:12px;color:var(--sub);margin-top:6px">↻ 재설정 ${t.deadline_log.length}회 · 마지막 ${fmtDl(t.deadline_log.at(-1).from)} → ${t.deadline ? fmtDl(t.deadline) : "없음"}</div>` : ""}`;
-  } else pop.innerHTML = `<h4>🕐 업무 시작시간</h4>` + startPickHtml(t);
+  const pop = $("#pop");
+  pop.innerHTML = pickHtml(t, kind, assignedToMe(t));
   pop.classList.toggle("dlpop", kind === "dl");
-  pop.classList.remove("hidden");
-  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
-  pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
-  pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+  placePop(pop, anchor);
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
@@ -917,19 +884,9 @@ const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
 $("#pop").onclick = async (e) => {
   if (!popFor || popFor.kind === "prefs") return;
   const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
-  let v = b.dataset.v;
-  if (b.dataset.own !== undefined) v = $("#pop input").value;
-  if (kind === "dl") { // 📅 작은 창
-    const d = b.dataset.q ? quickDl(t, b.dataset.q) : b.dataset.own !== undefined && v ? new Date(v) : undefined;
-    if (d === undefined) return;
-    closePop();
-    if (await save(t.id, { deadline: d ? d.toISOString() : null })) { renderWeek(); toast(d ? `📅 ${fmtDl(d.toISOString())}까지` : "데드라인을 지웠어요"); }
-    return;
-  }
-  if (v === undefined) return;
-  const patch = kind === "est" ? { estimate_min: +v > 0 ? Math.round(+v) : null } : { start_time: v || null };
+  const patch = pickPatch(t, kind, b, $("#pop")); if (!patch) return;
   closePop();
-  if (await save(t.id, patch)) renderWeek();
+  if (await save(t.id, patch)) { renderWeek(); if (kind === "dl") toast(patch.deadline ? `📅 ${fmtDl(patch.deadline)}까지` : "데드라인을 지웠어요"); }
 };
 document.addEventListener("pointerdown", (e) => { if (popFor && !e.target.closest("#pop, [data-act=est], [data-act=start], [data-act=dl], #prefBtn")) closePop(); });
 document.addEventListener("keydown", (e) => e.key === "Escape" && closePop());

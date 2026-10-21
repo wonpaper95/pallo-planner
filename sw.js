@@ -1,6 +1,6 @@
 // 앱처럼 설치 + 데드라인 푸시 알람. 화면 파일은 네트워크 우선(배포하면 바로 반영), 끊기면 캐시.
 const CACHE = "planner-v1";
-const SHELL = ["./", "index.html", "week.js", "config.js", "manifest.webmanifest", "icon-192.png"];
+const SHELL = ["./", "index.html", "week.js", "pick.js", "config.js", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
