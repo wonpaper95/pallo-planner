@@ -87,6 +87,8 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .rt { display: flex; gap: 10px; align-items: flex-start; padding: 6px 6px; border-bottom: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
 .rt input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--green); flex: none; }
 .rt.done span { color: var(--sub); text-decoration: line-through; }
+.rt.done input { display: none; } /* 끝낸 건 체크박스 자리에 이름 도장 */
+.rt .who { flex: none; font-size: 12.5px; padding: 1px 9px; border-radius: 99px; background: var(--green); color: #fff; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rt.red { background: color-mix(in srgb, #ff4d4f 13%, transparent); } .rt.green { background: color-mix(in srgb, var(--green) 13%, transparent); }
 .rt.yellow { background: color-mix(in srgb, #e9c23b 18%, transparent); font-weight: 600; }
 .rtdone { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--green) 22%, transparent); font-weight: 600; }
@@ -435,7 +437,7 @@ const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
 let tasks = [], dues = [], musts = [], openId = null, dirty = false;
-let teamTasks = [], routine = [], routineChecks = new Set();
+let teamTasks = [], routine = [], routineChecks = new Map();
 let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
@@ -546,33 +548,34 @@ const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d
 async function loadRoutine() {
   const day = today();
   const [r, c] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
-    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.from("routine_checks").select("item_id").eq("user_id", me.id).eq("day", day)]);
+    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day, p_team: previewTeam })]);
   if (fail(r.error || c.error)) return;
   routine = r.data;
   const mine = routine.filter((it) => applies(it, day)), dw = W.parse(day).getDay();
   $("#rtTitle").textContent = `오늘(${DOW[dw]}) 고정업무`;
   if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
-    $("#rtCount").textContent = `${mine.length}개 · 매니저별 현황`;
+    $("#rtCount").textContent = `${mine.length}개 · 지점별 현황`;
     $("#rtBar").parentElement.classList.add("hidden"); $("#rtList").innerHTML = "";
     $("#rtStatus").innerHTML = c.data.length ? `<table>${c.data.map((x) => { const pct = x.total ? Math.round((x.done / x.total) * 100) : 0;
-      return `<tr><td><b>${esc(x.name)}</b> <span style="color:var(--sub)">${esc(x.team ?? "팀 없음")}</span></td><td><div class="bar"><i style="width:${pct}%"></i></div></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉 퇴근 가능" : ""}</td></tr>`; }).join("")}</table>`
-      : `<div style="color:var(--sub);font-size:14px">아직 가입한 매니저가 없어요</div>`;
+      return `<tr><td><b>${esc(x.team)}</b> <span style="color:var(--sub)">${esc(x.members ?? "매니저 없음")}</span></td><td><div class="bar"><i style="width:${pct}%"></i></div></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉 퇴근 가능" : ""}</td></tr>`; }).join("")}</table>`
+      : `<div style="color:var(--sub);font-size:14px">지점이 없어요</div>`;
     return;
   }
-  routineChecks = new Set(c.data.map((x) => x.item_id));
+  routineChecks = new Map(c.data.map((x) => [x.item_id, x])); // 지점 공용: 누가 언제 했는지
   const done = mine.filter((it) => routineChecks.has(it.id)).length;
   $("#routinebox").classList.toggle("hidden", !mine.length);
   $("#rtCount").textContent = `${done}/${mine.length}`;
   $("#rtBar").style.width = (mine.length ? Math.round((done / mine.length) * 100) : 0) + "%";
-  $("#rtList").innerHTML = mine.map((it) => `<label class="rt ${it.color} ${routineChecks.has(it.id) ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${routineChecks.has(it.id) ? "checked" : ""}><span>${esc(it.title)}</span></label>`).join("")
+  $("#rtList").innerHTML = mine.map((it) => { const ck = routineChecks.get(it.id), at = ck && new Date(ck.done_at);
+    return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${ck ? "checked" : ""}>${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}<span>${esc(it.title)}</span></label>`; }).join("")
     + (mine.length && done === mine.length ? `<div class="rtdone">🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요</div>` : "");
   $("#rtStatus").innerHTML = "";
 }
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
-  const q = e.target.checked ? sb.from("routine_checks").insert({ item_id: id, day: today() })
-    : sb.from("routine_checks").delete().eq("user_id", me.id).eq("item_id", id).eq("day", today());
-  const { error } = await q; if (!fail(error)) loadRoutine();
+  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: today(), p_done: e.target.checked, p_team: previewTeam });
+  if (fail(error)) e.target.checked = !e.target.checked;
+  loadRoutine();
 });
 // 대표: 고정업무 편집기
 const WEEKS = [["", "매주"], ["1,3", "1·3주차"], ["2,4", "2·4주차"], ["1", "1주차"], ["2", "2주차"], ["3", "3주차"], ["4", "4주차"]];
@@ -783,6 +786,7 @@ function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => loadAssigned()).subscribe();
+  sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => loadRoutine()).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => (view === "team" ? loadTeam() : softReload())).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신

@@ -29,12 +29,12 @@ async function load() {
     sb.from("tasks").select("*").eq("user_id", me.id).eq("day", day).neq("title", "").order("sort").order("id"),
     role === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: day, p_to: day }),
     sb.from("routine_items").select("*").order("sort").order("id"),
-    role === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.from("routine_checks").select("item_id").eq("user_id", me.id).eq("day", day),
+    role === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day }),
     sb.from("tasks").select("id, title, deadline, day").eq("user_id", me.id).eq("done", false).not("deadline", "is", null).lte("deadline", soon).order("deadline").limit(10),
   ]);
   if (t.error || k.error || r.error || c.error || d.error) { $("#foot").textContent = "불러오지 못했어요 — 잠시 후 다시 시도"; return; }
   state = { tasks: t.data, team: k.data, routine: r.data.filter((it) => applies(it, day)), dues: d.data,
-    checks: role === "admin" ? new Set() : new Set(c.data.map((x) => x.item_id)), status: role === "admin" ? c.data : [] };
+    checks: new Map(role === "admin" ? [] : c.data.map((x) => [x.item_id, x])), status: role === "admin" ? c.data : [] }; // checks: 지점 공용, 누가 언제
   render();
 }
 
@@ -44,15 +44,16 @@ function render() {
   const { tasks, team, routine, checks, status, dues } = state;
   // 📌 고정업무
   if (role === "admin") {
-    $("#rtN").textContent = `${routine.length}개 · 매니저별`;
+    $("#rtN").textContent = `${routine.length}개 · 지점별`;
     $("#rtBar").parentElement.classList.add("hidden");
-    $("#rtList").innerHTML = status.length ? `<table>${status.map((x) => `<tr><td>${esc(x.name)} <span style="color:var(--sub)">${esc(x.team ?? "")}</span></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉" : ""}</td></tr>`).join("")}</table>` : `<div class="empty">가입한 매니저가 없어요</div>`;
+    $("#rtList").innerHTML = status.length ? `<table>${status.map((x) => `<tr><td>${esc(x.team)} <span style="color:var(--sub)">${esc(x.members ?? "매니저 없음")}</span></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉" : ""}</td></tr>`).join("")}</table>` : `<div class="empty">지점이 없어요</div>`;
   } else {
     const n = routine.filter((it) => checks.has(it.id)).length;
     $("#sRoutine").classList.toggle("hidden", !routine.length);
     $("#rtN").textContent = `${n}/${routine.length}`;
     $("#rtBar").style.width = (routine.length ? (n / routine.length) * 100 : 0) + "%";
-    $("#rtList").innerHTML = routine.map((it) => `<label class="it ${it.color} ${checks.has(it.id) ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${checks.has(it.id) ? "checked" : ""}><span class="t">${esc(it.title)}</span></label>`).join("")
+    $("#rtList").innerHTML = routine.map((it) => { const ck = checks.get(it.id);
+      return `<label class="it ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${ck ? "checked" : ""}>${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${esc(it.title)}</span></label>`; }).join("")
       + (routine.length && n === routine.length ? `<div class="done-all">🎉 고정업무 끝! 보고하고 퇴근하세요</div>` : "");
   }
   // ✅ 오늘 할 일 (+ 👥 팀): 안 끝난 것 먼저, 그다음 🔥·⭐, 시작시간
@@ -118,8 +119,7 @@ document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && clos
 // 체크하면 플래너와 같은 DB 에 바로 저장
 document.addEventListener("change", async (e) => {
   const el = e.target, on = el.checked; let r;
-  if (el.dataset.rt) r = on ? await sb.from("routine_checks").insert({ item_id: +el.dataset.rt, day })
-    : await sb.from("routine_checks").delete().eq("user_id", me.id).eq("item_id", +el.dataset.rt).eq("day", day);
+  if (el.dataset.rt) r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: day, p_done: on });
   else if (el.dataset.task) r = await sb.from("tasks").update({ done: on }).eq("id", +el.dataset.task);
   else if (el.dataset.team) r = await sb.rpc("set_team_task_done", { p_id: +el.dataset.team, p_done: on });
   else return;
@@ -160,7 +160,7 @@ async function boot() {
   await load();
   sb.channel("w-tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, soft).subscribe();
   sb.channel("w-team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, soft).subscribe();
-  sb.channel("w-rt").on("postgres_changes", { event: "*", schema: "public", table: "routine_checks", ...(role === "admin" ? {} : { filter: `user_id=eq.${me.id}` }) }, soft).subscribe();
+  sb.channel("w-rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, soft).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && load());
 }
 // 콜백 안에서 auth 를 다시 부르면 supabase-js 가 멈춤 → 한 박자 뒤에
