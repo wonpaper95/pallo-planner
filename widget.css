@@ -26,6 +26,8 @@ section.closed .list { display: none; }
 .tag.soon { background: var(--orange); border-color: var(--orange); color: #fff; } .tag.over { background: var(--red); border-color: var(--red); color: #fff; }
 .tag.run { background: var(--green); border-color: var(--green); color: #fff; font-variant-numeric: tabular-nums; } .tag.team { background: #0f9d76; border-color: #0f9d76; color: #fff; } .tag.asg { background: var(--blue); border-color: var(--blue); color: #fff; }
 .empty { color: var(--sub); font-size: 12px; padding: 2px; }
+#addForm { margin: 2px 0 4px; } #addInput { width: 100%; padding: 6px 8px; border-radius: 7px; border: 1px dashed var(--line); background: transparent; color: var(--text); font: inherit; }
+#addInput:focus { outline: none; border-style: solid; border-color: var(--accent); }
 .done-all { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: color-mix(in srgb, var(--green) 22%, transparent); font-weight: 600; font-size: 12.5px; }
 table { width: 100%; border-collapse: collapse; } td { padding: 3px 2px; border-top: 1px solid var(--line); font-size: 12.5px; } td.n { text-align: right; color: var(--sub); white-space: nowrap; }
 #login { padding: 24px 16px; text-align: center; color: var(--sub); } #login a { color: var(--accent); }

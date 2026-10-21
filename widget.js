@@ -91,6 +91,17 @@ document.addEventListener("change", async (e) => {
   load();
 });
 
+// ✚ 위젯에서 바로 오늘 할 일 추가
+$("#addForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const title = $("#addInput").value.trim(); if (!title || !me) return;
+  $("#addInput").disabled = true;
+  const { error } = await sb.from("tasks").insert({ day, title });
+  $("#addInput").disabled = false;
+  if (error) { $("#foot").textContent = "추가 실패: " + error.message; return; }
+  $("#addInput").value = ""; $("#addInput").focus(); load();
+};
+
 let t0;
 const soft = () => { clearTimeout(t0); t0 = setTimeout(load, 300); };
 setInterval(() => {
