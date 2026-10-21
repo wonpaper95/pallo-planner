@@ -66,13 +66,17 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .mk { font-size: 12px; padding: 1px 7px; border-radius: 99px; white-space: nowrap; cursor: pointer; border: 1px solid var(--line); color: var(--sub); }
 .mk.must { color: #fff; background: #ff4d4f; border-color: #ff4d4f; }
 .mk.must.late { background: #8f1d21; border-color: #ff6b6b; }
-.mk.imp { color: #fff; background: #ff4d4f; border-color: #ff4d4f; }
+.mk.imp { color: #fff; background: #ff8c1a; border-color: #ff8c1a; }
 .row.done .mk { opacity: .45; }
 /* 중요·오늘 꼭 → 밝은 빨간색 */
 .row.hot:not(.done) { box-shadow: inset 3px 0 #ff4d4f; background: color-mix(in srgb, #ff4d4f 9%, transparent); }
 .row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
+/* ★ 중요(🔥 없을 때) → 주황 */
+.row.imp:not(.done) { box-shadow: inset 3px 0 #ff8c1a; background: color-mix(in srgb, #ff8c1a 10%, transparent); }
+.row.imp:not(.done) textarea { color: #ff8c1a; font-weight: 700; }
 .quick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .mgrid .pill.hot { background: color-mix(in srgb, #ff4d4f 30%, transparent); color: #ff6b6b; font-weight: 700; }
+.mgrid .pill.imp { background: color-mix(in srgb, #ff8c1a 30%, transparent); color: #ffa24d; font-weight: 700; }
 /* 📌 고정업무 */
 #routinebox { border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
 #routinebox summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
@@ -197,7 +201,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .row .star { font-size: 17px; line-height: 22px; border-radius: 4px; color: var(--sub); opacity: .35; }
 .row .star:hover { background: var(--line); opacity: 1; }
 .row:hover .star { opacity: .8; }
-.row .star.on { opacity: 1; color: #ff4d4f; }
+.row .star.on { opacity: 1; color: #ff8c1a; }
 .row .more { color: var(--sub); font-size: 18px; line-height: 22px; border-radius: 4px; }
 .row .more:hover { background: var(--line); }
 .chip { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--sub); }
@@ -768,7 +772,7 @@ function renderMonth(byDay, dlByDay, hm) {
       .sort((a, b) => a.done - b.done || b.must_do - a.must_do || b.important - a.important || (a.start_time ?? "99").localeCompare(b.start_time ?? "99")); // 꼭·중요 먼저, 그다음 시작시간 순
     const pills = [
       ...dls.map((t) => `<button class="pill dl ${W.due(t.deadline).cls}" data-id="${t.id}">⏰${hm(t.deadline)} ${esc(t.title) || "(제목 없음)"}</button>`),
-      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && (t.must_do || t.important) ? "hot" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${t.start_time ? t.start_time.slice(0, 5) + " " : ""}${esc(t.title)}</button>`),
+      ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && t.must_do ? "hot" : !t.done && t.important ? "imp" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${t.start_time ? t.start_time.slice(0, 5) + " " : ""}${esc(t.title)}</button>`),
     ];
     const il = `<span class="il">일</span>`; // 폰에선 숫자만 (아이폰 캘린더처럼)
     const num = day === today() ? `<b>${d.getDate()}</b>${il}` : d.getDate() === 1 ? `<span class="il">${d.getMonth() + 1}월 </span>1${il}` : `${d.getDate()}${il}`;
@@ -939,7 +943,7 @@ async function toggleTeamTask(id, done) {
   view === "team" ? loadTeam() : loadAll();
 }
 function rowHtml(t) {
-  return `<div class="row ${t.done ? "done" : ""} ${t.important || t.must_do ? "hot" : ""}" data-id="${t.id}">
+  return `<div class="row ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""}" data-id="${t.id}">
     <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
     <textarea rows="1" placeholder="할 일 입력" ${assignedToMe(t) ? "readonly" : ""}>${esc(t.title)}</textarea>
