@@ -512,7 +512,7 @@ async function boot() {
   if (kk) {
     history.replaceState(null, "", location.pathname);
     toast({ ok: "💬 카카오톡 연결 완료! '나와의 채팅'에 확인 메시지를 보냈어요", nomsg: "💬 연결은 됐는데 확인 메시지를 못 보냈어요. 카카오 앱 설정을 확인해 주세요",
-      cancel: "카카오 연결을 취소했어요", expired: "시간이 지나서 다시 눌러 주세요" }[kk] ?? "카카오 연결에 실패했어요. 다시 시도해 주세요");
+      cancel: "카카오 연결을 취소했어요", noscope: "💬 '카카오톡 메시지 전송'에 체크해야 해요. ⚙️ → 연결하기를 다시 누르고 체크해 주세요", expired: "시간이 지나서 다시 눌러 주세요" }[kk] ?? "카카오 연결에 실패했어요. 다시 시도해 주세요");
   }
   listen();
   pushButton();
