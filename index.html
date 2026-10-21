@@ -1008,6 +1008,7 @@ $("#pop").onclick = async (e) => {
   const KA = { kakaoOn: "start", kakaoOff: "unlink", senderOn: "start_sender", senderOff: "unlink_sender" }[e.target.id];
   if (KA) { // 💬 카카오 로그인 다녀오면 ?kakao=… 로 돌아옴. 업무폰 계정은 카카오 로그인 화면에서 업무폰 아이디로
     if (KA.startsWith("unlink") && !confirm(KA === "unlink" ? "나에게 보내기를 끊을까요?" : "업무폰 계정 연결을 끊을까요? (나에게 보내기·푸시는 그대로)")) return;
+    if (KA === "start" && !confirm("다음 카카오 로그인 화면에서 대표님 카카오 계정으로 로그인하고\n'친구목록'과 '카카오톡 메시지 전송'에 모두 동의해 주세요.")) return;
     if (KA === "start_sender" && !confirm("다음 카카오 로그인 화면에서 업무폰 카카오 계정으로 로그인하고\n'친구목록'과 '카카오톡 메시지 전송'에 모두 동의해 주세요.\n(업무폰 카톡과 대표님 카톡이 친구여야 해요)")) return;
     const { data, error } = await sb.functions.invoke("planner-kakao", { body: { action: KA } });
     if (error) { let m = "연결하지 못했어요"; try { m = (await error.context.json()).error || m; } catch {} return toast(m); }
