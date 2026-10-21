@@ -430,16 +430,16 @@ function fmtDl(iso) { const d = new Date(iso); return `${d.getMonth() + 1}/${d.g
 const toLocalInput = (iso) => { const d = new Date(iso); return `${W.ymd(d)}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager";
+let myRole = "manager", myPhone = "";
 async function loadProfile() {
-  let { data } = await sb.from("profiles").select("name, role").eq("user_id", me.id).maybeSingle();
+  let { data } = await sb.from("profiles").select("name, role, phone").eq("user_id", me.id).maybeSingle();
   while (!data) {
     const name = (prompt("처음 오셨네요! 이름을 적어 주세요 (대표님이 업무를 배정할 때 이 이름으로 찾아요)\n예) 김예원") || "").trim();
     if (!name) continue;
-    const r = await sb.from("profiles").insert({ name }).select("name, role").single();
+    const r = await sb.from("profiles").insert({ name }).select("name, role, phone").single();
     if (!fail(r.error)) data = r.data;
   }
-  myRole = data.role; $("#me").textContent = `${data.name} · ${me.email}`;
+  myRole = data.role; myPhone = data.phone ?? ""; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
 }
@@ -599,7 +599,7 @@ async function loadTeam() {
     <h3>팀 업무 (지난 1주 ~ 앞으로)</h3>${list}
     <h3>팀 구성 — 매니저가 가입하면 여기서 팀을 정해 주세요</h3>
     ${teams.map((x) => `<div class="tcard"><b>${esc(x.name)}</b>${mgrs.filter((m) => m.team_id === x.id).map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("") || `<span style="color:var(--sub)">아직 없음</span>`}</div>`).join("")}
-    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
+    ${mgrs.map((m) => `<div class="tmem"><span>${esc(m.name)} ${m.has_phone ? "📱" : `<small style="color:var(--sub)">(카톡 번호 없음)</small>`}</span><select data-member="${m.user_id}"><option value="">팀 없음</option>${teams.map((x) => `<option value="${x.id}" ${m.team_id === x.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></div>`).join("")}`
     : my?.team_id ? `<h2>👥 ${esc(teams.find((x) => x.id === my.team_id)?.name ?? "")}</h2>
       <div class="tcard">${people.map((m) => `<span class="chipname">${esc(m.name)}</span>`).join("")}</div>
       <h3>우리 팀 업무 — 누가 끝내도 팀 전체 완료</h3>${list}`
@@ -865,6 +865,7 @@ function openPrefs(anchor) {
   const pop = $("#pop");
   pop.innerHTML = `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
+    + `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`
     + `<a class="tg" href="widget.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">💻 맥북 위젯 열기 ↗</a>`;
   pop.classList.remove("hidden");
   const r = anchor.getBoundingClientRect();
@@ -874,6 +875,13 @@ function openPrefs(anchor) {
 }
 $("#prefBtn").onclick = (e) => popFor?.kind === "prefs" ? closePop() : openPrefs(e.currentTarget);
 $("#pop").addEventListener("change", async (e) => {
+  if (e.target.id === "myPhone") { // 카톡 알림톡 받을 번호
+    const v = e.target.value.replace(/\D/g, "");
+    if (v && !/^01\d{8,9}$/.test(v)) return toast("휴대폰 번호를 확인해 주세요 (예: 01012345678)");
+    const { error } = await sb.from("profiles").update({ phone: v || null }).eq("user_id", me.id);
+    if (!fail(error)) { myPhone = v; toast(v ? "📱 대표님 배정·팀 업무가 카톡으로도 와요" : "카톡 알림을 껐어요"); }
+    return;
+  }
   const k = e.target.dataset.pref; if (!k) return;
   const next = { ...prefs(), [k]: e.target.checked };
   me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
