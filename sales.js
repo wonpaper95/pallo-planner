@@ -368,12 +368,12 @@ V().innerHTML = `
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
     <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><button type="button" class="slcurbtn" id="slCurBtn"></button></div>
     <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
-    <div class="slrow sl3"><label>지원자<small>월 목표에서 계산</small></label><div class="slcalc" id="slAppsGoal"></div><div class="slcur" id="slCur_apps"></div></div>
-    <div class="slrow sl3"><label>회신율<small id="slSrc_reply"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
-    <div class="slrow sl3"><label>상담률<small id="slSrc_consult"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
-    <div class="slrow sl3"><label>결제율<small id="slSrc_pay"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
-    <div class="slrow sl3"><label>객단가<small id="slSrc_arpu"></small></label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
-    <div class="slrow sl3"><label>환불율<small id="slSrc_refundRate"></small></label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
+    <div class="slrow sl3"><label>지원자수</label><div class="slcalc" id="slAppsGoal"></div><div class="slcur" id="slCur_apps"></div></div>
+    <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
+    <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
+    <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
+    <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
+    <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 남은 기간 목표</h3>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
@@ -489,7 +489,6 @@ function render() {
     const v = s.zero?.includes(el.dataset.k) ? SL.plan[el.dataset.k] : s[el.dataset.k];
     el.value = el.hasAttribute("data-money") ? won(v) : typeof v === "number" ? Math.round(v * 100) / 100 : v ?? "";
   });
-  for (const k of RATE_KEYS) setT("slSrc_" + k, s.zero.includes(k) ? `0이라 기본값 ${k === "arpu" ? won(RATES[k]) + "원" : RATES[k] + "%"}로 계산 중` : "");
   const sy = SL.sheet.sync, curEl = $v('[data-k="current"]');
   curEl.readOnly = s.linked; if (s.linked) curEl.value = won(s.current);
   $v('[data-k="base"]').readOnly = s.linked; if (s.linked) $v('[data-k="base"]').value = s.base;
