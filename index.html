@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
+<meta name="app-version" content="202610222135">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -543,9 +544,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js"></script>
-<script src="week.js"></script>
-<script src="pick.js"></script>
+<script src="config.js?v=202610222135"></script>
+<script src="week.js?v=202610222135"></script>
+<script src="pick.js?v=202610222135"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -1663,9 +1664,17 @@ $("#pushBtn").onclick = async () => {
 };
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+// 새 버전 확인: 서버 version.txt 가 지금 화면 버전과 다르면 한 번 새로고침 (폰 홈 화면 앱도 열 때·돌아올 때 자동 갱신)
+async function checkVer() {
+  try {
+    const v = (await (await fetch("version.txt?" + Date.now(), { cache: "no-store" })).text()).trim(), cur = document.querySelector('meta[name="app-version"]').content;
+    if (/^\d{12}$/.test(v) && v !== cur && sessionStorage.getItem("ver-reload") !== v) { sessionStorage.setItem("ver-reload", v); location.reload(); }
+  } catch {}
+}
+checkVer(); document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkVer());
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js"></script>
+<script src="sales.js?v=202610222135"></script>
 </body>
 </html>
