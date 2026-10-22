@@ -38,6 +38,7 @@ function calc(s) {
   const days = Math.max(1, workDays(s.base, s.end));
   const r = need(s, remain);
   const month = { ...need(s, s.goal), days: Math.max(1, workDays(addDays(pStart(s), -1), mEnd(s))) };
+  month.needApps = month.apps; if (s.appsGoal > 0) month.apps = s.appsGoal; // 지원자수 직접 입력하면 그 숫자가 목표 (비우면 계산값)
   return { ...r, remain, days, month, final: s.current + r.netAdd, rate: s.goal ? s.current / s.goal * 100 : 0,
     perDay: { apps: r.apps / days, replies: r.replies / days, consults: r.consults / days, payers: r.payers / days } };
 }
@@ -124,7 +125,7 @@ function compareFill(s, c) {
     return `<b>${f(v, u)}</b><small class="${good ? "up" : "dn"}">${d >= 0 ? "▲" : "▼"} ${u === "원" ? won(Math.abs(d)) + "원" : pct(Math.abs(d)) + "%p"} ${good ? "목표 이상" : "목표 미달"}</small>`; };
   const nd = m.net - planNet;
   setH("slCur_goal", `<b>${won(m.net)}원 (${pct(m.net / s.goal * 100)}%)</b><small class="${nd >= 0 ? "up" : "dn"}">오늘까지 계획 ${won(planNet)}원 대비 ${nd >= 0 ? "▲" : "▼"} ${won(Math.abs(nd))}원</small>`);
-  setH("slAppsGoal", `<b>${c.month.apps.toLocaleString()}명</b> <small>하루 ${pct(c.month.apps / c.month.days)}명</small>`);
+  const ag = $v('[data-k="appsGoal"]'); if (ag !== document.activeElement) ag.value = c.month.apps; // 비워 두면 월 목표에서 계산한 값
   const ap = workDays(addDays(pStart(s), -1), todayIso() < mEnd(s) ? todayIso() : mEnd(s)) * c.month.apps / c.month.days;
   setH("slCur_apps", m.apps ? `<b>${m.apps.toLocaleString()}명</b><small class="${m.apps >= ap ? "up" : "dn"}">오늘까지 계획 ${Math.round(ap)}명 대비 ${m.apps >= ap ? "▲" : "▼"} ${Math.abs(Math.round(m.apps - ap))}명</small>` : `<b>-</b><small>달력에 지원자 입력 없음</small>`);
   setH("slCur_reply", cell(s.reply, r(m.replies, m.apps), "%", 1, "reply"));
@@ -368,7 +369,7 @@ V().innerHTML = `
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
     <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><button type="button" class="slcurbtn" id="slCurBtn"></button></div>
     <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
-    <div class="slrow sl3"><label>지원자수</label><div class="slcalc" id="slAppsGoal"></div><div class="slcur" id="slCur_apps"></div></div>
+    <div class="slrow sl3"><label>지원자수</label><span class="u"><input type="number" min="0" data-k="appsGoal"><i>명</i></span><div class="slcur" id="slCur_apps"></div></div>
     <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
     <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
     <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
@@ -600,7 +601,7 @@ V().addEventListener("input", (ev) => {
   } else return;
   render(); savePlan();
 });
-V().addEventListener("focusout", (ev) => { if (ev.target.hasAttribute?.("data-money") && SL.plan) render(); });
+V().addEventListener("focusout", (ev) => { if ((ev.target.hasAttribute?.("data-money") || ev.target.dataset?.k === "appsGoal") && SL.plan) render(); });
 V().addEventListener("change", async (ev) => {
   const el = ev.target;
   if (el.id === "slTeam") { SL.team = +el.value; try { localStorage.setItem("sales-team", el.value); } catch {} return SL.load(); }
