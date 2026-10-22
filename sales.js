@@ -116,7 +116,7 @@ function leverHtml(s) {
   <p class="slhint">실행 전략은 이 순서(효과 큰 순)대로 정렬됩니다. 비율은 [1]에 입력한 값 기준입니다.</p>`;
 }
 
-// [3] 멤버십 비율: Premium(가장 비싼) 비율을 가장 높게, 나머지는 똑같이. [1] 객단가 A 에 맞춰 Premium = (A − 나머지 평균) ÷ (Premium − 나머지 평균).
+// [2]·[4] 멤버십 비율: Premium(가장 비싼) 비율을 가장 높게, 나머지는 똑같이. [1] 객단가 A 에 맞춰 Premium = (A − 나머지 평균) ÷ (Premium − 나머지 평균).
 // Premium 이 가장 높으려면 최소 1/(멤버십 수) → 그보다 낮은 A 면 전부 고르게(객단가는 목표보다 조금 높아짐)
 // 인원 = 필요 결제자 × 비율 (내림 후 남는 인원은 비싼 멤버십부터)
 function memberMix(s, payers) {
@@ -141,7 +141,7 @@ function memberMix(s, payers) {
 // 비율(0~1) → 소수 첫째 자리 %, 합계 정확히 100 (차이는 가장 비싼 멤버십에서)
 const toPct = (ms) => { const v = ms.map((m) => Math.round(m.w * 1000) / 10), hi = ms.reduce((a, m, i) => (m.price > ms[a].price ? i : a), 0);
   v[hi] = Math.round((v[hi] + 100 - v.reduce((t, x) => t + x, 0)) * 10) / 10; return v; };
-// [3] 직접 정한 비율로 객단가·필요 결제자 계산 + 목표 객단가 맞추는 가이드(싼 멤버십 → Premium 으로 옮기기)
+// [2] 직접 정한 비율로 객단가·필요 결제자 계산 + 목표 객단가 맞추는 가이드(싼 멤버십 → Premium 으로 옮기기)
 function mixPlan(s, c) {
   const base = memberMix(s, 0), mixA = base.reduce((t, m) => t + m.w * m.price, 0) || s.arpu;
   const pN = need({ ...s, arpu: mixA }, c.remain).payers, mix = memberMix(s, pN);
@@ -156,7 +156,8 @@ function mixPlan(s, c) {
     }
     guide = { ok: gap <= 1, w: toPct(w), moves: w.map((m, i) => ({ name: m.name, d: Math.round((m.w - base[i].w) * 1000) / 10 })).filter((x) => x.d) };
   }
-  return { mix, mixA, pN, sumP, guide };
+  const pNm = need({ ...s, arpu: mixA }, s.goal).payers, mixM = memberMix(s, pNm);
+  return { mix, mixA, pN, sumP, guide, pNm, mixM };
 }
 
 function compareFill(s, c) {
@@ -419,7 +420,12 @@ V().innerHTML = `
     <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
-  <section class="slcard"><h3>[2] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
+  <section class="slcard"><h3>[2] 월별 멤버십 목표 — 비율은 여기서 정합니다</h3>
+    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
+    <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table></div>
+    <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
+    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
+  <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
     <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
     <div class="slr2">
     <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
@@ -427,12 +433,11 @@ V().innerHTML = `
     <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
-  <section class="slcard"><h3>[3] 멤버십별 추가 결제 목표 (남은 기간)</h3>
-    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
-    <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table></div>
-    <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
-    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 이 비율의 객단가로 계산한 필요 결제자 × 비율.</p></section>
-  <section class="slcard"><h3>[4] 일일 실행 목표</h3><div id="slDaily"></div>
+  <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — [2]와 같은 비율</h3>
+    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
+    <tfoot><tr><th>합계</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr></tfoot></table></div>
+    <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div></section>
+  <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
     <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
 </div>
 <div class="slgrid">
@@ -563,7 +568,7 @@ function render() {
     ["오늘까지 순매출 (기준일 + 달력 실적)", won(a.net) + "원", a.net / s.goal * 100], ["남은 목표 금액", won(Math.max(0, s.goal - a.net)) + "원"], ["결제자 목표", c.payers + "명"]];
   setH("slKpis", kp.map(([l, v, b]) => `<div class="slkpi"><small>${l}</small><b>${v}</b>${b != null ? `<div class="bar"><i style="width:${Math.min(100, b || 0)}%"></i></div>` : ""}</div>`).join(""));
 
-  const mp = mixPlan(s, c), mix = mp.mix, mn = mp.pN, ms = mix.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0;
+  const mp = mixPlan(s, c), mix = mp.mixM, mn = mp.pNm, ms = mix.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0; // [2] 월 목표 기준
   const pctW = (w) => (Math.round(w * 1000) / 10).toLocaleString("ko-KR") + "%";
   if (!V().querySelector("#slMem").contains(document.activeElement)) setH("slMem", mix.map((m, i) =>
     `<tr><td><input value="${esc(m.name)}" data-m="${i}" data-f="name" style="text-align:left"></td><td><input value="${won(m.price)}" data-m="${i}" data-f="price" data-money></td>
@@ -571,11 +576,17 @@ function render() {
   else V().querySelectorAll("#slMem tr").forEach((tr, i) => { const c2 = tr.children; c2[3].textContent = mix[i].n + "명"; c2[4].textContent = won(mix[i].n * mix[i].price); });
   setT("slMemN", mn + "명"); setT("slMemSum", won(ms)); setT("slMemArpu", mn ? won(mArpu) + "원" : "-");
   setT("slMemSumP", pct(mp.sumP) + "%");
-  setT("slMemCmp", `이 비율의 객단가 ${won(mp.mixA)}원 · [1] 목표 객단가 ${won(s.arpu)}원 · 필요 결제자 ${mp.pN}명 ([1] 객단가 기준 ${c.payers}명)`);
+  setT("slMemCmp", `이 비율의 객단가 ${won(mp.mixA)}원 · [1] 목표 객단가 ${won(s.arpu)}원 · 월 필요 결제자 ${mp.pNm}명 ([1] 객단가 기준 ${c.month.payers}명)`);
+  // [4] 남은 기간: 같은 비율, 남은 금액 기준 인원
+  const rN = mp.pN, rS = mp.mix.reduce((x, m) => x + m.n * m.price, 0);
+  setH("slMemR", mp.mix.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.price)}</td><td>${pctW(m.w)}</td><td><b>${m.n}명</b></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
+  setT("slMemRSumP", pct(mp.sumP) + "%"); setT("slMemRN", rN + "명"); setT("slMemRSum", won(rS));
+  setT("slMemRArpu", `${rN}명 · ${rN ? won(rS / rN) : "-"}원`);
+  setT("slMemRCmp", `남은 목표 ${won(c.remain)}원 ÷ (이 비율의 객단가 ${won(mp.mixA)}원 × (1−환불율)) = ${rN}명`);
   const g = mp.guide, off = Math.abs(mp.sumP - 100) > 0.05;
   setH("slMemNote", off ? `<div class="sltip">⚠ 비율 합계가 ${pct(mp.sumP)}%예요. <button class="btn ghost" data-mixfix="sum" type="button">100%로 맞추기</button></div>`
     : !g ? `<div class="sltip ok">✓ 이 비율이면 목표 객단가 이상입니다 (+${won(mp.mixA - s.arpu)}원). 목표매출 가이드 달성 가능</div>`
-    : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixA)}원 낮아서 결제자가 ${mp.pN - c.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${x.name} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guide" type="button">가이드대로 맞추기</button></div>`
+    : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixA)}원 낮아서 월 결제자가 ${mp.pNm - c.month.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${x.name} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guide" type="button">가이드대로 맞추기</button></div>`
     : `<div class="sltip">Premium 100%여도 목표 객단가 ${won(s.arpu)}원에 못 미칩니다. [1] 객단가를 낮추거나 단가를 확인해 주세요.</div>`);
 
   const p = c.perDay, ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;
@@ -703,7 +714,7 @@ function curToggle(open) {
   try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
 }
 try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
-// [2] 남은 기간 목표 카드 접기·펴기 — 기본 접힘, 현재 순매출 줄은 늘 보임
+// [3] 남은 기간 목표 카드 접기·펴기 — 기본 접힘, 현재 순매출 줄은 늘 보임
 function r2Toggle(open) {
   V().classList.toggle("r2open", open);
   $v("#slR2Btn").textContent = open ? "▾ 접기" : "▸ 펼치기";

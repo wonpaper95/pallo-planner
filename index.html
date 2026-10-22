@@ -255,7 +255,7 @@ body:not(.sv) #salesView { display: none; }
 .slcard h3 { margin: 0 0 10px; font-size: 15px; color: var(--accent); } .slcard h4 { margin: 8px 0; font-size: 14px; }
 .sldefs summary { cursor: pointer; } .sldefs summary small { color: var(--sub); } .sldefs table { margin-top: 8px; font-size: 14px; border-collapse: collapse; }
 .sldefs td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; } .sldefs td:first-child { white-space: nowrap; width: 110px; }
-.slgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 0 14px; }
+.slgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 0 14px; align-items: start; }
 .slkpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .slkpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; } .slkpi small { color: var(--sub); display: block; font-size: 12px; } .slkpi b { font-size: 19px; }
 .slkpi .bar { margin-top: 6px; }
@@ -305,7 +305,7 @@ body:not(.sv) #salesView { display: none; }
 .slchart { width: 100%; min-width: 560px; height: auto; display: block; } .slchart text { font-size: 11px; fill: var(--sub); } .slchart text.td { fill: var(--orange); font-weight: 700; }
 .slchart .okb { fill: var(--green); } .slchart .nob { fill: var(--red); } .slchart .fut { fill: var(--line); opacity: .5; }
 .slchart .goal { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; } .slchart .gl { fill: var(--accent); font-weight: 600; } .slchart .off { fill: var(--sub); }
-.slscroll { overflow-x: auto; } .slmemt { min-width: 520px; } .slmemt td:first-child input { min-width: 96px; } .slmemt td:nth-child(2) input { min-width: 104px; } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
+.slscroll { overflow-x: auto; } @media (max-width: 600px) { .slmemt { min-width: 520px; } .slmemt td:first-child input { min-width: 96px; } .slmemt td:nth-child(2) input { min-width: 104px; } } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
 .slt tr.fut td { color: var(--sub); } .slt tr.offr td { color: var(--sub); font-size: 12px; } #salesView details summary { cursor: pointer; margin-top: 12px; }
 @media (max-width: 860px) { #salesView { padding: 10px 10px 80px; } .slcal .day { min-height: 70px; padding: 4px; } .slcal .tip { display: none; } .slcal .big b { font-size: 22px; }
   .slcal .day.low::after { content: "!"; position: absolute; right: 6px; top: 4px; color: var(--red); font-weight: 800; } .slrow { grid-template-columns: 90px 1fr; } }
