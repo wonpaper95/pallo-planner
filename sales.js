@@ -80,21 +80,21 @@ function mtd(s) {
   return t;
 }
 // [1] 목표(직접 입력) vs 현재(자동): 회신·상담은 달력 입력, 결제·금액은 시트(없으면 달력)
-function compareTable(s, c) {
+function compareFill(s, c) {
   const m = mtd(s), r = (x, y) => y ? x / y * 100 : null;
   const arpu = m.payers ? (s.linked ? m.signup : m.amount) / m.payers : null;
   const el = workDays(addDays(pStart(s), -1), todayIso() < mEnd(s) ? todayIso() : mEnd(s)), planNet = s.goal / c.month.days * el;
-  const rows = [
-    ["회신율", s.reply, r(m.replies, m.apps), "%", 1], ["상담률", s.consult, r(m.consults, m.replies), "%", 1], ["결제율", s.pay, r(m.payers, m.consults), "%", 1],
-    ["객단가", s.arpu, arpu, "원", 1], ["환불율", s.refundRate || 0, r(m.refund, m.amount), "%", -1]];
   const f = (v, u) => v == null ? "-" : u === "원" ? won(v) + "원" : pct(v) + "%";
-  const diff = (g, v, u, dir) => { if (v == null) return ""; const d = v - g, good = d * dir >= 0;
-    return `<span class="${good ? "up" : "dn"}">${d >= 0 ? "▲" : "▼"} ${u === "원" ? won(Math.abs(d)) + "원" : pct(Math.abs(d)) + "%p"}</span>`; };
+  const cell = (g, v, u, dir) => { if (v == null) return `<b>-</b><small>아직 데이터 없음</small>`; const d = v - g, good = d * dir >= 0;
+    return `<b>${f(v, u)}</b><small class="${good ? "up" : "dn"}">${d >= 0 ? "▲" : "▼"} ${u === "원" ? won(Math.abs(d)) + "원" : pct(Math.abs(d)) + "%p"} ${good ? "목표 이상" : "목표 미달"}</small>`; };
   const nd = m.net - planNet;
-  return `<h4 style="margin-top:14px">목표 vs 현재 <small class="slhint">(${md(pStart(s))}~오늘 누계 · 회신·상담은 달력 입력${s.linked ? ", 결제·금액은 재무 시트" : ""})</small></h4>
-  <table class="slt slcmp"><tr><th></th><th>목표</th><th>현재</th><th>차이</th></tr>
-  ${rows.map(([n, g, v, u, dir]) => `<tr><td>${n}</td><td>${f(g, u)}</td><td><b>${f(v, u)}</b></td><td>${diff(g, v, u, dir)}</td></tr>`).join("")}
-  <tr><td>순매출</td><td>${won(s.goal)}원</td><td><b>${won(m.net)}원</b> (${pct(m.net / s.goal * 100)}%)</td><td><span class="${nd >= 0 ? "up" : "dn"}">오늘까지 계획 ${won(planNet)}원 대비 ${nd >= 0 ? "▲" : "▼"} ${won(Math.abs(nd))}원</span></td></tr></table>`;
+  setH("slCur_goal", `<b>${won(m.net)}원 (${pct(m.net / s.goal * 100)}%)</b><small class="${nd >= 0 ? "up" : "dn"}">오늘까지 계획 ${won(planNet)}원 대비 ${nd >= 0 ? "▲" : "▼"} ${won(Math.abs(nd))}원</small>`);
+  setH("slCur_reply", cell(s.reply, r(m.replies, m.apps), "%", 1));
+  setH("slCur_consult", cell(s.consult, r(m.consults, m.replies), "%", 1));
+  setH("slCur_pay", cell(s.pay, r(m.payers, m.consults), "%", 1));
+  setH("slCur_arpu", cell(s.arpu, arpu, "원", 1));
+  setH("slCur_refundRate", cell(s.refundRate || 0, r(m.refund, m.amount), "%", -1));
+  setH("slCompare", `<p class="slhint">현재 = ${md(pStart(s))}~오늘 누계 · 회신·상담은 달력 입력${s.linked ? ", 결제·금액은 재무 시트" : ", 결제·금액도 달력 입력"}</p>`);
 }
 
 // 📈 일일·주간 기준: 하루 기준 = 월 목표 ÷ 영업일. 매일 이만큼 채우면 월 목표 달성
@@ -284,12 +284,13 @@ V().innerHTML = `
 <div class="slgrid">
   <section class="slcard"><h3>[1] 월별 목표 — 비율·객단가를 바꾸면 필요 인원이 바로 바뀝니다</h3>
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
-    <div class="slrow"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span></div>
-    <div class="slrow"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span></div>
-    <div class="slrow"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span></div>
-    <div class="slrow"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span></div>
-    <div class="slrow"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span></div>
-    <div class="slrow"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span></div>
+    <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><small>현재 (자동 측정)</small></div>
+    <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
+    <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
+    <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
+    <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
+    <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
+    <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 남은 기간 목표</h3>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
@@ -414,7 +415,7 @@ function render() {
     <tr><td>결제금액</td><td>${won(x.revenue)}원</td><td></td></tr>
     ${s.refundRate ? `<tr><td>환불 (${pct(s.refundRate)}%)</td><td>−${won(x.refundAmt)}원</td><td></td></tr>` : ""}
     <tr><td>순매출</td><td><b>${won(x.netAdd)}원</b></td><td></td></tr></table>`;
-  setH("slCompare", compareTable(s, c));
+  compareFill(s, c);
   setH("slPace", paceHtml(s, c));
   setH("slMonth", `<p class="slhint">${md(pStart(s))}~${md(mEnd(s))}, 영업일 ${c.month.days}일 (금요일 휴무 제외)</p>` + tbl(c.month, c.month.days, "하루 평균"));
   setH("slRemain", tbl(c, c.days, "처음 계획 하루 평균") + `<p class="slhint">예상 최종 순매출 <b>${won(c.final)}원</b> (목표 대비 ${pct(c.final / s.goal * 100)}%)</p>`);
