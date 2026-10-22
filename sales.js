@@ -97,6 +97,48 @@ function compareFill(s, c) {
   setH("slCompare", `<p class="slhint">현재 = ${md(pStart(s))}~오늘 누계 · 회신·상담은 달력 입력${s.linked ? ", 결제·금액은 재무 시트" : ", 결제·금액도 달력 입력"}</p>`);
 }
 
+// 📅 일일 / 🗓 주간 목표 카드: 목표(월 목표에서 자동으로 나눔) | 현재 | 차이. days = 그 기간의 날짜들
+const monOf = (d) => { const k = (D(d).getDay() + 6) % 7; return addDays(d, -k); };
+function periodCard(s, c, days, title, nav) {
+  const td = todayIso(), wd = c.month.days, work = days.filter((d) => !isOff(d)).length;
+  const per = (n) => n / wd * work, past = days.filter((d) => d <= td);
+  const sum = (k) => past.reduce((x, d) => x + (s.log[d]?.[k] || 0), 0), has = (k) => past.some((d) => s.log[d]?.[k] != null);
+  const act = { net: sum("amount") - sum("refund"), apps: sum("apps"), replies: sum("replies"), consults: sum("consults"), payers: sum("payers") };
+  const goal = { net: per(s.goal), apps: per(c.month.apps), replies: per(c.month.replies), consults: per(c.month.consults), payers: per(c.month.payers) };
+  const future = days[0] > td, off = !work;
+  const n1 = (v) => (Math.round(v * 10) / 10).toLocaleString("ko-KR");
+  const row = (lab, g, a, ok, u = "명") => {
+    const gs = u === "원" ? won(g) + "원" : n1(g) + "명";
+    if (future || !ok) return `<tr><td>${lab}</td><td>${gs}</td><td class="mut">${future ? "아직 안 옴" : "입력 없음"}</td><td></td></tr>`;
+    const d = a - g, good = d >= 0;
+    return `<tr><td>${lab}</td><td>${gs}</td><td><b>${u === "원" ? won(a) + "원" : a + "명"}</b></td><td class="${good ? "up" : "dn"}">${good ? "▲" : "▼"} ${u === "원" ? won(Math.abs(d)) + "원" : n1(Math.abs(d)) + "명"}</td></tr>`; };
+  const rate = (lab, g, x, y) => { if (future || !y) return `<tr><td>${lab}</td><td>${pct(g)}%</td><td class="mut">-</td><td></td></tr>`;
+    const v = x / y * 100, d = v - g; return `<tr><td>${lab}</td><td>${pct(g)}%</td><td><b>${pct(v)}%</b></td><td class="${d >= 0 ? "up" : "dn"}">${d >= 0 ? "▲" : "▼"} ${pct(Math.abs(d))}%p</td></tr>`; };
+  const pctDone = goal.net ? act.net / goal.net * 100 : 0;
+  const head = `<div class="slphead">${nav}<b>${title}</b>${off ? `<span class="mut">휴무</span>` : future ? "" : `<span class="${act.net >= goal.net ? "up" : "dn"}">${pct(pctDone)}% ${act.net >= goal.net ? "✓ 달성" : "✗ 미달"}</span>`}</div>`;
+  const bar = off || future ? "" : `<div class="bar"><i style="width:${Math.max(0, Math.min(100, pctDone))}%"></i></div>`;
+  const strip = days.length > 1 ? `<div class="slstrip">${days.map((d) => { const e = s.log[d], v = e ? (e.amount || 0) - (e.refund || 0) : 0;
+    const cls = isOff(d) ? "o" : d > td ? "f" : v >= s.goal / wd ? "y" : "n";
+    return `<span class="${cls}" title="${md(d)} ${won(v)}원"><small>${"일월화수목금토"[D(d).getDay()]}</small>${isOff(d) ? "휴" : d > td ? D(d).getDate() : cls === "y" ? "✓" : "✗"}</span>`; }).join("")}</div>` : "";
+  return head + bar + strip + `<table class="slt slcmp"><tr><th></th><th>목표</th><th>현재</th><th>차이</th></tr>
+    ${row("순매출", goal.net, act.net, has("amount") || s.linked, "원")}${row("지원자", goal.apps, act.apps, has("apps"))}${row("회신자", goal.replies, act.replies, has("replies"))}
+    ${row("상담자", goal.consults, act.consults, has("consults"))}${row("결제자", goal.payers, act.payers, has("payers") || s.linked)}
+    ${rate("회신율", s.reply, act.replies, act.apps)}${rate("상담률", s.consult, act.consults, act.replies)}${rate("결제율", s.pay, act.payers, act.consults)}</table>
+    <p class="slhint">목표 = 월 목표 ÷ 영업일 ${wd}일${days.length > 1 ? ` × 이 주 영업일 ${work}일` : ""}${days.length > 1 ? " · 오늘까지 합계" : ""}</p>`;
+}
+function dayWeekCards(s, c) {
+  const td = todayIso(), inM = (d) => d >= pStart(s) && d <= mEnd(s);
+  let d = SL.day && inM(SL.day) ? SL.day : (inM(td) ? td : pStart(s));
+  const navD = `<button class="rtnav" data-slday="-1">‹</button><button class="rtnav" data-slday="1">›</button>${d !== td && inM(td) ? `<button class="rtnav wk" data-slday="0">오늘</button>` : ""}`;
+  const dayHtml = periodCard(s, c, [d], `${md(d)}(${"일월화수목금토"[D(d).getDay()]})${d === td ? " · 오늘" : ""}`, navD);
+  let w = SL.week && SL.week <= mEnd(s) && addDays(SL.week, 6) >= pStart(s) ? SL.week : monOf(inM(td) ? td : pStart(s));
+  const wDays = []; for (let x = w; x <= addDays(w, 6); x = addDays(x, 1)) if (inM(x)) wDays.push(x);
+  const navW = `<button class="rtnav" data-slweek="-1">‹</button><button class="rtnav" data-slweek="1">›</button>${!wDays.includes(td) && inM(td) ? `<button class="rtnav wk" data-slweek="0">이번 주</button>` : ""}`;
+  const weekHtml = periodCard(s, c, wDays, `${md(wDays[0])}~${D(wDays[wDays.length - 1]).getDate()}일${wDays.includes(td) ? " · 이번 주" : ""}`, navW);
+  SL.day = d; SL.week = w;
+  setH("slDay", dayHtml); setH("slWeek", weekHtml);
+}
+
 // 📈 일일·주간 기준: 하루 기준 = 월 목표 ÷ 영업일. 매일 이만큼 채우면 월 목표 달성
 function paceHtml(s, c) {
   const td = todayIso(), wd = c.month.days, dGoal = s.goal / wd, dPay = c.month.payers / wd, dCon = c.month.consults / wd;
@@ -307,6 +349,10 @@ V().innerHTML = `
   <section class="slcard"><h3>[4] 일일 실행 목표</h3><div id="slDaily"></div>
     <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
 </div>
+<div class="slgrid">
+  <section class="slcard"><h3>📅 일일 목표 — 날짜별 목표 vs 현재</h3><div id="slDay"></div></section>
+  <section class="slcard"><h3>🗓 주간 목표 — 주별 목표 vs 현재</h3><div id="slWeek"></div></section>
+</div>
 <section class="slcard"><h3>📈 일일·주간 기준 — 매일 이만큼 채우면 월 목표 달성</h3><div id="slPace"></div></section>
 <section class="slcard"><h3>📅 일일 실적 달력 — 날짜를 눌러 실적을 입력하세요</h3>
   <p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
@@ -417,6 +463,7 @@ function render() {
     <tr><td>순매출</td><td><b>${won(x.netAdd)}원</b></td><td></td></tr></table>`;
   compareFill(s, c);
   setH("slPace", paceHtml(s, c));
+  dayWeekCards(s, c);
   setH("slMonth", `<p class="slhint">${md(pStart(s))}~${md(mEnd(s))}, 영업일 ${c.month.days}일 (금요일 휴무 제외)</p>` + tbl(c.month, c.month.days, "하루 평균"));
   setH("slRemain", tbl(c, c.days, "처음 계획 하루 평균") + `<p class="slhint">예상 최종 순매출 <b>${won(c.final)}원</b> (목표 대비 ${pct(c.final / s.goal * 100)}%)</p>`);
   setT("slPeriod", `현재 달성률 ${pct(c.rate)}% · 남은 목표 ${won(c.remain)}원 · ${md(addDays(s.base, 1))}~${md(s.end)}, 영업일 ${c.days}일 (금요일 휴무 제외)`);
@@ -509,7 +556,7 @@ V().addEventListener("focusout", (ev) => { if (ev.target.hasAttribute?.("data-mo
 V().addEventListener("change", async (ev) => {
   const el = ev.target;
   if (el.id === "slTeam") { SL.team = +el.value; try { localStorage.setItem("sales-team", el.value); } catch {} return SL.load(); }
-  if (el.dataset.k === "month" && el.value) { SL.month = el.value; return SL.load(); }
+  if (el.dataset.k === "month" && el.value) { SL.month = el.value; SL.day = SL.week = null; return SL.load(); }
   // 기준일을 뒤로 옮기면 그 사이 달력 실적을 현재 순매출에 넣을지 묻는다 (중복·누락 방지)
   if (el.dataset.k === "base" && el.value) {
     const s = SL.plan, old = s.base, nb = el.value;
@@ -526,6 +573,9 @@ V().addEventListener("click", async (ev) => {
     const s = SL.plan, mn = s.members.reduce((x, m) => x + m.n, 0); if (!mn) return;
     s.arpu = s.members.reduce((x, m) => x + m.n * m.price, 0) / mn; render(); savePlan(); return;
   }
+  const nd = ev.target.dataset.slday, nw = ev.target.dataset.slweek;
+  if (nd !== undefined) { SL.day = +nd === 0 ? todayIso() : addDays(SL.day, +nd); return render(); }
+  if (nw !== undefined) { SL.week = +nw === 0 ? monOf(todayIso()) : addDays(SL.week, 7 * +nw); return render(); }
   if (ev.target.id === "slSync") {
     ev.target.disabled = true; setT("slSheet", "시트 가져오는 중…");
     const { data, error } = await sb.functions.invoke("planner-sheets", { body: { month: SL.month } });
