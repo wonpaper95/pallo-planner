@@ -116,6 +116,21 @@ function leverHtml(s) {
   <p class="slhint">실행 전략은 이 순서(효과 큰 순)대로 정렬됩니다. 비율은 [1]에 입력한 값 기준입니다.</p>`;
 }
 
+// [3] 멤버십 비율: [1] 객단가를 맞추면서 Premium(가장 비싼) 비율을 최대로 = 가장 비싼 + 가장 싼 두 가지 조합.
+// 인원 = 필요 결제자 × 비율 (내림 후 남는 인원은 비싼 멤버십부터)
+function memberMix(s, payers) {
+  const ms = s.members.map((m, i) => ({ ...m, i, w: 0 })), live = ms.filter((m) => m.price > 0);
+  if (live.length) {
+    const hi = live.reduce((a, b) => (b.price > a.price ? b : a)), lo = live.reduce((a, b) => (b.price < a.price ? b : a)), A = s.arpu;
+    if (A >= hi.price || hi === lo) hi.w = 1; else if (A <= lo.price) lo.w = 1;
+    else { hi.w = (A - lo.price) / (hi.price - lo.price); lo.w = 1 - hi.w; }
+  }
+  const raw = ms.map((m) => m.w * payers), n = raw.map(Math.floor);
+  let rest = payers - n.reduce((a, b) => a + b, 0);
+  ms.filter((m) => m.w > 0 && raw[m.i] > n[m.i]).sort((a, b) => b.price - a.price).slice(0, rest).forEach((m) => n[m.i]++); // 남는 인원은 비싼 멤버십부터 → 객단가가 목표 밑으로 안 내려감
+  return ms.map((m, i) => ({ ...m, n: n[i] }));
+}
+
 function compareFill(s, c) {
   const m = mtd(s), r = (x, y) => y ? x / y * 100 : null;
   const arpu = m.payers ? (s.linked ? m.signup : m.amount) / m.payers : null;
@@ -293,7 +308,7 @@ function problems(s, c, a) {
 }
 
 function report(s, c, a, dailyRows) {
-  const ms = s.members.reduce((x, m) => x + m.n * m.price, 0), mn = s.members.reduce((x, m) => x + m.n, 0);
+  const mix = memberMix(s, c.payers), ms = mix.reduce((x, m) => x + m.n * m.price, 0), mn = c.payers;
   return `팔로 ${SL.teamName} ${D(mEnd(s)).getMonth() + 1}월 매출 목표 및 실행 계획
 
 보고 기준일: ${D(s.base).getFullYear()}년 ${md(s.base)}
@@ -332,7 +347,7 @@ ${s.refundRate ? `환불율: ${pct(s.refundRate)}%
 객단가 = 총 결제금액 ÷ 결제자 수
 환불율 = 환불금액 ÷ 총 결제금액 × 100
 [4] 멤버십별 추가 결제 목표
-${s.members.filter((m) => m.n).map((m) => `${m.name}\n단가: ${won(m.price)}원\n목표 인원: ${m.n}명\n목표 결제금액: ${won(m.n * m.price)}원`).join("\n")}
+${mix.filter((m) => m.n).map((m) => `${m.name} (${Math.round(m.w * 1000) / 10}%)\n단가: ${won(m.price)}원\n목표 인원: ${m.n}명\n목표 결제금액: ${won(m.n * m.price)}원`).join("\n")}
 합계
 목표 결제 인원: ${mn}명
 목표 결제금액: ${won(ms)}원
@@ -385,10 +400,10 @@ V().innerHTML = `
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></section>
   <section class="slcard"><h3>[3] 멤버십별 추가 결제 목표 (남은 기간)</h3>
-    <table class="slt"><thead><tr><th>멤버십</th><th>단가</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
-    <tfoot><tr><th>합계</th><th></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table>
-    <div class="slkpi" style="margin-top:12px"><small>이 멤버십 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
-    <p class="slwarn" id="slMemWarn"></p><button class="btn ghost" id="slMemApply" type="button">이 객단가를 [1]에 적용</button></section>
+    <table class="slt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
+    <tfoot><tr><th>합계</th><th></th><th>100%</th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table>
+    <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
+    <p class="slhint">비율은 [1] 객단가에 맞춰 Premium을 최대한 높게 잡은 조합입니다. 인원 = [2] 남은 기간 필요 결제자 × 비율.</p></section>
   <section class="slcard"><h3>[4] 일일 실행 목표</h3><div id="slDaily"></div>
     <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
 </div>
@@ -519,15 +534,14 @@ function render() {
     ["오늘까지 순매출 (기준일 + 달력 실적)", won(a.net) + "원", a.net / s.goal * 100], ["남은 목표 금액", won(Math.max(0, s.goal - a.net)) + "원"], ["결제자 목표", c.payers + "명"]];
   setH("slKpis", kp.map(([l, v, b]) => `<div class="slkpi"><small>${l}</small><b>${v}</b>${b != null ? `<div class="bar"><i style="width:${Math.min(100, b || 0)}%"></i></div>` : ""}</div>`).join(""));
 
-  const mn = s.members.reduce((x, m) => x + m.n, 0), ms = s.members.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0;
-  if (!V().querySelector("#slMem").contains(document.activeElement)) setH("slMem", s.members.map((m, i) =>
+  const mix = memberMix(s, c.payers), mn = c.payers, ms = mix.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0;
+  const pctW = (w) => (Math.round(w * 1000) / 10).toLocaleString("ko-KR") + "%";
+  if (!V().querySelector("#slMem").contains(document.activeElement)) setH("slMem", mix.map((m, i) =>
     `<tr><td><input value="${esc(m.name)}" data-m="${i}" data-f="name" style="text-align:left"></td><td><input value="${won(m.price)}" data-m="${i}" data-f="price" data-money></td>
-     <td><input type="number" min="0" value="${m.n}" data-m="${i}" data-f="n" style="width:64px"></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
-  else V().querySelectorAll("#slMem tr").forEach((tr, i) => { tr.lastElementChild.textContent = won(s.members[i].n * s.members[i].price); });
+     <td><b>${pctW(m.w)}</b></td><td>${m.n}명</td><td>${won(m.n * m.price)}</td></tr>`).join(""));
+  else V().querySelectorAll("#slMem tr").forEach((tr, i) => { const c2 = tr.children; c2[2].innerHTML = `<b>${pctW(mix[i].w)}</b>`; c2[3].textContent = mix[i].n + "명"; c2[4].textContent = won(mix[i].n * mix[i].price); });
   setT("slMemN", mn + "명"); setT("slMemSum", won(ms)); setT("slMemArpu", mn ? won(mArpu) + "원" : "-");
-  setT("slMemCmp", mn ? (Math.abs(mArpu - s.arpu) < 1 ? "[1]의 객단가와 같습니다."
-    : `[1]의 객단가 ${won(s.arpu)}원보다 ${won(Math.abs(mArpu - s.arpu))}원 ${mArpu > s.arpu ? "높습니다" : "낮습니다"}. 적용하면 필요 결제자가 ${need({ ...s, arpu: mArpu }, c.remain).payers}명이 됩니다.`) : "");
-  setT("slMemWarn", mn && mn < c.payers ? `[2] 남은 기간 필요 결제자 ${c.payers}명보다 ${c.payers - mn}명 적습니다.` : "");
+  setT("slMemCmp", `[1] 객단가 ${won(s.arpu)}원 기준 (인원 반올림으로 조금 다를 수 있음)`);
 
   const p = c.perDay, ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;
   const range = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `${Math.floor(v)}~${Math.ceil(v)}명`;
@@ -620,10 +634,6 @@ V().addEventListener("change", async (ev) => {
 V().addEventListener("click", async (ev) => {
   if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
   if (ev.target.closest("#slNetBtn")) return netToggle(!V().classList.contains("netopen"));
-  if (ev.target.id === "slMemApply") {
-    const s = SL.plan, mn = s.members.reduce((x, m) => x + m.n, 0); if (!mn) return;
-    s.arpu = s.members.reduce((x, m) => x + m.n * m.price, 0) / mn; render(); savePlan(); return;
-  }
   const nd = ev.target.dataset.slday, nw = ev.target.dataset.slweek;
   if (nd !== undefined) { SL.day = +nd === 0 ? todayIso() : addDays(SL.day, +nd); return render(); }
   if (nw !== undefined) { SL.week = +nw === 0 ? monOf(todayIso()) : addDays(SL.week, 7 * +nw); return render(); }
