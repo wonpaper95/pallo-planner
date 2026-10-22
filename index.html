@@ -1077,7 +1077,7 @@ function renderMonth(byDay, dlByDay, hm) {
     const d = W.parse(day), out = d.getMonth() + 1 !== cal.m;
     const dls = (dlByDay[day] ?? []).sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
     const list = (byDay[day] ?? []).filter((t) => t.title)
-      .sort((a, b) => a.done - b.done || b.must_do - a.must_do || b.important - a.important || (a.start_time ?? "99").localeCompare(b.start_time ?? "99")); // 꼭·중요 먼저, 그다음 시작시간 순
+      .sort(W.daySort); // 끝낸 일 위, 시작시간 없음 → 시간순 (주간과 같은 순서)
     const pills = [
       ...dls.map((t) => `<button class="pill dl ${W.due(t.deadline).cls}" data-id="${t.id}">⏰${hm(t.deadline)} ${esc(t.title) || "(제목 없음)"}</button>`),
       ...list.map((t) => `<button class="pill ${t.done ? "x" : ""} ${!t.done && t.must_do ? "hot" : !t.done && t.important ? "imp" : ""}" data-id="${t.id}">${t.must_do ? "🔥" : ""}${t.important ? "⭐" : ""}${t.start_time ? t.start_time.slice(0, 5) + " " : ""}${esc(t.title)}</button>`),
@@ -1285,7 +1285,7 @@ function renderWeek() {
   $("#rateBar").style.width = pct + "%";
   $("#rateTxt").textContent = `이번주 완료율 ${pct}% (${done}/${tasks.length})`;
   $("#days").innerHTML = DAYS.map((name, i) => {
-    const day = W.add(monday, i), list = tasks.filter((t) => t.day === day), tlist = teamTasks.filter((k) => k.day === day);
+    const day = W.add(monday, i), list = tasks.filter((t) => t.day === day).sort(W.daySort), tlist = teamTasks.filter((k) => k.day === day);
     const cls = ["day", i === 5 ? "sat" : i === 6 ? "sun" : "", day === today() ? "today" : ""].join(" ");
     return `<section class="${cls}" id="d-${day}" data-day="${day}">
       <h3><span>${name}</span><span class="pill">${md(day)}</span>${briefBtnHtml(day)}${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}</h3>

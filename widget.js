@@ -60,11 +60,9 @@ function render() {
     $("#rtList").innerHTML = state.carried.map((x) => row(x.it, null, x.from)).join("") + routine.map((it) => row(it, checks.get(it.id))).join("")
       + (routine.length && n === routine.length ? `<div class="done-all">🎉 고정업무 끝! 보고하고 퇴근하세요</div>` : "");
   }
-  // ✅ 오늘 할 일 (+ 👥 팀): 안 끝난 것 먼저, 그다음 🔥·⭐, 시작시간
+  // ✅ 오늘 할 일 (+ 👥 팀): 플래너와 같은 순서 — 끝낸 일 위, 시작시간 없음 → 시간순 (팀 일은 시작시간 없음 취급)
   const rows = [...tasks.map((t) => ({ k: "t", t })), ...team.map((t) => ({ k: "team", t }))]
-    .sort((a, b) => (a.k === "t" ? a.t.done : !!a.t.done_by) - (b.k === "t" ? b.t.done : !!b.t.done_by)
-      || (b.t.must_do || b.t.important ? 1 : 0) - (a.t.must_do || a.t.important ? 1 : 0)
-      || (a.t.start_time ?? "99").localeCompare(b.t.start_time ?? "99"));
+    .sort((a, b) => W.daySort(a.k === "t" ? a.t : { done: !!a.t.done_by, sort: 1e12, id: a.t.id }, b.k === "t" ? b.t : { done: !!b.t.done_by, sort: 1e12, id: b.t.id }));
   const doneN = rows.filter((x) => (x.k === "t" ? x.t.done : x.t.done_by)).length;
   $("#tdN").textContent = `${doneN}/${rows.length}`;
   $("#tdList").innerHTML = rows.map(({ k, t }) => k === "team"

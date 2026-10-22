@@ -22,6 +22,11 @@ const W = {
     const first = sun ? W.add(d1, -W.parse(d1).getDay()) : W.monday(d1);
     return Array.from({ length: 42 }, (_, i) => W.add(first, i));
   },
+  // 하루 할 일 순서(주간·월간·위젯 공용): 끝낸 일 위 → 안 끝낸 일 아래. 각 묶음 안에서 시작시간 없는 일(끌어 놓은 순서) 먼저, 그다음 시작시간 순
+  daySort(a, b) {
+    return (!!b.done - !!a.done) || (!!a.start_time - !!b.start_time) || String(a.start_time ?? "").localeCompare(String(b.start_time ?? ""))
+      || ((a.sort ?? 0) - (b.sort ?? 0)) || ((a.id ?? 0) - (b.id ?? 0));
+  },
   // 데드라인 상태: over(지남) / soon(24시간 안) / ok
   due(deadline, now = new Date()) {
     const ms = new Date(deadline) - now, h = Math.abs(ms) / 3600000;
