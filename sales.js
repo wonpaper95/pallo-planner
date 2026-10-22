@@ -150,9 +150,17 @@ function memberMix(s, payers) {
 const toPct = (ms) => { const v = ms.map((m) => Math.round(m.w * 1000) / 10), hi = ms.reduce((a, m, i) => (m.price > ms[a].price ? i : a), 0);
   v[hi] = Math.round((v[hi] + 100 - v.reduce((t, x) => t + x, 0)) * 10) / 10; return v; };
 // [2] 직접 정한 비율로 객단가·필요 결제자 계산 + 목표 객단가 맞추는 가이드(싼 멤버십 → Premium 으로 옮기기)
+// 비율대로 나눈 인원의 순매출(결제 − 환불)이 목표 이상이 되게: 모자라면 비율 있는 것 중 비싼 멤버십부터 1명씩 추가
+function fitMix(s, payers, goal) {
+  const rf = Math.min(0.99, (s.refundRate || 0) / 100), net = (mx) => mx.reduce((t, m) => t + m.n * m.price, 0) * (1 - rf);
+  let mix = memberMix(s, payers);
+  const order = mix.filter((m) => m.w > 0).sort((a, b) => b.price - a.price);
+  for (let k = 0; order.length && net(mix) < goal - 1 && k < 500; k++) { const m = order[k % order.length]; mix = mix.map((x) => x.i === m.i ? { ...x, n: x.n + 1 } : x); }
+  return mix;
+}
 function mixPlan(s, c) {
   const base = memberMix(s, 0), mixA = base.reduce((t, m) => t + m.w * m.price, 0) || s.arpu;
-  const pN = need({ ...s, arpu: mixA }, c.remain).payers, mix = memberMix(s, pN);
+  const mix = fitMix(s, need({ ...s, arpu: mixA }, c.remain).payers, c.remain), pN = mix.reduce((t, m) => t + m.n, 0);
   const sumP = s.members.every((m) => typeof m.p === "number") ? s.members.reduce((t, m) => t + m.p, 0) : 100;
   let guide = null;
   if (mixA < s.arpu - 1) {
@@ -164,7 +172,7 @@ function mixPlan(s, c) {
     }
     guide = { ok: gap <= 1, w: toPct(w), moves: w.map((m, i) => ({ name: m.name, d: Math.round((m.w - base[i].w) * 1000) / 10 })).filter((x) => x.d) };
   }
-  const pNm = need({ ...s, arpu: mixA }, s.goal).payers, mixM = memberMix(s, pNm);
+  const mixM = fitMix(s, need({ ...s, arpu: mixA }, s.goal).payers, s.goal), pNm = mixM.reduce((t, m) => t + m.n, 0);
   return { mix, mixA, pN, sumP, guide, pNm, mixM };
 }
 
@@ -432,7 +440,7 @@ V().innerHTML = `
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
-    <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table></div>
+    <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr><tr id="slMemRf"></tr><tr id="slMemNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
     <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
   <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
@@ -445,7 +453,7 @@ V().innerHTML = `
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
   <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — [2]와 같은 비율</h3>
     <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
-    <tfoot><tr><th>합계</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr></tfoot></table></div>
+    <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr><tr id="slMemRRf"></tr><tr id="slMemRNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div></section>
   <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
     <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
@@ -585,12 +593,17 @@ function render() {
      <td><span class="u"><input type="number" min="0" max="100" step="1" value="${Math.round(m.w * 1000) / 10}" data-m="${i}" data-f="p" style="width:74px"><i>%</i></span></td><td>${m.n}명</td><td>${won(m.n * m.price)}</td></tr>`).join(""));
   else V().querySelectorAll("#slMem tr").forEach((tr, i) => { const c2 = tr.children; c2[3].textContent = mix[i].n + "명"; c2[4].textContent = won(mix[i].n * mix[i].price); });
   setT("slMemN", mn + "명"); setT("slMemSum", won(ms)); setT("slMemArpu", mn ? won(mArpu) + "원" : "-");
+  const rfR = (s.refundRate || 0) / 100, netRows = (gross, goal, lab) => [
+    rfR ? `<td>환불 (${pct(s.refundRate)}%)</td><td></td><td></td><td></td><td>−${won(gross * rfR)}</td>` : "",
+    `<th>순매출</th><th></th><th></th><th></th><th class="${gross * (1 - rfR) >= goal - 1 ? "up" : "dn"}">${won(gross * (1 - rfR))} <small>(${lab} ${won(goal)} ${gross * (1 - rfR) >= goal - 1 ? "✓" : "✗"})</small></th>`];
+  { const [a1, b1] = netRows(ms, s.goal, "월 목표"); setH("slMemRf", a1); setH("slMemNet", b1); }
   setT("slMemSumP", pct(mp.sumP) + "%");
   setT("slMemCmp", `이 비율의 객단가 ${won(mp.mixA)}원 · [1] 목표 객단가 ${won(s.arpu)}원 · 월 필요 결제자 ${mp.pNm}명 ([1] 객단가 기준 ${c.month.payers}명)`);
   // [4] 남은 기간: 같은 비율, 남은 금액 기준 인원
   const rN = mp.pN, rS = mp.mix.reduce((x, m) => x + m.n * m.price, 0);
   setH("slMemR", mp.mix.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.price)}</td><td>${pctW(m.w)}</td><td><b>${m.n}명</b></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
   setT("slMemRSumP", pct(mp.sumP) + "%"); setT("slMemRN", rN + "명"); setT("slMemRSum", won(rS));
+  { const [a1, b1] = netRows(rS, c.remain, "남은 목표"); setH("slMemRRf", a1); setH("slMemRNet", b1); }
   setT("slMemRArpu", `${rN}명 · ${rN ? won(rS / rN) : "-"}원`);
   setT("slMemRCmp", `남은 목표 ${won(c.remain)}원 ÷ (이 비율의 객단가 ${won(mp.mixA)}원 × (1−환불율)) = ${rN}명`);
   const g = mp.guide, off = Math.abs(mp.sumP - 100) > 0.05;
