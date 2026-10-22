@@ -81,7 +81,18 @@ main { padding: 20px 24px 120px; min-width: 0; }
 #routinebox { border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; background: var(--panel); }
 #routinebox summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .rtnav { padding: 0 8px; border-radius: 6px; color: var(--sub); font-size: 16px; line-height: 24px; } .rtnav:hover { background: var(--hover); color: var(--text); }
-.rtnav.today { font-size: 12.5px; border: 1px solid var(--line); }
+.rtnav.wk { font-size: 12.5px; border: 1px solid var(--line); } .rtnav.wk.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 📅 고정업무 주간 기록 표 */
+.rtw { overflow-x: auto; } .bcard .rtw table { min-width: 640px; font-size: 12px; } .bcard .rtw td.t { min-width: 160px; }
+.bmode { display: inline-flex; gap: 2px; margin-left: auto; } .bmode button { padding: 4px 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--sub); font-size: 13px; } .bmode button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#rtWeek { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; overflow-x: auto; }
+#rtWeek .wh { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+.rtw table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 12.5px; }
+.rtw th, .rtw td { border: 1px solid var(--line); padding: 4px 5px; vertical-align: top; }
+.rtw th { background: var(--hover); font-weight: 600; white-space: nowrap; } .rtw th.td { background: color-mix(in srgb, var(--accent) 30%, var(--hover)); }
+.rtw td.t { min-width: 200px; } .rtw td.c { width: 11%; text-align: center; white-space: nowrap; }
+.rtw td.y { color: var(--green); } .rtw td.n { color: var(--red); } .rtw td.f, .rtw td.x { color: var(--sub); } .rtw td.x { background: color-mix(in srgb, var(--line) 35%, transparent); }
+.rtw td a { color: var(--accent); text-decoration: none; }
 #routinebox summary #rtCount { color: var(--sub); font-weight: 400; font-size: 14px; margin-right: auto; }
 .adminonly { display: none; } body.is-admin .adminonly { display: inline-block; }
 #rtEdit { padding: 3px 10px; font-size: 13px; }
@@ -366,9 +377,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <span class="range" id="wkRange"></span>
       </div>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
-      <details id="routinebox" open><summary>📌 <button class="rtnav" data-rtnav="-1" title="이전 날">‹</button><span id="rtTitle">오늘 고정업무</span><button class="rtnav" data-rtnav="1" title="다음 날">›</button><button class="rtnav today hidden" data-rtnav="0">오늘로</button> <span id="rtCount"></span>
+      <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
           <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
-        <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div></details>
+        <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
       <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
         <textarea id="asgText" rows="2" placeholder="예) 김예원 매니저님 금요일 6시까지 환불 리스트 정리해 주세요"></textarea>
         <div class="asgbar"><button id="asgParse" class="btn">AI로 정리하기</button><small>정리된 카드를 확인하고 [보내기]를 눌러야 들어가요</small></div>
@@ -603,9 +614,9 @@ async function loadAll(scrollToday) {
 // ── 📌 고정업무: 대표가 정한 목록 중 오늘 요일·주차에 해당하는 것만, 순서대로 ──
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
-let rtDay = null; // 📌 고정업무로 보는 날 (null = 오늘). ‹ › 로 지난 기록 보기
 async function loadRoutine() {
-  const day = rtDay ?? today(), isToday = day === today(), future = day > today();
+  const day = today(), isToday = true, future = false;
+  if (rtWk.open) renderRtWeek();
   const [r, c, k] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
     myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day, p_team: previewTeam }),
     myRole === "admin" || !isToday ? { data: [] } : sb.rpc("routine_carry", { p_day: day, p_team: previewTeam })]); // ↪ 전에 못 끝낸 '넘김' 일 (오늘만)
@@ -613,7 +624,6 @@ async function loadRoutine() {
   routine = r.data;
   const mine = routine.filter((it) => applies(it, day)), dw = W.parse(day).getDay();
   $("#rtTitle").textContent = isToday ? `오늘(${DOW[dw]}) 고정업무` : `${md(day)}(${DOW[dw]}) 고정업무`;
-  document.querySelector(".rtnav.today").classList.toggle("hidden", isToday);
   if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
     $("#rtCount").textContent = `${mine.length}개 · 지점별 현황`;
     $("#rtBar").parentElement.classList.add("hidden"); $("#rtList").innerHTML = "";
@@ -627,7 +637,7 @@ async function loadRoutine() {
   const carried = k.data.map((x) => ({ it: routine.find((i) => i.id === x.item_id), from: x.from_day })).filter((x) => x.it);
   if (!mine.length && !carried.length) { // 이날은 고정업무 없음 (‹ › 로 다른 날 보기)
     $("#rtCount").textContent = ""; $("#rtBar").style.width = "0%";
-    $("#rtList").innerHTML = `<div style="color:var(--sub);font-size:14px;padding:4px 0">${isToday ? "오늘은" : "이날은"} 고정업무가 없어요 · ‹ 로 지난 기록을 볼 수 있어요</div>`;
+    $("#rtList").innerHTML = `<div style="color:var(--sub);font-size:14px;padding:4px 0">오늘은 고정업무가 없어요 · 📅 주간 기록에서 지난 기록을 볼 수 있어요</div>`;
     $("#rtStatus").innerHTML = ""; return;
   }
   $("#rtCount").textContent = `${done}/${mine.length}`;
@@ -641,14 +651,54 @@ async function loadRoutine() {
     + (mine.length && done === mine.length ? `<div class="rtdone">${isToday ? "🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요" : "🎉 이날 고정업무를 모두 끝냈어요"}</div>` : "");
   $("#rtStatus").innerHTML = "";
 }
-$("#routinebox summary").addEventListener("click", (e) => { // ‹ › 오늘로 (접기 대신)
-  const b = e.target.closest("[data-rtnav]"); if (!b) return;
+// 📅 주간 기록: 고정업무 × 월~일 한 표 (매니저 = 우리 지점 누가·몇 시, 대표 = 지점별 n/N). ‹ › 는 주 단위
+const rtWk = { open: false, mon: null }, RT_START = "2026-10-21"; // 지점 공용 고정업무 기록을 시작한 날 (그 전 칸은 '–')
+try { rtWk.open = localStorage.getItem("rt-week") === "1"; } catch {}
+$("#routinebox summary").addEventListener("click", (e) => {
+  if (e.target.id !== "rtWkBtn") return;
   e.preventDefault();
-  const n = +b.dataset.rtnav;
-  rtDay = n === 0 ? null : W.add(rtDay ?? today(), n);
-  if (rtDay === today()) rtDay = null;
-  loadRoutine();
+  rtWk.open = !rtWk.open; try { localStorage.setItem("rt-week", rtWk.open ? "1" : ""); } catch {}
+  rtWk.open ? renderRtWeek() : $("#rtWeek").classList.add("hidden");
+  $("#rtWkBtn").classList.toggle("on", rtWk.open);
 });
+$("#rtWeek").addEventListener("click", (e) => {
+  const n = e.target.dataset.wk; if (n === undefined) return;
+  rtWk.mon = +n === 0 ? null : W.add(rtWk.mon ?? W.monday(today()), 7 * +n);
+  renderRtWeek();
+});
+// 지점 하나의 고정업무 × 요일 표 (매니저 주간 기록·대표 현황 탭 공용). team = null 이면 내 지점
+async function routineWeekTable(mon, team) {
+  const days = [0, 1, 2, 3, 4, 5, 6].map((i) => W.add(mon, i)), td = today();
+  const ck = await Promise.all(days.map((d) => sb.rpc("team_routine_checks_on", { p_day: d, p_team: team })));
+  if (ck.some((x) => fail(x.error))) return "";
+  const maps = ck.map((x) => new Map((x.data ?? []).map((c) => [c.item_id, c])));
+  const rows = routine.filter((it) => days.some((d) => applies(it, d)));
+  const hhmm = (iso) => { const t = new Date(iso); return `${pad(t.getHours())}:${pad(t.getMinutes())}`; };
+  const th = `<tr><th>고정업무</th>${days.map((d) => `<th class="${d === td ? "td" : ""}">${DOW[W.parse(d).getDay()]} ${md(d)}</th>`).join("")}</tr>`;
+  return rows.length ? `<div class="rtw"><table>${th}${rows.map((it) => `<tr><td class="t">${esc(it.title)}</td>${days.map((d, i) => {
+    if (!applies(it, d)) return `<td class="c x"></td>`;
+    const c = maps[i].get(it.id);
+    if (c) return `<td class="c y" title="${esc(c.done_name ?? "")} ${hhmm(c.done_at)}">✓ ${esc(c.done_name ?? "")}<br>${hhmm(c.done_at)}${c.link ? ` <a href="${esc(c.link)}" target="_blank" rel="noopener">🔗</a>` : ""}</td>`;
+    return d > td ? `<td class="c f">·</td>` : d < RT_START ? `<td class="c f" title="공용 고정업무 시작 전">–</td>` : d < td ? `<td class="c n">✗</td>` : `<td class="c">☐</td>`; }).join("")}</tr>`).join("")}</table></div>`
+    : `<div style="color:var(--sub);font-size:14px">이 주에는 고정업무가 없어요</div>`;
+}
+async function renderRtWeek() {
+  $("#rtWkBtn").classList.add("on");
+  const mon = rtWk.mon ?? W.monday(today()), days = [0, 1, 2, 3, 4, 5, 6].map((i) => W.add(mon, i)), td = today();
+  const head = `<div class="wh"><button class="rtnav" data-wk="-1">‹</button>${md(mon)} ~ ${md(days[6])} 고정업무 기록<button class="rtnav" data-wk="1">›</button>${mon !== W.monday(td) ? `<button class="rtnav wk" data-wk="0">이번 주</button>` : ""}</div>`;
+  const th = `<tr><th>${myRole === "admin" ? "지점" : "고정업무"}</th>${days.map((d) => `<th class="${d === td ? "td" : ""}">${DOW[W.parse(d).getDay()]} ${md(d)}</th>`).join("")}</tr>`;
+  if (myRole === "admin") { // 대표: 지점 × 요일 n/N
+    const st = await Promise.all(days.map((d) => sb.rpc("routine_status", { p_day: d })));
+    if (st.some((x) => fail(x.error))) return;
+    const teamsL = st[0].data ?? [];
+    $("#rtWeek").innerHTML = head + `<div class="rtw"><table>${th}${teamsL.map((tm) => `<tr><td class="t"><b>${esc(tm.team)}</b></td>${st.map((x, i) => {
+      const r = x.data.find((y) => y.team_id === tm.team_id); if (!r?.total) return `<td class="c x"></td>`;
+      if (days[i] < RT_START) return `<td class="c f">–</td>`;
+      const cls = days[i] > td ? "f" : r.done === r.total ? "y" : days[i] < td ? "n" : "";
+      return `<td class="c ${cls}">${r.done}/${r.total}${r.done === r.total ? " 🎉" : ""}</td>`; }).join("")}</tr>`).join("")}</table></div>`;
+  } else $("#rtWeek").innerHTML = head + await routineWeekTable(mon, previewTeam); // 매니저: 우리 지점
+  $("#rtWeek").classList.remove("hidden");
+}
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
   let link = null;
@@ -656,7 +706,7 @@ $("#rtList").addEventListener("change", async (e) => {
     link = (prompt("작성한 글의 링크를 붙여넣어 주세요\n(예: https://blog.naver.com/...)") || "").trim();
     if (!/^https?:\/\/\S+$/i.test(link)) { e.target.checked = false; return toast(link ? "https:// 로 시작하는 주소를 넣어 주세요" : "링크를 올려야 완료돼요"); }
   }
-  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || rtDay || today(), p_done: e.target.checked, p_team: previewTeam, p_link: link });
+  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: e.target.checked, p_team: previewTeam, p_link: link });
   if (fail(error)) e.target.checked = !e.target.checked;
   loadRoutine();
 });
@@ -708,7 +758,13 @@ $("#rtDialog").querySelector(".quick").onclick = async (e) => {
 };
 
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
-let boardT;
+let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
+try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
+$("#boardView").addEventListener("click", (e) => {
+  const m = e.target.dataset.bmode, n = e.target.dataset.bwk;
+  if (m) { boardWeek = m === "week"; try { localStorage.setItem("board-week", boardWeek ? "1" : ""); } catch {} return loadBoard(); }
+  if (n !== undefined) { boardMon = +n === 0 ? null : W.add(boardMon ?? W.monday(today()), 7 * +n); return loadBoard(); }
+});
 const boardSoon = () => { if (view !== "board") return; clearTimeout(boardT); boardT = setTimeout(loadBoard, 400); };
 setInterval(() => view === "board" && document.visibilityState === "visible" && loadBoard(), 60000); // 실시간이 끊겨도 1분마다
 async function loadBoard() {
@@ -720,6 +776,14 @@ async function loadBoard() {
     sb.from("routine_items").select("*").order("sort").order("id")]);
   if (fail(t.error || p.error || k.error || a.error || r.error)) return;
   const items = r.data, todays = items.filter((it) => applies(it, day)), name = (id) => items.find((i) => i.id === id);
+  const mode = `<span class="bmode"><button data-bmode="today" class="${boardWeek ? "" : "on"}">오늘</button><button data-bmode="week" class="${boardWeek ? "on" : ""}">이번 주</button></span>`;
+  if (boardWeek) { // 지점마다 매니저 주간 기록과 같은 표
+    routine = items;
+    const mon = boardMon ?? W.monday(day), tables = await Promise.all(t.data.map((tm) => routineWeekTable(mon, tm.id)));
+    $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><button class="rtnav" data-bwk="-1">‹</button><small>${md(mon)} ~ ${md(W.add(mon, 6))} 고정업무 기록</small><button class="rtnav" data-bwk="1">›</button>${mon !== W.monday(day) ? `<button class="rtnav wk" data-bwk="0">이번 주</button>` : ""}${mode}</div>`
+      + t.data.map((tm, i) => `<div class="bcard" style="margin-bottom:14px"><div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(p.data.filter((x) => x.team_id === tm.id && x.role === "manager").map((m) => m.name).join("·") || "매니저 없음")}</span></div>${tables[i]}</div>`).join("");
+    return;
+  }
   const per = await Promise.all(t.data.map(async (tm) => {
     const [c, cy] = await Promise.all([sb.rpc("team_routine_checks_on", { p_day: day, p_team: tm.id }), sb.rpc("routine_carry", { p_day: day, p_team: tm.id })]);
     return { tm, checks: new Map((c.data ?? []).map((x) => [x.item_id, x])), carry: cy.data ?? [] };
@@ -745,7 +809,7 @@ async function loadBoard() {
     </div>`;
   });
   const d = W.parse(day);
-  $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><small>${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]}) · 실시간 · ${hhmm(new Date().toISOString())} 기준</small></div><div class="bgrid">${cards.join("")}</div>`;
+  $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><small>${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]}) · 실시간 · ${hhmm(new Date().toISOString())} 기준</small>${mode}</div><div class="bgrid">${cards.join("")}</div>`;
 }
 
 // ── 👥 팀 화면 ──
