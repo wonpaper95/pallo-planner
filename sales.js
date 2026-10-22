@@ -61,7 +61,15 @@ function catchUp(s, a) {
   const n = Math.max(0, s.goal - (a.days ? a.net : s.current)), x = need(s, n);
   return { left, need: n, payN: x.payers, conN: x.consults, repN: x.replies, appN: x.apps };
 }
-const minConsult = (c) => Math.max(1, Math.round(c.perDay.consults));
+// 📅 캘린더 = 회신자(그날 상담 오기로 한 사람). 월 회신 목표 총량 − 어제까지 실제 회신 → 오늘~말일 영업일로 나눠 하루 최소
+// 앞서가면 남은 날 최소가 줄고, 뒤처지면 늘어남. 지난 날은 처음 계획(월 목표 ÷ 영업일) 기준으로 ✓/✗
+function replyPace(s, c) {
+  const T = c.month.replies, td = todayIso(), st = pStart(s), from = td < st ? st : td;
+  const done = Object.entries(s.log).reduce((t, [d, e]) => t + (d >= st && d < from ? e.replies || 0 : 0), 0);
+  const left = workDays(addDays(from, -1), mEnd(s)), plan = Math.max(1, Math.ceil(T / c.month.days - 1e-9));
+  return { T, done, left, plan, dyn: left ? Math.max(0, Math.ceil((T - done) / left - 1e-9)) : 0 };
+}
+const replyTgt = (s, c, d) => { const rp = replyPace(s, c); return d < todayIso() ? rp.plan : rp.dyn; };
 
 // 재무 시트가 연결된 지점: 결제자·결제금액·환불은 시트 값(직접 입력 안 씀), 현재 순매출 = 시트의 1일~기준일 합계
 function compose(plan, log, sheet) {
@@ -280,14 +288,15 @@ const TIPS = {
 };
 const tipList = (s, k) => TIPS[k].map((t) => t.replace("{fc}", s.firstContact));
 // 그날 상담이 목표보다 적으면 어느 단계가 막혔는지 보고 행동 요령을 고른다
-function diagnose(s, c, e) {
-  if (!e || e.consults == null) return null;
-  const tgt = minConsult(c), res = { low: e.consults < tgt, tgt, why: [] };
+function diagnose(s, c, e, tgt) {
+  if (!e || e.replies == null) return null;
+  const res = { low: e.replies < tgt, tgt, why: [] };
   if (res.low) {
-    if (e.apps != null && e.apps < Math.round(c.perDay.apps)) res.why.push(["지원자 부족", "apps"]);
-    if (e.apps && e.replies != null && e.replies / e.apps * 100 < s.reply) res.why.push(["회신율 낮음", "reply"]);
-    if (!res.why.length || (e.replies && e.consults / e.replies * 100 < s.consult)) res.why.push(["상담 연결 부족", "consult"]);
+    if (e.apps != null && e.apps < Math.round(c.month.apps / c.month.days)) res.why.push(["지원자 부족", "apps"]);
+    if (e.apps && e.replies / e.apps * 100 < s.reply) res.why.push(["회신율 낮음", "reply"]);
+    if (!res.why.length) res.why.push(["상담 예약 부족", "reply"]);
   }
+  if (e.replies && e.consults != null && e.consults / e.replies * 100 < s.consult) res.why.push(["방문(상담) 저조", "consult"]);
   if (e.consults && e.payers != null && e.payers / e.consults * 100 < s.pay) res.why.push(["결제율 낮음", "pay"]);
   return res;
 }
@@ -313,7 +322,7 @@ function strategies(s, c, a) {
   acts.forEach((t, i) => out.push(`(${i + 2}) ${t}`));
   let off = addDays(today, 1); while (off <= s.end && !isOff(off)) off = addDays(off, 1);
   if (off <= s.end) out.push(`(${acts.length + 2}) 휴무 대비: 다음 휴무일 ${md(off)}(금) 전날까지 상담 예약을 집중해서 잡고, 휴무일에 들어온 지원자는 다음 날 오전에 가장 먼저 연락하겠습니다.`);
-  out.push(`(${out.length + 1}) 일일 점검: 매일 마감 때 달력에 실적을 입력하고, 상담 최소 ${minConsult(c)}명에 못 미친 날은 다음 날 부족한 단계부터 조치하겠습니다.`);
+  out.push(`(${out.length + 1}) 일일 점검: 매일 마감 때 달력에 실적을 입력하고, 캘린더 회신(상담 오기로 한 사람) 최소 ${replyPace(s, c).dyn}명에 못 미친 날은 다음 날 부족한 단계부터 조치하겠습니다.`);
   return out;
 }
 // 실적 누계를 목표·오늘까지 계획과 비교해 문제점 문장을 만든다
@@ -328,9 +337,9 @@ function problems(s, c, a) {
   rate("회신율", a.replies, a.apps, s.reply); rate("상담률", a.consults, a.replies, s.consult); rate("결제율", a.payers, a.consults, s.pay);
   if (a.payers && a.arpu < s.arpu) out.push(`객단가: ${won(a.arpu)}원 (목표 ${won(s.arpu)}원)`);
   if (a.amount && a.refund / a.amount * 100 > (s.refundRate || 0)) out.push(`환불율: ${pct(a.refund / a.amount * 100)}% (목표 ${pct(s.refundRate || 0)}%)`);
-  const tgt = minConsult(c);
-  const low = Object.entries(s.log).filter(([d, e]) => d > from && d <= td && !isOff(d) && e.consults != null && e.consults < tgt).length;
-  if (low) out.push(`상담 최소 ${tgt}명 미달: ${low}일`);
+  const tgt = replyPace(s, c).plan;
+  const low = Object.entries(s.log).filter(([d, e]) => d > from && d <= td && !isOff(d) && e.replies != null && e.replies < tgt).length;
+  if (low) out.push(`캘린더 회신 최소 ${tgt}명 미달: ${low}일`);
   const gap = Math.round(planNet) - (s.linked ? a.net : a.amount - a.refund);
   if (gap > 0) out.push(`순매출: 오늘까지 계획 대비 ${won(gap)}원 부족 (현재 ${won(a.net)}원, 달성률 ${pct(a.net / s.goal * 100)}%)`);
   return out.length ? out : ["오늘까지 계획 대비 모든 단계가 목표 이상입니다."];
@@ -403,7 +412,7 @@ V().innerHTML = `
 <div id="slBody">
 <details class="slcard sldefs"><summary><b>📏 단계별 세는 법</b> <small>(모든 매니저가 같은 기준으로 입력)</small></summary><table>
   <tr><td><b>지원자</b></td><td>그날 SSO 지점 화면에 새로 들어온 신청 수 (하루치, 누계 아님)</td></tr>
-  <tr><td><b>회신자</b></td><td>우리가 연락해서 답장이나 통화가 되어 전산 상담 일정에 들어간 사람</td></tr>
+  <tr><td><b>회신자</b></td><td>그날 상담 오기로 한 사람 — 연락해서 전산 상담 일정(캘린더)에 잡힌 사람</td></tr>
   <tr><td><b>상담자</b></td><td>전산 상담 일정에 있는 사람 중 실제로 방문해 상담한 사람</td></tr>
   <tr><td><b>결제자</b></td><td>결제를 마친 사람. 상담 당일이 아니어도 나중에 결제하면 포함하고, 결제한 날짜에 넣습니다. 분납은 첫 결제일 기준</td></tr>
   <tr><td><b>결제금액·환불</b></td><td>카드 승인 금액 기준. 환불은 환불 처리한 날짜에 넣습니다</td></tr></table></details>
@@ -461,8 +470,8 @@ V().innerHTML = `
 <dialog id="slDlg"><form method="dialog">
   <h3 id="slDlgTitle"></h3>
   <div class="slrow"><label>지원자<small>SSO 새 신청, 하루치</small></label><input type="number" min="0" name="apps"></div>
-  <div class="slrow"><label>회신자<small>연락돼 전산 상담 일정에 들어간 사람</small></label><input type="number" min="0" name="replies"></div>
-  <div class="slrow"><label>상담자<small>일정 중 실제 방문·상담한 사람</small></label><input type="number" min="0" name="consults"></div>
+  <div class="slrow"><label>회신자<small>오늘 상담 오기로 한 사람 (캘린더)</small></label><input type="number" min="0" name="replies"></div>
+  <div class="slrow"><label>상담자<small>그중 실제 방문·상담한 사람</small></label><input type="number" min="0" name="consults"></div>
   <div class="slrow"><label>결제자<small>이날 결제한 사람 (분납은 첫 결제일)</small></label><input type="number" min="0" name="payers"></div>
   <div class="slrow"><label>결제금액<small>카드 승인 금액</small></label><input name="amount" data-money></div>
   <div class="slrow"><label>환불·정산<small>환불 처리한 날짜에 입력</small></label><input name="refund" data-money></div>
@@ -596,8 +605,8 @@ function render() {
 
   renderCal(s, c);
   const cu = catchUp(s, a);
-  setH("slCalNote", `달력의 <b>상담 최소 ${minConsult(c)}명</b>은 처음 계획 기준입니다.`
-    + (a.days ? ` 오늘 실적을 반영하면 남은 영업일 ${cu.left}일 동안 <b style="color:var(--red)">하루 ${Math.ceil(cu.conN / cu.left)}명</b>이 필요합니다 (실행 전략 (1)과 같은 숫자).` : ""));
+  const rp = replyPace(s, c), gap = rp.done - rp.plan * workDays(addDays(pStart(s), -1), addDays(todayIso(), -1));
+  setH("slCalNote", `📅 캘린더 = <b>회신자</b>(그날 상담 오기로 한 사람). 월 회신 목표 <b>${rp.T}명</b> 중 어제까지 <b>${rp.done}명</b> → 남은 영업일 ${rp.left}일 동안 <b style="color:${rp.dyn > rp.plan ? "var(--red)" : "var(--green)"}">하루 최소 ${rp.dyn}명</b> (처음 계획 하루 ${rp.plan}명${gap ? `, 계획보다 ${Math.abs(gap)}명 ${gap > 0 ? "앞섬 → 줄어듦" : "뒤처짐 → 늘어남"}` : ""}).`);
 
   // 시트 연동: 집계 시작일부터·월 전체 목표 기준 / 아니면 기준일 다음 날부터·남은 기간 목표 기준
   const td = todayIso(), el = workDays(s.linked ? addDays(pStart(s), -1) : s.base, td < s.end ? td : s.end), rr = (x, y) => y ? pct(x / y * 100) + "%" : "-";
@@ -618,23 +627,23 @@ function render() {
 }
 
 function renderCal(s, c) {
-  const first = D(mStart(s)), last = D(s.end), td = todayIso(), tgt = minConsult(c);
+  const first = D(mStart(s)), last = D(mEnd(s)), td = todayIso(), rp = replyPace(s, c);
   let html = "";
   for (let m = new Date(first.getFullYear(), first.getMonth(), 1); m <= last; m.setMonth(m.getMonth() + 1)) {
     html += `<h4>${m.getFullYear()}년 ${m.getMonth() + 1}월</h4><div class="slcal">` + "일월화수목금토".split("").map((d) => `<div class="dow">${d}</div>`).join("");
     const dim = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
     html += "<div></div>".repeat(m.getDay());
     for (let i = 1; i <= dim; i++) {
-      const d = iso(new Date(m.getFullYear(), m.getMonth(), i)), e = s.log[d], inPeriod = d > s.base && d <= s.end;
+      const d = iso(new Date(m.getFullYear(), m.getMonth(), i)), e = s.log[d], inPeriod = d >= pStart(s) && d <= mEnd(s);
       if (inPeriod && isOff(d)) { html += `<div class="day off"><div class="d">${i}</div><div class="big"><small>휴무</small></div></div>`; continue; }
-      if (!inPeriod) { html += `<div class="day off"><div class="d">${i}</div>${e ? `<div class="c">상담 ${e.consults ?? "-"}</div>` : ""}</div>`; continue; }
-      const g = diagnose(s, c, e);
+      if (!inPeriod) { html += `<div class="day off"><div class="d">${i}</div></div>`; continue; }
+      const tgt = d < td ? rp.plan : rp.dyn, g = diagnose(s, c, e, tgt);
       let cls = "day" + (d === td ? " today" : ""), body;
       if (g) {
         cls += g.low ? " low" : " good";
-        body = `<div class="big"><small>상담 / 최소</small><b>${e.consults}<i> / ${tgt}명</i></b></div>`;
+        body = `<div class="big"><small>회신 / 최소</small><b>${e.replies}<i> / ${tgt}명</i></b></div>${e.consults != null ? `<div class="c" style="text-align:center">방문 ${e.consults}명</div>` : ""}`;
         if (g.low) body += `<div class="tip">⚠ ${g.why.slice(0, 2).map((w) => w[0]).join("·")}<br>${tipList(s, g.why[0][1])[0]}</div>`;
-      } else body = `<div class="big"><small>상담 최소</small><b>${tgt}<i>명</i></b></div>` + (d < td ? '<div class="nil">미입력</div>' : "");
+      } else body = `<div class="big"><small>${d < td ? "계획" : "회신 최소"}</small><b>${tgt}<i>명</i></b></div>` + (d < td ? '<div class="nil">미입력</div>' : "");
       html += `<div class="${cls}" data-day="${d}"><div class="d">${i}</div>${body}</div>`;
     }
     html += "</div>";
@@ -735,10 +744,10 @@ function openDay(d) {
 }
 const readDlg = () => Object.fromEntries([...dlg.querySelectorAll("input")].filter((f) => f.value !== "").map((f) => [f.name, num(f.value)]));
 function showTips() {
-  const s = S(), g = diagnose(s, calc(s), readDlg());
+  const s = S(), c = calc(s), g = diagnose(s, c, readDlg(), replyTgt(s, c, editDay));
   $v("#slTips").innerHTML = !g ? "" : g.why.length
-    ? `<div class="sltip">${g.low ? `<h4>상담 목표 ${g.tgt}명보다 부족합니다</h4>` : ""}${g.why.map(([w, k]) => `<b>${w}</b><ul>${tipList(s, k).map((t) => `<li>${t}</li>`).join("")}</ul>`).join("")}</div>`
-    : `<div class="sltip ok"><b>상담 목표 달성 ✓</b></div>`;
+    ? `<div class="sltip">${g.low ? `<h4>캘린더 회신 최소 ${g.tgt}명보다 부족합니다</h4>` : ""}${g.why.map(([w, k]) => `<b>${w}</b><ul>${tipList(s, k).map((t) => `<li>${t}</li>`).join("")}</ul>`).join("")}</div>`
+    : `<div class="sltip ok"><b>캘린더 회신 최소 달성 ✓</b></div>`;
 }
 dlg.addEventListener("input", showTips);
 dlg.addEventListener("close", async () => {
@@ -774,7 +783,7 @@ SL.boardCards = async function (teamList) {
     const c = calc(s), a = actuals(s), cu = catchUp(s, a), r = s.goal ? a.net / s.goal * 100 : 0, tdE = s.log[todayIso()];
     return `<div class="bcard slb" data-slteam="${tm.id}"><div class="bh"><b>${esc(tm.name)}</b><span class="mem">${won(a.net)} / ${won(s.goal)}원</span><span class="pct">${pct(r)}%</span></div>
       <div class="bar"><i style="width:${Math.min(100, r)}%"></i></div>
-      <div class="bsub">남은 ${won(Math.max(0, s.goal - a.net))}원 · 남은 영업일 ${cu.left}일 · 하루 상담 <b>${Math.ceil(cu.conN / cu.left)}명</b> 필요 (처음 계획 ${minConsult(c)}명)${tdE?.consults != null ? ` · 오늘 상담 ${tdE.consults}명` : ""}</div></div>`;
+      <div class="bsub">남은 ${won(Math.max(0, s.goal - a.net))}원 · 남은 영업일 ${cu.left}일 · 하루 회신(캘린더) <b>${replyPace(s, c).dyn}명</b> 필요 (처음 계획 ${replyPace(s, c).plan}명)${tdE?.replies != null ? ` · 오늘 회신 ${tdE.replies}명` : ""}</div></div>`;
   });
   return `<h3 style="margin:4px 0 10px">💰 이번 달 매출</h3><div class="bgrid" style="margin-bottom:18px">${cards.join("")}</div>`;
 };
