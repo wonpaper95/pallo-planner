@@ -43,13 +43,14 @@ function calc(s) {
 }
 // 기준일 다음 날~오늘 달력 실적 합계 (앞날 입력은 예약이라 뺌)
 function actuals(s) {
-  const t = { apps: 0, replies: 0, consults: 0, payers: 0, amount: 0, refund: 0, days: 0, appDays: 0 }, td = todayIso();
+  const t = { apps: 0, replies: 0, consults: 0, payers: 0, amount: 0, refund: 0, signup: 0, days: 0, appDays: 0 }, td = todayIso();
   for (const [d, e] of Object.entries(s.log)) {
-    if (d <= s.base || d > s.end || d > td || isOff(d)) continue;
+    if (d <= (s.linked ? addDays(pStart(s), -1) : s.base) || d > s.end || d > td) continue; // 시트 연동이면 집계 시작일부터 (휴무일 매출도 포함)
     t.days++; if (e.apps != null) t.appDays++;
-    for (const k of ["apps", "replies", "consults", "payers", "amount", "refund"]) t[k] += e[k] || 0;
+    for (const k of ["apps", "replies", "consults", "payers", "amount", "refund", "signup"]) t[k] += e[k] || 0;
   }
-  t.net = s.current + t.amount - t.refund;
+  t.arpu = t.payers ? (s.linked ? t.signup : t.amount) / t.payers : 0; // 객단가 = 가입 금액 ÷ 가입 인원 (시트 연동)
+  t.net = s.linked ? t.amount - t.refund : s.current + t.amount - t.refund;
   return t;
 }
 // 오늘까지 실적을 반영해 남은 영업일에 필요한 인원을 다시 계산
@@ -68,9 +69,11 @@ function compose(plan, log, sheet) {
   const out = {};
   for (const [d, e] of Object.entries(log)) out[d] = { ...e, amount: 0, refund: 0, payers: 0 };
   for (const [d, v] of Object.entries(sheet.days)) out[d] = { ...(out[d] || {}), amount: v.amount, refund: v.refund, payers: v.payers, signup: v.signup, sheet: true };
+  // 기준일 = 오늘(자동). 집계 시작 전이면 시작 전날, 달이 지났으면 말일 → 현재 순매출이 늘 오늘까지 시트 합계
+  const td = todayIso(), base = td < pStart(plan) ? addDays(pStart(plan), -1) : td > mEnd(plan) ? mEnd(plan) : td;
   let current = 0;
-  for (const [d, v] of Object.entries(sheet.days)) if (d >= pStart(plan) && d <= plan.base) current += v.amount - v.refund;
-  return { ...plan, log: out, linked, current };
+  for (const [d, v] of Object.entries(sheet.days)) if (d >= pStart(plan) && d <= base) current += v.amount - v.refund;
+  return { ...plan, base, log: out, linked, current };
 }
 // 이 달 1일~오늘 누계 (기준일과 무관)
 function mtd(s) {
@@ -220,9 +223,9 @@ function strategies(s, c, a) {
     if (a.apps && a.replies / a.apps * 100 < s.reply) acts.push(`회신: 회신율 ${pct(a.replies / a.apps * 100)}%를 ${pct(s.reply)}%로 올리기 위해 미회신 지원자 ${a.apps - a.replies}명에게 오늘 안에 문자+전화로 재연락하고, 첫 연락은 ${s.firstContact}분 이내로 하겠습니다.`);
     if (a.replies && a.consults / a.replies * 100 < s.consult) acts.push(`상담 연결: 회신했지만 상담하지 않은 ${a.replies - a.consults}명에게 상담 가능 시간 2개를 제안해 예약을 잡고, 예약자에게는 전날 날짜·시간·위치를 다시 안내하겠습니다.`);
     if (a.consults && a.payers / a.consults * 100 < s.pay) acts.push(`결제: 결제율 ${pct(a.payers / a.consults * 100)}% (목표 ${pct(s.pay)}%). 상담 후 미결제자 ${a.consults - a.payers}명에게 24시간 안에 후속 연락하겠습니다.`);
-    if (a.payers && a.amount / a.payers < s.arpu) {
+    if (a.payers && a.arpu < s.arpu) {
       const up = [...s.members].sort((x, y) => x.price - y.price).find((m) => m.price >= s.arpu);
-      acts.push(`객단가: ${won(a.amount / a.payers)}원으로 목표 ${won(s.arpu)}원보다 낮습니다. 상담에서 ${up ? up.name + "(" + won(up.price) + "원) 이상" : "상위 멤버십"}을 먼저 제안하겠습니다.`);
+      acts.push(`객단가: ${won(a.arpu)}원으로 목표 ${won(s.arpu)}원보다 낮습니다. 상담에서 ${up ? up.name + "(" + won(up.price) + "원) 이상" : "상위 멤버십"}을 먼저 제안하겠습니다.`);
     }
     if (a.amount && a.refund / a.amount * 100 > (s.refundRate || 0)) acts.push(`환불: 환불율 ${pct(a.refund / a.amount * 100)}%. 환불 사유를 확인하고, 결제 직후 첫 수업 일정을 바로 잡아 이탈을 막겠습니다.`);
   } else acts.push(`광고·회신: 하루 지원자 ${per(appN)}명을 목표로 광고를 운영하고, 첫 연락은 ${s.firstContact}분 이내로 하겠습니다.`);
@@ -236,17 +239,19 @@ function strategies(s, c, a) {
 // 실적 누계를 목표·오늘까지 계획과 비교해 문제점 문장을 만든다
 function problems(s, c, a) {
   if (!a.days) return ["아직 기준일 이후 실적이 입력되지 않았습니다."];
-  const td = todayIso(), el = workDays(s.base, td < s.end ? td : s.end), p = c.perDay, out = [];
+  const td = todayIso(), from = s.linked ? addDays(pStart(s), -1) : s.base, el = workDays(from, td < s.end ? td : s.end), out = [];
+  const p = s.linked ? { apps: c.month.apps / c.month.days, consults: c.month.consults / c.month.days, payers: c.month.payers / c.month.days } : c.perDay;
+  const planNet = s.linked ? s.goal / c.month.days * el : c.netAdd / c.days * el;
   const short = (name, act, plan) => { const g = Math.round(plan) - act; if (g > 0) out.push(`${name}: 오늘까지 계획 ${Math.round(plan)}명 대비 ${act}명으로 ${g}명 부족`); };
   short("지원자", a.apps, p.apps * el); short("상담자", a.consults, p.consults * el); short("결제자", a.payers, p.payers * el);
   const rate = (name, x, y, tgt) => { if (!y) return; const r = x / y * 100; if (r < tgt) out.push(`${name}: ${pct(r)}% (목표 ${pct(tgt)}%)로 ${pct(tgt - r)}%p 낮음`); };
   rate("회신율", a.replies, a.apps, s.reply); rate("상담률", a.consults, a.replies, s.consult); rate("결제율", a.payers, a.consults, s.pay);
-  if (a.payers && a.amount / a.payers < s.arpu) out.push(`객단가: ${won(a.amount / a.payers)}원 (목표 ${won(s.arpu)}원)`);
+  if (a.payers && a.arpu < s.arpu) out.push(`객단가: ${won(a.arpu)}원 (목표 ${won(s.arpu)}원)`);
   if (a.amount && a.refund / a.amount * 100 > (s.refundRate || 0)) out.push(`환불율: ${pct(a.refund / a.amount * 100)}% (목표 ${pct(s.refundRate || 0)}%)`);
   const tgt = minConsult(c);
-  const low = Object.entries(s.log).filter(([d, e]) => d > s.base && d <= td && !isOff(d) && e.consults != null && e.consults < tgt).length;
+  const low = Object.entries(s.log).filter(([d, e]) => d > from && d <= td && !isOff(d) && e.consults != null && e.consults < tgt).length;
   if (low) out.push(`상담 최소 ${tgt}명 미달: ${low}일`);
-  const gap = Math.round(c.netAdd / c.days * el) - (a.amount - a.refund);
+  const gap = Math.round(planNet) - (s.linked ? a.net : a.amount - a.refund);
   if (gap > 0) out.push(`순매출: 오늘까지 계획 대비 ${won(gap)}원 부족 (현재 ${won(a.net)}원, 달성률 ${pct(a.net / s.goal * 100)}%)`);
   return out.length ? out : ["오늘까지 계획 대비 모든 단계가 목표 이상입니다."];
 }
@@ -326,7 +331,7 @@ V().innerHTML = `
 <div class="slgrid">
   <section class="slcard"><h3>[1] 월별 목표 — 비율·객단가를 바꾸면 필요 인원이 바로 바뀝니다</h3>
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
-    <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><small>현재 (자동 측정)</small></div>
+    <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><button type="button" class="slcurbtn" id="slCurBtn"></button></div>
     <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
     <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
     <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
@@ -448,7 +453,8 @@ function render() {
   });
   const sy = SL.sheet.sync, curEl = $v('[data-k="current"]');
   curEl.readOnly = s.linked; if (s.linked) curEl.value = won(s.current);
-  setT("slCurHint", s.linked ? `📗 재무 시트 연동 중 — 현재 순매출은 시트의 ${md(pStart(s))}~기준일 합계로 자동으로 들어갑니다. 결제자·결제금액·환불도 시트 값을 씁니다.`
+  $v('[data-k="base"]').readOnly = s.linked; if (s.linked) $v('[data-k="base"]').value = s.base;
+  setT("slCurHint", s.linked ? `📗 재무 시트 연동 중 — 기준일은 오늘로 자동, 현재 순매출은 시트의 ${md(pStart(s))}~오늘 합계(10분마다 갱신)입니다. 결제자·결제금액·환불도 시트 값을 씁니다.`
     : "⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.");
   $v("#slSync").classList.toggle("hidden", !sy);
   setT("slSheet", sy ? (sy.error ? `⚠ 시트: ${sy.error}` : `📗 시트 ${new Date(sy.synced_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 기준${sy.skipped ? ` · 못 읽은 줄 ${sy.skipped}` : ""}`) : "");
@@ -492,16 +498,18 @@ function render() {
   setH("slCalNote", `달력의 <b>상담 최소 ${minConsult(c)}명</b>은 처음 계획 기준입니다.`
     + (a.days ? ` 오늘 실적을 반영하면 남은 영업일 ${cu.left}일 동안 <b style="color:var(--red)">하루 ${Math.ceil(cu.conN / cu.left)}명</b>이 필요합니다 (실행 전략 (1)과 같은 숫자).` : ""));
 
-  const td = todayIso(), el = workDays(s.base, td < s.end ? td : s.end), rr = (x, y) => y ? pct(x / y * 100) + "%" : "-";
+  // 시트 연동: 집계 시작일부터·월 전체 목표 기준 / 아니면 기준일 다음 날부터·남은 기간 목표 기준
+  const td = todayIso(), el = workDays(s.linked ? addDays(pStart(s), -1) : s.base, td < s.end ? td : s.end), rr = (x, y) => y ? pct(x / y * 100) + "%" : "-";
+  const T = s.linked ? { ...c.month, d: c.month.days } : { ...c, d: c.days }, pd = (k) => T[k] / T.d;
   setH("slActual", a.days ? `<table class="slt" style="margin-top:12px">
     <tr><th>실적 누계 (${a.days}일 입력)</th><th>실제</th><th>오늘까지 계획</th><th>전체 목표</th></tr>
-    <tr><td>지원자</td><td>${a.apps}</td><td>${Math.round(p.apps * el)}</td><td>${c.apps}</td></tr>
-    <tr><td>회신자 (회신율)</td><td>${a.replies} (${rr(a.replies, a.apps)})</td><td>${Math.round(p.replies * el)}</td><td>${c.replies} (${pct(s.reply)}%)</td></tr>
-    <tr><td>상담자 (상담률)</td><td>${a.consults} (${rr(a.consults, a.replies)})</td><td>${Math.round(p.consults * el)}</td><td>${c.consults} (${pct(s.consult)}%)</td></tr>
-    <tr><td>결제자 (결제율)</td><td>${a.payers} (${rr(a.payers, a.consults)})</td><td>${Math.round(p.payers * el)}</td><td>${c.payers} (${pct(s.pay)}%)</td></tr>
-    <tr><td>객단가</td><td>${a.payers ? won(a.amount / a.payers) : "-"}</td><td></td><td>${won(s.arpu)}</td></tr>
+    <tr><td>지원자</td><td>${a.apps}</td><td>${Math.round(pd("apps") * el)}</td><td>${T.apps}</td></tr>
+    <tr><td>회신자 (회신율)</td><td>${a.replies} (${rr(a.replies, a.apps)})</td><td>${Math.round(pd("replies") * el)}</td><td>${T.replies} (${pct(s.reply)}%)</td></tr>
+    <tr><td>상담자 (상담률)</td><td>${a.consults} (${rr(a.consults, a.replies)})</td><td>${Math.round(pd("consults") * el)}</td><td>${T.consults} (${pct(s.consult)}%)</td></tr>
+    <tr><td>결제자 (결제율)</td><td>${a.payers} (${rr(a.payers, a.consults)})</td><td>${Math.round(pd("payers") * el)}</td><td>${T.payers} (${pct(s.pay)}%)</td></tr>
+    <tr><td>객단가</td><td>${a.payers ? won(a.arpu) : "-"}</td><td></td><td>${won(s.arpu)}</td></tr>
     <tr><td>환불율</td><td>${rr(a.refund, a.amount)}</td><td></td><td>${pct(s.refundRate || 0)}%</td></tr>
-    <tr><td>결제−환불</td><td>${won(a.amount - a.refund)}</td><td>${won(c.netAdd / c.days * el)}</td><td>${won(c.netAdd)}</td></tr></table>` : "");
+    <tr><td>결제−환불</td><td>${won(a.amount - a.refund)}</td><td>${won(T.netAdd / T.d * el)}</td><td>${won(T.netAdd)}</td></tr></table>` : "");
 
   setT("slStrategy", strategies(s, c, a).join("\n"));
   setT("slProblems", problems(s, c, a).map((t) => "- " + t).join("\n"));
@@ -569,6 +577,7 @@ V().addEventListener("change", async (ev) => {
   }
 });
 V().addEventListener("click", async (ev) => {
+  if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
   if (ev.target.id === "slMemApply") {
     const s = SL.plan, mn = s.members.reduce((x, m) => x + m.n, 0); if (!mn) return;
     s.arpu = s.members.reduce((x, m) => x + m.n * m.price, 0) / mn; render(); savePlan(); return;
@@ -591,6 +600,14 @@ V().addEventListener("click", async (ev) => {
   const cell = ev.target.closest("#slCal [data-day]"); if (!cell) return;
   openDay(cell.dataset.day);
 });
+
+// [1] 현재(자동 측정) 열 접기·펴기 — 기본은 접힘, 기기에 기억
+function curToggle(open) {
+  V().classList.toggle("curopen", open);
+  $v("#slCurBtn").textContent = open ? "현재 (자동 측정) ▾ 접기" : "현재 (자동 측정) ▸ 펼치기";
+  try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
+}
+try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
 
 // ── 달력 입력 창 ──
 const dlg = $v("#slDlg"); let editDay = null;
@@ -636,8 +653,9 @@ SL.boardCards = async function (teamList) {
   if (p.error || d.error || sd.error || sy.error) return "";
   const cards = teamList.map((tm) => {
     const row = p.data.find((x) => x.team_id === tm.id);
-    if (!row) return `<div class="bcard slb" data-slteam="${tm.id}"><div class="bh"><b>${esc(tm.name)}</b></div><div class="bsub">이번 달 매출 목표 미설정 — 눌러서 입력</div></div>`;
     const own = (q) => q.data.filter((x) => x.team_id === tm.id);
+    if (!row) { const sheetNet = own(sd).filter((x) => x.day <= todayIso()).reduce((t, x) => t + x.amount - x.refund, 0);
+      return `<div class="bcard slb" data-slteam="${tm.id}"><div class="bh"><b>${esc(tm.name)}</b>${sy.data.some((x) => x.team_id === tm.id) ? `<span class="mem">📗 시트 순매출 ${won(sheetNet)}원</span>` : ""}</div><div class="bsub">이번 달 매출 목표 미설정 — 눌러서 입력</div></div>`; }
     const s = compose({ ...newPlan(month), ...row.data, month }, Object.fromEntries(own(d).map((x) => [x.day, x])),
       { days: Object.fromEntries(own(sd).map((x) => [x.day, x])), sync: sy.data.find((x) => x.team_id === tm.id) });
     const c = calc(s), a = actuals(s), cu = catchUp(s, a), r = s.goal ? a.net / s.goal * 100 : 0, tdE = s.log[todayIso()];
