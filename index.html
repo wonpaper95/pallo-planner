@@ -293,7 +293,7 @@ body:not(.sv) #salesView { display: none; }
 .sllever { margin: 8px 0; padding-left: 22px; } .sllever li { padding: 8px 0; border-bottom: 1px solid var(--line); } .sllever li span { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
 .sllever li.top b { color: var(--accent); } .sllever em { font-style: normal; font-weight: 700; }
 .slcurbtn { font-size: 12px; font-weight: 600; color: var(--accent); text-align: left; padding: 2px 0; }
-#salesView:not(.curopen) .slcur, #salesView:not(.curopen) #slCompare { display: none; } #salesView:not(.netopen) .slnet { display: none; } #slNetBtn { display: block; margin: 0 0 8px; font-size: 13px; }
+#salesView:not(.curopen) .slcur, #salesView:not(.curopen) #slCompare { display: none; } #salesView:not(.r2open) .slr2 { display: none; } #slR2Btn { margin-left: 6px; font-size: 13px; vertical-align: 1px; }
 #salesView:not(.curopen) .slrow.sl3:not(.slhead) { grid-template-columns: 110px minmax(0, 1fr); } .slrow.slhead small { color: var(--sub); font-size: 12px; font-weight: 600; }
 .slcur { background: var(--bg); border: 1px dashed var(--line); border-radius: 8px; padding: 5px 10px; min-height: 36px; line-height: 1.25; }
 .slcur b { display: block; font-size: 14px; } .slcur small { display: block; font-size: 11.5px; color: var(--sub); }
@@ -305,7 +305,7 @@ body:not(.sv) #salesView { display: none; }
 .slchart { width: 100%; min-width: 560px; height: auto; display: block; } .slchart text { font-size: 11px; fill: var(--sub); } .slchart text.td { fill: var(--orange); font-weight: 700; }
 .slchart .okb { fill: var(--green); } .slchart .nob { fill: var(--red); } .slchart .fut { fill: var(--line); opacity: .5; }
 .slchart .goal { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; } .slchart .gl { fill: var(--accent); font-weight: 600; } .slchart .off { fill: var(--sub); }
-.slscroll { overflow-x: auto; } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
+.slscroll { overflow-x: auto; } .slmemt { min-width: 520px; } .slmemt td:first-child input { min-width: 96px; } .slmemt td:nth-child(2) input { min-width: 104px; } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
 .slt tr.fut td { color: var(--sub); } .slt tr.offr td { color: var(--sub); font-size: 12px; } #salesView details summary { cursor: pointer; margin-top: 12px; }
 @media (max-width: 860px) { #salesView { padding: 10px 10px 80px; } .slcal .day { min-height: 70px; padding: 4px; } .slcal .tip { display: none; } .slcal .big b { font-size: 22px; }
   .slcal .day.low::after { content: "!"; position: absolute; right: 6px; top: 4px; color: var(--red); font-weight: 800; } .slrow { grid-template-columns: 90px 1fr; } }

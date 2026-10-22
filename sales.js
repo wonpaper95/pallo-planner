@@ -419,17 +419,17 @@ V().innerHTML = `
     <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
-  <section class="slcard"><h3>[2] 남은 기간 목표</h3>
+  <section class="slcard"><h3>[2] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
+    <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
+    <div class="slr2">
+    <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
-    <button type="button" class="slcurbtn" id="slNetBtn"></button>
-    <div class="slnet"><div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
-    <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p></div>
     <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
-    <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></section>
+    <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
   <section class="slcard"><h3>[3] 멤버십별 추가 결제 목표 (남은 기간)</h3>
-    <table class="slt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
-    <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table>
+    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
+    <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
     <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 이 비율의 객단가로 계산한 필요 결제자 × 비율.</p></section>
   <section class="slcard"><h3>[4] 일일 실행 목표</h3><div id="slDaily"></div>
@@ -536,7 +536,6 @@ function render() {
   const sy = SL.sheet.sync, curEl = $v('[data-k="current"]');
   curEl.readOnly = s.linked; if (s.linked) curEl.value = won(s.current);
   $v('[data-k="base"]').readOnly = s.linked; if (s.linked) $v('[data-k="base"]').value = s.base;
-  netLabel();
   setT("slCurHint", s.linked ? `📗 재무 시트 연동 중 — 기준일은 오늘로 자동, 현재 순매출은 시트의 ${md(pStart(s))}~오늘 합계(10분마다 갱신)입니다. 결제자·결제금액·환불도 시트 값을 씁니다.`
     : "⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.");
   $v("#slSync").classList.toggle("hidden", !sy);
@@ -677,7 +676,7 @@ V().addEventListener("click", async (ev) => {
     setH("slMem", ""); render(); savePlan(); return;
   }
   if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
-  if (ev.target.closest("#slNetBtn")) return netToggle(!V().classList.contains("netopen"));
+  if (ev.target.closest("#slR2Btn")) return r2Toggle(!V().classList.contains("r2open"));
   const nd = ev.target.dataset.slday, nw = ev.target.dataset.slweek;
   if (nd !== undefined) { SL.day = +nd === 0 ? todayIso() : addDays(SL.day, +nd); return render(); }
   if (nw !== undefined) { SL.week = +nw === 0 ? monOf(todayIso()) : addDays(SL.week, 7 * +nw); return render(); }
@@ -704,14 +703,13 @@ function curToggle(open) {
   try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
 }
 try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
-// [2] 현재 순매출 줄 접기·펴기 — 기본은 접힘 (접으면 금액도 숨김)
-function netToggle(open) {
-  V().classList.toggle("netopen", open);
-  try { localStorage.setItem("sales-net-open", open ? "1" : ""); } catch {}
-  netLabel();
+// [2] 남은 기간 목표 카드 접기·펴기 — 기본 접힘, 현재 순매출 줄은 늘 보임
+function r2Toggle(open) {
+  V().classList.toggle("r2open", open);
+  $v("#slR2Btn").textContent = open ? "▾ 접기" : "▸ 펼치기";
+  try { localStorage.setItem("sales-r2-open", open ? "1" : ""); } catch {}
 }
-function netLabel() { $v("#slNetBtn").textContent = `현재 순매출 ${V().classList.contains("netopen") ? "▾ 접기" : "▸ 펼치기"}`; } // 접으면 금액도 안 보임
-try { netToggle(localStorage.getItem("sales-net-open") === "1"); } catch { netToggle(false); }
+try { r2Toggle(localStorage.getItem("sales-r2-open") === "1"); } catch { r2Toggle(false); }
 
 // ── 달력 입력 창 ──
 const dlg = $v("#slDlg"); let editDay = null;
