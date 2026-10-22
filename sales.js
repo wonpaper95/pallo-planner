@@ -61,13 +61,13 @@ function catchUp(s, a) {
   const n = Math.max(0, s.goal - (a.days ? a.net : s.current)), x = need(s, n);
   return { left, need: n, payN: x.payers, conN: x.consults, repN: x.replies, appN: x.apps };
 }
-// 📅 캘린더 = 회신자(그날 상담 오기로 한 사람). 월 회신 목표 총량 − 어제까지 실제 회신 → 오늘~말일 영업일로 나눠 하루 최소
-// 앞서가면 남은 날 최소가 줄고, 뒤처지면 늘어남. 지난 날은 처음 계획(월 목표 ÷ 영업일) 기준으로 ✓/✗
+// 📅 캘린더 = 회신자(그날 상담 오기로 한 사람). 실제 매출 기준: 남은 목표 매출(월 목표 − 실제 순매출)에 필요한 회신자 ÷ 오늘~말일 영업일 = 하루 최소
+// 매출이 앞서면 남은 날 최소가 줄고, 부족하면 늘어남. 지난 날은 처음 계획(월 회신 목표 ÷ 영업일) 기준으로 ✓/✗
 function replyPace(s, c) {
-  const T = c.month.replies, td = todayIso(), st = pStart(s), from = td < st ? st : td;
-  const done = Object.entries(s.log).reduce((t, [d, e]) => t + (d >= st && d < from ? e.replies || 0 : 0), 0);
+  const T = c.month.replies, td = todayIso(), st = pStart(s), from = td < st ? st : td, net = mtd(s).net;
+  const remain = Math.max(0, s.goal - net), n = need(s, remain);
   const left = workDays(addDays(from, -1), mEnd(s)), plan = Math.max(1, Math.ceil(T / c.month.days - 1e-9));
-  return { T, done, left, plan, dyn: left ? Math.max(0, Math.ceil((T - done) / left - 1e-9)) : 0 };
+  return { T, net, remain, n, left, plan, dyn: left ? Math.max(0, Math.ceil(n.replies / left - 1e-9)) : 0 };
 }
 const replyTgt = (s, c, d) => { const rp = replyPace(s, c); return d < todayIso() ? rp.plan : rp.dyn; };
 
@@ -605,8 +605,8 @@ function render() {
 
   renderCal(s, c);
   const cu = catchUp(s, a);
-  const rp = replyPace(s, c), gap = rp.done - rp.plan * workDays(addDays(pStart(s), -1), addDays(todayIso(), -1));
-  setH("slCalNote", `📅 캘린더 = <b>회신자</b>(그날 상담 오기로 한 사람). 월 회신 목표 <b>${rp.T}명</b> 중 어제까지 <b>${rp.done}명</b> → 남은 영업일 ${rp.left}일 동안 <b style="color:${rp.dyn > rp.plan ? "var(--red)" : "var(--green)"}">하루 최소 ${rp.dyn}명</b> (처음 계획 하루 ${rp.plan}명${gap ? `, 계획보다 ${Math.abs(gap)}명 ${gap > 0 ? "앞섬 → 줄어듦" : "뒤처짐 → 늘어남"}` : ""}).`);
+  const rp = replyPace(s, c), up = rp.dyn > rp.plan;
+  setH("slCalNote", `📅 캘린더 = <b>회신자</b>(그날 상담 오기로 한 사람). 실제 순매출 <b>${won(rp.net)}원</b>${s.linked ? " (📗 시트)" : ""} → 남은 목표 매출 <b>${won(rp.remain)}원</b>에 회신 ${rp.n.replies}명 · 상담 ${rp.n.consults}명 · 결제 ${rp.n.payers}명 필요 → 남은 영업일 ${rp.left}일 동안 <b style="color:${up ? "var(--red)" : "var(--green)"}">하루 회신 최소 ${rp.dyn}명 · 상담 ${rp.left ? Math.ceil(rp.n.consults / rp.left - 1e-9) : 0}명</b> (처음 계획 하루 회신 ${rp.plan}명 → 매출이 ${up ? "부족해 늘어남" : "앞서 줄어듦"}).`);
 
   // 시트 연동: 집계 시작일부터·월 전체 목표 기준 / 아니면 기준일 다음 날부터·남은 기간 목표 기준
   const td = todayIso(), el = workDays(s.linked ? addDays(pStart(s), -1) : s.base, td < s.end ? td : s.end), rr = (x, y) => y ? pct(x / y * 100) + "%" : "-";
