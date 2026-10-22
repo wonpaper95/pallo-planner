@@ -341,8 +341,9 @@ V().innerHTML = `
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 남은 기간 목표</h3>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
-    <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
-    <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
+    <button type="button" class="slcurbtn" id="slNetBtn"></button>
+    <div class="slnet"><div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
+    <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p></div>
     <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></section>
@@ -454,6 +455,7 @@ function render() {
   const sy = SL.sheet.sync, curEl = $v('[data-k="current"]');
   curEl.readOnly = s.linked; if (s.linked) curEl.value = won(s.current);
   $v('[data-k="base"]').readOnly = s.linked; if (s.linked) $v('[data-k="base"]').value = s.base;
+  netLabel();
   setT("slCurHint", s.linked ? `📗 재무 시트 연동 중 — 기준일은 오늘로 자동, 현재 순매출은 시트의 ${md(pStart(s))}~오늘 합계(10분마다 갱신)입니다. 결제자·결제금액·환불도 시트 값을 씁니다.`
     : "⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.");
   $v("#slSync").classList.toggle("hidden", !sy);
@@ -578,6 +580,7 @@ V().addEventListener("change", async (ev) => {
 });
 V().addEventListener("click", async (ev) => {
   if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
+  if (ev.target.closest("#slNetBtn")) return netToggle(!V().classList.contains("netopen"));
   if (ev.target.id === "slMemApply") {
     const s = SL.plan, mn = s.members.reduce((x, m) => x + m.n, 0); if (!mn) return;
     s.arpu = s.members.reduce((x, m) => x + m.n * m.price, 0) / mn; render(); savePlan(); return;
@@ -608,6 +611,15 @@ function curToggle(open) {
   try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
 }
 try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
+// [2] 현재 순매출 줄 접기·펴기 — 기본은 접힘 (접혀 있어도 버튼에 금액 표시)
+function netToggle(open) {
+  V().classList.toggle("netopen", open);
+  try { localStorage.setItem("sales-net-open", open ? "1" : ""); } catch {}
+  netLabel();
+}
+function netLabel() { const o = V().classList.contains("netopen"), s = SL.plan ? S() : null;
+  $v("#slNetBtn").textContent = `현재 순매출${s ? ` ${won(s.current)}원` : ""}${s?.linked ? " (시트 자동)" : ""} ${o ? "▾ 접기" : "▸ 펼치기"}`; }
+try { netToggle(localStorage.getItem("sales-net-open") === "1"); } catch { netToggle(false); }
 
 // ── 달력 입력 창 ──
 const dlg = $v("#slDlg"); let editDay = null;
