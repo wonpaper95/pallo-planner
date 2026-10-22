@@ -426,8 +426,8 @@ V().innerHTML = `
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
     <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
   <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
-    <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
     <div class="slr2">
+    <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
     <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
     <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
@@ -714,7 +714,7 @@ function curToggle(open) {
   try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
 }
 try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
-// [3] 남은 기간 목표 카드 접기·펴기 — 기본 접힘, 현재 순매출 줄은 늘 보임
+// [3] 남은 기간 목표 카드 접기·펴기 — 기본 접힘 (현재 순매출 포함 전부 숨김)
 function r2Toggle(open) {
   V().classList.toggle("r2open", open);
   $v("#slR2Btn").textContent = open ? "▾ 접기" : "▸ 펼치기";
