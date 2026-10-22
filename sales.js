@@ -83,46 +83,36 @@ function mtd(s) {
   return t;
 }
 // [1] 목표(직접 입력) vs 현재(자동): 회신·상담은 달력 입력, 결제·금액은 시트(없으면 달력)
-// 기능 1: 비율 자동/직접. 자동 = 이번 달 실적(표본이 충분할 때) → 없으면 회사 기본값. 0·빈칸 직접값도 자동으로
+// 비율은 직접 입력. 0·빈칸이면 계산이 전부 0명이 되므로 그 칸만 회사 기본값으로 계산 (s.zero 에 표시)
 const RATE_KEYS = ["reply", "consult", "pay", "arpu", "refundRate"];
-function autoRates(s) {
-  const m = mtd(s), sheet = s.linked ? "📗 시트" : "달력";
-  const pick = (ok, v, src, k) => ok ? { v, src } : { v: RATES[k], src: "기본값" };
-  return {
-    reply: pick(m.apps >= 20, m.replies / m.apps * 100, `실적 (지원 ${m.apps}명)`, "reply"),
-    consult: pick(m.replies >= 10, m.consults / m.replies * 100, `실적 (회신 ${m.replies}명)`, "consult"),
-    pay: pick(m.consults >= 5, m.payers / m.consults * 100, `실적 (상담 ${m.consults}명)`, "pay"),
-    arpu: pick(m.payers >= 3, (s.linked ? m.signup : m.amount) / m.payers, `${sheet} (가입 ${m.payers}명)`, "arpu"),
-    refundRate: pick(m.amount > 0, Math.min(95, m.refund / m.amount * 100), `${sheet} 환불 ÷ 결제`, "refundRate"),
-  };
-}
 function applyAuto(s) {
-  const mode = s.mode || {}, auto = autoRates(s), src = {};
-  for (const k of RATE_KEYS) {
-    const manual = mode[k] === "manual" && (k === "refundRate" ? s[k] >= 0 : s[k] > 0);
-    if (manual) src[k] = "직접"; else { s[k] = auto[k].v; src[k] = auto[k].src; }
-  }
-  s.src = src;
+  s.zero = RATE_KEYS.filter((k) => k !== "refundRate" && !(s[k] > 0));
+  for (const k of s.zero) s[k] = RATES[k];
   return s;
 }
 
 // 기능 2: 비율을 조금씩 올렸을 때 남은 목표에 필요한 지원자가 얼마나 줄어드는지 → 효과 큰 순서
 function levers(s) {
   const left = Math.max(0, s.goal - mtd(s).net), base = need(s, left);
-  const L = [["reply", "회신율 +5%p", { reply: s.reply + 5 }], ["consult", "상담률 +5%p", { consult: Math.min(100, s.consult + 5) }],
-    ["pay", "결제율 +5%p", { pay: Math.min(100, s.pay + 5) }], ["arpu", "객단가 +10만 원", { arpu: s.arpu + 100000 }]];
-  if ((s.refundRate || 0) > 0) L.push(["refund", `환불율 −${Math.min(10, Math.round(s.refundRate))}%p`, { refundRate: Math.max(0, s.refundRate - 10) }]);
-  const rows = L.map(([k, lab, ch]) => { const n = need({ ...s, ...ch }, left); return { k, lab, apps: n.apps, payers: n.payers, save: base.apps - n.apps, saveP: base.payers - n.payers }; })
-    .sort((x, y) => y.save - x.save);
+  const netAt = (x, apps) => apps * x.reply / 100 * x.consult / 100 * x.pay / 100 * x.arpu * (1 - Math.min(0.99, (x.refundRate || 0) / 100));
+  const rf = s.refundRate || 0, p = (v) => pct(v) + "%";
+  const L = [["reply", `회신율 ${p(s.reply)} → ${p(s.reply + 5)}`, { reply: s.reply + 5 }],
+    ["consult", `상담률 ${p(s.consult)} → ${p(Math.min(100, s.consult + 5))}`, { consult: Math.min(100, s.consult + 5) }],
+    ["pay", `결제율 ${p(s.pay)} → ${p(Math.min(100, s.pay + 5))}`, { pay: Math.min(100, s.pay + 5) }],
+    ["arpu", `객단가 ${won(s.arpu)} → ${won(s.arpu + 100000)}원`, { arpu: s.arpu + 100000 }]];
+  if (rf > 0) L.push(["refund", `환불율 ${p(rf)} → ${p(Math.max(0, rf - 10))}`, { refundRate: Math.max(0, rf - 10) }]);
+  const rows = L.map(([k, lab, ch]) => { const x = { ...s, ...ch }, n = need(x, left);
+    return { k, lab, apps: n.apps, payers: n.payers, save: base.apps - n.apps, gain: Math.round(netAt(x, base.apps) - netAt(s, base.apps)) }; })
+    .sort((x, y) => y.save - x.save || y.gain - x.gain);
   return { left, base, rows };
 }
 function leverHtml(s) {
   const { left, base, rows } = levers(s);
   if (!left) return `<p>이번 달 목표를 이미 채웠습니다 🎉</p>`;
-  return `<p class="slhint">지금 비율 그대로면 남은 ${won(left)}원에 <b>지원자 ${base.apps}명 · 결제자 ${base.payers}명</b>이 필요합니다. 아래는 하나씩 올렸을 때 줄어드는 인원입니다.</p>
-  <table class="slt"><tr><th>순위</th><th>개선</th><th>필요 지원자</th><th>줄어드는 지원자</th><th>필요 결제자</th></tr>
-  ${rows.map((r, i) => `<tr class="${i === 0 ? "now" : ""}"><td>${i + 1}${i === 0 ? " 🥇" : ""}</td><td>${r.lab}</td><td>${base.apps} → <b>${r.apps}명</b></td><td class="up">−${r.save}명</td><td>${base.payers} → ${r.payers}명</td></tr>`).join("")}</table>
-  <p class="slhint">실행 전략은 이 순위대로 정렬됩니다. 비율은 [1]의 현재 값(자동이면 실적·기본값) 기준입니다.</p>`;
+  return `<p class="slhint">지금 비율 그대로면 남은 ${won(left)}원에 <b>지원자 ${base.apps}명 · 결제자 ${base.payers}명</b>이 필요합니다. 하나씩 올렸을 때:</p>
+  <ol class="sllever">${rows.map((r, i) => `<li class="${i === 0 ? "top" : ""}"><b>${r.lab}${i === 0 ? " 🥇" : ""}</b>
+    <span>필요 지원자 ${base.apps}명 → ${r.apps}명 <em class="up">(−${r.save}명)</em> · 필요 결제자 ${base.payers}명 → ${r.payers}명 · 같은 지원자 ${base.apps}명이면 순매출 <em class="up">+${won(r.gain)}원</em></span></li>`).join("")}</ol>
+  <p class="slhint">실행 전략은 이 순서(효과 큰 순)대로 정렬됩니다. 비율은 [1]에 입력한 값 기준입니다.</p>`;
 }
 
 function compareFill(s, c) {
@@ -130,11 +120,13 @@ function compareFill(s, c) {
   const arpu = m.payers ? (s.linked ? m.signup : m.amount) / m.payers : null;
   const el = workDays(addDays(pStart(s), -1), todayIso() < mEnd(s) ? todayIso() : mEnd(s)), planNet = s.goal / c.month.days * el;
   const f = (v, u) => v == null ? "-" : u === "원" ? won(v) + "원" : pct(v) + "%";
-  const cell = (g, v, u, dir, k) => { if (s.src[k] !== "직접") return `<b>${f(g, u)}</b><small>자동 = ${s.src[k]}</small>`;
-    if (v == null) return `<b>-</b><small>아직 데이터 없음</small>`; const d = v - g, good = d * dir >= 0;
+  const cell = (g, v, u, dir, k) => { if (v == null) return `<b>-</b><small>아직 데이터 없음</small>`; const d = v - g, good = d * dir >= 0;
     return `<b>${f(v, u)}</b><small class="${good ? "up" : "dn"}">${d >= 0 ? "▲" : "▼"} ${u === "원" ? won(Math.abs(d)) + "원" : pct(Math.abs(d)) + "%p"} ${good ? "목표 이상" : "목표 미달"}</small>`; };
   const nd = m.net - planNet;
   setH("slCur_goal", `<b>${won(m.net)}원 (${pct(m.net / s.goal * 100)}%)</b><small class="${nd >= 0 ? "up" : "dn"}">오늘까지 계획 ${won(planNet)}원 대비 ${nd >= 0 ? "▲" : "▼"} ${won(Math.abs(nd))}원</small>`);
+  setH("slAppsGoal", `<b>${c.month.apps.toLocaleString()}명</b> <small>하루 ${pct(c.month.apps / c.month.days)}명</small>`);
+  const ap = workDays(addDays(pStart(s), -1), todayIso() < mEnd(s) ? todayIso() : mEnd(s)) * c.month.apps / c.month.days;
+  setH("slCur_apps", m.apps ? `<b>${m.apps.toLocaleString()}명</b><small class="${m.apps >= ap ? "up" : "dn"}">오늘까지 계획 ${Math.round(ap)}명 대비 ${m.apps >= ap ? "▲" : "▼"} ${Math.abs(Math.round(m.apps - ap))}명</small>` : `<b>-</b><small>달력에 지원자 입력 없음</small>`);
   setH("slCur_reply", cell(s.reply, r(m.replies, m.apps), "%", 1, "reply"));
   setH("slCur_consult", cell(s.consult, r(m.consults, m.replies), "%", 1, "consult"));
   setH("slCur_pay", cell(s.pay, r(m.payers, m.consults), "%", 1, "pay"));
@@ -260,7 +252,7 @@ function strategies(s, c, a) {
   const today = todayIso() < s.base ? s.base : todayIso();
   out.push(`(1) 남은 목표 재계산 (오늘 실적 반영): 남은 영업일 ${left}일 동안 순매출 ${won(n)}원이 더 필요합니다. [1]의 비율 기준으로 결제 ${payN}명(하루 ${per(payN)}명), 상담 ${conN}명(하루 ${per(conN)}명), 회신 ${repN}명(하루 ${per(repN)}명), 지원자 ${appN}명(하루 ${per(appN)}명)을 확보하겠습니다.`);
   const acts = [], lv = levers(s), has = a.days > 0, r = (x, y) => y ? pct(x / y * 100) + "%" : null;
-  const tgt = (k, u) => s.src?.[k] === "직접" ? ` (목표 ${u === "원" ? won(s[k]) + "원" : pct(s[k]) + "%"})` : s.src?.[k] === "기본값" ? " (기본값 — 달력 입력이 쌓이면 실제 값으로 바뀜)" : "";
+  const tgt = (k, u) => ` (목표 ${u === "원" ? won(s[k]) + "원" : pct(s[k]) + "%"})`;
   const T = {
     reply: `회신: 회신율 ${r(a.replies, a.apps) ?? pct(s.reply) + "%"}${tgt("reply")}. ${has && a.apps > a.replies ? `미회신 지원자 ${a.apps - a.replies}명에게 ` : "미회신 지원자에게 "}오늘 안에 문자+전화로 재연락하고, 첫 연락은 ${s.firstContact}분 이내로 하겠습니다.`,
     consult: `상담 연결: 상담률 ${r(a.consults, a.replies) ?? pct(s.consult) + "%"}${tgt("consult")}. ${has && a.replies > a.consults ? `회신했지만 상담하지 않은 ${a.replies - a.consults}명에게 ` : "회신자에게 "}상담 가능 시간 2개를 제안하고, 예약자에게는 전날 날짜·시간·위치를 다시 안내하겠습니다.`,
@@ -269,7 +261,7 @@ function strategies(s, c, a) {
       return `객단가: 현재 ${won(a.payers ? a.arpu : s.arpu)}원${tgt("arpu", "원")}. 상담에서 ${up ? up.name + "(" + won(up.price) + "원) 이상" : "상위 멤버십"}을 먼저 제안하겠습니다.`; })(),
     refund: `환불: 환불율 ${r(a.refund, a.amount) ?? pct(s.refundRate || 0) + "%"}${tgt("refundRate")}. 환불 사유를 확인하고, 결제 직후 첫 수업 일정을 바로 잡아 이탈을 막겠습니다.`,
   };
-  if (lv.left && lv.rows[0]) acts.push(`효과 1순위: ${lv.rows[0].lab} 하면 필요 지원자가 ${lv.rows[0].save}명 줄어듭니다(${lv.base.apps}→${lv.rows[0].apps}명). 아래 순서대로 개선하겠습니다.`);
+  if (lv.left && lv.rows[0]) acts.push(`효과 1순위 — ${lv.rows[0].lab}: 필요 지원자 ${lv.base.apps}명 → ${lv.rows[0].apps}명(−${lv.rows[0].save}명), 같은 지원자면 순매출 +${won(lv.rows[0].gain)}원. 아래 순서대로 개선하겠습니다.`);
   for (const row of lv.rows.slice(0, 3)) acts.push(T[row.k]);
   const avgApps = a.apps / (a.appDays || 1);
   if (!has || avgApps < per(appN)) acts.push(`광고: ${has && a.appDays ? `하루 평균 지원자 ${pct(avgApps)}명, ` : ""}필요 하루 ${per(appN)}명. 성과 낮은 광고 2개를 새 제목·이미지·문구로 교체하고, 반응 좋은 광고 예산을 늘리겠습니다.`);
@@ -376,11 +368,12 @@ V().innerHTML = `
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
     <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><button type="button" class="slcurbtn" id="slCurBtn"></button></div>
     <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
-    <div class="slrow sl3"><label>회신율 <button type="button" class="slmode" data-mode="reply"></button><small id="slSrc_reply"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
-    <div class="slrow sl3"><label>상담률 <button type="button" class="slmode" data-mode="consult"></button><small id="slSrc_consult"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
-    <div class="slrow sl3"><label>결제율 <button type="button" class="slmode" data-mode="pay"></button><small id="slSrc_pay"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
-    <div class="slrow sl3"><label>객단가 <button type="button" class="slmode" data-mode="arpu"></button><small id="slSrc_arpu"></small></label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
-    <div class="slrow sl3"><label>환불율 <button type="button" class="slmode" data-mode="refundRate"></button><small id="slSrc_refundRate"></small></label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
+    <div class="slrow sl3"><label>지원자<small>월 목표에서 계산</small></label><div class="slcalc" id="slAppsGoal"></div><div class="slcur" id="slCur_apps"></div></div>
+    <div class="slrow sl3"><label>회신율<small id="slSrc_reply"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
+    <div class="slrow sl3"><label>상담률<small id="slSrc_consult"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
+    <div class="slrow sl3"><label>결제율<small id="slSrc_pay"></small></label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
+    <div class="slrow sl3"><label>객단가<small id="slSrc_arpu"></small></label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
+    <div class="slrow sl3"><label>환불율<small id="slSrc_refundRate"></small></label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 남은 기간 목표</h3>
     <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
@@ -493,13 +486,10 @@ function render() {
   const s = S(), c = calc(s), a = actuals(s);
   V().querySelectorAll("[data-k]").forEach((el) => {
     if (el === document.activeElement) return;
-    const v = s[el.dataset.k];
+    const v = s.zero?.includes(el.dataset.k) ? SL.plan[el.dataset.k] : s[el.dataset.k];
     el.value = el.hasAttribute("data-money") ? won(v) : typeof v === "number" ? Math.round(v * 100) / 100 : v ?? "";
   });
-  for (const k of RATE_KEYS) { const auto = s.src[k] !== "직접", inp = $v(`[data-k="${k}"]`);
-    inp.readOnly = auto; inp.classList.toggle("slauto", auto);
-    $v(`[data-mode="${k}"]`).textContent = auto ? "자동" : "직접"; $v(`[data-mode="${k}"]`).classList.toggle("on", auto);
-    setT("slSrc_" + k, auto ? s.src[k] : "직접 입력한 목표"); }
+  for (const k of RATE_KEYS) setT("slSrc_" + k, s.zero.includes(k) ? `0이라 기본값 ${k === "arpu" ? won(RATES[k]) + "원" : RATES[k] + "%"}로 계산 중` : "");
   const sy = SL.sheet.sync, curEl = $v('[data-k="current"]');
   curEl.readOnly = s.linked; if (s.linked) curEl.value = won(s.current);
   $v('[data-k="base"]').readOnly = s.linked; if (s.linked) $v('[data-k="base"]').value = s.base;
@@ -628,12 +618,6 @@ V().addEventListener("change", async (ev) => {
   }
 });
 V().addEventListener("click", async (ev) => {
-  const mk = ev.target.dataset.mode;
-  if (mk) { // 자동 ↔ 직접. 직접으로 바꾸면 지금 값에서 시작
-    const p = SL.plan, cur = S()[mk]; p.mode = { ...(p.mode || {}) };
-    if (p.mode[mk] === "manual") delete p.mode[mk]; else { p.mode[mk] = "manual"; p[mk] = mk === "arpu" ? Math.round(cur) : Math.round(cur * 10) / 10; }
-    render(); savePlan(); return;
-  }
   if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
   if (ev.target.closest("#slNetBtn")) return netToggle(!V().classList.contains("netopen"));
   if (ev.target.id === "slMemApply") {
@@ -666,14 +650,13 @@ function curToggle(open) {
   try { localStorage.setItem("sales-cur-open", open ? "1" : ""); } catch {}
 }
 try { curToggle(localStorage.getItem("sales-cur-open") === "1"); } catch { curToggle(false); }
-// [2] 현재 순매출 줄 접기·펴기 — 기본은 접힘 (접혀 있어도 버튼에 금액 표시)
+// [2] 현재 순매출 줄 접기·펴기 — 기본은 접힘 (접으면 금액도 숨김)
 function netToggle(open) {
   V().classList.toggle("netopen", open);
   try { localStorage.setItem("sales-net-open", open ? "1" : ""); } catch {}
   netLabel();
 }
-function netLabel() { const o = V().classList.contains("netopen"), s = SL.plan ? S() : null;
-  $v("#slNetBtn").textContent = `현재 순매출${s ? ` ${won(s.current)}원` : ""}${s?.linked ? " (시트 자동)" : ""} ${o ? "▾ 접기" : "▸ 펼치기"}`; }
+function netLabel() { $v("#slNetBtn").textContent = `현재 순매출 ${V().classList.contains("netopen") ? "▾ 접기" : "▸ 펼치기"}`; } // 접으면 금액도 안 보임
 try { netToggle(localStorage.getItem("sales-net-open") === "1"); } catch { netToggle(false); }
 
 // ── 달력 입력 창 ──
