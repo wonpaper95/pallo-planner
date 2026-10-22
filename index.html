@@ -258,7 +258,8 @@ body:not(.bv) #boardView { display: none; }
 .bcard li:first-child { border-top: 0; } .bcard li .w { color: var(--green); white-space: nowrap; font-size: 12.5px; } .bcard li.no { color: var(--text); } .bcard li.no::before { content: "☐"; color: var(--sub); }
 .bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
-@media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; } }
+@media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; }
+  #fbBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -297,6 +298,13 @@ dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--p
 .nbtn { padding: 8px 16px; margin: 0 6px 6px 0; border-radius: 99px; border: 1px solid var(--line); background: var(--bg); font-size: 15px; }
 .nbtn:hover:not(:disabled) { border-color: var(--accent); } .nbtn:disabled { opacity: .4; cursor: default; }
 .chipname [data-rmname] { margin-left: 4px; color: var(--sub); } .chipname small { color: var(--sub); }
+#fbBtn b { margin-left: 4px; padding: 0 6px; border-radius: 99px; background: var(--red); color: #fff; font-size: 11px; }
+.fbkind { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; } .fbkind label { display: flex; align-items: center; gap: 4px; margin: 0; color: var(--text); font-size: 14px; }
+.fbkind input { width: auto !important; }
+.fbi { border-top: 1px solid var(--line); padding: 8px 2px; display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.fbi .b { flex: 1; white-space: pre-wrap; word-break: break-word; } .fbi .m { color: var(--sub); font-size: 12px; display: block; margin-top: 2px; }
+.fbi.done .b { color: var(--sub); } .fbi .st { white-space: nowrap; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.fbi .st.new { color: #fff; background: var(--orange); border-color: var(--orange); } .fbi .st.done { color: var(--green); }
 dialog::backdrop { background: rgba(0,0,0,.5); }
 dialog label { display: block; font-size: 13px; color: var(--sub); margin: 14px 0 4px; }
 dialog input:not([type=checkbox]), dialog select, dialog textarea { width: 100%; padding: 9px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
@@ -363,6 +371,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <span id="me"></span>
     <button id="todayBtn" class="btn ghost">오늘</button>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
+    <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
@@ -397,6 +406,12 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="boardView"></section>
 </div>
 
+<dialog id="fbDlg" class="wide"><h3 style="margin:0 0 4px">🐞 버그 신고 · 💡 개선 제안</h3>
+  <p style="color:var(--sub);font-size:13px;margin:0 0 8px">적어서 보내면 대표님께 바로 알림(푸시·카톡)이 가요</p>
+  <div class="fbkind"><label><input type="radio" name="fbk" value="bug" checked> 🐞 버그(안 돼요·이상해요)</label><label><input type="radio" name="fbk" value="idea"> 💡 개선(이렇게 되면 좋겠어요)</label></div>
+  <textarea id="fbBody" rows="4" maxlength="2000" placeholder="예) 위젯에서 고정업무 체크가 안 돼요 / 팀 업무에도 데드라인 알림이 오면 좋겠어요"></textarea>
+  <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="fbSend" style="flex:1">보내기</button><button class="btn ghost" id="fbClose">닫기</button></div>
+  <h4 id="fbListTitle" style="margin:16px 0 6px;color:var(--sub);font-size:13px"></h4><div id="fbList"></div></dialog>
 <dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p id="pwNote" style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
   <form id="pwForm"><input id="pw1" type="password" minlength="6" autocomplete="new-password" placeholder="새 비밀번호" required style="margin-top:10px">
   <input id="pw2" type="password" minlength="6" autocomplete="new-password" placeholder="한 번 더" required style="margin-top:8px"><div class="msg" id="pwMsg" style="color:var(--red);font-size:13px;min-height:18px;margin-top:6px"></div>
@@ -496,6 +511,7 @@ async function loadProfile() {
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
+  if (isBoss) loadFeedback(); // 🐞 처리 전 개수 배지
   if (isBoss) { const k = (await sb.rpc("kakao_status")).data?.[0]; kakaoMe = !!k?.me; kakaoSender = k?.sender ? (k.receiver || "연결됨") : null; } // 💬 카톡 연결 상태
   $("#previewBar").classList.toggle("hidden", !previewTeam);
   if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
@@ -757,6 +773,31 @@ $("#rtDialog").querySelector(".quick").onclick = async (e) => {
   $("#rtRows").lastElementChild?.querySelector(".t").select();
 };
 
+// ── 🐞 버그 신고·💡 개선 제안: 누구나 보내고, 대표에게 푸시+카톡(planner-push). 대표는 처리완료 표시 ──
+async function loadFeedback() {
+  const { data, error } = await sb.rpc("feedback_list"); if (fail(error)) return;
+  const admin = myRole === "admin" || isBoss, nNew = data.filter((x) => x.status === "new").length;
+  $("#fbNew").textContent = nNew; $("#fbNew").classList.toggle("hidden", !(isBoss && nNew));
+  $("#fbListTitle").textContent = data.length ? (isBoss ? `받은 신고·제안 (처리 전 ${nNew})` : "내가 보낸 것") : "";
+  $("#fbList").innerHTML = data.map((x) => { const d = new Date(x.created_at);
+    return `<div class="fbi ${x.status}"><span>${x.kind === "bug" ? "🐞" : "💡"}</span><span class="b">${esc(x.body)}<span class="m">${isBoss ? `${esc(x.who ?? "")}${x.team ? `(${esc(x.team)})` : ""} · ` : ""}${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span></span>`
+      + (isBoss ? `<button class="st ${x.status}" data-fb="${x.id}" data-st="${x.status === "new" ? "done" : "new"}" title="눌러서 바꾸기">${x.status === "new" ? "처리 전" : "✓ 처리완료"}</button>`
+        : `<span class="st ${x.status}">${x.status === "new" ? "확인 중" : "✓ 처리완료"}</span>`) + `</div>`; }).join("");
+}
+$("#fbBtn").onclick = () => { $("#fbDlg").showModal(); loadFeedback(); };
+$("#fbClose").onclick = () => $("#fbDlg").close();
+$("#fbSend").onclick = async () => {
+  const body = $("#fbBody").value.trim(); if (body.length < 2) return toast("내용을 적어 주세요");
+  const kind = document.querySelector('input[name="fbk"]:checked').value;
+  const { error } = await sb.from("feedback").insert({ kind, body }); if (fail(error)) return;
+  $("#fbBody").value = ""; toast(kind === "bug" ? "🐞 보냈어요. 대표님께 알림이 가요" : "💡 보냈어요. 대표님께 알림이 가요"); loadFeedback();
+};
+$("#fbList").onclick = async (e) => {
+  const b = e.target.closest("[data-fb]"); if (!b) return;
+  const { error } = await sb.from("feedback").update({ status: b.dataset.st }).eq("id", b.dataset.fb);
+  if (!fail(error)) loadFeedback();
+};
+
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
 let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
 try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
@@ -999,6 +1040,7 @@ function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
+  if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
