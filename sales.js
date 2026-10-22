@@ -439,7 +439,7 @@ V().innerHTML = `
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
-    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
+    <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr><tr id="slMemRf"></tr><tr id="slMemNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
     <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
@@ -452,7 +452,7 @@ V().innerHTML = `
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
   <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — [2]와 같은 비율</h3>
-    <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
+    <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr><tr id="slMemRRf"></tr><tr id="slMemRNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div></section>
   <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
@@ -590,12 +590,12 @@ function render() {
   const pctW = (w) => (Math.round(w * 1000) / 10).toLocaleString("ko-KR") + "%";
   if (!V().querySelector("#slMem").contains(document.activeElement)) setH("slMem", mix.map((m, i) =>
     `<tr><td><input value="${esc(m.name)}" data-m="${i}" data-f="name" style="text-align:left"></td><td><input value="${won(m.price)}" data-m="${i}" data-f="price" data-money></td>
-     <td><span class="u"><input type="number" min="0" max="100" step="1" value="${Math.round(m.w * 1000) / 10}" data-m="${i}" data-f="p" style="width:74px"><i>%</i></span></td><td>${m.n}명</td><td>${won(m.n * m.price)}</td></tr>`).join(""));
+     <td><span class="u"><input type="number" min="0" max="100" step="1" value="${Math.round(m.w * 1000) / 10}" data-m="${i}" data-f="p"><i>%</i></span></td><td>${m.n}명</td><td>${won(m.n * m.price)}</td></tr>`).join(""));
   else V().querySelectorAll("#slMem tr").forEach((tr, i) => { const c2 = tr.children; c2[3].textContent = mix[i].n + "명"; c2[4].textContent = won(mix[i].n * mix[i].price); });
   setT("slMemN", mn + "명"); setT("slMemSum", won(ms)); setT("slMemArpu", mn ? won(mArpu) + "원" : "-");
   const rfR = (s.refundRate || 0) / 100, netRows = (gross, goal, lab) => [
-    rfR ? `<td>환불 (${pct(s.refundRate)}%)</td><td></td><td></td><td></td><td>−${won(gross * rfR)}</td>` : "",
-    `<th>순매출</th><th></th><th></th><th></th><th class="${gross * (1 - rfR) >= goal - 1 ? "up" : "dn"}">${won(gross * (1 - rfR))} <small>(${lab} ${won(goal)} ${gross * (1 - rfR) >= goal - 1 ? "✓" : "✗"})</small></th>`];
+    rfR ? `<td colspan="4">환불 (${pct(s.refundRate)}%)</td><td>−${won(gross * rfR)}</td>` : "",
+    `<th colspan="4">순매출 <small class="${gross * (1 - rfR) >= goal - 1 ? "up" : "dn"}">${lab} ${won(goal)} ${gross * (1 - rfR) >= goal - 1 ? "✓ 달성" : "✗ 미달"}</small></th><th class="${gross * (1 - rfR) >= goal - 1 ? "up" : "dn"}">${won(gross * (1 - rfR))}</th>`];
   { const [a1, b1] = netRows(ms, s.goal, "월 목표"); setH("slMemRf", a1); setH("slMemNet", b1); }
   setT("slMemSumP", pct(mp.sumP) + "%");
   setT("slMemCmp", `이 비율의 객단가 ${won(mp.mixA)}원 · [1] 목표 객단가 ${won(s.arpu)}원 · 월 필요 결제자 ${mp.pNm}명 ([1] 객단가 기준 ${c.month.payers}명)`);

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610222149">
+<meta name="app-version" content="202610222152">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -306,7 +306,7 @@ body:not(.sv) #salesView { display: none; }
 .slchart { width: 100%; min-width: 560px; height: auto; display: block; } .slchart text { font-size: 11px; fill: var(--sub); } .slchart text.td { fill: var(--orange); font-weight: 700; }
 .slchart .okb { fill: var(--green); } .slchart .nob { fill: var(--red); } .slchart .fut { fill: var(--line); opacity: .5; }
 .slchart .goal { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; } .slchart .gl { fill: var(--accent); font-weight: 600; } .slchart .off { fill: var(--sub); }
-.slscroll { overflow-x: auto; } @media (max-width: 600px) { .slmemt { min-width: 520px; } .slmemt td:first-child input { min-width: 96px; } .slmemt td:nth-child(2) input { min-width: 104px; } } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
+.slscroll { overflow-x: auto; } .slmemt { table-layout: fixed; } .slmemt td input { width: 100%; box-sizing: border-box; } .slmemt td, .slmemt th { overflow: hidden; text-overflow: ellipsis; } .slmemt tfoot th:first-child small { margin-left: 6px; font-weight: 600; } @media (max-width: 600px) { .slmemt { min-width: 520px; } .slmemt td:first-child input { min-width: 96px; } .slmemt td:nth-child(2) input { min-width: 104px; } } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
 .slt tr.fut td { color: var(--sub); } .slt tr.offr td { color: var(--sub); font-size: 12px; } #salesView details summary { cursor: pointer; margin-top: 12px; }
 @media (max-width: 860px) { #salesView { padding: 10px 10px 80px; } .slcal .day { min-height: 70px; padding: 4px; } .slcal .tip { display: none; } .slcal .big b { font-size: 22px; }
   .slcal .day.low::after { content: "!"; position: absolute; right: 6px; top: 4px; color: var(--red); font-weight: 800; } .slrow { grid-template-columns: 90px 1fr; } }
@@ -544,9 +544,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610222149"></script>
-<script src="week.js?v=202610222149"></script>
-<script src="pick.js?v=202610222149"></script>
+<script src="config.js?v=202610222152"></script>
+<script src="week.js?v=202610222152"></script>
+<script src="pick.js?v=202610222152"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -1675,6 +1675,6 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610222149"></script>
+<script src="sales.js?v=202610222152"></script>
 </body>
 </html>
