@@ -240,10 +240,49 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg { position: sticky; top: 53px; z-index: 4; display: flex; justify-content: center; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
+@media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 5개 → 폰에서 한 줄 */
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
+/* 💰 매출 목표 */
+body:not(.sv) #salesView { display: none; }
+#salesView { max-width: 1100px; margin: 0 auto; padding: 16px 20px 100px; }
+#salesView .slbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; } #salesView .slbar h2 { margin: 0 auto 0 0; }
+#salesView .slbar small { color: var(--sub); } #salesView .slbar a { text-decoration: none; }
+#salesView select, #salesView input, #salesView textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+.slcard { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); padding: 14px 16px; margin-bottom: 14px; }
+.slcard h3 { margin: 0 0 10px; font-size: 15px; color: var(--accent); } .slcard h4 { margin: 8px 0; font-size: 14px; }
+.sldefs summary { cursor: pointer; } .sldefs summary small { color: var(--sub); } .sldefs table { margin-top: 8px; font-size: 14px; border-collapse: collapse; }
+.sldefs td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; } .sldefs td:first-child { white-space: nowrap; width: 110px; }
+.slgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 0 14px; }
+.slkpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.slkpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; } .slkpi small { color: var(--sub); display: block; font-size: 12px; } .slkpi b { font-size: 19px; }
+.slkpi .bar { margin-top: 6px; }
+.slrow { display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; } .slrow label { font-size: 13px; color: var(--sub); }
+.slrow label small { display: block; font-size: 11px; line-height: 1.3; margin-top: 2px; } .slrow input { width: 100%; }
+.slcard .u { position: relative; display: block; } .slcard .u input { padding-right: 34px; width: 100%; } .slcard .u i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--sub); font-style: normal; font-size: 13px; }
+.slhint { font-size: 12px; color: var(--sub); margin: 4px 0 8px; } .slwarn { color: var(--red); font-size: 13px; }
+.slt { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; } .slt th, .slt td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+.slt th:first-child, .slt td:first-child { text-align: left; } .slt td input { padding: 6px; text-align: right; width: 100%; }
+#salesView pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 14px/1.7 inherit; font-family: inherit; margin: 0; }
+#salesView textarea.grow { width: 100%; field-sizing: content; min-height: 3.5em; resize: vertical; }
+#salesView .btn.ghost, #salesView .btn { display: inline-block; }
+.slcal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; } .slcal .dow { font-size: 12px; color: var(--sub); text-align: center; }
+.slcal .day { min-height: 92px; border: 1px solid var(--line); border-radius: 10px; padding: 6px; font-size: 12px; cursor: pointer; background: var(--bg); position: relative; }
+.slcal .day.off { background: var(--panel); color: var(--sub); opacity: .6; cursor: default; } .slcal .day.today { outline: 2px solid var(--orange); }
+.slcal .day.low { border-color: var(--red); background: rgba(235, 87, 87, .1); } .slcal .day.good { border-color: var(--green); background: rgba(77, 171, 154, .1); }
+.slcal .d { font-weight: 700; } .slcal .c { font-size: 13px; margin-top: 2px; } .slcal .nil { color: var(--sub); font-size: 11px; margin-top: 4px; }
+.slcal .big { text-align: center; margin-top: 4px; line-height: 1.1; } .slcal .big small { display: block; font-size: 11px; color: var(--sub); }
+.slcal .big b { font-size: 30px; color: var(--accent); } .slcal .big b i { font-style: normal; font-size: 15px; color: var(--sub); font-weight: 600; }
+.slcal .low .big b { color: var(--red); } .slcal .good .big b { color: var(--green); } .slcal .tip { margin-top: 4px; color: var(--red); font-size: 11px; line-height: 1.35; }
+#slDlg { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); max-width: 520px; width: calc(100% - 32px); padding: 16px; }
+#slDlg h3 { margin: 0 0 10px; color: var(--accent); } .sltools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.sltip { background: rgba(235, 87, 87, .1); border: 1px solid var(--red); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
+.sltip.ok { background: rgba(77, 171, 154, .1); border-color: var(--green); color: var(--green); } .sltip h4 { margin: 0 0 6px; color: var(--red); font-size: 14px; } .sltip ul { margin: 0 0 6px; padding-left: 18px; }
+.slb { cursor: pointer; }
+@media (max-width: 860px) { #salesView { padding: 10px 10px 80px; } .slcal .day { min-height: 70px; padding: 4px; } .slcal .tip { display: none; } .slcal .big b { font-size: 22px; }
+  .slcal .day.low::after { content: "!"; position: absolute; right: 6px; top: 4px; color: var(--red); font-weight: 800; } .slrow { grid-template-columns: 90px 1fr; } }
 /* 📊 지점 현황판 (대표) */
 #boardView { max-width: 1400px; margin: 0 auto; padding: 16px 20px 100px; }
 #boardView .bhead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; } #boardView .bhead small { color: var(--sub); }
@@ -375,7 +414,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -404,6 +443,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section class="mview" id="monthView"></section>
   <section id="teamView"></section>
   <section id="boardView"></section>
+  <section id="salesView"></section>
 </div>
 
 <dialog id="fbDlg" class="wide"><h3 style="margin:0 0 4px">🐞 버그 신고 · 💡 개선 제안</h3>
@@ -555,6 +595,7 @@ async function boot() {
   await loadProfile();
   await loadAll(true);
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
+  if (view === "sales") window.SL?.load();
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -820,8 +861,8 @@ async function loadBoard() {
   const mode = `<span class="bmode"><button data-bmode="today" class="${boardWeek ? "" : "on"}">오늘</button><button data-bmode="week" class="${boardWeek ? "on" : ""}">이번 주</button></span>`;
   if (boardWeek) { // 지점마다 매니저 주간 기록과 같은 표
     routine = items;
-    const mon = boardMon ?? W.monday(day), tables = await Promise.all(t.data.map((tm) => routineWeekTable(mon, tm.id)));
-    $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><button class="rtnav" data-bwk="-1">‹</button><small>${md(mon)} ~ ${md(W.add(mon, 6))} 고정업무 기록</small><button class="rtnav" data-bwk="1">›</button>${mon !== W.monday(day) ? `<button class="rtnav wk" data-bwk="0">이번 주</button>` : ""}${mode}</div>`
+    const mon = boardMon ?? W.monday(day), [tables, sales] = await Promise.all([Promise.all(t.data.map((tm) => routineWeekTable(mon, tm.id))), SL.boardCards(t.data)]);
+    $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><button class="rtnav" data-bwk="-1">‹</button><small>${md(mon)} ~ ${md(W.add(mon, 6))} 고정업무 기록</small><button class="rtnav" data-bwk="1">›</button>${mon !== W.monday(day) ? `<button class="rtnav wk" data-bwk="0">이번 주</button>` : ""}${mode}</div>${sales}`
       + t.data.map((tm, i) => `<div class="bcard" style="margin-bottom:14px"><div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(p.data.filter((x) => x.team_id === tm.id && x.role === "manager").map((m) => m.name).join("·") || "매니저 없음")}</span></div>${tables[i]}</div>`).join("");
     return;
   }
@@ -849,8 +890,8 @@ async function loadBoard() {
         return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)}${ck.link ? ` <a href="${esc(ck.link)}" target="_blank" rel="noopener">🔗 링크</a>` : ""}</li>`; }).join("")}</ul></details>` : ""}
     </div>`;
   });
-  const d = W.parse(day);
-  $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><small>${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]}) · 실시간 · ${hhmm(new Date().toISOString())} 기준</small>${mode}</div><div class="bgrid">${cards.join("")}</div>`;
+  const d = W.parse(day), sales = await SL.boardCards(t.data);
+  $("#boardView").innerHTML = `<div class="bhead"><h2 style="margin:0">📊 지점 현황</h2><small>${d.getMonth() + 1}/${d.getDate()}(${DOW[d.getDay()]}) · 실시간 · ${hhmm(new Date().toISOString())} 기준</small>${mode}</div>${sales}<h3 style="margin:4px 0 10px">📌 오늘 업무</h3><div class="bgrid">${cards.join("")}</div>`;
 }
 
 // ── 👥 팀 화면 ──
@@ -1043,6 +1084,8 @@ function listen() {
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
+  sb.channel("sales").on("postgres_changes", { event: "*", schema: "public", table: "sales_plans" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
+    .on("postgres_changes", { event: "*", schema: "public", table: "sales_days" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old)).subscribe(); // 💰 같은 지점이 고치면 바로
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신
 }
@@ -1108,9 +1151,10 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
+  if (v === "sales" && me && window.SL) SL.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
@@ -1595,5 +1639,6 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
+<script src="sales.js"></script>
 </body>
 </html>

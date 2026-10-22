@@ -1,0 +1,491 @@
+// 💰 매출 목표 탭: 월 목표 → 필요 지원자·회신·상담·결제 역산, 일일 실적 달력(상담 최소·행동 요령), 자동 문제점·실행 전략·보고문.
+// 지점(팀)·월마다 sales_plans 1줄 + 날마다 sales_days 1줄. 같은 지점 매니저끼리 실시간 공유, 대표는 전 지점.
+// index.html 의 sb·me·$·esc·toast·fail·isBoss·previewTeam·teams 를 씀. 이름 충돌 막으려고 전부 감쌈 → window.SL
+(() => {
+const MEMBERS = () => [{ name: "Premium", price: 2470000, n: 8 }, { name: "Pro Max", price: 1900000, n: 6 }, { name: "Pro", price: 1140000, n: 13 }, { name: "Plus", price: 760000, n: 6 }];
+const RATES = { goal: 50000000, reply: 35, consult: 65, pay: 36.3, arpu: 1531515, refundRate: 0, firstContact: 30 };
+const OFF = [5]; // 휴무 요일 (0=일 … 5=금)
+
+const won = (n) => Math.round(n || 0).toLocaleString("ko-KR");
+const num = (s) => +String(s).replace(/[^\d.-]/g, "") || 0;
+const pct = (n) => (Math.round(n * 10) / 10).toLocaleString("ko-KR");
+const D = (s) => new Date(s + "T00:00:00");
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const addDays = (s, n) => { const d = D(s); d.setDate(d.getDate() + n); return iso(d); };
+const md = (s) => `${D(s).getMonth() + 1}월 ${D(s).getDate()}일`;
+const todayIso = () => iso(new Date());
+const isOff = (d) => OFF.includes(D(d).getDay());
+const mStart = (s) => s.month + "-01";
+const mEnd = (s) => { const [y, m] = s.month.split("-").map(Number); return iso(new Date(y, m, 0)); };
+// from 다음 날부터 to까지 영업일 수
+const workDays = (from, to) => { let n = 0; for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (!isOff(d)) n++; return n; };
+const newPlan = (month, prev) => ({ ...RATES, members: MEMBERS(), ...(prev ? pick(prev) : {}),
+  month, current: 0, base: addDays(month + "-01", -1), end: mEnd({ month }), problems: "", strategyAdd: "" });
+const pick = (p) => Object.fromEntries(["goal", "reply", "consult", "pay", "arpu", "refundRate", "firstContact", "members"].filter((k) => p[k] != null).map((k) => [k, p[k]]));
+
+// 목표 금액에서 거꾸로: 결제자 → 상담자 → 회신자 → 지원자 (단계마다 올림)
+function need(s, amount) {
+  const rf = Math.min(0.99, (s.refundRate || 0) / 100), up = (x, r) => r > 0 ? Math.ceil(x / r - 1e-9) : 0;
+  const payers = amount > 0 ? up(amount, s.arpu * (1 - rf)) : 0;
+  const consults = up(payers, s.pay / 100), replies = up(consults, s.consult / 100), apps = up(replies, s.reply / 100);
+  const revenue = Math.round(payers * s.arpu), refundAmt = Math.round(revenue * rf);
+  return { apps, replies, consults, payers, revenue, refundAmt, netAdd: revenue - refundAmt };
+}
+function calc(s) {
+  const remain = Math.max(0, s.goal - s.current);
+  const days = Math.max(1, workDays(s.base, s.end));
+  const r = need(s, remain);
+  const month = { ...need(s, s.goal), days: Math.max(1, workDays(addDays(mStart(s), -1), mEnd(s))) };
+  return { ...r, remain, days, month, final: s.current + r.netAdd, rate: s.goal ? s.current / s.goal * 100 : 0,
+    perDay: { apps: r.apps / days, replies: r.replies / days, consults: r.consults / days, payers: r.payers / days } };
+}
+// 기준일 다음 날~오늘 달력 실적 합계 (앞날 입력은 예약이라 뺌)
+function actuals(s) {
+  const t = { apps: 0, replies: 0, consults: 0, payers: 0, amount: 0, refund: 0, days: 0 }, td = todayIso();
+  for (const [d, e] of Object.entries(s.log)) {
+    if (d <= s.base || d > s.end || d > td || isOff(d)) continue;
+    t.days++; for (const k of ["apps", "replies", "consults", "payers", "amount", "refund"]) t[k] += e[k] || 0;
+  }
+  t.net = s.current + t.amount - t.refund;
+  return t;
+}
+// 오늘까지 실적을 반영해 남은 영업일에 필요한 인원을 다시 계산
+function catchUp(s, a) {
+  const td = todayIso(), from = td < s.base ? s.base : td;
+  const left = Math.max(0, workDays(from, s.end)) || 1;
+  const n = Math.max(0, s.goal - (a.days ? a.net : s.current)), x = need(s, n);
+  return { left, need: n, payN: x.payers, conN: x.consults, repN: x.replies, appN: x.apps };
+}
+const minConsult = (c) => Math.max(1, Math.round(c.perDay.consults));
+
+const TIPS = {
+  apps: ["성과 낮은 광고 2개를 새 제목·이미지·문구로 교체", "반응 좋은 광고 예산을 올려 노출 확대", "SSO에서 지점 지원자 수가 제대로 들어왔는지 확인"],
+  reply: ["미회신 지원자에게 오늘 안에 문자+전화로 재연락", "운영시간 내 첫 연락 {fc}분 이내로 맞추기", "학습 목적에 맞춘 답변 + 상담 가능 시간 2개 제시"],
+  consult: ["회신자 중 미예약자에게 구체적인 상담 시간 제안", "내일 예약자에게 날짜·시간·위치 다시 안내", "미방문자에게 참여 의사 확인 후 다른 일정 제안"],
+  pay: ["상담 후 미결제자에게 24시간 안에 후속 연락", "상담자 목적에 맞는 멤버십 1개를 골라 추천"],
+};
+const tipList = (s, k) => TIPS[k].map((t) => t.replace("{fc}", s.firstContact));
+// 그날 상담이 목표보다 적으면 어느 단계가 막혔는지 보고 행동 요령을 고른다
+function diagnose(s, c, e) {
+  if (!e || e.consults == null) return null;
+  const tgt = minConsult(c), res = { low: e.consults < tgt, tgt, why: [] };
+  if (res.low) {
+    if (e.apps != null && e.apps < Math.round(c.perDay.apps)) res.why.push(["지원자 부족", "apps"]);
+    if (e.apps && e.replies != null && e.replies / e.apps * 100 < s.reply) res.why.push(["회신율 낮음", "reply"]);
+    if (!res.why.length || (e.replies && e.consults / e.replies * 100 < s.consult)) res.why.push(["상담 연결 부족", "consult"]);
+  }
+  if (e.consults && e.payers != null && e.payers / e.consults * 100 < s.pay) res.why.push(["결제율 낮음", "pay"]);
+  return res;
+}
+
+function strategies(s, c, a) {
+  const { left, need: n, payN, conN, repN, appN } = catchUp(s, a), out = [], per = (x) => Math.ceil(x / left);
+  const today = todayIso() < s.base ? s.base : todayIso();
+  out.push(`(1) 남은 목표 재계산 (오늘 실적 반영): 남은 영업일 ${left}일 동안 순매출 ${won(n)}원이 더 필요합니다. 목표 비율 기준으로 결제 ${payN}명(하루 ${per(payN)}명), 상담 ${conN}명(하루 ${per(conN)}명), 회신 ${repN}명(하루 ${per(repN)}명), 지원자 ${appN}명(하루 ${per(appN)}명)을 확보하겠습니다.`);
+  const acts = [];
+  if (a.days) {
+    const avgApps = a.apps / a.days;
+    if (avgApps < per(appN)) acts.push(`광고: 하루 평균 지원자 ${pct(avgApps)}명으로 필요 ${per(appN)}명보다 ${pct(per(appN) - avgApps)}명 부족합니다. 성과 낮은 광고 2개를 새 제목·이미지·문구로 교체하고, 반응 좋은 광고 예산을 늘리겠습니다.`);
+    if (a.apps && a.replies / a.apps * 100 < s.reply) acts.push(`회신: 회신율 ${pct(a.replies / a.apps * 100)}%를 ${pct(s.reply)}%로 올리기 위해 미회신 지원자 ${a.apps - a.replies}명에게 오늘 안에 문자+전화로 재연락하고, 첫 연락은 ${s.firstContact}분 이내로 하겠습니다.`);
+    if (a.replies && a.consults / a.replies * 100 < s.consult) acts.push(`상담 연결: 회신했지만 상담하지 않은 ${a.replies - a.consults}명에게 상담 가능 시간 2개를 제안해 예약을 잡고, 예약자에게는 전날 날짜·시간·위치를 다시 안내하겠습니다.`);
+    if (a.consults && a.payers / a.consults * 100 < s.pay) acts.push(`결제: 결제율 ${pct(a.payers / a.consults * 100)}% (목표 ${pct(s.pay)}%). 상담 후 미결제자 ${a.consults - a.payers}명에게 24시간 안에 후속 연락하겠습니다.`);
+    if (a.payers && a.amount / a.payers < s.arpu) {
+      const up = [...s.members].sort((x, y) => x.price - y.price).find((m) => m.price >= s.arpu);
+      acts.push(`객단가: ${won(a.amount / a.payers)}원으로 목표 ${won(s.arpu)}원보다 낮습니다. 상담에서 ${up ? up.name + "(" + won(up.price) + "원) 이상" : "상위 멤버십"}을 먼저 제안하겠습니다.`);
+    }
+    if (a.amount && a.refund / a.amount * 100 > (s.refundRate || 0)) acts.push(`환불: 환불율 ${pct(a.refund / a.amount * 100)}%. 환불 사유를 확인하고, 결제 직후 첫 수업 일정을 바로 잡아 이탈을 막겠습니다.`);
+  } else acts.push(`광고·회신: 하루 지원자 ${per(appN)}명을 목표로 광고를 운영하고, 첫 연락은 ${s.firstContact}분 이내로 하겠습니다.`);
+  if (!acts.length) acts.push("현재 모든 단계가 목표 이상입니다. 지금 광고·회신 방식을 유지하고, 반응 좋은 광고의 예산을 조금 늘리겠습니다.");
+  acts.forEach((t, i) => out.push(`(${i + 2}) ${t}`));
+  let off = addDays(today, 1); while (off <= s.end && !isOff(off)) off = addDays(off, 1);
+  if (off <= s.end) out.push(`(${acts.length + 2}) 휴무 대비: 다음 휴무일 ${md(off)}(금) 전날까지 상담 예약을 집중해서 잡고, 휴무일에 들어온 지원자는 다음 날 오전에 가장 먼저 연락하겠습니다.`);
+  out.push(`(${out.length + 1}) 일일 점검: 매일 마감 때 달력에 실적을 입력하고, 상담 최소 ${minConsult(c)}명에 못 미친 날은 다음 날 부족한 단계부터 조치하겠습니다.`);
+  return out;
+}
+// 실적 누계를 목표·오늘까지 계획과 비교해 문제점 문장을 만든다
+function problems(s, c, a) {
+  if (!a.days) return ["아직 기준일 이후 실적이 입력되지 않았습니다."];
+  const td = todayIso(), el = workDays(s.base, td < s.end ? td : s.end), p = c.perDay, out = [];
+  const short = (name, act, plan) => { const g = Math.round(plan) - act; if (g > 0) out.push(`${name}: 오늘까지 계획 ${Math.round(plan)}명 대비 ${act}명으로 ${g}명 부족`); };
+  short("지원자", a.apps, p.apps * el); short("상담자", a.consults, p.consults * el); short("결제자", a.payers, p.payers * el);
+  const rate = (name, x, y, tgt) => { if (!y) return; const r = x / y * 100; if (r < tgt) out.push(`${name}: ${pct(r)}% (목표 ${pct(tgt)}%)로 ${pct(tgt - r)}%p 낮음`); };
+  rate("회신율", a.replies, a.apps, s.reply); rate("상담률", a.consults, a.replies, s.consult); rate("결제율", a.payers, a.consults, s.pay);
+  if (a.payers && a.amount / a.payers < s.arpu) out.push(`객단가: ${won(a.amount / a.payers)}원 (목표 ${won(s.arpu)}원)`);
+  if (a.amount && a.refund / a.amount * 100 > (s.refundRate || 0)) out.push(`환불율: ${pct(a.refund / a.amount * 100)}% (목표 ${pct(s.refundRate || 0)}%)`);
+  const tgt = minConsult(c);
+  const low = Object.entries(s.log).filter(([d, e]) => d > s.base && d <= td && !isOff(d) && e.consults != null && e.consults < tgt).length;
+  if (low) out.push(`상담 최소 ${tgt}명 미달: ${low}일`);
+  const gap = Math.round(c.netAdd / c.days * el) - (a.amount - a.refund);
+  if (gap > 0) out.push(`순매출: 오늘까지 계획 대비 ${won(gap)}원 부족 (현재 ${won(a.net)}원, 달성률 ${pct(a.net / s.goal * 100)}%)`);
+  return out.length ? out : ["오늘까지 계획 대비 모든 단계가 목표 이상입니다."];
+}
+
+function report(s, c, a, dailyRows) {
+  const ms = s.members.reduce((x, m) => x + m.n * m.price, 0), mn = s.members.reduce((x, m) => x + m.n, 0);
+  return `팔로 ${SL.teamName} ${D(mEnd(s)).getMonth() + 1}월 매출 목표 및 실행 계획
+
+보고 기준일: ${D(s.base).getFullYear()}년 ${md(s.base)}
+목표 기간: ${D(mStart(s)).getFullYear()}년 ${md(mStart(s))}~${D(mEnd(s)).getDate()}일
+[현재 문제점]
+${problems(s, c, a).map((t) => "- " + t).join("\n")}${s.problems ? "\n" + s.problems : ""}
+[실행 전략]
+${strategies(s, c, a).join("\n")}${s.strategyAdd ? "\n" + s.strategyAdd : ""}
+[1] 월별 목표
+월 목표 순매출: ${won(s.goal)}원 (영업일 ${c.month.days}일)
+필요 지원자 ${c.month.apps}명 → 회신 ${c.month.replies}명 → 상담 ${c.month.consults}명 → 결제 ${c.month.payers}명
+[2] 순매출 현황
+목표 순매출: ${won(s.goal)}원
+현재 순매출: ${won(s.current)}원
+남은 목표 금액: ${won(c.remain)}원
+목표 달성률: ${(Math.round(c.rate * 100) / 100).toFixed(2)}%
+[3] 남은 기간 목표
+기간: ${md(addDays(s.base, 1))}~${D(s.end).getDate()}일, 영업일 ${c.days}일 (금요일 휴무 제외)
+추가 지원자 수: ${c.apps}명
+회신율: ${pct(s.reply)}%
+회신자 수: ${c.replies}명
+상담률: ${pct(s.consult)}%
+상담자 수: ${c.consults}명
+결제율: 약 ${pct(s.pay)}%
+결제자 수: ${c.payers}명
+객단가: 약 ${won(s.arpu)}원
+추가 결제금액: ${won(c.revenue)}원
+${s.refundRate ? `환불율: ${pct(s.refundRate)}%
+예상 환불금액: ${won(c.refundAmt)}원
+순 추가 매출: ${won(c.netAdd)}원
+` : ""}예상 최종 순매출: ${won(c.final)}원
+계산 기준
+회신율 = 회신자 수 ÷ 지원자 수 × 100
+상담률 = 상담자 수 ÷ 회신자 수 × 100
+결제율 = 결제자 수 ÷ 상담자 수 × 100
+객단가 = 총 결제금액 ÷ 결제자 수
+환불율 = 환불금액 ÷ 총 결제금액 × 100
+[4] 멤버십별 추가 결제 목표
+${s.members.filter((m) => m.n).map((m) => `${m.name}\n단가: ${won(m.price)}원\n목표 인원: ${m.n}명\n목표 결제금액: ${won(m.n * m.price)}원`).join("\n")}
+합계
+목표 결제 인원: ${mn}명
+목표 결제금액: ${won(ms)}원
+멤버십 기준 객단가: ${mn ? won(ms / mn) : "-"}원
+[5] 일일 실행 목표
+${dailyRows.map((r) => `${r[0]}: 하루 평균 ${r[1]}`).join("\n")}
+운영시간 내 첫 연락: ${s.firstContact}분 이내 목표
+실적 점검: 매일 마감 시 1회
+${a.days ? `[실적 누계] ${a.days}일 입력 기준
+지원자 ${a.apps}명 / 회신 ${a.replies}명 / 상담 ${a.consults}명 / 결제 ${a.payers}명
+결제금액 ${won(a.amount)}원, 환불·정산 ${won(a.refund)}원, 현재 순매출 ${won(a.net)}원 (달성률 ${pct(a.net / s.goal * 100)}%)
+` : ""}`.trim();
+}
+
+// ── 화면 ──
+const V = () => document.getElementById("salesView");
+const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log: {}, myTeam: undefined };
+const S = () => ({ ...SL.plan, log: SL.log });
+
+V().innerHTML = `
+<div class="slbar"><h2>💰 매출 목표</h2><select id="slTeam" class="adminonly" aria-label="지점"></select><b id="slTeamName"></b>
+  <input type="month" data-k="month" aria-label="목표 월"><a href="https://sso.pallo.co.kr/select?pick=branch" target="_blank" rel="noopener" class="btn ghost">지원자 수 확인 (SSO)</a><small id="slSaved"></small></div>
+<div id="slEmpty" class="hidden"></div>
+<div id="slBody">
+<details class="slcard sldefs"><summary><b>📏 단계별 세는 법</b> <small>(모든 매니저가 같은 기준으로 입력)</small></summary><table>
+  <tr><td><b>지원자</b></td><td>그날 SSO 지점 화면에 새로 들어온 신청 수 (하루치, 누계 아님)</td></tr>
+  <tr><td><b>회신자</b></td><td>우리가 연락해서 답장이나 통화가 되어 전산 상담 일정에 들어간 사람</td></tr>
+  <tr><td><b>상담자</b></td><td>전산 상담 일정에 있는 사람 중 실제로 방문해 상담한 사람</td></tr>
+  <tr><td><b>결제자</b></td><td>결제를 마친 사람. 상담 당일이 아니어도 나중에 결제하면 포함하고, 결제한 날짜에 넣습니다. 분납은 첫 결제일 기준</td></tr>
+  <tr><td><b>결제금액·환불</b></td><td>카드 승인 금액 기준. 환불은 환불 처리한 날짜에 넣습니다</td></tr></table></details>
+<div class="slkpis" id="slKpis"></div>
+<div class="slgrid">
+  <section class="slcard"><h3>[1] 월별 목표 — 비율·객단가를 바꾸면 필요 인원이 바로 바뀝니다</h3>
+    <div class="slrow"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span></div>
+    <div class="slrow"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span></div>
+    <div class="slrow"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span></div>
+    <div class="slrow"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span></div>
+    <div class="slrow"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span></div>
+    <div class="slrow"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span></div>
+    <div id="slMonth"></div></section>
+  <section class="slcard"><h3>[2] 남은 기간 목표</h3>
+    <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
+    <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
+    <p class="slhint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
+    <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
+    <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
+    <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></section>
+  <section class="slcard"><h3>[3] 멤버십별 추가 결제 목표 (남은 기간)</h3>
+    <table class="slt"><thead><tr><th>멤버십</th><th>단가</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
+    <tfoot><tr><th>합계</th><th></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table>
+    <div class="slkpi" style="margin-top:12px"><small>이 멤버십 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
+    <p class="slwarn" id="slMemWarn"></p><button class="btn ghost" id="slMemApply" type="button">이 객단가를 [1]에 적용</button></section>
+  <section class="slcard"><h3>[4] 일일 실행 목표</h3><div id="slDaily"></div>
+    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
+</div>
+<section class="slcard"><h3>📅 일일 실적 달력 — 날짜를 눌러 실적을 입력하세요</h3>
+  <p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
+  <p class="slhint">빨간 칸은 상담자 수가 하루 목표보다 적은 날입니다. 입력한 숫자를 보고 어느 단계가 막혔는지 판단해 행동 요령을 띄웁니다. 아직 오지 않은 날은 예약된 상담 수를 넣어두면 미리 확인할 수 있습니다.</p>
+  <div id="slActual"></div></section>
+<section class="slcard"><h3>현재 문제점 (보고문 맨 앞)</h3><pre id="slProblems"></pre>
+  <p class="slhint">위 내용은 달력 실적과 목표를 비교해 자동으로 씁니다. 덧붙일 내용은 아래에 쓰세요.</p>
+  <textarea data-k="problems" class="grow" placeholder="예: 주말 상담 예약이 몰려 평일 상담이 비어 있음"></textarea>
+  <h3 style="margin-top:14px">실행 전략 (보고문 문제점 다음)</h3><pre id="slStrategy"></pre>
+  <p class="slhint">위 전략은 목표와 실적 숫자를 보고 자동으로 씁니다. 덧붙일 실행 전략은 아래에 쓰세요.</p>
+  <textarea data-k="strategyAdd" class="grow" placeholder="예: 이번 주 금요일 휴무 전날(목) 상담 예약을 집중 배치"></textarea></section>
+<section class="slcard"><h3>📋 보고문</h3><pre id="slReport" style="max-height:420px;overflow:auto"></pre><button class="btn" id="slCopy" type="button">보고문 복사</button></section>
+</div>
+<dialog id="slDlg"><form method="dialog">
+  <h3 id="slDlgTitle"></h3>
+  <div class="slrow"><label>지원자<small>SSO 새 신청, 하루치</small></label><input type="number" min="0" name="apps"></div>
+  <div class="slrow"><label>회신자<small>연락돼 전산 상담 일정에 들어간 사람</small></label><input type="number" min="0" name="replies"></div>
+  <div class="slrow"><label>상담자<small>일정 중 실제 방문·상담한 사람</small></label><input type="number" min="0" name="consults"></div>
+  <div class="slrow"><label>결제자<small>이날 결제한 사람 (분납은 첫 결제일)</small></label><input type="number" min="0" name="payers"></div>
+  <div class="slrow"><label>결제금액<small>카드 승인 금액</small></label><input name="amount" data-money></div>
+  <div class="slrow"><label>환불·정산<small>환불 처리한 날짜에 입력</small></label><input name="refund" data-money></div>
+  <p class="slhint" id="slDlgNote" style="color:var(--red)"></p><div id="slTips"></div><p class="slhint" id="slDlgWho"></p>
+  <div class="sltools"><button class="btn" value="save">저장</button><button class="btn ghost" value="clear">이 날 지우기</button><button class="btn ghost" value="cancel">닫기</button></div>
+</form></dialog>`;
+
+const $v = (s) => V().querySelector(s);
+const setH = (id, h) => { const el = document.getElementById(id); if (el) el.innerHTML = h; };
+const setT = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+
+// ── 불러오기·저장 ──
+SL.load = async function () {
+  if (!me) return;
+  if (SL.myTeam === undefined) SL.myTeam = (await sb.from("profiles").select("team_id").eq("user_id", me.id).single()).data?.team_id ?? null;
+  const boss = isBoss && !previewTeam;
+  if (boss && !teams.length) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
+  if (boss) {
+    try { SL.team = SL.team ?? (+localStorage.getItem("sales-team") || null); } catch {}
+    if (!teams.some((t) => t.id === SL.team)) SL.team = teams[0]?.id ?? null;
+    $v("#slTeam").innerHTML = teams.map((t) => `<option value="${t.id}" ${t.id === SL.team ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+  } else SL.team = previewTeam || SL.myTeam;
+  $v("#slTeam").classList.toggle("hidden", !boss);
+  if (!SL.team) { $v("#slBody").classList.add("hidden"); $v("#slEmpty").classList.remove("hidden");
+    $v("#slEmpty").innerHTML = `<div class="slcard">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 매출 목표가 보여요.</div>`; return; }
+  $v("#slBody").classList.remove("hidden"); $v("#slEmpty").classList.add("hidden");
+  SL.teamName = (teams.find((t) => t.id === SL.team) ?? (await sb.from("teams").select("name").eq("id", SL.team).single()).data)?.name ?? "";
+  $v("#slTeamName").textContent = boss ? "" : SL.teamName;
+  SL.month = SL.month ?? todayIso().slice(0, 7);
+  const [p, prev] = await Promise.all([
+    sb.from("sales_plans").select("data").eq("team_id", SL.team).eq("month", SL.month).maybeSingle(),
+    sb.from("sales_plans").select("data").eq("team_id", SL.team).lt("month", SL.month).order("month", { ascending: false }).limit(1).maybeSingle()]);
+  if (fail(p.error || prev.error)) return;
+  SL.plan = p.data ? { ...newPlan(SL.month), ...p.data.data, month: SL.month } : newPlan(SL.month, prev.data?.data); // 새 달은 지난달 비율·멤버십 이어받기
+  await loadDays();
+  render();
+};
+async function loadDays() {
+  const s = SL.plan, from = s.base < mStart(s) ? s.base : mStart(s), to = s.end > mEnd(s) ? s.end : mEnd(s);
+  const { data, error } = await sb.from("sales_days").select("*").eq("team_id", SL.team).gte("day", from).lte("day", to);
+  if (fail(error)) return;
+  SL.log = Object.fromEntries(data.map((r) => [r.day, r]));
+}
+let saveT;
+function savePlan() {
+  clearTimeout(saveT); setT("slSaved", "저장 중…");
+  const team = SL.team, month = SL.month, data = { ...SL.plan }; delete data.month;
+  saveT = setTimeout(async () => {
+    const { error } = await sb.from("sales_plans").upsert({ team_id: team, month, data });
+    if (!fail(error)) setT("slSaved", "저장됨 ✓");
+  }, 600);
+}
+// 다른 매니저가 고치면 다시 불러옴 (입력 중이면 끝난 뒤)
+let rtT;
+SL.remote = (row) => {
+  boardSoon(); // 📊 현황판도 갱신
+  if (row && row.team_id !== SL.team) return;
+  if (view !== "sales") return;
+  clearTimeout(rtT);
+  rtT = setTimeout(function again() {
+    if (V().contains(document.activeElement) && document.activeElement.matches("input, textarea") || $v("#slDlg").open) return (rtT = setTimeout(again, 1500));
+    SL.load();
+  }, 400);
+};
+
+function render() {
+  const s = S(), c = calc(s), a = actuals(s);
+  V().querySelectorAll("[data-k]").forEach((el) => {
+    if (el === document.activeElement) return;
+    const v = s[el.dataset.k];
+    el.value = el.hasAttribute("data-money") ? won(v) : typeof v === "number" ? Math.round(v * 100) / 100 : v ?? "";
+  });
+  const day = (n, d) => (Math.round(n / d * 10) / 10).toLocaleString("ko-KR");
+  const tbl = (x, d, lab) => `<table class="slt"><tr><th>필요</th><th>합계</th><th>${lab} (${d}일)</th></tr>
+    <tr><td>지원자</td><td><b>${x.apps.toLocaleString()}명</b></td><td>${day(x.apps, d)}명</td></tr>
+    <tr><td>회신자 (${pct(s.reply)}%)</td><td><b>${x.replies.toLocaleString()}명</b></td><td>${day(x.replies, d)}명</td></tr>
+    <tr><td>상담자 (${pct(s.consult)}%)</td><td><b>${x.consults.toLocaleString()}명</b></td><td>${day(x.consults, d)}명</td></tr>
+    <tr><td>결제자 (${pct(s.pay)}%)</td><td><b>${x.payers.toLocaleString()}명</b></td><td>${day(x.payers, d)}명</td></tr>
+    <tr><td>결제금액</td><td>${won(x.revenue)}원</td><td></td></tr>
+    ${s.refundRate ? `<tr><td>환불 (${pct(s.refundRate)}%)</td><td>−${won(x.refundAmt)}원</td><td></td></tr>` : ""}
+    <tr><td>순매출</td><td><b>${won(x.netAdd)}원</b></td><td></td></tr></table>`;
+  setH("slMonth", `<p class="slhint">${md(mStart(s))}~${md(mEnd(s))}, 영업일 ${c.month.days}일 (금요일 휴무 제외)</p>` + tbl(c.month, c.month.days, "하루 평균"));
+  setH("slRemain", tbl(c, c.days, "처음 계획 하루 평균") + `<p class="slhint">예상 최종 순매출 <b>${won(c.final)}원</b> (목표 대비 ${pct(c.final / s.goal * 100)}%)</p>`);
+  setT("slPeriod", `현재 달성률 ${pct(c.rate)}% · 남은 목표 ${won(c.remain)}원 · ${md(addDays(s.base, 1))}~${md(s.end)}, 영업일 ${c.days}일 (금요일 휴무 제외)`);
+
+  const kp = [["기준일 달성률 (현재 순매출 기준)", pct(c.rate) + "%", c.rate], ["예상 최종 순매출", won(c.final) + "원", c.final / s.goal * 100],
+    ["오늘까지 순매출 (기준일 + 달력 실적)", won(a.net) + "원", a.net / s.goal * 100], ["남은 목표 금액", won(Math.max(0, s.goal - a.net)) + "원"], ["결제자 목표", c.payers + "명"]];
+  setH("slKpis", kp.map(([l, v, b]) => `<div class="slkpi"><small>${l}</small><b>${v}</b>${b != null ? `<div class="bar"><i style="width:${Math.min(100, b || 0)}%"></i></div>` : ""}</div>`).join(""));
+
+  const mn = s.members.reduce((x, m) => x + m.n, 0), ms = s.members.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0;
+  if (!V().querySelector("#slMem").contains(document.activeElement)) setH("slMem", s.members.map((m, i) =>
+    `<tr><td><input value="${esc(m.name)}" data-m="${i}" data-f="name" style="text-align:left"></td><td><input value="${won(m.price)}" data-m="${i}" data-f="price" data-money></td>
+     <td><input type="number" min="0" value="${m.n}" data-m="${i}" data-f="n" style="width:64px"></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
+  else V().querySelectorAll("#slMem tr").forEach((tr, i) => { tr.lastElementChild.textContent = won(s.members[i].n * s.members[i].price); });
+  setT("slMemN", mn + "명"); setT("slMemSum", won(ms)); setT("slMemArpu", mn ? won(mArpu) + "원" : "-");
+  setT("slMemCmp", mn ? (Math.abs(mArpu - s.arpu) < 1 ? "[1]의 객단가와 같습니다."
+    : `[1]의 객단가 ${won(s.arpu)}원보다 ${won(Math.abs(mArpu - s.arpu))}원 ${mArpu > s.arpu ? "높습니다" : "낮습니다"}. 적용하면 필요 결제자가 ${need({ ...s, arpu: mArpu }, c.remain).payers}명이 됩니다.`) : "");
+  setT("slMemWarn", mn && mn < c.payers ? `[2] 남은 기간 필요 결제자 ${c.payers}명보다 ${c.payers - mn}명 적습니다.` : "");
+
+  const p = c.perDay, ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;
+  const range = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `${Math.floor(v)}~${Math.ceil(v)}명`;
+  const dailyRows = [["신규 지원자", ab(p.apps)], ["회신자", ab(p.replies)], ["상담 진행", range(p.consults)], ["결제", ab(p.payers)]];
+  setH("slDaily", `<table class="slt">${dailyRows.map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`);
+
+  renderCal(s, c);
+  const cu = catchUp(s, a);
+  setH("slCalNote", `달력의 <b>상담 최소 ${minConsult(c)}명</b>은 처음 계획 기준입니다.`
+    + (a.days ? ` 오늘 실적을 반영하면 남은 영업일 ${cu.left}일 동안 <b style="color:var(--red)">하루 ${Math.ceil(cu.conN / cu.left)}명</b>이 필요합니다 (실행 전략 (1)과 같은 숫자).` : ""));
+
+  const td = todayIso(), el = workDays(s.base, td < s.end ? td : s.end), rr = (x, y) => y ? pct(x / y * 100) + "%" : "-";
+  setH("slActual", a.days ? `<table class="slt" style="margin-top:12px">
+    <tr><th>실적 누계 (${a.days}일 입력)</th><th>실제</th><th>오늘까지 계획</th><th>전체 목표</th></tr>
+    <tr><td>지원자</td><td>${a.apps}</td><td>${Math.round(p.apps * el)}</td><td>${c.apps}</td></tr>
+    <tr><td>회신자 (회신율)</td><td>${a.replies} (${rr(a.replies, a.apps)})</td><td>${Math.round(p.replies * el)}</td><td>${c.replies} (${pct(s.reply)}%)</td></tr>
+    <tr><td>상담자 (상담률)</td><td>${a.consults} (${rr(a.consults, a.replies)})</td><td>${Math.round(p.consults * el)}</td><td>${c.consults} (${pct(s.consult)}%)</td></tr>
+    <tr><td>결제자 (결제율)</td><td>${a.payers} (${rr(a.payers, a.consults)})</td><td>${Math.round(p.payers * el)}</td><td>${c.payers} (${pct(s.pay)}%)</td></tr>
+    <tr><td>객단가</td><td>${a.payers ? won(a.amount / a.payers) : "-"}</td><td></td><td>${won(s.arpu)}</td></tr>
+    <tr><td>환불율</td><td>${rr(a.refund, a.amount)}</td><td></td><td>${pct(s.refundRate || 0)}%</td></tr>
+    <tr><td>결제−환불</td><td>${won(a.amount - a.refund)}</td><td>${won(c.netAdd / c.days * el)}</td><td>${won(c.netAdd)}</td></tr></table>` : "");
+
+  setT("slStrategy", strategies(s, c, a).join("\n"));
+  setT("slProblems", problems(s, c, a).map((t) => "- " + t).join("\n"));
+  setT("slReport", report(s, c, a, dailyRows));
+}
+
+function renderCal(s, c) {
+  const first = D(mStart(s)), last = D(s.end), td = todayIso(), tgt = minConsult(c);
+  let html = "";
+  for (let m = new Date(first.getFullYear(), first.getMonth(), 1); m <= last; m.setMonth(m.getMonth() + 1)) {
+    html += `<h4>${m.getFullYear()}년 ${m.getMonth() + 1}월</h4><div class="slcal">` + "일월화수목금토".split("").map((d) => `<div class="dow">${d}</div>`).join("");
+    const dim = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
+    html += "<div></div>".repeat(m.getDay());
+    for (let i = 1; i <= dim; i++) {
+      const d = iso(new Date(m.getFullYear(), m.getMonth(), i)), e = s.log[d], inPeriod = d > s.base && d <= s.end;
+      if (inPeriod && isOff(d)) { html += `<div class="day off"><div class="d">${i}</div><div class="big"><small>휴무</small></div></div>`; continue; }
+      if (!inPeriod) { html += `<div class="day off"><div class="d">${i}</div>${e ? `<div class="c">상담 ${e.consults ?? "-"}</div>` : ""}</div>`; continue; }
+      const g = diagnose(s, c, e);
+      let cls = "day" + (d === td ? " today" : ""), body;
+      if (g) {
+        cls += g.low ? " low" : " good";
+        body = `<div class="big"><small>상담 / 최소</small><b>${e.consults}<i> / ${tgt}명</i></b></div>`;
+        if (g.low) body += `<div class="tip">⚠ ${g.why.slice(0, 2).map((w) => w[0]).join("·")}<br>${tipList(s, g.why[0][1])[0]}</div>`;
+      } else body = `<div class="big"><small>상담 최소</small><b>${tgt}<i>명</i></b></div>` + (d < td ? '<div class="nil">미입력</div>' : "");
+      html += `<div class="${cls}" data-day="${d}"><div class="d">${i}</div>${body}</div>`;
+    }
+    html += "</div>";
+  }
+  setH("slCal", html);
+}
+
+// ── 입력 ──
+// 금액 칸: 입력하는 동안 바로 쉼표 (커서는 뒤에서부터 같은 자리 유지)
+V().addEventListener("input", (ev) => {
+  const el = ev.target; if (!el.hasAttribute("data-money")) return;
+  const digits = el.value.replace(/[^\d]/g, ""); if (!digits) return;
+  const fromEnd = el.value.length - el.selectionStart;
+  el.value = Number(digits).toLocaleString("ko-KR");
+  const pos = Math.max(0, el.value.length - fromEnd); el.setSelectionRange(pos, pos);
+}, true);
+V().addEventListener("input", (ev) => {
+  const el = ev.target, s = SL.plan; if (!s || el.closest("dialog")) return;
+  if (el.dataset.k) {
+    if (el.dataset.k === "base" || el.dataset.k === "month") return; // change 에서 처리
+    s[el.dataset.k] = (el.type === "date" || el.tagName === "TEXTAREA") ? el.value : num(el.value);
+  } else if (el.dataset.m) {
+    const m = s.members[el.dataset.m]; m[el.dataset.f] = el.dataset.f === "name" ? el.value : num(el.value);
+  } else return;
+  render(); savePlan();
+});
+V().addEventListener("focusout", (ev) => { if (ev.target.hasAttribute?.("data-money") && SL.plan) render(); });
+V().addEventListener("change", async (ev) => {
+  const el = ev.target;
+  if (el.id === "slTeam") { SL.team = +el.value; try { localStorage.setItem("sales-team", el.value); } catch {} return SL.load(); }
+  if (el.dataset.k === "month" && el.value) { SL.month = el.value; return SL.load(); }
+  // 기준일을 뒤로 옮기면 그 사이 달력 실적을 현재 순매출에 넣을지 묻는다 (중복·누락 방지)
+  if (el.dataset.k === "base" && el.value) {
+    const s = SL.plan, old = s.base, nb = el.value;
+    if (nb > old) {
+      let net = 0, n = 0;
+      for (const [d, e] of Object.entries(SL.log)) if (d > old && d <= nb && !isOff(d) && (e.amount || e.refund)) { net += (e.amount || 0) - (e.refund || 0); n++; }
+      if (n && confirm(`기준일을 ${md(nb)}로 옮깁니다.\n${md(addDays(old, 1))}~${md(nb)} 달력에 입력한 ${n}일 실적(결제−환불 ${won(net)}원)을 현재 순매출에 더할까요?\n\n[확인] 더하기 — 현재 순매출을 아직 안 고쳤을 때\n[취소] 안 더하기 — 현재 순매출을 이미 새 숫자로 넣었을 때`)) s.current += net;
+    }
+    s.base = nb; await loadDays(); render(); savePlan();
+  }
+});
+V().addEventListener("click", async (ev) => {
+  if (ev.target.id === "slMemApply") {
+    const s = SL.plan, mn = s.members.reduce((x, m) => x + m.n, 0); if (!mn) return;
+    s.arpu = s.members.reduce((x, m) => x + m.n * m.price, 0) / mn; render(); savePlan(); return;
+  }
+  if (ev.target.id === "slCopy") {
+    try { await navigator.clipboard.writeText($v("#slReport").textContent); toast("보고문을 복사했어요"); }
+    catch { const r = document.createRange(); r.selectNodeContents($v("#slReport")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("선택된 글을 ⌘/Ctrl+C로 복사하세요"); }
+    return;
+  }
+  const cell = ev.target.closest("#slCal [data-day]"); if (!cell) return;
+  openDay(cell.dataset.day);
+});
+
+// ── 달력 입력 창 ──
+const dlg = $v("#slDlg"); let editDay = null;
+const F = ["apps", "replies", "consults", "payers", "amount", "refund"];
+function openDay(d) {
+  editDay = d; const e = SL.log[d] || {};
+  $v("#slDlgTitle").textContent = `${md(d)} 실적 (${SL.teamName})`;
+  for (const f of dlg.querySelectorAll("input")) f.value = e[f.name] == null ? "" : f.hasAttribute("data-money") ? won(e[f.name]) : e[f.name];
+  $v("#slDlgNote").textContent = d > todayIso() ? "앞날 입력은 예약으로만 봅니다. 칸 색깔만 바뀌고 실적에는 더해지지 않습니다. 그날이 지나면 실제 숫자로 고쳐주세요." : "";
+  $v("#slDlgWho").textContent = e.updated_at ? `마지막 저장 ${new Date(e.updated_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "";
+  showTips(); dlg.showModal();
+}
+const readDlg = () => Object.fromEntries([...dlg.querySelectorAll("input")].filter((f) => f.value !== "").map((f) => [f.name, num(f.value)]));
+function showTips() {
+  const s = S(), g = diagnose(s, calc(s), readDlg());
+  $v("#slTips").innerHTML = !g ? "" : g.why.length
+    ? `<div class="sltip">${g.low ? `<h4>상담 목표 ${g.tgt}명보다 부족합니다</h4>` : ""}${g.why.map(([w, k]) => `<b>${w}</b><ul>${tipList(s, k).map((t) => `<li>${t}</li>`).join("")}</ul>`).join("")}</div>`
+    : `<div class="sltip ok"><b>상담 목표 달성 ✓</b></div>`;
+}
+dlg.addEventListener("input", showTips);
+dlg.addEventListener("close", async () => {
+  const v = dlg.returnValue, d = editDay, e = readDlg();
+  if (v === "save" && Object.keys(e).length) {
+    const row = { team_id: SL.team, day: d, ...Object.fromEntries(F.map((k) => [k, e[k] ?? null])) };
+    const { data, error } = await sb.from("sales_days").upsert(row).select().single();
+    if (fail(error)) return;
+    SL.log[d] = data; toast("저장했어요");
+  } else if (v === "clear" || (v === "save" && SL.log[d])) {
+    const { error } = await sb.from("sales_days").delete().eq("team_id", SL.team).eq("day", d);
+    if (fail(error)) return;
+    delete SL.log[d];
+  }
+  render();
+});
+
+// ── 📊 현황판 카드 (대표): 지점마다 이번 달 달성률·오늘 필요 상담 ──
+SL.boardCards = async function (teamList) {
+  const month = todayIso().slice(0, 7), last = mEnd({ month });
+  const [p, d] = await Promise.all([sb.from("sales_plans").select("team_id, data").eq("month", month),
+    sb.from("sales_days").select("*").gte("day", addDays(month + "-01", -1)).lte("day", last)]);
+  if (p.error || d.error) return "";
+  const cards = teamList.map((tm) => {
+    const row = p.data.find((x) => x.team_id === tm.id);
+    if (!row) return `<div class="bcard slb" data-slteam="${tm.id}"><div class="bh"><b>${esc(tm.name)}</b></div><div class="bsub">이번 달 매출 목표 미설정 — 눌러서 입력</div></div>`;
+    const s = { ...newPlan(month), ...row.data, month, log: Object.fromEntries(d.data.filter((x) => x.team_id === tm.id).map((x) => [x.day, x])) };
+    const c = calc(s), a = actuals(s), cu = catchUp(s, a), r = s.goal ? a.net / s.goal * 100 : 0, tdE = s.log[todayIso()];
+    return `<div class="bcard slb" data-slteam="${tm.id}"><div class="bh"><b>${esc(tm.name)}</b><span class="mem">${won(a.net)} / ${won(s.goal)}원</span><span class="pct">${pct(r)}%</span></div>
+      <div class="bar"><i style="width:${Math.min(100, r)}%"></i></div>
+      <div class="bsub">남은 ${won(Math.max(0, s.goal - a.net))}원 · 남은 영업일 ${cu.left}일 · 하루 상담 <b>${Math.ceil(cu.conN / cu.left)}명</b> 필요 (처음 계획 ${minConsult(c)}명)${tdE?.consults != null ? ` · 오늘 상담 ${tdE.consults}명` : ""}</div></div>`;
+  });
+  return `<h3 style="margin:4px 0 10px">💰 이번 달 매출</h3><div class="bgrid" style="margin-bottom:18px">${cards.join("")}</div>`;
+};
+document.addEventListener("click", (ev) => { // 현황 카드 누르면 그 지점 매출 탭으로
+  const c = ev.target.closest("[data-slteam]"); if (!c) return;
+  SL.team = +c.dataset.slteam; try { localStorage.setItem("sales-team", c.dataset.slteam); } catch {}
+  setView("sales");
+});
+})();
