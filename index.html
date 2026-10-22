@@ -287,6 +287,8 @@ body:not(.sv) #salesView { display: none; }
 .slstrip small { display: block; font-size: 10.5px; font-weight: 500; color: var(--sub); } .slstrip .y { color: var(--green); border-color: var(--green); } .slstrip .n { color: var(--red); border-color: var(--red); }
 .slstrip .f { color: var(--sub); opacity: .6; } .slstrip .o { color: var(--sub); background: var(--panel); }
 .slrow.sl3 { grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr); }
+.slmode { font-size: 11px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--sub); margin-left: 4px; vertical-align: 1px; }
+.slmode.on { background: var(--accent); border-color: var(--accent); color: #fff; } #salesView input.slauto { color: var(--accent); background: var(--panel); }
 .slcurbtn { font-size: 12px; font-weight: 600; color: var(--accent); text-align: left; padding: 2px 0; }
 #salesView:not(.curopen) .slcur, #salesView:not(.curopen) #slCompare { display: none; } #salesView:not(.netopen) .slnet { display: none; } #slNetBtn { display: block; margin: 0 0 8px; font-size: 13px; }
 #salesView:not(.curopen) .slrow.sl3:not(.slhead) { grid-template-columns: 110px minmax(0, 1fr); } .slrow.slhead small { color: var(--sub); font-size: 12px; font-weight: 600; }
