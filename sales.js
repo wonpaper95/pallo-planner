@@ -127,10 +127,12 @@ function leverHtml(s) {
 // [2]·[4] 멤버십 비율: Premium(가장 비싼) 비율을 가장 높게, 나머지는 똑같이. [1] 객단가 A 에 맞춰 Premium = (A − 나머지 평균) ÷ (Premium − 나머지 평균).
 // Premium 이 가장 높으려면 최소 1/(멤버십 수) → 그보다 낮은 A 면 전부 고르게(객단가는 목표보다 조금 높아짐)
 // 인원 = 필요 결제자 × 비율 (내림 후 남는 인원은 비싼 멤버십부터)
-function memberMix(s, payers) {
-  const ms = s.members.map((m, i) => ({ ...m, i, w: 0 })), live = ms.filter((m) => m.price > 0);
-  const sumP = ms.reduce((t, m) => t + (m.p || 0), 0);
-  if (ms.every((m) => typeof m.p === "number") && sumP > 0) for (const m of ms) m.w = m.p / sumP; // 직접 정한 비율
+// key: "p" = [2] 월별 비율, "pr" = [4] 남은 기간 비율 (안 정했으면 [2] 비율을 그대로)
+const ratioKey = (s, key) => { const has = (k) => s.members.every((m) => typeof m[k] === "number") && s.members.some((m) => m[k] > 0);
+  return has(key) ? key : key === "pr" && has("p") ? "p" : null; };
+function memberMix(s, payers, key = "p") {
+  const ms = s.members.map((m, i) => ({ ...m, i, w: 0 })), live = ms.filter((m) => m.price > 0), rk = ratioKey(s, key);
+  if (rk) { const sum = ms.reduce((t, m) => t + (m[rk] || 0), 0); for (const m of ms) m.w = (m[rk] || 0) / sum; } // 직접 정한 비율
   else if (live.length) {
     const hi = live.reduce((a, b) => (b.price > a.price ? b : a)), rest = live.filter((m) => m !== hi);
     if (!rest.length) hi.w = 1;
@@ -149,19 +151,23 @@ function memberMix(s, payers) {
 // 비율(0~1) → 소수 첫째 자리 %, 합계 정확히 100 (차이는 가장 비싼 멤버십에서)
 const toPct = (ms) => { const v = ms.map((m) => Math.round(m.w * 1000) / 10), hi = ms.reduce((a, m, i) => (m.price > ms[a].price ? i : a), 0);
   v[hi] = Math.round((v[hi] + 100 - v.reduce((t, x) => t + x, 0)) * 10) / 10; return v; };
+// 가이드용: Premium 아닌 쪽은 내림 → 반올림 때문에 목표 객단가 밑으로 안 떨어짐
+const toPctUp = (ms) => { const hi = ms.reduce((a, m, i) => (m.price > ms[a].price ? i : a), 0), v = ms.map((m, i) => i === hi ? 0 : Math.floor(m.w * 1000 + 1e-6) / 10);
+  v[hi] = Math.round((100 - v.reduce((t, x) => t + x, 0)) * 10) / 10; return v; };
 // [2] 직접 정한 비율로 객단가·필요 결제자 계산 + 목표 객단가 맞추는 가이드(싼 멤버십 → Premium 으로 옮기기)
 // 비율대로 나눈 인원의 순매출(결제 − 환불)이 목표 이상이 되게: 모자라면 비율 있는 것 중 비싼 멤버십부터 1명씩 추가
-function fitMix(s, payers, goal) {
+function fitMix(s, payers, goal, key = "p") {
   const rf = Math.min(0.99, (s.refundRate || 0) / 100), net = (mx) => mx.reduce((t, m) => t + m.n * m.price, 0) * (1 - rf);
-  let mix = memberMix(s, payers);
+  let mix = memberMix(s, payers, key);
   const order = mix.filter((m) => m.w > 0).sort((a, b) => b.price - a.price);
   for (let k = 0; order.length && net(mix) < goal - 1 && k < 500; k++) { const m = order[k % order.length]; mix = mix.map((x) => x.i === m.i ? { ...x, n: x.n + 1 } : x); }
   return mix;
 }
-function mixPlan(s, c) {
-  const base = memberMix(s, 0), mixA = base.reduce((t, m) => t + m.w * m.price, 0) || s.arpu;
-  const mix = fitMix(s, need({ ...s, arpu: mixA }, c.remain).payers, c.remain), pN = mix.reduce((t, m) => t + m.n, 0);
-  const sumP = s.members.every((m) => typeof m.p === "number") ? s.members.reduce((t, m) => t + m.p, 0) : 100;
+// 비율 한 벌(key)로: 객단가·목표 금액(goalAmt) 채우는 최소 인원·합계 %·목표 객단가 가이드(싼 멤버십 → Premium 으로 옮기기)
+function ratioPlan(s, key, goalAmt) {
+  const base = memberMix(s, 0, key), mixA = base.reduce((t, m) => t + m.w * m.price, 0) || s.arpu;
+  const mix = fitMix(s, need({ ...s, arpu: mixA }, goalAmt).payers, goalAmt, key), n = mix.reduce((t, m) => t + m.n, 0);
+  const rk = ratioKey(s, key), sumP = rk ? s.members.reduce((t, m) => t + (m[rk] || 0), 0) : 100;
   let guide = null;
   if (mixA < s.arpu - 1) {
     const w = base.map((m) => ({ ...m })), live = w.filter((m) => m.price > 0), hi = live.reduce((a, b) => (b.price > a.price ? b : a));
@@ -170,10 +176,13 @@ function mixPlan(s, c) {
       if (gap <= 0) break;
       const take = Math.min(m.w, gap / (hi.price - m.price)); m.w -= take; hi.w += take; gap -= take * (hi.price - m.price);
     }
-    guide = { ok: gap <= 1, w: toPct(w), moves: w.map((m, i) => ({ name: m.name, d: Math.round((m.w - base[i].w) * 1000) / 10 })).filter((x) => x.d) };
+    guide = { ok: gap <= 1, w: toPctUp(w), moves: w.map((m, i) => ({ name: m.name, d: Math.round((m.w - base[i].w) * 1000) / 10 })).filter((x) => x.d) };
   }
-  const mixM = fitMix(s, need({ ...s, arpu: mixA }, s.goal).payers, s.goal), pNm = mixM.reduce((t, m) => t + m.n, 0);
-  return { mix, mixA, pN, sumP, guide, pNm, mixM };
+  return { base, mixA, mix, n, sumP, guide };
+}
+function mixPlan(s, c) {
+  const M = ratioPlan(s, "p", s.goal), Rm = ratioPlan(s, "pr", c.remain);
+  return { mixM: M.mix, pNm: M.n, mixA: M.mixA, sumP: M.sumP, guide: M.guide, mix: Rm.mix, pN: Rm.n, mixAR: Rm.mixA, sumPR: Rm.sumP, guideR: Rm.guide, ownR: ratioKey(s, "pr") === "pr" };
 }
 
 function compareFill(s, c) {
@@ -451,10 +460,12 @@ V().innerHTML = `
     <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
-  <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — [2]와 같은 비율</h3>
+  <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — 남은 기간 비율 따로 조정</h3>
+    <p class="slhint" style="font-size:13px;margin-top:-4px">남은 기간 동안 목표 매출을 채우려면 어떤 멤버십을 몇 명 해야 하는지 보는 칸입니다. 처음엔 [2] 비율이고, 바꾸면 남은 기간에만 적용됩니다.</p>
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr><tr id="slMemRRf"></tr><tr id="slMemRNet"></tr></tfoot></table></div>
-    <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div></section>
+    <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div>
+    <div id="slMemRNote"></div></section>
   <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
     <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
 </div>
@@ -599,13 +610,20 @@ function render() {
   { const [a1, b1] = netRows(ms, s.goal, "월 목표"); setH("slMemRf", a1); setH("slMemNet", b1); }
   setT("slMemSumP", pct(mp.sumP) + "%");
   setT("slMemCmp", `이 비율의 객단가 ${won(mp.mixA)}원 · [1] 목표 객단가 ${won(s.arpu)}원 · 월 필요 결제자 ${mp.pNm}명 ([1] 객단가 기준 ${c.month.payers}명)`);
-  // [4] 남은 기간: 같은 비율, 남은 금액 기준 인원
+  // [4] 남은 기간: 비율 따로(안 정했으면 [2] 비율), 남은 금액 기준 인원
   const rN = mp.pN, rS = mp.mix.reduce((x, m) => x + m.n * m.price, 0);
-  setH("slMemR", mp.mix.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.price)}</td><td>${pctW(m.w)}</td><td><b>${m.n}명</b></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
-  setT("slMemRSumP", pct(mp.sumP) + "%"); setT("slMemRN", rN + "명"); setT("slMemRSum", won(rS));
+  if (!V().querySelector("#slMemR").contains(document.activeElement)) setH("slMemR", mp.mix.map((m, i) => `<tr><td>${esc(m.name)}</td><td>${won(m.price)}</td>
+    <td><span class="u"><input type="number" min="0" max="100" step="1" value="${Math.round(m.w * 1000) / 10}" data-m="${i}" data-f="pr"><i>%</i></span></td><td><b>${m.n}명</b></td><td>${won(m.n * m.price)}</td></tr>`).join(""));
+  else V().querySelectorAll("#slMemR tr").forEach((tr, i) => { const c2 = tr.children; c2[3].innerHTML = `<b>${mp.mix[i].n}명</b>`; c2[4].textContent = won(mp.mix[i].n * mp.mix[i].price); });
+  setT("slMemRSumP", pct(mp.sumPR) + "%"); setT("slMemRN", rN + "명"); setT("slMemRSum", won(rS));
   { const [a1, b1] = netRows(rS, c.remain, "남은 목표"); setH("slMemRRf", a1); setH("slMemRNet", b1); }
   setT("slMemRArpu", `${rN}명 · ${rN ? won(rS / rN) : "-"}원`);
-  setT("slMemRCmp", `남은 목표 ${won(c.remain)}원 ÷ (이 비율의 객단가 ${won(mp.mixA)}원 × (1−환불율)) = ${rN}명`);
+  setT("slMemRCmp", `남은 목표 ${won(c.remain)}원 ÷ (이 비율의 객단가 ${won(mp.mixAR)}원 × (1−환불율)) = ${rN}명`);
+  { const g = mp.guideR, off = Math.abs(mp.sumPR - 100) > 0.05, back = mp.ownR ? ` <button class="btn ghost" data-mixfix="resetR" type="button">[2] 비율로 되돌리기</button>` : "";
+    setH("slMemRNote", (off ? `<div class="sltip">⚠ 비율 합계가 ${pct(mp.sumPR)}%예요. <button class="btn ghost" data-mixfix="sumR" type="button">100%로 맞추기</button></div>`
+      : !g ? `<div class="sltip ok">✓ 이 비율이면 목표 객단가 이상입니다 (+${won(mp.mixAR - s.arpu)}원). 남은 목표 달성 가능</div>`
+      : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixAR)}원 낮아서 남은 기간 결제자가 ${rN - c.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${x.name} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guideR" type="button">가이드대로 맞추기</button></div>`
+      : `<div class="sltip">Premium 100%여도 목표 객단가 ${won(s.arpu)}원에 못 미칩니다.</div>`) + (back ? `<p>${back}</p>` : "")); }
   const g = mp.guide, off = Math.abs(mp.sumP - 100) > 0.05;
   setH("slMemNote", off ? `<div class="sltip">⚠ 비율 합계가 ${pct(mp.sumP)}%예요. <button class="btn ghost" data-mixfix="sum" type="button">100%로 맞추기</button></div>`
     : !g ? `<div class="sltip ok">✓ 이 비율이면 목표 객단가 이상입니다 (+${won(mp.mixA - s.arpu)}원). 목표매출 가이드 달성 가능</div>`
@@ -681,6 +699,7 @@ V().addEventListener("input", (ev) => {
     s[el.dataset.k] = (el.type === "date" || el.tagName === "TEXTAREA") ? el.value : num(el.value);
   } else if (el.dataset.m) {
     if (el.dataset.f === "p" && !s.members.every((m) => typeof m.p === "number")) { const v = toPct(memberMix(S(), 0)); s.members.forEach((m, i) => { m.p = v[i]; }); }
+    if (el.dataset.f === "pr" && ratioKey(s, "pr") !== "pr") { const v = toPct(memberMix(S(), 0, "pr")); s.members.forEach((m, i) => { m.pr = v[i]; }); }
     const m = s.members[el.dataset.m]; m[el.dataset.f] = el.dataset.f === "name" ? el.value : num(el.value);
   } else return;
   render(); savePlan();
@@ -707,7 +726,10 @@ V().addEventListener("click", async (ev) => {
     const p = SL.plan, s2 = S(), c2 = calc(s2), mp = mixPlan(s2, c2), cur = memberMix(s2, 0);
     if (fx === "sum") { const v = toPct(cur); p.members.forEach((m, i) => { m.p = v[i]; }); }
     if (fx === "guide" && mp.guide) p.members.forEach((m, i) => { m.p = mp.guide.w[i]; });
-    setH("slMem", ""); render(); savePlan(); return;
+    if (fx === "sumR") { const v = toPct(memberMix(s2, 0, "pr")); p.members.forEach((m, i) => { m.pr = v[i]; }); }
+    if (fx === "guideR" && mp.guideR) p.members.forEach((m, i) => { m.pr = mp.guideR.w[i]; });
+    if (fx === "resetR") p.members.forEach((m) => { delete m.pr; });
+    setH("slMem", ""); setH("slMemR", ""); render(); savePlan(); return;
   }
   if (ev.target.closest("#slCurBtn")) return curToggle(!V().classList.contains("curopen"));
   if (ev.target.closest("#slR2Btn")) return r2Toggle(!V().classList.contains("r2open"));
