@@ -430,6 +430,7 @@ V().innerHTML = `
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
     <div id="slMonth"></div><div id="slCompare"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
+    <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
     <tfoot><tr><th>합계</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>

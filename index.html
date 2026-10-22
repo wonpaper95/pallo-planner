@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610222142">
+<meta name="app-version" content="202610222144">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -544,9 +544,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610222142"></script>
-<script src="week.js?v=202610222142"></script>
-<script src="pick.js?v=202610222142"></script>
+<script src="config.js?v=202610222144"></script>
+<script src="week.js?v=202610222144"></script>
+<script src="pick.js?v=202610222144"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -1675,6 +1675,6 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610222142"></script>
+<script src="sales.js?v=202610222144"></script>
 </body>
 </html>
