@@ -281,6 +281,15 @@ body:not(.sv) #salesView { display: none; }
 .sltip { background: rgba(235, 87, 87, .1); border: 1px solid var(--red); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
 .sltip.ok { background: rgba(77, 171, 154, .1); border-color: var(--green); color: var(--green); } .sltip h4 { margin: 0 0 6px; color: var(--red); font-size: 14px; } .sltip ul { margin: 0 0 6px; padding-left: 18px; }
 .slb { cursor: pointer; }
+#salesView .up { color: var(--green); } #salesView .dn { color: var(--red); } .slcmp td:last-child { font-size: 13px; }
+.slpace { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.slpace div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); } .slpace small { display: block; color: var(--sub); font-size: 12px; }
+.slpace b { display: block; font-size: 19px; } .slpace span { font-size: 13px; color: var(--sub); } .slpace span b { display: inline; font-size: 13px; }
+.slchart { width: 100%; min-width: 560px; height: auto; display: block; } .slchart text { font-size: 11px; fill: var(--sub); } .slchart text.td { fill: var(--orange); font-weight: 700; }
+.slchart .okb { fill: var(--green); } .slchart .nob { fill: var(--red); } .slchart .fut { fill: var(--line); opacity: .5; }
+.slchart .goal { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; } .slchart .gl { fill: var(--accent); font-weight: 600; } .slchart .off { fill: var(--sub); }
+.slscroll { overflow-x: auto; } .slscroll .slt th, .slscroll .slt td { white-space: nowrap; } .sldaily { min-width: 620px; font-size: 13px; } .slt tr.now td { background: rgba(233, 162, 59, .14); font-weight: 600; }
+.slt tr.fut td { color: var(--sub); } .slt tr.offr td { color: var(--sub); font-size: 12px; } #salesView details summary { cursor: pointer; margin-top: 12px; }
 @media (max-width: 860px) { #salesView { padding: 10px 10px 80px; } .slcal .day { min-height: 70px; padding: 4px; } .slcal .tip { display: none; } .slcal .big b { font-size: 22px; }
   .slcal .day.low::after { content: "!"; position: absolute; right: 6px; top: 4px; color: var(--red); font-weight: 800; } .slrow { grid-template-columns: 90px 1fr; } }
 /* 📊 지점 현황판 (대표) */
@@ -1085,7 +1094,8 @@ function listen() {
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
   sb.channel("sales").on("postgres_changes", { event: "*", schema: "public", table: "sales_plans" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
-    .on("postgres_changes", { event: "*", schema: "public", table: "sales_days" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old)).subscribe(); // 💰 같은 지점이 고치면 바로
+    .on("postgres_changes", { event: "*", schema: "public", table: "sales_days" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
+    .on("postgres_changes", { event: "*", schema: "public", table: "sales_sheet_sync" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old)).subscribe(); // 📗 시트 새로 가져오면 // 💰 같은 지점이 고치면 바로
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && softReload());
   setInterval(() => document.visibilityState === "visible" && renderDue(), 60000); // 'n분 남음' 갱신
 }
