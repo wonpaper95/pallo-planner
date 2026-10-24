@@ -1,15 +1,15 @@
 // ✍️ 블로그 작성기 Edge Function. 화면(blog.js)이 sb.functions.invoke("blog-write", { body: { action, ... } }) 로 부른다.
-// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | similar(유사도)
+// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
 // 비밀값: ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET (supabase secrets set …)
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import {
-  COMMON, CONCEPTS, CONVERT_SCHEMA, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
+  COMMON, CONCEPTS, CONVERT_SCHEMA, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
 } from "./prompt.ts";
 
 const MODEL = "claude-opus-5-5";
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6, cacheRead: 0.2 / 1e6, cacheWrite: 5 / 1e6 }; // USD / token
-const AI_KINDS = ["write", "convert", "style"]; // 하루 제한에 세는 것
+const AI_KINDS = ["write", "convert", "style", "sns"]; // 하루 제한에 세는 것 (블로그·게시물 합산)
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
     switch (body.action) {
       case "write": return json(await write(who, team, body));
       case "convert": return json(await convert(who, team, body));
+      case "sns": return json(await sns(who, team, body));
       case "style": return json(await style(who, team, body));
       case "keywords": return json(await keywords(who, team, body));
       case "similar": return json(await similar(team, body));
@@ -71,6 +72,16 @@ async function teamFor(who: Who, asked?: number) {
   return { id: t.data.id as number, name: t.data.name as string, profile: (p.data?.data ?? {}) as Record<string, unknown> };
 }
 type Team = Awaited<ReturnType<typeof teamFor>>;
+// 지점 프로필 → 프롬프트 줄 (write·sns 공용)
+const profileLines = (team: Team) => {
+  const p = team.profile as Record<string, any>;
+  return [
+    `# 지점`, `지점명: ${p.display || team.name}`, `주소·위치: ${p.address || "[확인 필요]"} / ${p.location || ""}`,
+    `과목: ${(p.subjects ?? []).join(", ")}`, `강점: ${p.strengths || ""}`, `운영시간: ${p.hours || "[확인 필요]"}`,
+    `상담 방법: ${p.contact || "[확인 필요]"}`, `브랜드 태그: ${(p.brandTags ?? ["팔로"]).join(", ")}`, p.notes ? `지점 메모: ${p.notes}` : "",
+  ];
+};
+const kstToday = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 
 // ── 하루 제한·기록 ──
 const kstMidnight = () => { const k = new Date(Date.now() + 9 * 3600e3); k.setUTCHours(0, 0, 0, 0); return new Date(k.getTime() - 9 * 3600e3).toISOString(); };
@@ -128,9 +139,7 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
   const p = team.profile as Record<string, any>;
   const lines = [
     `오늘: ${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)}`,
-    `# 지점`, `지점명: ${p.display || team.name}`, `주소·위치: ${p.address || "[확인 필요]"} / ${p.location || ""}`,
-    `과목: ${(p.subjects ?? []).join(", ")}`, `강점: ${p.strengths || ""}`, `운영시간: ${p.hours || "[확인 필요]"}`,
-    `상담 방법: ${p.contact || "[확인 필요]"}`, `브랜드 태그: ${(p.brandTags ?? ["팔로"]).join(", ")}`, p.notes ? `지점 메모: ${p.notes}` : "",
+    ...profileLines(team),
     `# 이번 글`, `작성 방식: ${o.mode === "topic" ? "매니저가 준 주제로 작성 (사진은 보조)" : "사진을 보고 내용을 잡아 작성"}`,
     o.topic ? `주제/메모: ${o.topic}` : "", o.facts ? `확인된 사실(이것만 숫자·후기로 쓸 수 있음): ${o.facts}` : "확인된 사실: 없음 → 숫자·후기·일정은 [확인 필요]로",
     `과목: ${o.subject || "지점 과목 중 사진·주제에 맞는 것"}`,
@@ -165,6 +174,36 @@ async function convert(who: Who, team: Team, b: { title?: string; body?: string 
     [{ type: "text", text: `지점: ${p.display || team.name} (${p.location || p.address || ""})\n상담: ${p.contact || "[확인 필요]"}\n\n제목: ${b.title ?? ""}\n\n${b.body.slice(0, 12000)}` }],
     CONVERT_SCHEMA, "low");
   return { channels: out, quota: await record(who, team.id, "convert", usage) };
+}
+
+// ── sns: 사진·주제 → 공통 원고 + 인스타·구글·네이버·당근 (게시물 탭) ──
+async function sns(who: Who, team: Team, b: { photos?: Photo[]; topic?: string; tone?: string }) {
+  await guard(team.id);
+  const photos = (b.photos ?? []).slice(0, 10), topic = String(b.topic ?? "").trim();
+  if (!photos.length && !topic) throw new HttpError(400, "사진을 올리거나 주제를 적어 주세요");
+  const [recent, others] = await Promise.all([
+    admin.from("sns_posts").select("topic, draft").eq("team_id", team.id).order("created_at", { ascending: false }).limit(20),
+    admin.from("sns_posts").select("channels").neq("team_id", team.id).order("created_at", { ascending: false }).limit(6),
+  ]);
+  const mine = (recent.data ?? []).map((r) => r.topic || String(r.draft).split("\n")[0]).filter(Boolean);
+  const naver = (others.data ?? []).map((r: any) => r.channels?.naver).filter((n: any) => n?.body);
+  const lines = [
+    `오늘: ${kstToday()}`,
+    ...profileLines(team),
+    `# 이번 게시물`,
+    topic ? `주제/메모: ${topic}` : "주제 없음 → 사진을 보고 내용을 잡아라",
+    `어투: ${SNS_TONES[b.tone ?? ""] ?? SNS_TONES.friendly}`,
+    `사진: ${photos.length}장 (아래 순서 = 게시 순서)${photos.length ? "" : " — 사진 없이 문구만"}`,
+    mine.length ? `# 이 지점 최근 게시물 (겹치지 않게)\n${mine.map((t) => `- ${String(t).slice(0, 80)}`).join("\n")}` : "",
+    naver.length ? `# 다른 지점 최근 네이버 소식 (구성을 다르게)\n${naver.map((n: any) => `- ${n.title}: ${String(n.body).slice(0, 100).replace(/\s+/g, " ")}`).join("\n")}` : "",
+  ].filter(Boolean).join("\n");
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [{ type: "text", text: lines }];
+  photos.forEach((ph, i) => {
+    content.push({ type: "text", text: `사진 ${i + 1}${ph.note ? ` (매니저 메모: ${ph.note})` : ""}` });
+    content.push({ type: "image", source: { type: "base64", media_type: ph.media_type as "image/jpeg", data: ph.data } });
+  });
+  const { out, usage } = await ask(sys(SNS_SYSTEM), content, SNS_SCHEMA, "low");
+  return { result: out, quota: await record(who, team.id, "sns", usage) };
 }
 
 // ── style: 블로그 URL → 스타일 프리셋 저장 ──
@@ -218,18 +257,24 @@ async function keywords(who: Who, team: Team, b: { hints?: string[] }) {
 
 // ── similar: 전 지점 최근 글과 겹침 (3글자 조각 자카드) ──
 const shingles = (s: string) => { const t = s.replace(/\s+/g, "").replace(/[^\p{L}\p{N}]/gu, ""), set = new Set<string>(); for (let i = 0; i + 3 <= t.length; i++) set.add(t.slice(i, i + 3)); return set; };
-async function similar(team: Team, b: { text?: string; exclude_id?: number }) {
+async function similar(team: Team, b: { text?: string; exclude_id?: number; channel?: string }) {
   const mine = shingles(String(b.text ?? ""));
   if (mine.size < 50) return { matches: [] };
+  const naver = b.channel === "naver";
   const [posts, teams] = await Promise.all([
-    admin.from("blog_posts").select("id, team_id, title, body, created_at").order("created_at", { ascending: false }).limit(80),
+    naver
+      ? admin.from("sns_posts").select("id, team_id, channels, created_at").neq("team_id", team.id).order("created_at", { ascending: false }).limit(80)
+      : admin.from("blog_posts").select("id, team_id, title, body, created_at").order("created_at", { ascending: false }).limit(80),
     admin.from("teams").select("id, name"),
   ]);
   const tn = Object.fromEntries((teams.data ?? []).map((t) => [t.id, t.name]));
-  const matches = (posts.data ?? []).filter((p) => p.id !== b.exclude_id).map((p) => {
+  const rows = (posts.data ?? []).map((p: any) => naver
+    ? { id: p.id, team_id: p.team_id, created_at: p.created_at, title: p.channels?.naver?.title ?? "", body: `${p.channels?.naver?.title ?? ""}\n${p.channels?.naver?.body ?? ""}` }
+    : p);
+  const matches = rows.filter((p: any) => p.id !== b.exclude_id).map((p: any) => {
     const o = shingles(p.body); let inter = 0; for (const x of mine) if (o.has(x)) inter++;
     return { id: p.id, title: p.title, team: tn[p.team_id] ?? "", same_team: p.team_id === team.id, date: p.created_at.slice(0, 10), score: Math.round(inter / (mine.size + o.size - inter || 1) * 100) };
-  }).sort((a, c) => c.score - a.score).slice(0, 3);
+  }).sort((a: any, c: any) => c.score - a.score).slice(0, 3);
   return { matches };
 }
 
