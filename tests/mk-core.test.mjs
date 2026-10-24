@@ -188,6 +188,15 @@ test("normalize: 원화 파일은 currency KRW", () => {
   assert.equal(MK.normalize("광고 이름,일,지출 금액 (KRW)\nA,2026-10-20,1000").currency, "KRW");
 });
 
+test("sanitizeLead: 전산 신규 회신 실제 상태값 (띄어쓰기 포함)", () => {
+  const s = (status) => MK.sanitizeLead({ source_key: "2026-10-24T19:35|A|0", ad_name: "A", lead_date: "2026-10-24", status }).lead?.status;
+  assert.equal(s("진행 중"), "lead");
+  assert.equal(s("최후 통첩"), "lead");
+  assert.equal(s("예약 확정"), "consult");
+  assert.equal(s("전화상 안함"), "lost");
+  assert.equal(s("등록"), "enroll");
+});
+
 test("sanitizeLead: 긴 숫자 리드 번호는 전화번호로 오인하지 않음", () => {
   assert.equal(MK.sanitizeLead({ source_key: "90106123456789", ad_name: "A", lead_date: "2026-10-20", status: "lead" }).ok, true);
   assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "lead", subject: "01012345678" }).ok, false);
