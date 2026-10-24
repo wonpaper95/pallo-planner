@@ -89,3 +89,4 @@ body:not(.blv) #blogView { display: none; }
   #blogView { padding: 10px 10px 80px; } .blpaper { padding: 12px; } .blk .tools { display: flex; }
   .blacts { position: static; } .blacts .btn { flex: 1 1 45%; padding: 8px 10px; font-size: 14px; }
 }
+.blpref { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); } .blpref .btn { margin-right: 4px; }
