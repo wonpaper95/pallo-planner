@@ -354,7 +354,7 @@ async function generate() {
   if (o.mode === "topic" && !o.topic.trim()) return toast("주제를 적어 주세요");
   if (BL.post && !confirm(`지금 시안을 새 시안으로 바꿀까요?${BL.quota ? ` (오늘 남은 ${BL.quota.limit - BL.quota.used}회)` : ""}`)) return;
   const preset = o.preset === "auto" ? recommend(o)[0] : o.preset;
-  const btn = $b("#blGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초~1분)";
+  const btn = $b("#blGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초 안팎)";
   $b("#blGoNote").textContent = "사진을 보고 → 초안 → 편집장 시점 점검 → 수정까지 한 번에 해요";
   try {
     const r = await call("write", { photos: BL.photos.map((p) => ({ data: p.ai, media_type: "image/jpeg", note: p.note })), options: { ...o, preset } });

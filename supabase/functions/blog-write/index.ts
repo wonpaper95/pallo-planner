@@ -149,7 +149,9 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     content.push({ type: "text", text: `사진 ${i + 1}${ph.note ? ` (매니저 메모: ${ph.note})` : ""}` });
     content.push({ type: "image", source: { type: "base64", media_type: ph.media_type as "image/jpeg", data: ph.data } });
   });
-  const { out, usage } = await ask(sys(COMMON, `# 스타일 프리셋: ${preset.name}\n${preset.rules}`), content, POST_SCHEMA, "medium");
+  // 글쓰기 깊이: 서버 실행 시간 제한(무료 150초) 때문에 비밀값 BLOG_WRITE_EFFORT 로 조절 (low | medium)
+  const effort = Deno.env.get("BLOG_WRITE_EFFORT") === "medium" ? "medium" : "low";
+  const { out, usage } = await ask(sys(COMMON, `# 스타일 프리셋: ${preset.name}\n${preset.rules}`), content, POST_SCHEMA, effort);
   out.blocks = (out.blocks ?? []).map((x: any) => ({ ...x, photo: x.photo > 0 && x.photo <= photos.length ? x.photo : 0 }));
   return { post: out, quota: await record(who, team.id, "write", usage) };
 }
