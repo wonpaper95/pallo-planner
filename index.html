@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610242009">
+<meta name="app-version" content="202610242130">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -239,12 +239,12 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 /* 월 달력 */
 /* 주간 | 월간 전환 탭 */
 .seg { position: sticky; top: 53px; z-index: 4; display: flex; justify-content: center; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
-.seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; max-width: 100%; overflow-x: auto; }
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
-@media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } .seg div { max-width: 100%; overflow-x: auto; } } /* 탭 5개 → 폰에서 한 줄 */
+@media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 7개(현황은 대표만) → 폰에서 한 줄, 넘치면 .seg div 안에서만 가로 스크롤 */
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.psv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -416,6 +416,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="blog.css?v=202610242009">
 <link rel="stylesheet" href="photo.css?v=202610242009">
 <link rel="stylesheet" href="post.css?v=202610242009">
+<link rel="stylesheet" href="marketing.css?v=202610242130">
 </head>
 <body>
 
@@ -445,7 +446,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="post">게시물</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -476,6 +477,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="boardView"></section>
   <section id="salesView"></section>
   <section id="blogView"></section>
+  <section id="mkView"></section>
   <section id="postView"></section>
 </div>
 
@@ -633,6 +635,7 @@ async function boot() {
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
   if (view === "sales") window.SL?.load();
   if (view === "blog") window.BL?.load();
+  if (view === "mk") window.MK?.load();
   if (view === "post") window.PS?.load();
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
@@ -1190,11 +1193,12 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("psv", v === "post");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
   if (v === "blog" && me && window.BL) BL.load();
+  if (v === "mk" && me && window.MK) MK.load();
   if (v === "post" && me && window.PS) PS.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
@@ -1719,6 +1723,8 @@ boot();
 <script src="sales.js?v=202610242009"></script>
 <script src="photo.js?v=202610242009"></script>
 <script src="blog.js?v=202610242009"></script>
+<script src="mk-core.js?v=202610242130"></script>
+<script src="marketing.js?v=202610242130"></script>
 <script src="sns-core.js?v=202610242009"></script>
 <script src="post.js?v=202610242009"></script>
 </body>
