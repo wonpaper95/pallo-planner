@@ -42,3 +42,12 @@ async function __mkJeonsan(cutoff, { maxPages = 40, detailWait = 1200 } = {}) {
   }
   return { count: out.length, pages, leads: out };
 }
+
+// javascript_tool 결과는 약 2,000자에서 잘린다 → 광고명은 번호로, 상태는 한 글자로 줄여 40줄씩 받는다.
+// 1) `__mkPack().ads` (광고명 목록)  2) `__mkPack(0, 40).r`, `__mkPack(40, 80).r` … 빈 배열이 나올 때까지.
+// 줄 형식 "MM-DD HH:MM~광고번호~상태[~순번]" (상태 L=lead C=consult X=lost E=enroll). 연도는 대상 주의 연도.
+function __mkPack(from = 0, to = 0) {
+  const L = window.__mkLast?.leads ?? [], ads = [...new Set(L.map((l) => l.ad_name))];
+  const st = { "진행 중": "L", "최후 통첩": "L", "예약 확정": "C", "전화상 안함": "X", 등록: "E" };
+  return { ads: to ? undefined : ads, r: L.slice(from, to || 0).map((l) => { const [t, , n] = l.source_key.split("|"); return `${t.slice(5).replace("T", " ")}~${ads.indexOf(l.ad_name)}~${st[l.status] ?? l.status}${n !== "0" ? `~${n}` : ""}`; }) };
+}

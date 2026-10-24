@@ -73,6 +73,12 @@
 ### Supabase
 스킬이 결과를 쓰고 플래너가 읽는 공용 저장소. 촬영 컷·AI 컷·완성본은 Storage. 메타 토큰은 **Supabase secret**(채팅에 붙여넣지 않기). 예약 자동 게시는 Edge Function + 스케줄.
 
+### 구현 위치 (0~1단계)
+- 계산: `mk-core.js` (테스트 `node --test 'tests/*.test.mjs'`) · 화면: `marketing.js` / `marketing.css` · DB: `supabase/migrations/20261025120000_marketing.sql`
+- 스킬: `~/.claude/skills/pallo-meta-analyze/SKILL.md` → 스크립트 `scripts/mk/*.mjs` (서비스 키: `~/.config/pallo/marketing.env`), 전산 읽기 스니펫 `scripts/mk/jeonsan-extract.js`
+- 전산 화면 구조: `docs/meta-marketing/jeonsan-leads.md`
+- 광고 계정: 실제 광고는 **"팔로 대구 동성로점" 광고 계정(3542016502769477)** 하나에서 4개 지점이 같이 돈다. 광고관리자 열 구성 **"팔로 마케팅 분석용"**(캠페인 이름 포함)으로 내보낸다. 금액 USD.
+
 ## 만드는 순서
 
 | 단계 | 내용 | 메타 API 필요 |
