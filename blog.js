@@ -83,7 +83,7 @@ async function call(action, body = {}) {
 function shell() {
   V().dataset.ready = 1;
   V().innerHTML = `<div class="blbar"><h2>✍️ 블로그</h2><select id="blTeam" class="hidden"></select><span id="blTeamName" class="mut"></span>
-    <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button></div>
+    <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button><button data-bt="fb">개선사항 보내기</button></div>
     <span id="blQuota" class="mut"></span></div>
   <div id="blBody"></div>
   <input type="file" id="blFile" accept="image/*" multiple hidden>
@@ -142,7 +142,30 @@ function renderTab() {
   if (BL.tab === "new") renderNew();
   else if (BL.tab === "list") renderList();
   else if (BL.tab === "profile") renderProfile();
+  else if (BL.tab === "fb") renderFb();
   else renderUsage();
+}
+
+// ── 개선사항 보내기: 플래너 🐞 신고·제안(feedback)에 kind=blog 로 넣음 → 대표 푸시·카톡 + 맥미니 예약 작업이 메일·작업 브랜치 ──
+async function renderFb() {
+  $b("#blBody").innerHTML = `<div class="card blset"><h3 style="margin:0 0 4px">💬 블로그 개선사항 보내기</h3>
+    <p class="mut" style="margin:0">불편한 점이나 있으면 좋을 기능을 적어 주세요. 대표님께 바로 알림이 가고, 반영되면 아래에서 "반영됨"으로 바뀌어요.</p>
+    <div class="blseg" id="blFbKind" style="margin-top:12px"><button type="button" data-fbk="bug" class="on">🐞 불편·오류</button><button type="button" data-fbk="idea">💡 아이디어</button></div>
+    <textarea id="blFbBody" style="min-height:7em;margin-top:10px" placeholder="예) 사진이 10장 넘으면 시안이 늦게 나와요 / 제목에 지점명이 자동으로 들어가면 좋겠어요"></textarea>
+    <div style="text-align:right;margin-top:10px"><button type="button" class="btn" id="blFbSend">보내기</button></div></div>
+    <h3 style="margin:18px 0 8px">${isBoss && !previewTeam ? "받은 블로그 개선사항" : "내가 보낸 개선사항"}</h3><div class="bllist" id="blFbList"><div class="mut">불러오는 중…</div></div>`;
+  const { data, error } = await sb.rpc("feedback_list"); if (fail(error)) return;
+  const list = (data ?? []).filter((x) => x.kind === "blog");
+  $b("#blFbList").innerHTML = list.length ? list.map((x) => `<div class="card"><div class="t"><b style="font-weight:500;white-space:pre-wrap">${esc(x.body)}</b>
+      <span class="mut">${x.created_at.slice(0, 10)}${x.who ? ` · ${esc(x.who)}${x.team ? `(${esc(x.team)})` : ""}` : ""}</span></div>
+      <span class="blbadge ${x.status === "new" ? "" : "pub"}">${x.status === "new" ? "확인 중" : "✓ 반영됨"}</span></div>`).join("")
+    : `<div class="card blempty">아직 보낸 개선사항이 없어요.</div>`;
+}
+async function sendFb() {
+  const t = $b("#blFbBody").value.trim(); if (t.length < 2) return toast("내용을 적어 주세요");
+  const k = $b("#blFbKind .on")?.dataset.fbk === "idea" ? "💡 아이디어" : "🐞 불편·오류";
+  const { error } = await sb.from("feedback").insert({ kind: "blog", body: `✍️ 블로그 ${k}: ${t}` }); if (fail(error)) return;
+  toast("보냈어요. 대표님께 알림이 가요"); renderFb();
 }
 
 // ── 새 글: 입력 ──
@@ -665,6 +688,8 @@ function wire() {
       if (!fail(error)) { if (BL.postId === +d.delp) { BL.postId = null; } renderList(); } return;
     }
     if (t.id === "blPfSave") return saveProfile();
+    if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
+    if (t.id === "blFbSend") return sendFb();
   });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset, X = BL.post;
