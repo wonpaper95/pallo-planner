@@ -287,7 +287,8 @@ async function openPost(id) {
   const got = await PHOTO.fromUrls(data.photos.map((x) => pub(x.path)));
   if (got.includes(null)) toast("불러오지 못한 사진이 있어요 (지워졌을 수 있어요)");
   PS.photos = got.map((p, i) => p && Object.assign(p, { path: data.photos[i].path, pathOf: p.url })).filter(Boolean);
-  PS.post = { id: data.id, savedPaths: data.photos.map((x) => x.path), topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
+  // 못 불러온 사진은 목록에 넣지 않는다. 넣으면 다음 저장 때 일시적 실패로 파일이 지워진다
+  PS.post = { id: data.id, savedPaths: PS.photos.map((x) => x.path), topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
   PS.topic = data.topic; PS.tone = data.tone; PS.ch = "instagram";
   await loadJobs(); PS.sel = new Set(PS.jobs.map((j) => j.channel));
   PS.tab = "make"; renderTab();
