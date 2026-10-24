@@ -236,8 +236,46 @@ async function photosOut() {
   await PHOTO.share(list, `${PS.teamName}_${chOf(PS.ch).label.replace(/^\S+\s/, "")}_${kstDay()}_사진${list.length}장.zip`);
 }
 
-// ── 목록 (Task 6 에서 채움) ──
-function renderList() { $p("#psBody").innerHTML = `<div class="card blempty">목록은 다음 단계에서 붙여요.</div>`; }
+// ── 목록: 내 지점 게시물 + 채널별 상태 ──
+const ORDER = Object.fromEntries(C.CHANNELS.map((c, i) => [c.key, i]));
+async function renderList() {
+  $p("#psBody").innerHTML = `<div class="mut">불러오는 중…</div>`;
+  const { data, error } = await sb.from("sns_posts").select("id, topic, draft, photos, created_at, sns_jobs(channel, status, run_at, result_url, error_ko)")
+    .eq("team_id", PS.team).order("created_at", { ascending: false }).limit(60);
+  if (fail(error)) return;
+  $p("#psBody").innerHTML = data.length ? `<div class="bllist">${data.map((x) => {
+    const jobs = [...x.sns_jobs].sort((a, b) => ORDER[a.channel] - ORDER[b.channel]);
+    return `<div class="card">
+      ${x.photos?.[0] ? `<img class="psthumb" src="${esc(pub(x.photos[0].path))}" alt="" loading="lazy">` : `<div class="psthumb">📝</div>`}
+      <div class="t"><b>${esc(C.titleOf(x))}</b><span class="mut">${x.created_at.slice(0, 10)} · 사진 ${x.photos?.length ?? 0}장</span>
+        <div class="psbadges">${jobs.map((j) => { const b = C.badge(j); return j.result_url
+          ? `<a class="blbadge ${b.cls}" href="${esc(j.result_url)}" target="_blank" rel="noopener">${esc(chOf(j.channel).label)} ${esc(b.text)} ↗</a>`
+          : `<span class="blbadge ${b.cls}">${esc(chOf(j.channel).label)} ${esc(b.text)}</span>`; }).join("") || `<span class="mut">고른 채널 없음</span>`}</div></div>
+      <button type="button" class="btn ghost small" data-open="${x.id}">열기</button><button type="button" class="btn ghost small" data-delp="${x.id}">삭제</button></div>`; }).join("")}</div>`
+    : `<div class="card blempty">아직 만든 게시물이 없어요. [만들기]에서 문구를 만들면 여기에 쌓여요.</div>`;
+}
+async function openPost(id) {
+  const { data, error } = await sb.from("sns_posts").select("*").eq("id", id).single();
+  if (fail(error)) return;
+  $p("#psBody").innerHTML = `<div class="mut">사진 불러오는 중…</div>`;
+  const got = await PHOTO.fromUrls(data.photos.map((x) => pub(x.path)));
+  if (got.includes(null)) toast("불러오지 못한 사진이 있어요 (지워졌을 수 있어요)");
+  PS.photos = got.map((p, i) => p && Object.assign(p, { path: data.photos[i].path, pathOf: p.url })).filter(Boolean);
+  PS.post = { id: data.id, topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
+  PS.topic = data.topic; PS.tone = data.tone; PS.ch = "instagram";
+  await loadJobs(); PS.sel = new Set(PS.jobs.map((j) => j.channel));
+  PS.tab = "make"; renderTab();
+}
+async function deletePost(id) {
+  if (!confirm("이 게시물을 지울까요? 올려 둔 사진 파일도 같이 지워요. 되돌릴 수 없어요.")) return;
+  const row = (await sb.from("sns_posts").select("photos").eq("id", id).single()).data;
+  const paths = (row?.photos ?? []).map((x) => x.path);
+  if (paths.length) { const { error } = await sb.storage.from("sns").remove(paths); if (error) console.warn("사진 파일 지우기 실패", error); }
+  const { error } = await sb.from("sns_posts").delete().eq("id", id);
+  if (fail(error)) return;
+  if (PS.post?.id === id) reset();
+  toast("지웠어요"); renderList();
+}
 
 // ── 이벤트 (한 번만 연결) ──
 function wire() {
