@@ -1,0 +1,10 @@
+/* 🖼 사진 편집 창 (photo.js). body 에 붙는 dialog 라 어느 탭에서 열어도 같은 모양 */
+#phEditDlg { width: min(980px, calc(100vw - 24px)); }
+#phEditDlg .cv { position: relative; background: #111; border-radius: 8px; overflow: hidden; touch-action: none; }
+#phEditDlg canvas { display: block; max-width: 100%; margin: 0 auto; cursor: crosshair; }
+#phEditDlg .tb { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
+#phEditDlg .tb input[type=range] { width: 120px; }
+#phEditDlg .mut { color: var(--sub); font-size: 12.5px; }
+#phEditDlg .btn.small { padding: 5px 9px; font-size: 13px; }
+#phEditDlg .blseg button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
+#phEditDlg .blseg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }

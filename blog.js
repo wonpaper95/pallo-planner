@@ -11,13 +11,9 @@ const AGES = ["20대", "30대", "40대", "50대 이상"].map((a) => [a, a]);
 const READERS = [["worker", "직장인"], ["student", "대학생·취준생"], ["parent", "학부모"], ["senior", "시니어"], ["general", "성인 누구나"]];
 const TONES = [["friendly", "친근한 존댓말"], ["warm", "다정한 존댓말"], ["expert", "전문가 정보체"], ["fun", "유머 섞인"], ["casual", "수다체 반말"]];
 const CONCEPTS = [["class", "수업 현장"], ["review", "수강 후기"], ["event", "이벤트·모집"], ["tip", "공부 팁"], ["daily", "원장·강사 일상"], ["exam", "시험 정보"], ["exchange", "1:1 언어교환"], ["opening", "오픈 준비"]];
-const RATIOS = { orig: 0, "4:3": 4 / 3, "1:1": 1, "3:4": 3 / 4, "16:9": 16 / 9 };
 const BANNED = ["컬컴", "CULCOM", "culcom", "100%", "무조건", "보장", "1등", "1위", "최고", "최저가", "완벽"];
 const CLICHES = ["알아보겠습니다", "정리해보았습니다", "결론적으로", "이처럼", "다양한", "효과적인", "핵심은"];
 const SUBJ_RE = { 영어: /영어|오픽|토익|토스|토플|아이엘츠|IELTS|프리토킹|비즈니스/, 일본어: /일본어|JLPT|JPT|워홀/, 중국어: /중국어|HSK/, 스페인어: /스페인어|DELE|dele|FLEX|SIELE/ };
-const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
-const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
-const JSZIP = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
 
 // 2026-10-24 키워드 리서치로 채운 지점 기본값 (지점 설정에서 저장하면 그 값을 씀)
 const STRENGTH = "소수정예 수업, 1:1 언어교환, 토스·토플·IELTS·오픽·JLPT 등 시험 준비";
@@ -64,9 +60,9 @@ const pad = (n) => String(n).padStart(2, "0");
 const len = (s) => [...String(s ?? "")].length;
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
-const loadScript = (src) => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); });
+const copy = PHOTO.copy; // 사진·복사 도구는 photo.js (게시물 탭과 공용)
 const P = () => BL.profile ?? {};
-let seq = 0, drag = null;
+let drag = null;
 
 async function call(action, body = {}) {
   const { data, error } = await sb.functions.invoke("blog-write", { body: { action, team_id: BL.team, ...body } });
@@ -87,15 +83,6 @@ function shell() {
     <span id="blQuota" class="mut"></span></div>
   <div id="blBody"></div>
   <input type="file" id="blFile" accept="image/*" multiple hidden>
-  <dialog id="blEditDlg"><h3 style="margin:0 0 8px">🖼 사진 편집 <small class="mut" id="blEdNo"></small></h3>
-    <div class="tb"><span class="mut">비율</span><span class="blseg" id="blEdRatio">${Object.keys(RATIOS).map((r) => `<button type="button" data-ratio="${r}">${r === "orig" ? "원본" : r}</button>`).join("")}</span></div>
-    <div class="tb"><span class="blseg" id="blEdMode"><button type="button" data-emode="blur">🟦 모자이크 그리기</button><button type="button" data-emode="pan">✋ 자르기 위치</button></span>
-      <button type="button" class="btn ghost small" id="blEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="blEdClear">모자이크 지우기</button>
-      <span class="mut">밝기</span><input type="range" id="blEdBright" min="-40" max="40" value="0"><span class="mut">대비</span><input type="range" id="blEdContrast" min="-40" max="40" value="0"></div>
-    <div class="cv"><canvas id="blEdCv"></canvas></div>
-    <div class="mut" style="margin-top:6px">모자이크: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요.</div>
-    <label>사진 메모 (AI에게 알려줄 내용, 선택)</label><input id="blEdNote" placeholder="예) 토요반 프리토킹 시간, 원어민 강사">
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn ghost" id="blEdCancel">취소</button><button type="button" class="btn" id="blEdSave">적용</button></div></dialog>
   <dialog id="blConvDlg" class="wide"><h3 style="margin:0 0 8px">🔁 다른 채널용</h3><div id="blConvBody"></div>
     <div style="text-align:right;margin-top:12px"><button type="button" class="btn ghost" onclick="this.closest('dialog').close()">닫기</button></div></dialog>
   <dialog id="blStyleDlg"><h3 style="margin:0 0 4px">➕ 블로그 스타일 추가</h3><p class="mut" style="margin:0">잘 쓴다고 생각하는 네이버 블로그 글 주소를 넣으면 구조·톤·사진 리듬만 분석해서 프리셋으로 저장해요. 문장은 베끼지 않아요.</p>
@@ -230,160 +217,20 @@ function renderChips() {
   el.innerHTML = all.slice(0, 28).map((k) => `<button type="button" class="blchip ${k === o.main_keyword ? "main" : o.sub_keywords.includes(k) ? "sub" : ""}" data-chip="${esc(k)}" title="네이버 월간 검색수">${esc(k)}${vol(k) ? ` <small>· ${vol(k).toLocaleString()}</small>` : ""}</button>`).join("");
 }
 
-// ── 사진: 읽기·편집·굽기 ──
-const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-async function addFiles(files) {
-  const added = [];
-  for (const f of files) {
-    if (!/^image\//.test(f.type) && !/\.(heic|heif)$/i.test(f.name)) continue;
-    try {
-      const img = await loadImg(URL.createObjectURL(f));
-      const p = { id: ++seq, name: f.name, img, note: "", faced: false, edits: { ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast: 0, blurs: [] } };
-      BL.photos.push(p); added.push(p);
-    } catch { toast(`${f.name}: 이 형식은 못 읽어요 (HEIC면 JPG로 바꿔서 올려 주세요)`); }
-  }
-  await Promise.all(added.map(bake));
-  renderThumbs(); presetWhy();
-}
-function cropRect(p) {
-  const W = p.img.naturalWidth, H = p.img.naturalHeight, r = RATIOS[p.edits.ratio];
-  if (!r) return { x: 0, y: 0, w: W, h: H };
-  let w = W, h = W / r; if (h > H) { h = H; w = H * r; }
-  return { x: (W - w) * p.edits.ox, y: (H - h) * p.edits.oy, w, h };
-}
-function mosaic(ctx, x, y, w, h) {
-  if (w < 2 || h < 2) return;
-  const cell = Math.max(6, Math.round(Math.max(w, h) / 9)), t = document.createElement("canvas");
-  t.width = Math.max(1, Math.ceil(w / cell)); t.height = Math.max(1, Math.ceil(h / cell));
-  t.getContext("2d").drawImage(ctx.canvas, x, y, w, h, 0, 0, t.width, t.height);
-  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, t.width, t.height, x, y, w, h); ctx.restore();
-}
-function tone(ctx, e) {
-  if (!e.bright && !e.contrast) return;
-  const { width: w, height: h } = ctx.canvas, d = ctx.getImageData(0, 0, w, h), a = d.data;
-  const b = e.bright * 2.2, c = (100 + e.contrast) / 100;
-  for (let i = 0; i < a.length; i += 4) for (let k = 0; k < 3; k++) a[i + k] = Math.max(0, Math.min(255, (a[i + k] - 128) * c + 128 + b));
-  ctx.putImageData(d, 0, 0);
-}
-// 편집 반영한 사진 (crop: 자르기 적용 여부)
-function draw(p, maxSide, e = p.edits, crop = true) {
-  const W = p.img.naturalWidth, H = p.img.naturalHeight, c = crop ? cropRect({ ...p, edits: e }) : { x: 0, y: 0, w: W, h: H };
-  const s = Math.min(1, maxSide / Math.max(c.w, c.h)), cv = document.createElement("canvas");
-  cv.width = Math.round(c.w * s); cv.height = Math.round(c.h * s);
-  const ctx = cv.getContext("2d"); ctx.drawImage(p.img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
-  e.blurs.forEach((r) => mosaic(ctx, (r.x - c.x) * s, (r.y - c.y) * s, r.w * s, r.h * s));
-  tone(ctx, e);
-  return { cv, s, c };
-}
-async function bake(p) {
-  const big = draw(p, 2000).cv;
-  p.blob = await new Promise((ok) => big.toBlob(ok, "image/jpeg", 0.9));
-  if (p.url) URL.revokeObjectURL(p.url);
-  p.url = URL.createObjectURL(p.blob);
-  p.ai = draw(p, 1024).cv.toDataURL("image/jpeg", 0.8).split(",")[1];
-}
-
-// 얼굴 찾기: 전체 + 2×2 조각(작은 얼굴용)으로 돌리고 겹치는 건 합침
-let detector;
-async function faceDetector() {
-  if (detector) return detector;
-  const v = await import(`${MP}/vision_bundle.mjs`);
-  const fs = await v.FilesetResolver.forVisionTasks(`${MP}/wasm`);
-  detector = await v.FaceDetector.createFromOptions(fs, { baseOptions: { modelAssetPath: FACE_MODEL }, runningMode: "IMAGE", minDetectionConfidence: 0.35 });
-  return detector;
-}
-async function findFaces(p) {
-  const d = await faceDetector(), W = p.img.naturalWidth, H = p.img.naturalHeight, boxes = [];
-  const run = (sx, sy, sw, sh) => {
-    const k = Math.min(1, 1024 / Math.max(sw, sh)), cv = document.createElement("canvas");
-    cv.width = Math.round(sw * k); cv.height = Math.round(sh * k);
-    cv.getContext("2d").drawImage(p.img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
-    for (const det of d.detect(cv).detections) { const b = det.boundingBox; boxes.push({ x: sx + b.originX / k, y: sy + b.originY / k, w: b.width / k, h: b.height / k }); }
-  };
-  run(0, 0, W, H);
-  const tw = W * 0.6, th = H * 0.6;
-  for (const fx of [0, 0.4]) for (const fy of [0, 0.4]) run(W * fx, H * fy, tw, th);
-  const iou = (a, b) => { const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); return x * y / Math.min(a.w * a.h, b.w * b.h); };
-  const keep = [];
-  boxes.sort((a, b) => b.w * b.h - a.w * a.h).forEach((b) => { if (!keep.some((k) => iou(k, b) > 0.3)) keep.push(b); });
-  return keep.map((b) => ({ x: Math.max(0, b.x - b.w * 0.25), y: Math.max(0, b.y - b.h * 0.35), w: b.w * 1.5, h: b.h * 1.6 }));
-}
+// ── 사진: 읽기·편집은 photo.js(PHOTO) ──
+async function addFiles(files) { BL.photos.push(...await PHOTO.fromFiles(files)); renderThumbs(); presetWhy(); }
 async function faceAll() {
-  const todo = BL.photos.filter((p) => !p.faced); if (!todo.length) return toast("모든 사진을 이미 확인했어요");
+  if (!BL.photos.some((p) => !p.faced)) return toast("모든 사진을 이미 확인했어요");
   const btn = $b("#blFaceAll"); if (btn) { btn.disabled = true; btn.textContent = "🙂 얼굴 찾는 중…"; }
   try {
-    let n = 0;
-    for (const p of todo) { const f = await findFaces(p); p.edits.blurs.push(...f); p.faced = true; n += f.length; await bake(p); }
+    const n = await PHOTO.faceAll(BL.photos);
     toast(n ? `얼굴 ${n}개를 모자이크했어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "찾은 얼굴이 없어요. 작은 얼굴은 [편집]에서 확인해 주세요");
   } catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요. [편집]에서 직접 칠해 주세요"); }
   renderThumbs(); if (BL.post) renderOut();
 }
-
-// 사진 편집 창
-const ED = { p: null, e: null, mode: "blur", s: 1, drag: null };
 function openEditor(id) {
   const p = BL.photos.find((x) => x.id === id); if (!p) return;
-  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur";
-  $b("#blEdNo").textContent = `사진 ${pad(BL.photos.indexOf(p) + 1)}`;
-  $b("#blEdBright").value = ED.e.bright; $b("#blEdContrast").value = ED.e.contrast; $b("#blEdNote").value = p.note;
-  $b("#blEditDlg").showModal(); edDraw();
-}
-function edDraw() {
-  const { p, e } = ED, maxW = Math.min(940, window.innerWidth - 60), maxH = window.innerHeight * 0.55;
-  const s = Math.min(maxW / p.img.naturalWidth, maxH / p.img.naturalHeight, 1); ED.s = s;
-  const { cv: src } = draw(p, Math.max(p.img.naturalWidth, p.img.naturalHeight) * s, e, false);
-  const cv = $b("#blEdCv"); cv.width = src.width; cv.height = src.height;
-  const ctx = cv.getContext("2d"); ctx.drawImage(src, 0, 0);
-  const c = cropRect({ ...p, edits: e }), cx = c.x * s, cy = c.y * s, cw = c.w * s, ch = c.h * s;
-  ctx.fillStyle = "rgba(0,0,0,.55)";
-  ctx.fillRect(0, 0, cv.width, cy); ctx.fillRect(0, cy + ch, cv.width, cv.height - cy - ch); ctx.fillRect(0, cy, cx, ch); ctx.fillRect(cx + cw, cy, cv.width - cx - cw, ch);
-  ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(cx, cy, cw, ch);
-  ctx.setLineDash([5, 4]); ctx.strokeStyle = "#ffd400";
-  e.blurs.forEach((r) => ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s));
-  if (ED.drag?.rect) { const r = ED.drag.rect; ctx.strokeStyle = "#4dabf7"; ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s); }
-  ctx.setLineDash([]);
-  V().querySelectorAll("[data-ratio]").forEach((b) => b.classList.toggle("on", b.dataset.ratio === e.ratio));
-  V().querySelectorAll("[data-emode]").forEach((b) => b.classList.toggle("on", b.dataset.emode === ED.mode));
-}
-function edPoint(ev) { const r = $b("#blEdCv").getBoundingClientRect(), k = $b("#blEdCv").width / r.width; return { x: (ev.clientX - r.left) * k / ED.s, y: (ev.clientY - r.top) * k / ED.s }; }
-function wireEditor() {
-  const cv = $b("#blEdCv");
-  cv.onpointerdown = (ev) => { cv.setPointerCapture(ev.pointerId); const pt = edPoint(ev); ED.drag = { start: pt, last: pt, moved: false }; };
-  cv.onpointermove = (ev) => {
-    const d = ED.drag; if (!d) return; const pt = edPoint(ev);
-    if (Math.abs(pt.x - d.start.x) + Math.abs(pt.y - d.start.y) > 6 / ED.s) d.moved = true;
-    if (ED.mode === "blur") d.rect = { x: Math.min(d.start.x, pt.x), y: Math.min(d.start.y, pt.y), w: Math.abs(pt.x - d.start.x), h: Math.abs(pt.y - d.start.y) };
-    else {
-      const c = cropRect({ ...ED.p, edits: ED.e }), W = ED.p.img.naturalWidth, H = ED.p.img.naturalHeight;
-      if (W > c.w) ED.e.ox = Math.max(0, Math.min(1, ED.e.ox + (pt.x - d.last.x) / (W - c.w)));
-      if (H > c.h) ED.e.oy = Math.max(0, Math.min(1, ED.e.oy + (pt.y - d.last.y) / (H - c.h)));
-    }
-    d.last = pt; edDraw();
-  };
-  cv.onpointerup = () => {
-    const d = ED.drag; ED.drag = null; if (!d) return;
-    if (ED.mode === "blur") {
-      if (d.moved && d.rect.w > 4 && d.rect.h > 4) ED.e.blurs.push(d.rect);
-      else if (!d.moved) { const { x, y } = d.start, i = ED.e.blurs.findIndex((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h); if (i >= 0) ED.e.blurs.splice(i, 1); }
-    }
-    edDraw();
-  };
-  $b("#blEdRatio").onclick = (ev) => { const r = ev.target.dataset.ratio; if (r) { ED.e.ratio = r; edDraw(); } };
-  $b("#blEdMode").onclick = (ev) => { const m = ev.target.dataset.emode; if (m) { ED.mode = m; edDraw(); } };
-  $b("#blEdBright").oninput = (ev) => { ED.e.bright = +ev.target.value; edDraw(); };
-  $b("#blEdContrast").oninput = (ev) => { ED.e.contrast = +ev.target.value; edDraw(); };
-  $b("#blEdClear").onclick = () => { ED.e.blurs = []; edDraw(); };
-  $b("#blEdFace").onclick = async (ev) => {
-    ev.target.disabled = true; ev.target.textContent = "찾는 중…";
-    try { const f = await findFaces(ED.p); ED.e.blurs.push(...f); ED.faced = true; toast(f.length ? `얼굴 ${f.length}개를 찾았어요` : "찾은 얼굴이 없어요. 직접 칠해 주세요"); }
-    catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요"); }
-    ev.target.disabled = false; ev.target.textContent = "🙂 얼굴 자동 찾기"; edDraw();
-  };
-  $b("#blEdCancel").onclick = () => $b("#blEditDlg").close();
-  $b("#blEdSave").onclick = async () => {
-    const p = ED.p; p.edits = ED.e; p.note = $b("#blEdNote").value.trim(); p.faced = true; // 편집 창에서 직접 봤으면 확인한 것으로
-    await bake(p); $b("#blEditDlg").close(); renderThumbs(); if (BL.post) renderOut();
-  };
+  PHOTO.edit(p, { title: `사진 ${pad(BL.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); if (BL.post) renderOut(); } });
 }
 
 // ── 시안 만들기 ──
@@ -486,30 +333,11 @@ async function richHtml(embed) {
   out.push(`<p>${esc(tagsText())}</p>`);
   return out.join("");
 }
-// html 은 Promise 로 받는다: Safari 는 클릭 직후 await 없이 clipboard.write 를 불러야 해서 내용은 나중에 채움
-async function copy(text, html) {
-  try {
-    if (html && window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/html": html.then((h) => new Blob([h], { type: "text/html" })), "text/plain": new Blob([text], { type: "text/plain" }) })]);
-    else await navigator.clipboard.writeText(text);
-    return true;
-  } catch (e) {
-    console.warn("clipboard.write 실패 → 글자만 복사", e);
-    const t = document.createElement("textarea"); t.value = text; document.body.append(t); t.select();
-    const ok = document.execCommand("copy"); t.remove(); if (!ok) toast("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"); return ok;
-  }
-}
 async function photosOut() {
   const list = []; let n = 0;
-  BL.post.blocks.forEach((b) => { if (b.type === "photo") { n++; const p = photoOf(b.pid); if (p) list.push(new File([p.blob], `${pad(n)}.jpg`, { type: "image/jpeg" })); } });
+  BL.post.blocks.forEach((b) => { if (b.type === "photo") { n++; const p = photoOf(b.pid); if (p) list.push({ name: `${pad(n)}.jpg`, blob: p.blob }); } });
   if (!list.length) return toast("시안에 들어간 사진이 없어요");
-  if (/iPhone|iPad|Android/i.test(navigator.userAgent) && navigator.canShare?.({ files: list })) {
-    try { await navigator.share({ files: list }); return; } catch (e) { if (e.name === "AbortError") return; }
-  }
-  await loadScript(JSZIP);
-  const zip = new JSZip(); list.forEach((f) => zip.file(f.name, f));
-  const a = document.createElement("a"); a.href = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
-  a.download = `${BL.teamName}_${today()}_사진${list.length}장.zip`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast(`사진 ${list.length}장을 01, 02… 번호대로 받았어요`);
+  await PHOTO.share(list, `${BL.teamName}_${today()}_사진${list.length}장.zip`);
 }
 
 // ── 발행 전 점검 ──
@@ -605,9 +433,9 @@ async function renderUsage() {
     const mine = g.data.filter((x) => x.team_id === t.id), ai = mine.filter((x) => x.kind !== "keywords");
     const cost = mine.reduce((s, x) => s + +x.cost_usd, 0);
     return `<tr><td>${esc(t.name)}</td><td>${ai.filter((x) => x.created_at >= midnight).length} / <input type="number" min="0" max="200" data-lim="${t.id}" value="${lim[t.id] ?? 10}"></td>
-      <td>${mine.filter((x) => x.kind === "write").length}</td><td>${mine.filter((x) => x.kind === "convert" || x.kind === "style").length}</td><td>$${cost.toFixed(2)} <small class="mut">(약 ${Math.round(cost * 1400).toLocaleString()}원)</small></td></tr>`;
+      <td>${mine.filter((x) => x.kind === "write").length}</td><td>${mine.filter((x) => ["convert", "style", "sns"].includes(x.kind)).length}</td><td>$${cost.toFixed(2)} <small class="mut">(약 ${Math.round(cost * 1400).toLocaleString()}원)</small></td></tr>`;
   });
-  $b("#blBody").innerHTML = `<div class="card"><table class="blusage"><tr><th>지점</th><th>오늘 / 하루 제한</th><th>이번 달 글</th><th>변환·스타일</th><th>이번 달 AI 비용</th></tr>${rows.join("")}</table>
+  $b("#blBody").innerHTML = `<div class="card"><table class="blusage"><tr><th>지점</th><th>오늘 / 하루 제한</th><th>이번 달 글</th><th>변환·스타일·게시물</th><th>이번 달 AI 비용</th></tr>${rows.join("")}</table>
     <p class="mut">비용은 Claude API 토큰 단가로 계산한 추정치예요 (환율 1,400원). 하루 제한 숫자를 바꾸면 바로 저장돼요.</p></div>`;
 }
 
@@ -646,7 +474,6 @@ function wire() {
   $b("#blFile").onchange = (ev) => { addFiles([...ev.target.files]); ev.target.value = ""; };
   $b("#blTeam").onchange = (ev) => { BL.team = +ev.target.value; try { localStorage.setItem("blog-team", ev.target.value); } catch {} BL.profile = null; BL.post = null; BL.postId = null; BL.sim = null; BL.kw = null; BL.load(); };
   v.addEventListener("paste", pasteAsText);
-  wireEditor();
   v.addEventListener("click", async (ev) => {
     const t = ev.target, d = t.dataset ?? {}, X = BL.post;
     if (d.bt) { if (BL.tab === "new" && X) await savePost(true); BL.tab = d.bt; return renderTab(); }

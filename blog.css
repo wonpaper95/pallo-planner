@@ -82,11 +82,6 @@ body:not(.blv) #blogView { display: none; }
 .blusage input { width: 70px; text-align: right; }
 
 /* 사진 편집 */
-#blEditDlg { width: min(980px, calc(100vw - 24px)); }
-#blEditDlg .cv { position: relative; background: #111; border-radius: 8px; overflow: hidden; touch-action: none; }
-#blEditDlg canvas { display: block; max-width: 100%; margin: 0 auto; cursor: crosshair; }
-#blEditDlg .tb { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
-#blEditDlg .tb input[type=range] { width: 120px; }
 #blConvDlg textarea, #blStyleDlg textarea { width: 100%; min-height: 9em; }
 
 @media (max-width: 900px) {
