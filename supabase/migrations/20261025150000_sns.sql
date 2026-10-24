@@ -98,7 +98,7 @@ create policy sns_jobs_del on public.sns_jobs for delete
   using ((blog_is_admin() or team_id = blog_my_team()) and method = 'manual');
 
 -- 사진 버킷: 인스타·구글 API가 공개 https 주소로 가져가야 해서 공개. blog-temp 와 같은 패턴(JPEG, 무작위 이름, 자기 지점 폴더만).
--- 모자이크·자르기는 기기 안에서 끝낸 뒤 올리므로 원본 얼굴 사진은 올라오지 않는다. 정리는 4단계(끝난 뒤 7일).
+-- 올리기 전에 얼굴 자동 모자이크를 먼저 돌리고(실패하면 올리지 않음), 고쳐서 새로 올리면 예전 파일은 바로 지운다. 자동 모자이크가 놓친 얼굴은 매니저가 [편집]으로 확인. 끝난 게시물 정리는 4단계(끝난 뒤 7일).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('sns', 'sns', true, 10485760, array['image/jpeg'])
 on conflict (id) do nothing;

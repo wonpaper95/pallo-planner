@@ -116,17 +116,23 @@ async function faceAll() {
 async function generate() {
   if (!PS.photos.length && !PS.topic.trim()) return toast("사진을 올리거나 주제를 적어 주세요");
   if (PS.post && !confirm("지금 문구를 새로 만든 문구로 바꿀까요? (고친 내용은 사라져요)")) return;
+  const team = PS.team; // 기다리는 사이 대표가 지점을 바꾸면 결과를 버린다
   const btn = $p("#psGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초 안팎)";
   $p("#psGoNote").textContent = "공통 원고 → 인스타 · 구글 · 네이버 · 당근 순서로 다시 써요";
   try {
     const r = await call("sns", { photos: PS.photos.map((p) => ({ data: p.ai, media_type: "image/jpeg", note: p.note })), topic: PS.topic, tone: PS.tone });
     if (!r) return;
     setQuota(r.quota);
+    if (PS.team !== team) return;
     const n = C.normalizeAi(r.result);
     PS.post = { ...(PS.post ?? {}), topic: PS.topic, tone: PS.tone, draft: n.draft, channels: n.channels, self_review: n.self_review };
     renderOut(); await save(); renderOut();
     $p("#psOut").scrollIntoView({ behavior: "smooth", block: "start" });
-  } finally { btn.disabled = false; btn.textContent = "✨ 문구 만들기"; $p("#psGoNote").textContent = ""; }
+  } finally {
+    const b = $p("#psGo"), note = $p("#psGoNote"); // 화면이 다시 그려졌을 수 있어 다시 찾는다
+    if (b) { b.disabled = false; b.textContent = "✨ 문구 만들기"; }
+    if (note) note.textContent = "";
+  }
 }
 
 // ── 결과: 채널별 보기·고치기 ──
@@ -182,14 +188,22 @@ const similarSoon = debounce(async () => {
 const editedSoon = debounce(() => { check(); save(); }, 900);
 
 // ── 저장: 사진 올리기 → sns_posts → 고른 채널 작업(sns_jobs) ──
-async function uploadPhotos() {
+class FaceCheckError extends Error {}
+// 모자이크 안 한 사진은 공개 버킷에 올리지 않는다: 올리기 전에 얼굴 자동 확인을 먼저 돌리고, 못 돌리면 아무것도 올리지 않는다.
+async function uploadPhotos(team) {
+  if (PS.photos.some((p) => !p.faced)) {
+    try { await PHOTO.faceAll(PS.photos); } catch (e) { console.error(e); throw new FaceCheckError("face"); }
+    renderThumbs();
+    if (PS.photos.some((p) => !p.faced)) throw new FaceCheckError("face");
+  }
   const out = [];
-  for (const p of PS.photos) {
+  for (const p of [...PS.photos]) {
     if (!(p.path && p.pathOf === p.url)) {
-      const path = `${PS.team}/${crypto.randomUUID()}.jpg`;
-      const { error } = await sb.storage.from("sns").upload(path, p.blob, { contentType: "image/jpeg" });
+      const url = p.url, blob = p.blob; // 올리는 동안 [편집]으로 사진이 바뀌어도 올린 것과 같은 걸로 기록한다
+      const path = `${team}/${crypto.randomUUID()}.jpg`;
+      const { error } = await sb.storage.from("sns").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
-      p.path = path; p.pathOf = p.url;
+      p.path = path; p.pathOf = url;
     }
     out.push({ path: p.path, w: p.w, h: p.h });
   }
@@ -200,25 +214,36 @@ async function save() {
   const X = PS.post; if (!X) return;
   if (saving) { saving.again = true; return; } // 저장 중이면 끝난 뒤 한 번 더
   saving = {};
+  const team = PS.team; // 저장하는 동안 대표가 지점을 바꿔도 처음 지점에만 쓴다
   try {
-    const photos = await uploadPhotos();
-    const row = { team_id: PS.team, topic: X.topic ?? "", tone: X.tone ?? "friendly", draft: X.draft ?? "", photos, channels: X.channels, updated_at: new Date().toISOString() };
-    if (X.id) fail((await sb.from("sns_posts").update(row).eq("id", X.id)).error);
+    const photos = await uploadPhotos(team);
+    if (PS.team !== team) return;
+    const row = { topic: X.topic ?? "", tone: X.tone ?? "friendly", draft: X.draft ?? "", photos, channels: X.channels, updated_at: new Date().toISOString() };
+    let ok = false;
+    if (X.id) ok = !fail((await sb.from("sns_posts").update(row).eq("id", X.id)).error);
     else {
-      const { data, error } = await sb.from("sns_posts").insert(row).select("id").single();
-      if (!fail(error)) { X.id = data.id; await syncJobs(); renderOut(); }
+      const { data, error } = await sb.from("sns_posts").insert({ team_id: team, ...row }).select("id").single();
+      if (!fail(error)) { ok = true; X.id = data.id; if (PS.post === X) { await syncJobs(team); renderOut(); } }
     }
-  } catch (e) { console.error(e); toast("사진을 올리지 못했어요. 인터넷 연결을 확인하고 다시 고쳐 주세요"); }
+    if (ok) { // 고쳐서 다시 올렸거나 뺀 사진의 예전 파일은 바로 지운다
+      const keep = new Set(photos.map((x) => x.path)), old = (X.savedPaths ?? []).filter((x) => !keep.has(x));
+      X.savedPaths = [...keep];
+      if (old.length) { const { error } = await sb.storage.from("sns").remove(old); if (error) console.warn("예전 사진 파일 지우기 실패", error); }
+    }
+  } catch (e) {
+    console.error(e);
+    toast(e instanceof FaceCheckError ? "얼굴 확인이 안 돼서 사진을 아직 올리지 않았어요. [편집]에서 얼굴을 확인해 주세요" : "사진을 올리지 못했어요. 인터넷 연결을 확인하고 다시 고쳐 주세요");
+  }
   finally { const again = saving.again; saving = null; if (again) save(); }
 }
 const saveSoon = debounce(save, 1200);
 async function loadJobs() { PS.jobs = PS.post?.id ? (await sb.from("sns_jobs").select("*").eq("post_id", PS.post.id)).data ?? [] : []; }
-async function syncJobs() {
+async function syncJobs(team = PS.team) {
   const X = PS.post; if (!X?.id) return;
   const have = new Set(PS.jobs.map((j) => j.channel));
   const add = [...PS.sel].filter((k) => !have.has(k));
   const drop = PS.jobs.filter((j) => !PS.sel.has(j.channel) && j.status === "waiting_copy").map((j) => j.id);
-  if (add.length) fail((await sb.from("sns_jobs").insert(C.jobRows({ id: X.id, team_id: PS.team }, add))).error);
+  if (add.length) fail((await sb.from("sns_jobs").insert(C.jobRows({ id: X.id, team_id: team }, add))).error);
   if (drop.length) fail((await sb.from("sns_jobs").delete().in("id", drop)).error);
   await loadJobs();
 }
@@ -262,7 +287,7 @@ async function openPost(id) {
   const got = await PHOTO.fromUrls(data.photos.map((x) => pub(x.path)));
   if (got.includes(null)) toast("불러오지 못한 사진이 있어요 (지워졌을 수 있어요)");
   PS.photos = got.map((p, i) => p && Object.assign(p, { path: data.photos[i].path, pathOf: p.url })).filter(Boolean);
-  PS.post = { id: data.id, topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
+  PS.post = { id: data.id, savedPaths: data.photos.map((x) => x.path), topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
   PS.topic = data.topic; PS.tone = data.tone; PS.ch = "instagram";
   await loadJobs(); PS.sel = new Set(PS.jobs.map((j) => j.channel));
   PS.tab = "make"; renderTab();
@@ -271,11 +296,12 @@ async function deletePost(id) {
   if (!confirm("이 게시물을 지울까요? 올려 둔 사진 파일도 같이 지워요. 되돌릴 수 없어요.")) return;
   const row = (await sb.from("sns_posts").select("photos").eq("id", id).single()).data;
   const paths = (row?.photos ?? []).map((x) => x.path);
-  if (paths.length) { const { error } = await sb.storage.from("sns").remove(paths); if (error) console.warn("사진 파일 지우기 실패", error); }
   const { error } = await sb.from("sns_posts").delete().eq("id", id);
   if (fail(error)) return;
+  let left = false; // 글을 먼저 지우고, 지워진 걸 확인한 뒤에만 사진 파일을 지운다
+  if (paths.length) { const { error } = await sb.storage.from("sns").remove(paths); if (error) { console.warn("사진 파일 지우기 실패", error); left = true; } }
   if (PS.post?.id === id) reset();
-  toast("지웠어요"); renderList();
+  toast(left ? "게시물은 지웠지만 사진 파일 일부를 못 지웠어요" : "지웠어요"); renderList();
 }
 
 // ── 이벤트 (한 번만 연결) ──
@@ -311,14 +337,14 @@ function wire() {
   });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset;
-    if (d.f === "topic") { PS.topic = t.value; return; }
+    if (d.f === "topic") { PS.topic = t.value; if (PS.post) { PS.post.topic = t.value; saveSoon(); } return; }
     if (!d.c || !PS.post || t.tagName === "SELECT") return;
     PS.post.channels[PS.ch][d.c] = d.c === "hashtags" ? C.parseTags(t.value) : t.value;
     editedSoon();
   });
   v.addEventListener("change", async (ev) => {
     const t = ev.target, d = t.dataset;
-    if (d.f === "tone") { PS.tone = t.value; return; }
+    if (d.f === "tone") { PS.tone = t.value; if (PS.post) { PS.post.tone = t.value; saveSoon(); } return; }
     if (d.c && PS.post && t.tagName === "SELECT") { PS.post.channels[PS.ch][d.c] = t.value; renderOut(); return saveSoon(); }
     if (d.sel) { if (t.checked) PS.sel.add(d.sel); else PS.sel.delete(d.sel); if (PS.post?.id) await syncJobs(); return renderOut(); }
   });

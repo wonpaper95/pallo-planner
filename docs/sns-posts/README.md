@@ -73,7 +73,7 @@
 - **`sns_accounts`** — 지점(team_id) × 채널(`instagram` | `google`): 외부 ID(인스타 비즈니스 계정 ID / 구글 `accounts/…/locations/…`), 표시 이름, 상태(`ok` | `token` | `perm` | `unknown`), 확인 시각. **토큰은 여기 두지 않는다.**
 - **`sns_posts`** — 게시물 1건: team_id, 작성자, 주제, 어투, 공통 원고, 사진 목록(순서·Storage 경로·가로세로), 채널별 문구 JSON(`instagram{caption,hashtags}` / `google{body,type,button,start,end}` / `naver{title,body}` / `daangn{title,body}`), 출처(`direct` | `blog:<id>` | `marketing:<id>`), 만든 시각.
 - **`sns_jobs`** — 게시물 × 채널 1건: 방식(`api` | `manual`), 예약 시각(즉시면 지금), 상태(`queued` · `running` · `posted` · `failed` · `waiting_copy` · `done_manual`), 결과 URL·외부 ID, 오류(원문 + 한국어 풀이), 시도 횟수, 다음 시도 시각. 목록 뱃지는 전부 여기서.
-- **Storage `sns` 버킷(공개)** — 인스타·구글 API가 사진을 **공개 https 주소**로 가져가야 함. `blog-temp` 와 같은 패턴: JPEG만, 무작위 파일 이름, 자기 지점 폴더(`<team_id>/…`)에만 올리기, 대표는 전부. 모자이크·자르기는 기기 안에서 끝낸 뒤 올리므로 원본 얼굴 사진은 서버에 올라가지 않는다. 예약 대기 중엔 지우면 안 되므로 **모든 작업이 끝난(게시됨·실패·올렸어요) 뒤 7일 지나면** tick 에서 삭제.
+- **Storage `sns` 버킷(공개)** — 인스타·구글 API가 사진을 **공개 https 주소**로 가져가야 함. `blog-temp` 와 같은 패턴: JPEG만, 무작위 파일 이름, 자기 지점 폴더(`<team_id>/…`)에만 올리기, 대표는 전부. 올리기 전에 얼굴 자동 모자이크를 먼저 돌리고(실패하면 올리지 않음), 고쳐서 새로 올리면 예전 파일은 바로 지운다. 자동 모자이크가 놓친 얼굴은 매니저가 [편집]으로 확인. 예약 대기 중엔 지우면 안 되므로 **모든 작업이 끝난(게시됨·실패·올렸어요) 뒤 7일 지나면** tick 에서 삭제.
 - **재사용:** AI 생성 횟수·비용은 `blog_gens` 에 kind=`sns` 로 기록 → 블로그 사용량 탭에 같이 보임. 하루 제한은 `blog_limits` 공용(`blog-write` 의 `AI_KINDS` 에 `sns` 추가 → 블로그와 합산). 지점 정보는 `blog_profiles`.
 - **RLS:** `blog_my_team()` / `blog_is_admin()` 재사용. 매니저는 자기 지점 행만 읽기·쓰기, `sns_accounts` 쓰기는 대표만. `sns_jobs` 의 상태를 `posted` 로 바꾸는 건 Edge Function(서비스 키)만 — 매니저는 `waiting_copy → done_manual` 만 가능.
 - **실시간:** `sns_jobs` 변경 구독 → 예약 게시가 끝나면 열린 화면 뱃지가 바로 바뀜(기존 탭들과 같은 방식).
@@ -118,7 +118,6 @@
 메타·구글 준비가 늦으면 1단계로 먼저 운영한다. 각 단계는 실제로 쓰면서 확인한 뒤 다음으로.
 
 **진행:** 0~1단계 구현 완료(브랜치 `feat/sns-posts`, 로컬 확인). 운영 배포 전. 배포 순서: 마이그레이션 → `blog-write` 함수 → 프런트(버전 올리기). 지점 프로필(블로그 탭 [지점 설정])을 저장해 둔 지점이어야 AI가 주소·상담 방법을 씀 — 안 하면 `[확인 필요]`로 나옴.
-**알려진 한계(4단계에서 정리):** 다시 연 게시물의 사진을 고치면 새 파일로 올라가고 예전 파일은 버킷에 남는다.
 **2단계(자동 게시) 전에 막을 것:** 게시물 삭제가 api 작업까지 cascade 로 지움 → 자동 작업이 있는 게시물은 삭제 막기 / 트리거가 옛 상태(OLD)가 자동 상태인 수동 작업을 사람이 되돌리는 경우 / `run_at` 도 서버 전용으로.
 
 ## 검증
@@ -132,6 +131,7 @@
 ## 배포 (블로그 탭과 같은 방식)
 
 - 마이그레이션: `supabase db query --linked --project-ref aiqrchgwrfrmscstlsmv -f <파일>` (이 프로젝트는 db push 안 씀)
-- 함수: `supabase functions deploy sns-publish --project-ref aiqrchgwrfrmscstlsmv --use-api` (+ `blog-write` 고쳤으면 같이)
+- 함수: 1단계는 `blog-write` 만 배포 (`supabase functions deploy blog-write --project-ref aiqrchgwrfrmscstlsmv --use-api`). `sns-publish` 는 2단계부터.
+- 마이그레이션 적용 뒤 확인: `select count(*) from pg_policies where policyname like 'sns_%';` → 11
 - 프런트: `version.txt` 와 index.html 의 `?v=`·`app-version` 을 `TZ=Asia/Seoul date +%Y%m%d%H%M` 로 → main 푸시(GitHub Pages)
 - **운영 배포·실게시는 사용자가 확인한 뒤에만.**
