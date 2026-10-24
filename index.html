@@ -525,6 +525,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button data-m="15">15분</button><button data-m="30">30분</button><button data-m="60">1시간</button>
     <button data-m="120">2시간</button><button data-m="180">3시간</button><button data-m="">지우기</button>
   </div>
+  <label><input type="checkbox" id="sCd"> ⏰ 이 시간 안에 끝내기 (카운트다운 · 끝나면 알림)</label>
   <label>업무 수행시간</label>
   <div class="timerline"><b id="sSpent">0:00:00</b><button class="btn ghost" id="sTimer">▶ 시작</button>
     <input type="number" id="sSpentEdit" min="0" inputmode="numeric" placeholder="분으로 직접 고치기"></div>
@@ -1208,18 +1209,18 @@ function chip(t) {
 const pad = (n) => String(n).padStart(2, "0");
 const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
 function hms(sec, withSec) { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return withSec ? `${h}:${pad(m)}:${pad(sec % 60)}` : `${h}:${pad(m)}`; }
-// ⏳ 해결목표 카운트다운: 예상시간이 있으면 남은 시간이 줄어듦(⚙️에서 끄면 올라가는 시계). 0 되면 알림창·소리 + 서버 푸시
-const cdOn = () => prefs().countdown !== false;
+// ⏳ 해결목표 카운트다운: 해결목표 정할 때 '네'를 고른 일만 남은 시간이 줄어듦. 0 되면 알림창·소리 + 서버 푸시
+const cdOn = (t) => !!(t.countdown && t.estimate_min);
 const mmss = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`; };
 function tmText(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
-  if (est && cdOn() && !t.done) { const left = est * 60 - sec; return `${run ? "⏸" : "▶"} ${left > 0 ? `⏳ ${mmss(left)}` : `⏰ +${mmss(-left)} 초과`}`; }
+  if (cdOn(t) && !t.done) { const left = est * 60 - sec; return `${run ? "⏸" : "▶"} ${left > 0 ? `⏳ ${mmss(left)}` : `⏰ +${mmss(-left)} 초과`}`; }
   return `${t.done ? "⏱" : run ? "⏸" : "▶"} ${hms(sec, run)}`;
 }
 function timeBtn(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
   if (t.done && !sec) return "";
-  if (!run && !sec) return `<button class="tm none" data-act="timer" title="${est && cdOn() ? `${minLabel(est)} 카운트다운 시작` : "타이머 시작"}">▶</button>`;
+  if (!run && !sec) return `<button class="tm none" data-act="timer" title="${cdOn(t) ? `${minLabel(est)} 카운트다운 시작` : "타이머 시작"}">▶</button>`;
   const over = est && sec > est * 60;
   return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}"><b>${tmText(t)}</b></button>`;
 }
@@ -1243,7 +1244,7 @@ function quickBtns(t) {
   const st = t.start_time?.slice(0, 5), est = t.estimate_min;
   if (t.done && !st && !est) return "";
   return `<button class="qb ${st ? "" : "empty"}" data-act="start" title="업무 시작시간">🕐${st ? ` ${st}(시작!)` : ""}</button>`
-    + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">⏳${est ? ` ${minLabel(est)} 해결목표` : ""}</button>`;
+    + `<button class="qb ${est ? "" : "empty"}" data-act="est" title="예상 소요시간">${t.countdown && est ? "⏰" : "⏳"}${est ? ` ${minLabel(est)} 해결목표` : ""}</button>`;
 }
 let popFor = null;
 function openPop(anchor, t, kind) {
@@ -1254,7 +1255,7 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["countdown", "⏳ 해결목표 카운트다운"], ["dl", "📅 데드라인"],
+const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
 function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
@@ -1331,7 +1332,7 @@ setInterval(() => {
     el.querySelector("b").textContent = tmText(t);
     const over = !!(t.estimate_min && elapsed(t) >= t.estimate_min * 60);
     el.classList.toggle("over", over);
-    if (over && cdOn()) timeUp(t);
+    if (over && cdOn(t)) timeUp(t);
   });
   const t = openId && cur(); if (t && $("#sheet").open) $("#sSpent").textContent = hms(elapsed(t), true);
 }, 1000);
@@ -1566,7 +1567,7 @@ $("#weekCal").addEventListener("contextmenu", (e) => e.target.closest(".pill") &
 // ── 상세 시트: 데드라인 설정·재설정·알람 ──
 function openSheet(t, focusDl) {
   openId = t.id;
-  $("#sTitle").value = t.title; $("#sDone").checked = t.done; $("#sDay").value = t.day;
+  $("#sTitle").value = t.title; $("#sDone").checked = t.done; $("#sCd").checked = !!t.countdown; $("#sDay").value = t.day;
   $("#sDl").value = toLocalInput(t.deadline ?? new Date()); // 없으면 연 시점부터 고르게
   $("#sDlLabel").textContent = t.deadline ? "데드라인 재설정" : "데드라인 (아직 없음 — 시간을 고르면 설정돼요)";
   $("#sRemind").value = t.remind_min ?? "";
@@ -1594,6 +1595,7 @@ async function sheetSave(patch) {
   if (d) { openSheet(d); renderWeek(); }
 }
 $("#sTitle").onchange = () => sheetSave({ title: $("#sTitle").value.trim() });
+$("#sCd").onchange = () => sheetSave({ countdown: $("#sCd").checked });
 $("#sDone").onchange = () => sheetSave({ done: $("#sDone").checked }).then(bumpStats);
 $("#sNote").onchange = () => sheetSave({ note: $("#sNote").value });
 $("#sStart").onclick = (e) => {

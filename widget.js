@@ -85,7 +85,7 @@ function render() {
 // ⏳ 해결목표 카운트다운(플래너와 같음): 예상시간 있으면 남은 시간, 넘으면 +초과
 function tmLabel(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
-  if (est && me?.user_metadata?.prefs?.countdown !== false && !t.done) { const left = est * 60 - sec, a = Math.abs(Math.floor(left)), mm = `${Math.floor(a / 60)}:${pad(a % 60)}`; return `${run ? "⏸" : "▶"} ${left > 0 ? `⏳ ${mm}` : `⏰ +${mm}`}`; }
+  if (est && t.countdown && !t.done) { const left = est * 60 - sec, a = Math.abs(Math.floor(left)), mm = `${Math.floor(a / 60)}:${pad(a % 60)}`; return `${run ? "⏸" : "▶"} ${left > 0 ? `⏳ ${mm}` : `⏰ +${mm}`}`; }
   return `${t.done ? "⏱" : run ? "⏸" : "▶"} ${hms(sec)}`;
 }
 // 줄 버튼: 플래너와 같은 🕐 시작 · ⏳ 예상 · ▶ 타이머 · 📅 데드라인 (끝낸 일은 값 있는 것만)
@@ -93,7 +93,7 @@ function qbtns(t) {
   const st = t.start_time?.slice(0, 5), est = t.estimate_min, sec = elapsed(t), run = !!t.started_at;
   const b = (act, on, label, cls = "", extra = "") => t.done && !on ? "" : `<button class="qb ${on ? "" : "empty"} ${cls}" data-act="${act}" data-id="${t.id}" ${extra}>${label}</button>`;
   return b("start", st, `🕐${st ? ` ${st}(시작!)` : ""}`)
-    + b("est", est, `⏳${est ? ` ${minLabel(est)} 해결목표` : ""}`)
+    + b("est", est, `${t.countdown && est ? "⏰" : "⏳"}${est ? ` ${minLabel(est)} 해결목표` : ""}`)
     + b("timer", sec, sec || run ? tmLabel(t) : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
     + b("dl", t.deadline, t.deadline ? `📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + W.due(t.deadline).text}` : "📅", t.deadline && !t.done ? W.due(t.deadline).cls : "");
 }

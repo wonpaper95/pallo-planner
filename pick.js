@@ -33,6 +33,10 @@ function pickHtml(t, kind, locked) {
       ${(t.deadline_log || []).length ? `<div style="font-size:12px;color:var(--sub);margin-top:6px">↻ 재설정 ${t.deadline_log.length}회 · 마지막 ${fmtDl(t.deadline_log.at(-1).from)} → ${t.deadline ? fmtDl(t.deadline) : "없음"}</div>` : ""}`;
   return `<h4>🕐 업무 시작시간</h4>` + startPickHtml(t);
 }
+// ⏳ 해결목표 고른 뒤 질문: 이 시간 안에 끝내기(카운트다운·끝나면 알림) 할지
+const cdAskHtml = (t, m) => `<h4>⏰ ${minLabel(m)} 카운트다운 할까요?</h4>
+  <div style="font-size:12px;color:var(--sub);margin-bottom:8px">▶ 누르면 남은 시간이 줄어들고, 끝나면 알림이 와요</div>
+  <div class="grid" style="grid-template-columns:1fr 1fr"><button data-cd="1" data-m="${m}" class="${t.countdown ? "on" : ""}">⏰ 네, 카운트다운</button><button data-cd="0" data-m="${m}" class="${t.countdown ? "" : "on"}">아니요, 시간만</button></div>`;
 // 누른 버튼 → 저장할 값. 아직 고른 게 아니면 undefined
 function pickPatch(t, kind, b, pop) {
   const own = b.dataset.own !== undefined, v = own ? pop.querySelector("input").value : b.dataset.v;
@@ -40,8 +44,10 @@ function pickPatch(t, kind, b, pop) {
     const d = b.dataset.q ? quickDl(t, b.dataset.q) : own && v ? new Date(v) : undefined;
     return d === undefined ? undefined : { deadline: d ? d.toISOString() : null };
   }
+  if (kind === "est" && b.dataset.cd !== undefined) return { estimate_min: +b.dataset.m, countdown: b.dataset.cd === "1" };
   if (v === undefined) return undefined;
-  return kind === "est" ? { estimate_min: +v > 0 ? Math.round(+v) : null } : { start_time: v || null };
+  if (kind === "est" && +v > 0) { pop.innerHTML = cdAskHtml(t, Math.round(+v)); return undefined; } // 바로 저장 말고 물어봄
+  return kind === "est" ? { estimate_min: null, countdown: false } : { start_time: v || null };
 }
 // 버튼 밑(공간 없으면 위)에 띄우기
 function placePop(pop, anchor) {
