@@ -6,6 +6,17 @@
 
 관련 문서: 블로그 작성기 `docs/blog-writer/README.md`(지점 표·공통 규칙), 메타 마케팅 `~/pallo-planner-marketing/docs/meta-marketing/README.md`(브랜치 `feat/meta-marketing`).
 
+## 파일 (1단계까지)
+
+| 파일 | 역할 |
+|---|---|
+| `post.js` / `post.css` | 게시물 탭 화면 (`window.PS`): 만들기 · 목록 |
+| `sns-core.js` | 채널 목록·제한·점검·상태 뱃지 순수 함수 (`window.SNSCORE`, `node --test 'tests/*.test.mjs'`) |
+| `photo.js` / `photo.css` | 사진 공용 (블로그와 같이 씀): 자르기·모자이크·얼굴·편집 창·복사·번호대로 받기 (`window.PHOTO`) |
+| `supabase/migrations/20261025150000_sns.sql` | sns_accounts · sns_posts · sns_jobs + 상태 지킴 트리거(사람은 수동 작업의 복사 대기↔올렸어요만, 서버 전용 칸은 못 씀) + RLS + `sns` 버킷 |
+| `supabase/functions/blog-write` | `sns` action(4채널 문구), `similar` 의 `channel: "naver"` |
+| `~/.cache/pallo-planner-dev/test-sns.sh` | 로컬 점검 (저장소 밖). `AI=1` 이면 실제 AI 1회 |
+
 ## 확정된 결정 (사용자와 정함)
 
 - **독립 탭.** 블로그 탭 서브탭이나 마케팅 탭 안이 아니라 새 탭 `post.js` / `post.css` (`window.PS`). sales.js·blog.js 와 같은 방식으로 index.html 전역(sb·me·esc·toast…)을 쓴다.
@@ -105,6 +116,10 @@
 | 4 | 블로그 탭 [게시물로 보내기], 마케팅 시안 → `sns_posts` 연결, 7일 뒤 사진 정리 | 연결 완료 | 아니요 |
 
 메타·구글 준비가 늦으면 1단계로 먼저 운영한다. 각 단계는 실제로 쓰면서 확인한 뒤 다음으로.
+
+**진행:** 0~1단계 구현 완료(브랜치 `feat/sns-posts`, 로컬 확인). 운영 배포 전. 배포 순서: 마이그레이션 → `blog-write` 함수 → 프런트(버전 올리기). 지점 프로필(블로그 탭 [지점 설정])을 저장해 둔 지점이어야 AI가 주소·상담 방법을 씀 — 안 하면 `[확인 필요]`로 나옴.
+**알려진 한계(4단계에서 정리):** 다시 연 게시물의 사진을 고치면 새 파일로 올라가고 예전 파일은 버킷에 남는다.
+**2단계(자동 게시) 전에 막을 것:** 게시물 삭제가 api 작업까지 cascade 로 지움 → 자동 작업이 있는 게시물은 삭제 막기 / 트리거가 옛 상태(OLD)가 자동 상태인 수동 작업을 사람이 되돌리는 경우 / `run_at` 도 서버 전용으로.
 
 ## 검증
 
