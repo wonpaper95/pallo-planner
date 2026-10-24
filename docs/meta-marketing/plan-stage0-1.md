@@ -25,7 +25,7 @@
 | 파일 | 역할 |
 |---|---|
 | `mk-core.js` | 순수 로직: CSV 파싱, 헤더 별칭→표준 필드, 종류 판별, 리드 정제, 주간 리포트·페르소나 입력 계산. 브라우저 `window.MKCORE`, Node `require` |
-| `tests/mk-core.test.mjs` | mk-core 단위 테스트 (`node --test tests/`) |
+| `tests/mk-core.test.mjs` | mk-core 단위 테스트 (`node --test 'tests/*.test.mjs'`) |
 | `supabase/migrations/20261025120000_marketing.sql` | mk_ad_daily · mk_ad_demo · mk_organic · mk_leads · mk_uploads · mk_reports + RLS |
 | `marketing.js` / `marketing.css` | 마케팅 탭: 리포트 / 페르소나 / 데이터 올리기(대표) |
 | `index.html` | 탭 버튼·section·script/css 연결 (몇 줄) |
@@ -122,7 +122,7 @@ test("normalize: 모르는 파일은 kind null, 필수 열 빠지면 missing", (
 
 - [ ] **Step 2: 실패 확인**
 
-Run: `cd ~/pallo-planner-marketing && node --test tests/`
+Run: `cd ~/pallo-planner-marketing && node --test 'tests/*.test.mjs'`
 Expected: FAIL — `Cannot find module '../mk-core.js'`
 
 - [ ] **Step 3: 구현**
@@ -255,7 +255,7 @@ return { ALIAS, parseCsv, toNumber, toDate, detectKind, normalize };
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `cd ~/pallo-planner-marketing && node --test tests/`
+Run: `cd ~/pallo-planner-marketing && node --test 'tests/*.test.mjs'`
 Expected: 7 tests PASS
 
 - [ ] **Step 5: 커밋**
@@ -369,7 +369,7 @@ test("buildPersonaInputs: 퍼널·등록자 분포", () => {
 
 - [ ] **Step 2: 실패 확인**
 
-Run: `cd ~/pallo-planner-marketing && node --test tests/`
+Run: `cd ~/pallo-planner-marketing && node --test 'tests/*.test.mjs'`
 Expected: FAIL — `MK.sanitizeLead is not a function`
 
 - [ ] **Step 3: 구현**
@@ -459,7 +459,7 @@ return { ALIAS, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATU
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `cd ~/pallo-planner-marketing && node --test tests/`
+Run: `cd ~/pallo-planner-marketing && node --test 'tests/*.test.mjs'`
 Expected: 13 tests PASS. (테스트 D: 직전 리드당 10,000 → 이번 주 30,000 = 200% 상승, 등록 0 → cut)
 
 - [ ] **Step 5: 커밋**
@@ -1012,7 +1012,7 @@ cd ~/pallo-planner-marketing && git add scripts/mk && git commit -m "📣 마케
 - [ ] **Step 2:** 메뉴에서 리드/신규 회신/상담 목록 화면을 찾아 URL 기록. `get_page_text` 대신 `read_page` 로 표 **머리글만** 확인하고, 행 내용은 광고명·날짜·상태 열만 본다.
 - [ ] **Step 3:** 상태 필터(드롭다운)의 선택지를 전부 기록 → 표준값(lead/consult/visit/enroll/lost) 매핑 표 작성. 리드 번호(행 고유 ID)가 어디 있는지(링크 URL의 숫자 등) 기록.
 - [ ] **Step 4:** 위 내용을 `jeonsan-leads.md` 에 작성. 구미점 지점 코드가 없으면 "미오픈 — 리드 없음"으로 기록.
-- [ ] **Step 5:** `STATUS_MAP` 에 실제 상태값 추가, 테스트에 `assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "<실제값>" }).lead.status, "<표준값>")` 추가 → `node --test tests/` PASS
+- [ ] **Step 5:** `STATUS_MAP` 에 실제 상태값 추가, 테스트에 `assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "<실제값>" }).lead.status, "<표준값>")` 추가 → `node --test 'tests/*.test.mjs'` PASS
 - [ ] **Step 6: 커밋**
 ```bash
 cd ~/pallo-planner-marketing && git add docs/meta-marketing/jeonsan-leads.md mk-core.js tests/mk-core.test.mjs && git commit -m "📣 마케팅: 전산 리드 화면 조사·상태값 매핑"
@@ -1083,7 +1083,7 @@ description: 팔로 지점별 메타 주간 분석. 대표가 마케팅 탭에 �
 `docs/meta-marketing/README.md` 의 "구성 요소" 아래에 추가:
 ```markdown
 ### 구현 위치 (0~1단계)
-- 계산: `mk-core.js` (테스트 `node --test tests/`) · 화면: `marketing.js` · DB: `supabase/migrations/20261025120000_marketing.sql`
+- 계산: `mk-core.js` (테스트 `node --test 'tests/*.test.mjs'`) · 화면: `marketing.js` · DB: `supabase/migrations/20261025120000_marketing.sql`
 - 스킬: `~/.claude/skills/pallo-meta-analyze/SKILL.md` → 스크립트 `scripts/mk/*.mjs` (서비스 키: `~/.config/pallo/marketing.env`)
 - 전산 화면 구조: `docs/meta-marketing/jeonsan-leads.md`
 ```
