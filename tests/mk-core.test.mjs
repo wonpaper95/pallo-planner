@@ -250,3 +250,27 @@ test("buildWeekly: 4주 안에 리드가 없으면(오래된 리드만) 등록 �
   assert.equal(r.flags.noLeads, true);
   assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
 });
+
+test("teamKeyOf: 명시 과목이 우선, 영어 제외는 느슨한 말에만", () => {
+  assert.equal(MK.teamKeyOf("[중국어][멤버모집] 대구 영어권 여행"), "jpcn");
+  assert.equal(MK.teamKeyOf("대구 일본어 영어로 배우기"), "jpcn");
+  assert.equal(MK.teamKeyOf("대구 일중 스페인어 무료체험"), "jpcn");
+  assert.equal(MK.teamKeyOf("대구 평일중 직장인 영어"), "dsr");
+  assert.equal(MK.teamKeyOf("대구 일본여행 영어회화"), "dsr");
+});
+
+test("teamKeyOfTeamName: 운영·개발 지점 이름 8개", () => {
+  const m = { 대구영어점: "dsr", 대구동성로점: "dsr", 대구일중점: "jpcn", 대구일본어중국어점: "jpcn", 울산점: "ulsan", 구미점: "gumi" };
+  for (const [n, k] of Object.entries(m)) assert.equal(MK.teamKeyOfTeamName(n), k, n);
+  assert.equal(MK.teamKeyOfTeamName("모르는점"), null);
+  assert.equal(MK.teamKeyOfTeamName(undefined), null);
+});
+
+test("buildWeekly: 이번 주 지출 $1·리드 0 은 피로도 아님, $60 은 피로도", () => {
+  assert.equal(MK.ZERO_WEEK_MIN_SPEND, 5);
+  const mk = (sp) => [day("2026-10-01", "X", 50000, 5), day("2026-10-20", "X", sp, 0)];
+  const lds = [lead("1", "X", "2026-10-02", "enroll")];
+  const run = (sp) => MK.buildWeekly({ week: "2026-10-19", ads: mk(sp), organic: [], leads: lds }).ads[0];
+  assert.doesNotMatch(run(1).reason, /피로도/);
+  assert.match(run(60).reason, /피로도/);
+});

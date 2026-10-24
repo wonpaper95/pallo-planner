@@ -41,10 +41,10 @@ async function __mkJeonsan(cutoff, { maxPages = 40, settle = 300 } = {}) {
       for (let i = 0; i < 27; i++) { p = panel(); if (p?.at && p.at === stamp(m[0])) break; p = null; await sleep(150); }
       const reg = p ? +((p.box.innerText || "").match(/(\d+)\s*명/)?.[1] ?? 0) : null;
       if (!p) unverified++;
-      const ad = (cell("광고명") === "-" ? "" : cell("광고명")).replace(/\|/g, "/"); // source_key 구분자 | 와 겹치지 않게
+      const ad = cell("광고명") === "-" ? "" : cell("광고명"); // 원본 광고명 유지
       const st = reg > 0 ? "등록" : cell("상태");
       byStatus[st] = (byStatus[st] ?? 0) + 1;
-      const base = `${date}T${m[4]}:${m[5]}|${ad}`;
+      const base = `${date}T${m[4]}:${m[5]}|${ad.replace(/\|/g, "/")}`; // source_key 구분자 | 와 겹치지 않게
       seen[base] = (seen[base] ?? -1) + 1;           // 같은 분·같은 광고 지원자 구분
       out.push({ source_key: `${base}|${seen[base]}`, ad_name: ad, lead_date: date, status: st, registered: reg, channel: cell("광고 매체"), path: cell("유입경로") });
     }

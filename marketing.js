@@ -74,8 +74,7 @@ function personaHtml(d) {
 // ── CSV 올리기 (대표) ──
 // 광고는 계정 하나를 4개 지점이 같이 써서, 행마다 mk-core 가 캠페인 이름으로 판별한 team_key 를 지점 id 로 바꾼다.
 // 게시물(오가닉)은 지점 인스타·페북 계정별 파일이라 위에서 고른 지점으로 올린다.
-const TEAM_RE = { dsr: /동성로/, jpcn: /일본어|중국어/, ulsan: /울산/, gumi: /구미/ };
-const teamIdOf = (key) => teams.find((t) => TEAM_RE[key]?.test(t.name))?.id ?? null;
+const teamIdOf = (key) => teams.find((t) => MKCORE.teamKeyOfTeamName(t.name) === key)?.id ?? null;
 const teamName = (id) => teams.find((t) => t.id === +id)?.name ?? "";
 const dateOf = (r) => r.date ?? r.period_from ?? r.published_at;
 function assign(p) {

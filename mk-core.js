@@ -107,11 +107,22 @@ function teamKeyOf(text) {
   const s = String(text ?? "");
   if (/울산/.test(s)) return "ulsan";
   if (/구미/.test(s)) return "gumi";
-  // '평일중'(평일 중) 안의 '일중'은 일중 표기가 아니고, 영어·스페인어 말이 함께 있으면 '일본여행' 같은 말로 jpcn 이 되지 않는다
-  if (/대구|동성로|대일|(?<!평)일중/.test(s)) return /일본|중국|대일|(?<!평)일중|JLPT|HSK/i.test(s) && !/영어|스페인어/.test(s) ? "jpcn" : "dsr";
+  // 대구 계열: 일본어·중국어 같은 명시 과목이 있으면 영어 말이 같이 있어도 jpcn. '평일중'(평일 중) 안의 '일중'은 일중 표기가 아님.
+  // 영어·스페인어 제외는 '일본여행' 같은 느슨한 말(일본|중국)에만 적용한다.
+  if (/대구|동성로|대일|(?<!평)일중/.test(s)) {
+    if (/일본어|중국어|JLPT|HSK|대일|(?<!평)일중|\[일본어\]|\[중국어\]/i.test(s)) return "jpcn";
+    return /일본|중국/.test(s) && !/영어|스페인어/.test(s) ? "jpcn" : "dsr";
+  }
   // 지역 없는 일본어·중국어 캠페인(예: "팔로 일본어 잠재고객")은 대구일본어중국어점 — 울산·구미 캠페인은 이름에 지역이 붙는다
   if (/일본어|중국어/.test(s)) return "jpcn";
   return null;
+}
+
+// 지점 이름 → team_key. 운영(대구영어점·대구일중점)과 개발(대구동성로점·대구일본어중국어점) 이름을 모두 받는다. 어느 이름도 두 키에 걸리지 않는다.
+const TEAM_NAME_RE = { dsr: /동성로|대구\s*영어/, jpcn: /일본어|중국어|일중/, ulsan: /울산/, gumi: /구미/ };
+function teamKeyOfTeamName(name) {
+  const n = String(name ?? "");
+  return Object.keys(TEAM_NAME_RE).find((k) => TEAM_NAME_RE[k].test(n)) ?? null;
 }
 
 function normalize(text) {
@@ -171,7 +182,8 @@ const usd = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
 // ── 주간 리포트 ──
 const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 70, // 달러
-   FATIGUE = 1.3;
+   FATIGUE = 1.3,
+   ZERO_WEEK_MIN_SPEND = 5; // 이번 주 리드 0 피로도는 지출 5달러 이상일 때만 (소액은 우연)
 function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
   const end = addDays(week, 6), from4 = addDays(week, -21), prevEnd = addDays(week, -1);
   const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
@@ -189,7 +201,7 @@ function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
     const cpl = lw ? spend / lw : null, prevCpl = sum(prev, "leads") ? sum(prev, "spend") / sum(prev, "leads") : null;
     const enrolls4w = enrolls(ad_name), cpe4w = enrolls4w ? spend4w / enrolls4w : null;
     const myLeads = leads4.filter((l) => l.ad_name === ad_name), young = myLeads.filter((l) => l.lead_date > addDays(end, -7)).length; // 7일 이내 리드는 아직 등록 전일 수 있음
-    const zeroWeek = spend > 0 && lw === 0 && prevCpl !== null; // 이번 주 돈만 쓰고 리드 0
+    const zeroWeek = spend >= ZERO_WEEK_MIN_SPEND && lw === 0 && prevCpl !== null; // 이번 주 돈만 쓰고 리드 0
     const cheap = enrolls4w >= 1 && teamCpe !== null && cpe4w <= teamCpe;
     let verdict, reason;
     if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${usd(spend4w)}, 리드 0`];
@@ -229,6 +241,6 @@ function buildPersonaInputs({ leads = [], demo = [] }) {
   return { sample: leads.length, funnel, enrolledBySubject: count(enrolled, "subject"), enrolledByAge: count(enrolled, "age_band"), leadsByAgeGender };
 }
 
-return { ALIAS, decode, teamKeyOf, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
-  MIN_SAMPLE, ZERO_LEAD_SPEND, FATIGUE, buildWeekly, buildPersonaInputs };
+return { ALIAS, decode, teamKeyOf, teamKeyOfTeamName, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
+  MIN_SAMPLE, ZERO_LEAD_SPEND, ZERO_WEEK_MIN_SPEND, FATIGUE, buildWeekly, buildPersonaInputs };
 });
