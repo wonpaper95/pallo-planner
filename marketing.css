@@ -12,6 +12,7 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .mut { color: var(--sub); font-size: 12.5px; }
 #mkView .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 #mkView .kpi b { display: block; font-size: 20px; }
+#mkView .kpi small { display: block; font-size: 11px; }
 #mkView .tw { overflow-x: auto; }
 #mkView table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 #mkView th, #mkView td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }

@@ -7,8 +7,9 @@ const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
 const $m = (s) => V().querySelector(s);
-const usd = (n) => (n === null || n === undefined ? "–" : "$" + (Math.round(n * 100) / 100).toLocaleString("en-US"));
-const pct = (n) => (Math.round(n * 1000) / 10) + "%";
+const n = (v) => Number(v) || 0; // 리포트 JSON 은 스킬이 쓴 값이라, 화면에 넣는 숫자는 모두 숫자로 바꿔서 쓴다
+const usd = (v) => (v === null || v === undefined ? "–" : "$" + (Math.round(n(v) * 100) / 100).toLocaleString("en-US"));
+const pct = (v) => (Math.round(n(v) * 1000) / 10) + "%";
 let parsed = [];
 
 MK.load = async function () {
@@ -42,30 +43,30 @@ async function renderReport(kind) {
 }
 
 function weeklyHtml(d) {
-  const f = d.flags ?? {}, t = d.totals ?? {}, n = d.notes ?? {};
+  const f = d.flags ?? {}, t = d.totals ?? {}, nt = d.notes ?? {};
   const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "등록 데이터 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
-  const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${n.ads?.[a.ad_name] ? `<div class="mut">${esc(n.ads[a.ad_name])}</div>` : ""}</td>
-    <td><span class="vd ${esc(a.verdict)}">${VERDICT[a.verdict] ?? a.verdict}</span><div class="mut">${esc(a.reason)}</div></td>
-    <td>${usd(a.spend)}</td><td>${a.leads}</td><td>${usd(a.cpl)}</td><td>${a.leads4w}</td><td>${a.enrolls4w}</td><td>${usd(a.cpe4w)}</td></tr>`).join("");
-  const posts = (arr) => (arr ?? []).map((p) => `<tr><td>${p.permalink ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(p.caption || p.post_id)}</a>` : esc(p.caption || p.post_id)}<div class="mut">${esc(p.type)} · ${esc(p.published_at)}</div></td>
-    <td>${(p.reach ?? 0).toLocaleString("ko-KR")}</td><td>${p.saves ?? 0}</td><td>${p.shares ?? 0}</td><td>${p.score == null ? "–" : pct(p.score)}</td></tr>`).join("");
+  const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${nt.ads?.[a.ad_name] ? `<div class="mut">${esc(nt.ads[a.ad_name])}</div>` : ""}</td>
+    <td><span class="vd ${esc(a.verdict)}">${VERDICT[a.verdict] ?? esc(a.verdict)}</span><div class="mut">${esc(a.reason)}</div></td>
+    <td>${usd(a.spend)}</td><td>${n(a.leads)}</td><td>${usd(a.cpl)}</td><td>${n(a.leads4w)}</td><td>${n(a.enrolls4w)}</td><td>${usd(a.cpe4w)}</td></tr>`).join("");
+  const posts = (arr) => (arr ?? []).map((p) => `<tr><td>${String(p.permalink ?? "").startsWith("https://") ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(p.caption || p.post_id)}</a>` : esc(p.caption || p.post_id)}<div class="mut">${esc(p.type)} · ${esc(p.published_at)}</div></td>
+    <td>${n(p.reach).toLocaleString("ko-KR")}</td><td>${n(p.saves)}</td><td>${n(p.shares)}</td><td>${p.score == null ? "–" : pct(p.score)}</td></tr>`).join("");
   const ptable = (arr) => `<div class="tw"><table><tr><th>게시물</th><th>도달</th><th>저장</th><th>공유</th><th>저장+공유율</th></tr>${posts(arr)}</table></div>`;
   return warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
-    + (n.summary ? `<div class="card"><b>이번 주 한 줄</b><p>${esc(n.summary)}</p>${n.tests?.length ? `<b>새로 테스트할 방향</b><ul>${n.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "")
-    + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${usd(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${t.leads ?? 0}</b></div>
-       <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 등록</span><b>${t.enrolls4w ?? 0}</b></div><div class="kpi"><span class="mut">4주 등록당 비용</span><b>${usd(t.cpe4w)}</b></div></div>`
+    + (nt.summary || nt.caution ? `<div class="card">${nt.summary ? `<b>이번 주 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${nt.tests?.length ? `<b>새로 테스트할 방향</b><ul>${nt.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
+    + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${usd(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${n(t.leads)}</b></div>
+       <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 등록</span><b>${n(t.enrolls4w)}</b>${n(t.otherEnrolls4w) > 0 ? `<small class="mut">(광고 외 등록 ${n(t.otherEnrolls4w)})</small>` : ""}</div><div class="kpi"><span class="mut">4주 등록당 비용</span><b>${usd(t.cpe4w)}</b></div></div>`
     + `<div class="card"><b>소재 판정</b><div class="tw"><table><tr><th>광고</th><th>판정</th><th>이번 주 지출</th><th>리드</th><th>리드당</th><th>4주 리드</th><th>4주 등록</th><th>등록당</th></tr>${ads || `<tr><td colspan="8">광고 없음</td></tr>`}</table></div></div>`
     + `<div class="card"><b>오가닉 잘 된 게시물</b>${ptable(d.organic?.top)}</div><div class="card"><b>오가닉 아쉬운 게시물</b>${ptable(d.organic?.bottom)}</div>`;
 }
 
 function personaHtml(d) {
   const p = d.persona ?? {};
-  const dist = (o) => Object.entries(o ?? {}).map(([k, v]) => `${esc(k)} ${v}명`).join(" · ") || "–";
+  const dist = (o) => Object.entries(o ?? {}).map(([k, v]) => `${esc(k)} ${n(v)}명`).join(" · ") || "–";
   return (d.borrowed ? `<div class="card warn">⚠️ 이 지점은 표본이 적어서 다른 지점 패턴을 빌려 썼어요 (표본 ${esc(d.sample)}건)</div>` : "")
     + `<div class="card"><h3>${esc(p.title ?? "페르소나")}</h3><p>${esc(p.who ?? "")}</p><p><b>원하는 것</b> ${esc(p.wants ?? "")}</p>
        ${p.messages?.length ? `<b>반응한 메시지</b><ul>${p.messages.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
        <p><b>활동 시간</b> ${esc(p.times ?? "")}</p>${p.caution ? `<p class="mut">${esc(p.caution)}</p>` : ""}</div>`
-    + `<div class="card"><b>근거 숫자</b><p class="mut">리드 → 상담 → 방문 → 등록: ${["lead", "consult", "visit", "enroll"].map((k) => d.funnel?.[k] ?? 0).join(" → ")} (이탈 ${d.funnel?.lost ?? 0})</p>
+    + `<div class="card"><b>근거 숫자</b><p class="mut">리드 → 상담 → 방문 → 등록: ${["lead", "consult", "visit", "enroll"].map((k) => n(d.funnel?.[k])).join(" → ")} (이탈 ${n(d.funnel?.lost)})</p>
        <p class="mut">등록자 나이대: ${dist(d.enrolledByAge)}</p><p class="mut">등록자 과목: ${dist(d.enrolledBySubject)}</p>
        <p class="mut">광고 리드 연령·성별: ${(d.leadsByAgeGender ?? []).slice(0, 6).map((x) => `${esc(x.age)} ${esc(x.gender)} ${pct(x.share)}`).join(" · ") || "–"}</p></div>`;
 }
