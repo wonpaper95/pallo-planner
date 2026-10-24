@@ -446,7 +446,7 @@ function renderOut() {
       <button type="button" class="btn ghost" id="blCopyAll" title="사진까지 한 번에 붙여넣기 (스마트에디터에서 안 될 수 있어요)">🧪 사진까지 통째 복사</button>
       <button type="button" class="btn ghost" id="blConv">🔁 인스타·당근·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
     </div></div>`;
-  check(); similarSoon();
+  check(); similarSoon(); publishUsed();
 }
 const pasteAsText = (ev) => { if (!ev.target.closest("[contenteditable]")) return; ev.preventDefault(); document.execCommand("insertText", false, ev.clipboardData.getData("text/plain")); };
 
@@ -457,20 +457,23 @@ function plainText() {
   return BL.post.blocks.map((b) => b.type === "photo" ? `📷 사진 ${pad(++n)}${b.caption ? ` — ${b.caption}` : ""}` : b.type === "divider" ? "────────" : b.type === "map" ? `📍 [지도: ${P().display || BL.teamName}]` : b.text).join("\n\n") + "\n\n" + tagsText();
 }
 const tagsText = () => (BL.post.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
-// 통째 복사용 사진: 스마트에디터 붙여넣기 한도 5MB → 블로그 크기(긴 변 1280px)로 줄이고, 넘치면 크기·화질을 낮춰 다시
-const PASTE_MAX = 4.6e6;
-function embedSizes() {
-  const ps = BL.post.blocks.filter((b) => b.type === "photo").map((b) => photoOf(b.pid)).filter(Boolean);
-  for (let side = 1280, q = 0.82; side >= 480; side = Math.round(side * 0.8), q = Math.max(0.6, q - 0.06)) {
-    const urls = new Map(ps.map((p) => [p.id, draw(p, side).cv.toDataURL("image/jpeg", q)]));
-    if ([...urls.values()].reduce((s, u) => s + u.length, 0) <= PASTE_MAX) return urls;
-  }
-  return null; // 사진이 너무 많아 한도 안에 못 넣음
+// 네이버 스마트에디터는 data:/blob: 이미지를 거부하고(“허용되지 않는 형식”) https 주소 이미지는 가져가서 다시 올린다.
+// → 모자이크 반영된 사진을 임시 공개 보관함(blog-temp, 무작위 이름, 2일 뒤 삭제)에 올려 그 주소로 붙여넣기·끌어놓기
+async function publish(p) {
+  if (p.pub && p.pubOf === p.url) return p.pub;
+  const path = `${BL.team}/${crypto.randomUUID()}.jpg`;
+  const { error } = await sb.storage.from("blog-temp").upload(path, p.blob, { contentType: "image/jpeg" });
+  if (error) throw error;
+  p.pub = sb.storage.from("blog-temp").getPublicUrl(path).data.publicUrl; p.pubOf = p.url;
+  return p.pub;
 }
+const publishUsed = debounce(async () => {
+  for (const pid of used()) { const p = photoOf(pid); if (p) try { await publish(p); } catch (e) { console.warn("사진 임시 올리기 실패", e); } }
+}, 600);
 async function richHtml(embed) {
   const lines = (t) => String(t).split("\n").map((l) => `<p>${l.trim() ? esc(l) : "<br>"}</p>`).join("");
-  const urls = embed ? embedSizes() : null;
-  if (embed && !urls) throw new Error("too-big");
+  const urls = new Map();
+  if (embed) for (const pid of used()) { const p = photoOf(pid); if (p) urls.set(p.id, await publish(p)); }
   let n = 0; const out = [];
   for (const b of BL.post.blocks) {
     if (b.type === "text") out.push(lines(b.text));
@@ -680,10 +683,10 @@ function wire() {
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
     if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 스마트에디터 본문에 붙여넣고 📷 사진 01 자리에 01번 사진을 올리세요"); return; }
     if (t.id === "blCopyAll") {
-      t.textContent = "🧪 준비 중…"; let big = false;
-      const html = richHtml(true); html.catch(() => { big = true; });
+      t.textContent = "🧪 사진 올리는 중…"; let failed = false;
+      const html = richHtml(true); html.catch(() => { failed = true; });
       const ok = await copy(plainText(), html); t.textContent = "🧪 사진까지 통째 복사";
-      if (ok) toast(big ? "사진이 많아 5MB를 넘어서 글자만 복사했어요. 사진은 시안에서 네이버 글쓰기로 끌어다 놓아 주세요" : "사진까지 복사했어요 (5MB 안으로 줄임). 사진이 빠지면 시안의 사진을 네이버로 끌어다 놓아 주세요");
+      if (ok) toast(failed ? "사진을 올리지 못해 글자만 복사했어요. 인터넷 연결을 확인하고 다시 눌러 주세요" : "사진까지 복사했어요. 네이버 글쓰기에 붙여넣으면 사진은 네이버가 가져가 올려요");
       return;
     }
     if (t.id === "blCopyTitle") { if (await copy(X.titles[X.sel])) toast("제목 복사했어요"); return; }
@@ -734,9 +737,12 @@ function wire() {
     const th = ev.target.closest?.("[data-thumb]"), sp = ev.target.closest?.("[data-spare]"), bk = ev.target.closest?.(".blk.photo");
     drag = th ? { kind: "thumb", i: +th.dataset.thumb } : sp ? { kind: "spare", pid: +sp.dataset.spare } : bk ? { kind: "blk", i: +bk.dataset.i } : null;
     if (!drag) return;
-    // 사진(<img>)을 잡고 끌면 크롬이 실제 이미지 파일을 같이 실어 줌 → 네이버 글쓰기 창에 바로 놓을 수 있다.
-    // 그 데이터를 덮어쓰지 않도록 text/plain 은 건드리지 않고, 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
+    // 네이버 글쓰기로 끌 때: 크롬 기본값은 blob: 주소라 네이버가 거부 → 미리 올려 둔 https 주소로 바꿔 실음 (다른 사이트 사진 끌어오기와 같은 방식)
+    // 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
     ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("application/x-pallo", "1");
+    const p = photoOf(drag.kind === "spare" ? drag.pid : drag.kind === "blk" ? BL.post?.blocks[drag.i]?.pid : 0);
+    if (p?.pub && p.pubOf === p.url) { ev.dataTransfer.setData("text/uri-list", p.pub); ev.dataTransfer.setData("text/html", `<img src="${p.pub}" alt="">`); }
+    else if (p) { publish(p).catch(() => {}); toast("사진을 준비하는 중이에요. 2~3초 뒤 다시 끌어 주세요"); }
     (th || sp || bk).classList.add("dragging");
   });
   v.addEventListener("dragend", () => { drag = null; v.querySelectorAll(".dragging, .dropbefore, .dropon").forEach((x) => x.classList.remove("dragging", "dropbefore", "dropon")); });

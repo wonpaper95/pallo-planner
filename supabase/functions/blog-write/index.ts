@@ -233,5 +233,13 @@ async function similar(team: Team, b: { text?: string; exclude_id?: number }) {
   return { matches };
 }
 
-// ── usage: 오늘 남은 횟수 ──
-async function usage(team: Team) { return { quota: await usedToday(team.id) }; }
+// ── usage: 오늘 남은 횟수 (블로그 탭 열 때마다 불림 → 그 김에 2일 지난 임시 사진 정리) ──
+async function usage(team: Team) {
+  await cleanTemp(team.id).catch((e) => console.error("blog-temp 정리 실패", e));
+  return { quota: await usedToday(team.id) };
+}
+async function cleanTemp(team: number) {
+  const { data } = await admin.storage.from("blog-temp").list(String(team), { limit: 1000 });
+  const old = (data ?? []).filter((f) => f.created_at && Date.now() - Date.parse(f.created_at) > 2 * 864e5).map((f) => `${team}/${f.name}`);
+  if (old.length) await admin.storage.from("blog-temp").remove(old);
+}
