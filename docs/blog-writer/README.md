@@ -64,3 +64,13 @@
 3. **배포:** `supabase functions deploy blog-write`, 마이그레이션 `supabase db push`, 프런트는 기존 방식대로(버전 문자열 `?v=` 와 version.txt 갱신 후 main 푸시).
 4. **실제 테스트:** 글 생성 품질, 얼굴 모자이크(MediaPipe short-range는 교실 원거리 얼굴을 놓칠 수 있음 → 2×2 조각으로 보완했지만 확인 필요), 스마트에디터 붙여넣기(서식·🧪 통째 복사), 아이폰 사진 저장(공유 시트) 동작.
 5. 맥북의 `keyword-map.md`·`strategy.md`(willyblog1 참조 파일)를 받아 동성로점 키워드 기본값에 반영.
+
+## 개선사항 자동 처리 (2026-10-24~)
+
+- 매니저: 블로그 탭 → [개선사항 보내기] → `feedback` 테이블에 `kind='blog'`로 저장 (대표 푸시·카톡은 기존 신고·제안 흐름 그대로).
+- 맥미니 예약 작업 `pallo-blog-feedback` (30분마다 9~22시): 새 건을 dusdn2295@gmail.com 으로 알리고 → `fb/blog-<id>` 브랜치에서 고쳐 푸시 → 완료 메일. **main·배포·운영 DB는 건드리지 않음.** 상태는 `~/.cache/pallo-planner-dev/blog-feedback-state.json`.
+- 사용자가 "개선사항 #<id> 배포해"라고 하면:
+  1. `fb/blog-<id>` 변경을 읽고 확인 → main 에 머지
+  2. 버전 올리기: `version.txt` 와 index.html 의 `?v=`·`app-version` 을 `TZ=Asia/Seoul date +%Y%m%d%H%M` 로 → main 푸시 (GitHub Pages)
+  3. 함수를 고쳤으면 `supabase functions deploy blog-write --project-ref aiqrchgwrfrmscstlsmv --use-api`, 마이그레이션이 있으면 `supabase db query --linked --project-ref aiqrchgwrfrmscstlsmv -f <파일>` (이 프로젝트는 db push 안 씀)
+  4. 운영 `feedback` 에서 그 id 의 status 를 `done` 으로 → 매니저 화면에 "✓ 반영됨"
