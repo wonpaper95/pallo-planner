@@ -21,6 +21,7 @@ export async function select(table, query, order) {
   const PAGE = 1000, out = [];
   for (let from = 0; ; from += PAGE) {
     const r = await fetch(`${URL_}/rest/v1/${table}?${q}`, { headers: { ...H, Range: `${from}-${from + PAGE - 1}`, "Range-Unit": "items" } });
+    if (r.status === 416) return out; // 범위 밖 = 데이터 끝 (딱 1000의 배수일 때)
     if (!r.ok) throw new Error(`${table} 읽기 실패 ${r.status}: ${await r.text()}`);
     const rows = await r.json();
     out.push(...rows);
