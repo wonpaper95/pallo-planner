@@ -30,4 +30,7 @@ body:not(.psv) #postView { display: none; }
 #postView .psthumb { width: 56px; height: 56px; flex: none; border-radius: 8px; object-fit: cover; background: var(--bg); display: grid; place-items: center; }
 #postView .psbadges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .blbadge.bad { color: var(--red); border-color: var(--red); }
+#postView .pslinks { margin-bottom: 12px; }
+#postView .pslinks .psrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#postView .pslinks .btn.off { opacity: .55; cursor: default; }
 @media (max-width: 560px) { #postView { padding: 12px 12px 100px; } }

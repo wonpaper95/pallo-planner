@@ -114,7 +114,7 @@ BL.load = async function () {
   if (prev !== BL.team || !BL.profile) {
     const row = (await sb.from("blog_profiles").select("data").eq("team_id", BL.team).maybeSingle()).data;
     BL.profile = { ...(DEF[defKey(BL.teamName)] ?? { display: BL.teamName, subjects: ["영어"], regions: [], mainKeywords: [], subKeywords: [], brandTags: ["팔로"] }), ...(row?.data ?? {}) };
-    BL.profileSaved = !!row;
+    BL.profileSaved = !!row && Object.keys(row.data ?? {}).some((k) => k !== "links"); // 게시물 탭 바로가기(links)만 저장된 행은 아직 지점 설정 전
     if (prev !== undefined && prev !== BL.team) { BL.post = null; BL.postId = null; }
     BL.opts = { mode: "photo", topic: "", facts: "", subject: "", preset: "auto", writer: P().writer || "director", age: "30대", reader: "worker", readerAge: "30대", tone: "friendly", concept: P().concept || "class", main_keyword: "", sub_keywords: [] };
   }

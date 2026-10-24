@@ -15,6 +15,7 @@ const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = set
 const kstDay = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
 const pub = (path) => sb.storage.from("sns").getPublicUrl(path).data.publicUrl;
 const chOf = (k) => C.CHANNELS.find((c) => c.key === k);
+const linkOf = (k) => PS.links?.[k] || chOf(k).open; // 지점이 저장한 바로가기, 없으면 채널 기본 주소
 const jobOf = (k) => PS.jobs.find((j) => j.channel === k);
 const facts = () => ({ photos: PS.photos.length, unfaced: PS.photos.filter((p) => !p.faced).length });
 const MARK = { ok: "✔", warn: "!", bad: "✕", info: "·" };
@@ -38,6 +39,7 @@ function shell() {
   V().innerHTML = `<div class="psbar"><h2>📸 게시물</h2><select id="psTeam" class="hidden"></select><span id="psTeamName" class="mut"></span>
     <div class="pstabs"><button type="button" data-pt="make">만들기</button><button type="button" data-pt="list">목록</button></div>
     <span id="psQuota" class="mut"></span></div>
+  <div id="psLinks" class="pslinks"></div>
   <div id="psBody"></div>
   <input type="file" id="psFile" accept="image/*" multiple hidden>`;
   wire();
@@ -61,6 +63,8 @@ PS.load = async function () {
   PS.teamName = (teams.find((t) => t.id === PS.team) ?? (await sb.from("teams").select("name").eq("id", PS.team).single()).data)?.name ?? "";
   $p("#psTeamName").textContent = boss ? "" : PS.teamName;
   if (prev !== undefined && prev !== PS.team) reset();
+  if (prev !== PS.team || !PS.links) PS.links = (await sb.from("blog_profiles").select("data").eq("team_id", PS.team).maybeSingle()).data?.data?.links ?? {};
+  renderLinks();
   call("usage").then((r) => r && setQuota(r.quota));
   renderTab();
 };
@@ -164,7 +168,7 @@ function renderOut() {
     <div class="blacts">
       <button type="button" class="btn" id="psCopy">📋 문구 복사</button>
       <button type="button" class="btn ghost" id="psPhotos">🖼 사진 ${k === "google" ? "1장" : "번호대로"} 받기</button>
-      <a class="btn ghost" href="${c.open}" target="_blank" rel="noopener">↗ ${esc(c.label.replace(/^\S+\s/, ""))} 열기</a>
+      <a class="btn ghost" href="${esc(linkOf(k))}" target="_blank" rel="noopener">↗ ${esc(c.label.replace(/^\S+\s/, ""))} 열기</a>
       ${doneBtn}
     </div></div>`;
   check();
@@ -264,6 +268,42 @@ async function photosOut() {
   await PHOTO.share(list, `${PS.teamName}_${chOf(PS.ch).label.replace(/^\S+\s/, "")}_${kstDay()}_사진${list.length}장.zip`);
 }
 
+// ── 바로가기: 지점마다 인스타·구글·네이버·당근 주소를 저장해 두고 한 번에 연다 (blog_profiles.data.links — 블로그 지점 설정과 같은 줄) ──
+const LINK_HINT = { instagram: "https://www.instagram.com/지점계정", google: "https://business.google.com/ (프로필 관리 주소)", naver: "https://new.smartplace.naver.com/ (소식 쓰기 주소)", daangn: "https://business.daangn.com/ (비즈프로필 주소)" };
+const okUrl = (u) => /^https?:\/\//i.test(u);
+function renderLinks(edit) {
+  const el = $p("#psLinks"); if (!el || !PS.team) return;
+  const L = PS.links ?? {};
+  if (edit) {
+    el.innerHTML = `<div class="card"><b>🔗 우리 지점 바로가기</b> <span class="mut">채널마다 올리는 곳 주소를 넣어 두면 [열기]가 바로 그곳으로 가요</span>
+      ${C.CHANNELS.map((c) => `<label>${c.label}</label><input data-lnk="${c.key}" value="${esc(L[c.key] ?? "")}" placeholder="${esc(LINK_HINT[c.key])}" style="width:100%">`).join("")}
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn ghost" id="psLnkCancel">취소</button><button type="button" class="btn" id="psLnkSave">저장</button></div></div>`;
+    return;
+  }
+  const set = C.CHANNELS.filter((c) => L[c.key]);
+  el.innerHTML = `<div class="psrow">${C.CHANNELS.map((c) => L[c.key]
+    ? `<a class="btn ghost small" href="${esc(L[c.key])}" target="_blank" rel="noopener">${c.label} ↗</a>`
+    : `<span class="btn ghost small off" title="주소가 없어요 — ✏️ 로 넣어 주세요">${c.label} ·</span>`).join("")}
+    <button type="button" class="btn ghost small" id="psLnkEdit">✏️ ${set.length ? "바로가기 수정" : "우리 지점 주소 넣기"}</button></div>`;
+}
+async function saveLinks() {
+  const L = {};
+  for (const c of C.CHANNELS) {
+    let u = $p(`[data-lnk="${c.key}"]`).value.trim();
+    if (!u) continue;
+    if (!/^[a-z]+:\/\//i.test(u)) u = "https://" + u; // 주소만 붙여넣어도 되게
+    if (!okUrl(u)) return toast(`${c.label} 주소는 http(s)로 시작해야 해요`);
+    L[c.key] = u;
+  }
+  const team = PS.team;
+  const row = (await sb.from("blog_profiles").select("data").eq("team_id", team).maybeSingle()).data; // 블로그 지점 설정을 덮어쓰지 않게 읽고 합친다
+  const data = { ...(row?.data ?? {}), links: L };
+  const { error } = await sb.from("blog_profiles").upsert({ team_id: team, data, updated_at: new Date().toISOString() });
+  if (fail(error)) return;
+  PS.links = L; if (window.BL?.profile && window.BL.team === team) window.BL.profile.links = L; // 블로그 탭이 같은 세션에서 저장해도 유지
+  toast("바로가기를 저장했어요"); renderLinks(); if (PS.post) renderOut();
+}
+
 // ── 목록: 내 지점 게시물 + 채널별 상태 ──
 const ORDER = Object.fromEntries(C.CHANNELS.map((c, i) => [c.key, i]));
 async function renderList() {
@@ -316,6 +356,9 @@ function wire() {
   v.addEventListener("click", async (ev) => {
     const t = ev.target, d = t.dataset ?? {};
     if (d.pt) { PS.tab = d.pt; return renderTab(); }
+    if (t.id === "psLnkEdit") return renderLinks(true);
+    if (t.id === "psLnkCancel") return renderLinks();
+    if (t.id === "psLnkSave") return saveLinks();
     if (t.closest?.("#psDrop")) return $p("#psFile").click();
     if (d.rm) { PS.photos = PS.photos.filter((p) => p.id !== +d.rm); renderThumbs(); return photosChanged(); }
     if (d.ed) {
