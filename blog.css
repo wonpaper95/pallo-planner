@@ -44,7 +44,7 @@ body:not(.blv) #blogView { display: none; }
 
 /* 시안 */
 .blempty { padding: 60px 20px; text-align: center; color: var(--sub); }
-.bltitles label.t { display: flex; gap: 8px; align-items: center; margin: 4px 0; color: var(--text); font-size: 15px; }
+#blogView .bltitles label.t { display: flex; gap: 8px; align-items: center; margin: 4px 0; color: var(--text); font-size: 15px; }
 .bltitles label.t input[type=text] { flex: 1; } .bltitles small { color: var(--sub); white-space: nowrap; }
 .blpaper { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 12px; max-width: 720px; }
 .blk { position: relative; margin: 0 0 10px; border-radius: 8px; }
@@ -92,4 +92,5 @@ body:not(.blv) #blogView { display: none; }
 @media (max-width: 900px) {
   .blgrid { grid-template-columns: minmax(0, 1fr); } .blform { position: static; max-height: none; }
   #blogView { padding: 10px 10px 80px; } .blpaper { padding: 12px; } .blk .tools { display: flex; }
+  .blacts { position: static; } .blacts .btn { flex: 1 1 45%; padding: 8px 10px; font-size: 14px; }
 }
