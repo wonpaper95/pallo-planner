@@ -21,7 +21,11 @@ class HttpError extends Error { constructor(public status: number, msg: string) 
 
 const URL_ = Deno.env.get("SUPABASE_URL")!;
 const admin = createClient(URL_, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const anthropic = new Anthropic(); // ANTHROPIC_API_KEY
+let client: Anthropic | null = null; // 키가 없어도 usage·similar 는 돌도록 쓸 때 만든다
+const anthropic = () => {
+  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new HttpError(503, "AI 키(ANTHROPIC_API_KEY)가 아직 연결되지 않았어요");
+  return (client ??= new Anthropic());
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -89,7 +93,7 @@ async function record(who: Who, team: number, kind: string, u?: Anthropic.Beta.B
 
 // ── Claude 호출 (구조화 출력 + 거절 시 서버 측 대체 모델) ──
 async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high") {
-  const msg = await anthropic.beta.messages.stream({
+  const msg = await anthropic().beta.messages.stream({
     model: MODEL,
     max_tokens: 32000,
     betas: ["server-side-fallback-2026-07-01"],
@@ -145,7 +149,9 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     content.push({ type: "text", text: `사진 ${i + 1}${ph.note ? ` (매니저 메모: ${ph.note})` : ""}` });
     content.push({ type: "image", source: { type: "base64", media_type: ph.media_type as "image/jpeg", data: ph.data } });
   });
-  const { out, usage } = await ask(sys(COMMON, `# 스타일 프리셋: ${preset.name}\n${preset.rules}`), content, POST_SCHEMA, "medium");
+  // 글쓰기 깊이: 서버 실행 시간 제한(무료 150초) 때문에 비밀값 BLOG_WRITE_EFFORT 로 조절 (low | medium)
+  const effort = Deno.env.get("BLOG_WRITE_EFFORT") === "medium" ? "medium" : "low";
+  const { out, usage } = await ask(sys(COMMON, `# 스타일 프리셋: ${preset.name}\n${preset.rules}`), content, POST_SCHEMA, effort);
   out.blocks = (out.blocks ?? []).map((x: any) => ({ ...x, photo: x.photo > 0 && x.photo <= photos.length ? x.photo : 0 }));
   return { post: out, quota: await record(who, team.id, "write", usage) };
 }
@@ -227,5 +233,13 @@ async function similar(team: Team, b: { text?: string; exclude_id?: number }) {
   return { matches };
 }
 
-// ── usage: 오늘 남은 횟수 ──
-async function usage(team: Team) { return { quota: await usedToday(team.id) }; }
+// ── usage: 오늘 남은 횟수 (블로그 탭 열 때마다 불림 → 그 김에 2일 지난 임시 사진 정리) ──
+async function usage(team: Team) {
+  await cleanTemp(team.id).catch((e) => console.error("blog-temp 정리 실패", e));
+  return { quota: await usedToday(team.id) };
+}
+async function cleanTemp(team: number) {
+  const { data } = await admin.storage.from("blog-temp").list(String(team), { limit: 1000 });
+  const old = (data ?? []).filter((f) => f.created_at && Date.now() - Date.parse(f.created_at) > 2 * 864e5).map((f) => `${team}/${f.name}`);
+  if (old.length) await admin.storage.from("blog-temp").remove(old);
+}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610222211">
+<meta name="app-version" content="202610242100">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -325,7 +325,7 @@ body:not(.sv) #salesView { display: none; }
 .bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
 @media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; }
-  #fbBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
+  #fbBtn .lbl, #consultBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -413,8 +413,8 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202610222211">
-<link rel="stylesheet" href="marketing.css?v=202610251200">
+<link rel="stylesheet" href="blog.css?v=202610242009">
+<link rel="stylesheet" href="marketing.css?v=202610242100">
 </head>
 <body>
 
@@ -438,6 +438,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <span id="previewBar" class="hidden" style="padding:2px 10px;border-radius:99px;background:var(--orange);color:#fff;font-size:12px;font-weight:600;cursor:pointer" title="누르면 대표 화면으로">👀 매니저 화면 미리보기 중 · 끄기</span>
     <span id="me"></span>
     <button id="todayBtn" class="btn ghost">오늘</button>
+    <a id="consultBtn" class="btn ghost" href="https://magical-buttercream-d5b901.netlify.app/" target="_blank" rel="noopener" title="상담 녹음·AI 피드백 (새 탭)" style="text-decoration:none">🎙️<span class="lbl"> 상담 AI</span></a>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
@@ -551,9 +552,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610222211"></script>
-<script src="week.js?v=202610222211"></script>
-<script src="pick.js?v=202610222211"></script>
+<script src="config.js?v=202610242009"></script>
+<script src="week.js?v=202610242009"></script>
+<script src="pick.js?v=202610242009"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -1714,9 +1715,9 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610222211"></script>
-<script src="blog.js?v=202610222211"></script>
-<script src="mk-core.js?v=202610251200"></script>
-<script src="marketing.js?v=202610251200"></script>
+<script src="sales.js?v=202610242009"></script>
+<script src="blog.js?v=202610242009"></script>
+<script src="mk-core.js?v=202610242100"></script>
+<script src="marketing.js?v=202610242100"></script>
 </body>
 </html>

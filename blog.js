@@ -24,22 +24,38 @@ const STRENGTH = "소수정예 수업, 1:1 언어교환, 토스·토플·IELTS·
 const DEF = {
   dsr: { display: "팔로 대구동성로점", address: "대구 중구 동성로2길 81, 5층", location: "동성로 중심, 중앙로역·반월당역 도보권", subjects: ["영어", "스페인어"],
     regions: ["대구", "동성로", "반월당", "중앙로"], strengths: STRENGTH + ", 스페인어 DELE 준비", brandTags: ["팔로", "팔로대구"], writer: "enfp",
-    mainKeywords: ["동성로 영어회화", "대구 성인영어회화", "대구 직장인 영어회화", "대구 스페인어학원", "대구 언어교환"],
-    subKeywords: ["대구 영어회화", "대구 영어회화학원", "대구 영어회화 1:1", "대구 영어회화학원 왕초보", "대구 영어회화 원어민", "대구 비즈니스 영어", "대구 오픽 학원", "대구 토익스피킹", "대구 토플 학원", "대구 아이엘츠학원", "동성로 영어회화 학원", "동성로 성인영어", "반월당 영어회화", "대구 영어 프리토킹", "대구 스페인어", "동성로 스페인어", "대구 스페인어 회화", "대구 DELE", "dele 시험 일정"] },
+    mainKeywords: ["대구 영어회화", "대구 영어회화학원", "대구 오픽학원", "대구 토익스피킹학원", "대구 성인영어회화"],
+    subKeywords: ["대구 영어학원", "대구 오픽", "대구 토스학원", "대구 토플학원", "대구 아이엘츠", "대구 아이엘츠학원", "대구 토익스피킹", "대구 토플", "대구 스페인어", "동성로 영어회화", "대구 스페인어학원", "대구 성인영어", "대구 회화학원", "대구 언어교환",
+      "DELE 시험", "DELE 시험 일정", "DELE B1", "스페인어 DELE", "대구 직장인 영어회화", "동성로 성인영어", "대구 영어회화 1:1", "반월당 영어회화"] },
   jpcn: { display: "팔로 대구일본어중국어점", address: "대구 중구 동성로3길 83, 4층", location: "동성로 상권 안쪽(공평동), 중앙로역·반월당역 인근", subjects: ["일본어", "중국어"],
     regions: ["대구", "동성로"], strengths: STRENGTH + ", 중국어 HSK 준비", brandTags: ["팔로", "팔로대구"],
-    mainKeywords: ["대구 일본어 회화", "대구 중국어 학원 성인", "대구 JLPT", "대구 HSK", "동성로 일본어 학원"],
-    subKeywords: ["대구 일본어학원", "대구 일본어", "대구일본어학원추천", "대구 일본어 스터디", "대구 일본어 회화 모임", "대구 일본어 과외", "동성로 JLPT", "대구 성인 일본어", "대구 직장인 일본어", "대구 일본어 학원 주말", "대구 JLPT N3", "대구 워홀 일본어", "대구 중국어학원", "대구 중국어 회화", "대구 중국어 스터디", "대구 HSK 학원", "대구 직장인 중국어", "대구 언어교환"] },
+    mainKeywords: ["대구 일본어학원", "대구 중국어학원", "대구 일본어", "대구 중국어", "대구 일본어회화"],
+    subKeywords: ["대구 중국어회화", "JLPT 대구", "동성로 일본어학원", "대구 언어교환", "대구 일본어스터디", "대구 JLPT", "대구 일본어회화학원", "대구 일본어학원 추천", "대구 일본어학원 수강료", "대구 중국어회화학원", "대구 JLPT학원", "동성로 일본어", "대구 HSK", "대구 HSK학원", "HSK 시험접수",
+      "대구 직장인 일본어", "대구 성인 일본어", "대구 워홀 일본어", "대구 직장인 중국어"] },
   ulsan: { display: "팔로 울산점", address: "울산 남구 삼산중로 67, 7층", location: "삼산동, 롯데백화점·현대백화점 울산점 인근", subjects: ["영어", "일본어", "스페인어"],
     regions: ["울산", "삼산동", "삼산", "달동"], strengths: STRENGTH + ", 스페인어 DELE 준비", brandTags: ["팔로", "팔로울산"],
-    mainKeywords: ["삼산동 영어회화", "울산 성인 영어회화", "울산 일본어 학원 직장인", "울산 언어교환", "울산 스페인어학원"],
-    subKeywords: ["울산 영어회화", "울산 영어회화 성인반", "울산 성인 영어학원", "울산 영어회화 1:1", "울산 직장인 영어회화", "울산 영어 회화 스터디", "울산 오픽", "울산 토익스피킹", "울산 토플", "울산 아이엘츠", "삼산동 영어학원", "울산 일본어학원", "울산 일본어 회화 학원", "울산 일본어 학원 주말", "삼산동 일본어", "울산 JLPT", "울산 워홀 일본어", "울산 스페인어 회화", "울산 DELE", "삼산동 스페인어"] },
+    mainKeywords: ["울산 일본어학원", "울산 영어회화", "울산 영어학원", "울산 영어회화학원", "울산 토익스피킹"],
+    subKeywords: ["울산 성인영어회화", "울산 일본어", "울산 오픽", "삼산동 영어", "울산 스페인어", "울산 성인영어", "울산 아이엘츠", "울산 토플", "울산 아이엘츠학원", "울산 JLPT", "울산 언어교환", "울산 직장인 영어",
+      "삼산동 영어회화", "삼산동 일본어", "울산 일본어 학원 직장인", "울산 일본어 학원 주말", "DELE 시험 일정", "울산 DELE"] },
   gumi: { display: "팔로 구미점", address: "경북 구미시 옥계북로 34, 7층", location: "옥계동", subjects: ["영어", "일본어"],
     regions: ["구미", "옥계", "인동", "산동"], strengths: STRENGTH, brandTags: ["팔로", "팔로구미"], concept: "opening", notes: "오픈 준비 중 — 오픈 소식·사전 상담 위주",
-    mainKeywords: ["구미 영어회화 성인반", "구미 성인 영어회화", "옥계동 영어회화", "구미 일본어 회화", "구미 영어학원 성인"],
-    subKeywords: ["구미 영어회화", "구미 영어학원", "구미 영어회화 학원", "구미 직장인 영어회화", "구미 영어스터디", "구미 토익 스피킹 학원", "구미 오픽", "구미 영어회화 과외", "옥계 영어회화 학원", "인동 영어회화", "구미 일본어", "구미 일본어 학원", "구미 성인 일본어", "옥계 일본어", "구미 JLPT", "구미 언어교환"] },
+    mainKeywords: ["구미 영어학원", "구미 일본어학원", "구미 일본어", "구미 영어회화", "구미 영어회화학원"],
+    subKeywords: ["옥계 영어", "구미 오픽", "구미 토익스피킹", "구미 성인영어회화", "구미 성인영어학원", "구미 성인영어", "구미 JLPT", "구미 언어교환",
+      "옥계동 영어회화", "구미 직장인 영어회화", "구미 영어회화 성인반", "구미 성인 일본어", "옥계 일본어"] },
 };
-const defKey = (n) => /일본어|중국어/.test(n) ? "jpcn" : /울산/.test(n) ? "ulsan" : /구미/.test(n) ? "gumi" : /동성로|대구/.test(n) ? "dsr" : null;
+// 네이버 검색광고 월간 검색수(PC+모바일), 2026-10-24 조회. 칩 옆에 보여 줌 (공백 빼고 맞춤). 없는 건 10 미만이거나 미조회
+const VOL = { 대구영어회화: 1370, 대구영어회화학원: 560, 대구오픽학원: 300, 대구토익스피킹학원: 270, 대구성인영어회화: 200, 대구영어학원: 610, 대구오픽: 230, 대구토스학원: 230, 대구토플학원: 190,
+  대구아이엘츠: 140, 대구아이엘츠학원: 120, 대구토익스피킹: 120, 대구토플: 90, 대구스페인어: 80, 동성로영어회화: 70, 대구스페인어학원: 60, 대구성인영어: 60, 대구회화학원: 55, 대구언어교환: 40,
+  DELE시험: 770, DELE시험일정: 190, DELEB1: 120, 스페인어DELE: 100,
+  대구일본어학원: 890, 대구중국어학원: 300, 대구일본어: 290, 대구중국어: 230, 대구일본어회화: 200, 대구중국어회화: 60, JLPT대구: 50, 동성로일본어학원: 40, 대구일본어스터디: 35, 대구JLPT: 30,
+  대구일본어회화학원: 30, 대구일본어학원추천: 30, 대구일본어학원수강료: 30, 대구중국어회화학원: 25, 대구JLPT학원: 20, 동성로일본어: 15, 대구HSK: 15, 대구HSK학원: 10, HSK시험접수: 2100,
+  울산일본어학원: 420, 울산영어회화: 410, 울산영어학원: 280, 울산영어회화학원: 210, 울산토익스피킹: 110, 울산성인영어회화: 90, 울산일본어: 80, 울산오픽: 70, 삼산동영어: 40, 울산스페인어: 30,
+  울산성인영어: 30, 울산아이엘츠: 25, 울산토플: 15, 울산아이엘츠학원: 15, 울산JLPT: 10, 울산언어교환: 10, 울산직장인영어: 10,
+  구미영어학원: 220, 구미일본어학원: 100, 구미일본어: 90, 구미영어회화: 80, 구미영어회화학원: 65, 옥계영어: 60, 구미오픽: 30, 구미토익스피킹: 15, 구미성인영어회화: 15, 구미성인영어학원: 15,
+  구미성인영어: 15, 구미JLPT: 10, 구미언어교환: 10 };
+const vol = (k) => VOL[k.replace(/\s/g, "")] ?? BL.kw?.find((x) => x.keyword === k.replace(/\s/g, ""))?.total;
+// 운영 지점 이름: 구미점·대구영어점·울산점·대구일중점
+const defKey = (n) => /일본어|중국어|일중/.test(n) ? "jpcn" : /울산/.test(n) ? "ulsan" : /구미/.test(n) ? "gumi" : /동성로|대구/.test(n) ? "dsr" : null;
 
 const V = () => document.getElementById("blogView");
 const $b = (s) => V().querySelector(s);
@@ -67,7 +83,7 @@ async function call(action, body = {}) {
 function shell() {
   V().dataset.ready = 1;
   V().innerHTML = `<div class="blbar"><h2>✍️ 블로그</h2><select id="blTeam" class="hidden"></select><span id="blTeamName" class="mut"></span>
-    <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button></div>
+    <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button><button data-bt="fb">개선사항 보내기</button></div>
     <span id="blQuota" class="mut"></span></div>
   <div id="blBody"></div>
   <input type="file" id="blFile" accept="image/*" multiple hidden>
@@ -126,7 +142,30 @@ function renderTab() {
   if (BL.tab === "new") renderNew();
   else if (BL.tab === "list") renderList();
   else if (BL.tab === "profile") renderProfile();
+  else if (BL.tab === "fb") renderFb();
   else renderUsage();
+}
+
+// ── 개선사항 보내기: 플래너 🐞 신고·제안(feedback)에 kind=blog 로 넣음 → 대표 푸시·카톡 + 맥미니 예약 작업이 메일·작업 브랜치 ──
+async function renderFb() {
+  $b("#blBody").innerHTML = `<div class="card blset"><h3 style="margin:0 0 4px">💬 블로그 개선사항 보내기</h3>
+    <p class="mut" style="margin:0">불편한 점이나 있으면 좋을 기능을 적어 주세요. 대표님께 바로 알림이 가고, 반영되면 아래에서 "반영됨"으로 바뀌어요.</p>
+    <div class="blseg" id="blFbKind" style="margin-top:12px"><button type="button" data-fbk="bug" class="on">🐞 불편·오류</button><button type="button" data-fbk="idea">💡 아이디어</button></div>
+    <textarea id="blFbBody" style="min-height:7em;margin-top:10px" placeholder="예) 사진이 10장 넘으면 시안이 늦게 나와요 / 제목에 지점명이 자동으로 들어가면 좋겠어요"></textarea>
+    <div style="text-align:right;margin-top:10px"><button type="button" class="btn" id="blFbSend">보내기</button></div></div>
+    <h3 style="margin:18px 0 8px">${isBoss && !previewTeam ? "받은 블로그 개선사항" : "내가 보낸 개선사항"}</h3><div class="bllist" id="blFbList"><div class="mut">불러오는 중…</div></div>`;
+  const { data, error } = await sb.rpc("feedback_list"); if (fail(error)) return;
+  const list = (data ?? []).filter((x) => x.kind === "blog");
+  $b("#blFbList").innerHTML = list.length ? list.map((x) => `<div class="card"><div class="t"><b style="font-weight:500;white-space:pre-wrap">${esc(x.body)}</b>
+      <span class="mut">${x.created_at.slice(0, 10)}${x.who ? ` · ${esc(x.who)}${x.team ? `(${esc(x.team)})` : ""}` : ""}</span></div>
+      <span class="blbadge ${x.status === "new" ? "" : "pub"}">${x.status === "new" ? "확인 중" : "✓ 반영됨"}</span></div>`).join("")
+    : `<div class="card blempty">아직 보낸 개선사항이 없어요.</div>`;
+}
+async function sendFb() {
+  const t = $b("#blFbBody").value.trim(); if (t.length < 2) return toast("내용을 적어 주세요");
+  const k = $b("#blFbKind .on")?.dataset.fbk === "idea" ? "💡 아이디어" : "🐞 불편·오류";
+  const { error } = await sb.from("feedback").insert({ kind: "blog", body: `✍️ 블로그 ${k}: ${t}` }); if (fail(error)) return;
+  toast("보냈어요. 대표님께 알림이 가요"); renderFb();
 }
 
 // ── 새 글: 입력 ──
@@ -178,7 +217,7 @@ function presetWhy() {
 // 사진 썸네일
 function renderThumbs() {
   const el = $b("#blThumbs"); if (!el) return;
-  el.innerHTML = BL.photos.map((p, i) => `<div class="blthumb" draggable="true" data-thumb="${i}"><img src="${p.url}" alt=""><span class="no">${pad(i + 1)}</span>
+  el.innerHTML = BL.photos.map((p, i) => `<div class="blthumb" draggable="true" data-thumb="${i}"><img src="${p.url}" alt="" draggable="false"><span class="no">${pad(i + 1)}</span>
     <button type="button" class="x" data-rm="${p.id}" title="빼기">✕</button><button type="button" class="ed" data-ed="${p.id}">편집</button>${p.faced ? `<span class="face">🙂${p.edits.blurs.length || ""}</span>` : ""}
     <input data-note="${p.id}" value="${esc(p.note)}" placeholder="메모"></div>`).join("");
   const n = BL.photos.length, unchecked = BL.photos.filter((p) => !p.faced).length;
@@ -188,7 +227,7 @@ function renderChips() {
   const el = $b("#blChips"); if (!el) return;
   const o = BL.opts, re = SUBJ_RE[o.subject];
   const all = [...new Set([...(P().mainKeywords ?? []), ...BL.extraKw, ...(P().subKeywords ?? [])])].filter((k) => !re || re.test(k) || /언어교환/.test(k));
-  el.innerHTML = all.slice(0, 28).map((k) => `<button type="button" class="blchip ${k === o.main_keyword ? "main" : o.sub_keywords.includes(k) ? "sub" : ""}" data-chip="${esc(k)}">${esc(k)}</button>`).join("");
+  el.innerHTML = all.slice(0, 28).map((k) => `<button type="button" class="blchip ${k === o.main_keyword ? "main" : o.sub_keywords.includes(k) ? "sub" : ""}" data-chip="${esc(k)}" title="네이버 월간 검색수">${esc(k)}${vol(k) ? ` <small>· ${vol(k).toLocaleString()}</small>` : ""}</button>`).join("");
 }
 
 // ── 사진: 읽기·편집·굽기 ──
@@ -354,7 +393,7 @@ async function generate() {
   if (o.mode === "topic" && !o.topic.trim()) return toast("주제를 적어 주세요");
   if (BL.post && !confirm(`지금 시안을 새 시안으로 바꿀까요?${BL.quota ? ` (오늘 남은 ${BL.quota.limit - BL.quota.used}회)` : ""}`)) return;
   const preset = o.preset === "auto" ? recommend(o)[0] : o.preset;
-  const btn = $b("#blGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초~1분)";
+  const btn = $b("#blGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초 안팎)";
   $b("#blGoNote").textContent = "사진을 보고 → 초안 → 편집장 시점 점검 → 수정까지 한 번에 해요";
   try {
     const r = await call("write", { photos: BL.photos.map((p) => ({ data: p.ai, media_type: "image/jpeg", note: p.note })), options: { ...o, preset } });
@@ -396,6 +435,7 @@ function renderOut() {
     <div class="blchips">${(X.thumbnail_texts ?? []).map((t) => `<button type="button" class="blchip" data-copy="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="mut" style="margin-top:10px">메인 <b>${esc(X.main_keyword)}</b> · 서브 ${esc((X.sub_keywords ?? []).join(", "))} · ${esc(presetName(X.opts?.preset))}</div>
     ${spare.length ? `<div class="mut" style="margin-top:10px">안 쓴 사진 — 본문으로 끌어다 놓으세요</div><div class="bltray">${spare.map((p) => `<div class="blthumb" draggable="true" data-spare="${p.id}"><img src="${p.url}" alt=""></div>`).join("")}</div>` : ""}
+    <div class="mut" style="margin-top:10px">💡 시안의 사진은 네이버 글쓰기 창으로 바로 끌어다 놓을 수 있어요 (크롬)</div>
     <div class="blpaper" id="blPaper">${X.blocks.map((b, i) => blockHtml(b, i, b.type === "photo" ? ++n : n)).join("")}</div>
     <div class="bltags" id="blTags" contenteditable="true">${esc((X.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" "))}</div>
     <details style="margin-top:10px"><summary class="mut">🔁 AI 자체 검수 메모</summary><div class="mut" style="white-space:pre-wrap;margin-top:6px">${esc(X.self_review)}</div></details>
@@ -406,7 +446,7 @@ function renderOut() {
       <button type="button" class="btn ghost" id="blCopyAll" title="사진까지 한 번에 붙여넣기 (스마트에디터에서 안 될 수 있어요)">🧪 사진까지 통째 복사</button>
       <button type="button" class="btn ghost" id="blConv">🔁 인스타·당근·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
     </div></div>`;
-  check(); similarSoon();
+  check(); similarSoon(); publishUsed();
 }
 const pasteAsText = (ev) => { if (!ev.target.closest("[contenteditable]")) return; ev.preventDefault(); document.execCommand("insertText", false, ev.clipboardData.getData("text/plain")); };
 
@@ -417,16 +457,30 @@ function plainText() {
   return BL.post.blocks.map((b) => b.type === "photo" ? `📷 사진 ${pad(++n)}${b.caption ? ` — ${b.caption}` : ""}` : b.type === "divider" ? "────────" : b.type === "map" ? `📍 [지도: ${P().display || BL.teamName}]` : b.text).join("\n\n") + "\n\n" + tagsText();
 }
 const tagsText = () => (BL.post.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
-const dataUrl = (blob) => new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+// 네이버 스마트에디터는 data:/blob: 이미지를 거부하고(“허용되지 않는 형식”) https 주소 이미지는 가져가서 다시 올린다.
+// → 모자이크 반영된 사진을 임시 공개 보관함(blog-temp, 무작위 이름, 2일 뒤 삭제)에 올려 그 주소로 붙여넣기·끌어놓기
+async function publish(p) {
+  if (p.pub && p.pubOf === p.url) return p.pub;
+  const path = `${BL.team}/${crypto.randomUUID()}.jpg`;
+  const { error } = await sb.storage.from("blog-temp").upload(path, p.blob, { contentType: "image/jpeg" });
+  if (error) throw error;
+  p.pub = sb.storage.from("blog-temp").getPublicUrl(path).data.publicUrl; p.pubOf = p.url;
+  return p.pub;
+}
+const publishUsed = debounce(async () => {
+  for (const pid of used()) { const p = photoOf(pid); if (p) try { await publish(p); } catch (e) { console.warn("사진 임시 올리기 실패", e); } }
+}, 600);
 async function richHtml(embed) {
   const lines = (t) => String(t).split("\n").map((l) => `<p>${l.trim() ? esc(l) : "<br>"}</p>`).join("");
+  const urls = new Map();
+  if (embed) for (const pid of used()) { const p = photoOf(pid); if (p) urls.set(p.id, await publish(p)); }
   let n = 0; const out = [];
   for (const b of BL.post.blocks) {
     if (b.type === "text") out.push(lines(b.text));
     else if (b.type === "quote") out.push(`<blockquote><p><b>${esc(b.text)}</b></p></blockquote>`);
     else if (b.type === "divider") out.push("<hr>");
     else if (b.type === "map") out.push(`<p>📍 [지도: ${esc(P().display || BL.teamName)}]</p>`);
-    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${await dataUrl(p.blob)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
+    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${urls.get(p.id)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
     out.push("<p><br></p>");
   }
   out.push(`<p>${esc(tagsText())}</p>`);
@@ -438,7 +492,8 @@ async function copy(text, html) {
     if (html && window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/html": html.then((h) => new Blob([h], { type: "text/html" })), "text/plain": new Blob([text], { type: "text/plain" }) })]);
     else await navigator.clipboard.writeText(text);
     return true;
-  } catch {
+  } catch (e) {
+    console.warn("clipboard.write 실패 → 글자만 복사", e);
     const t = document.createElement("textarea"); t.value = text; document.body.append(t); t.select();
     const ok = document.execCommand("copy"); t.remove(); if (!ok) toast("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"); return ok;
   }
@@ -600,8 +655,9 @@ function wire() {
     if (d.rm) { BL.photos = BL.photos.filter((p) => p.id !== +d.rm); renderThumbs(); presetWhy(); if (X) renderOut(); return; }
     if (d.ed) return openEditor(+d.ed);
     if (t.id === "blFaceAll") return faceAll();
-    if (d.chip) {
-      const o = BL.opts, k = d.chip;
+    const chip = t.closest("[data-chip]");
+    if (chip) {
+      const o = BL.opts, k = chip.dataset.chip;
       if (o.main_keyword === k) o.main_keyword = "";
       else if (o.sub_keywords.includes(k)) { o.sub_keywords = o.sub_keywords.filter((x) => x !== k); o.main_keyword = k; }
       else o.sub_keywords.push(k);
@@ -626,7 +682,13 @@ function wire() {
     if (d.add) { X.blocks.splice(+d.add + 1, 0, { type: "text", text: "", photo: 0, caption: "", pid: 0 }); renderOut(); v.querySelector(`[data-tx="${+d.add + 1}"]`)?.focus(); return; }
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
     if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 스마트에디터 본문에 붙여넣고 📷 사진 01 자리에 01번 사진을 올리세요"); return; }
-    if (t.id === "blCopyAll") { t.textContent = "🧪 준비 중…"; const ok = await copy(plainText(), richHtml(true)); t.textContent = "🧪 사진까지 통째 복사"; if (ok) toast("사진까지 복사했어요. 스마트에디터에서 사진이 빠지면 [본문 복사]로 해 주세요"); return; }
+    if (t.id === "blCopyAll") {
+      t.textContent = "🧪 사진 올리는 중…"; let failed = false;
+      const html = richHtml(true); html.catch(() => { failed = true; });
+      const ok = await copy(plainText(), html); t.textContent = "🧪 사진까지 통째 복사";
+      if (ok) toast(failed ? "사진을 올리지 못해 글자만 복사했어요. 인터넷 연결을 확인하고 다시 눌러 주세요" : "사진까지 복사했어요. 네이버 글쓰기에 붙여넣으면 사진은 네이버가 가져가 올려요");
+      return;
+    }
     if (t.id === "blCopyTitle") { if (await copy(X.titles[X.sel])) toast("제목 복사했어요"); return; }
     if (t.id === "blTagsCopy") { if (await copy(tagsText())) toast("해시태그 복사했어요"); return; }
     if (t.id === "blPhotos") return photosOut();
@@ -648,6 +710,8 @@ function wire() {
       if (!fail(error)) { if (BL.postId === +d.delp) { BL.postId = null; } renderList(); } return;
     }
     if (t.id === "blPfSave") return saveProfile();
+    if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
+    if (t.id === "blFbSend") return sendFb();
   });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset, X = BL.post;
@@ -673,13 +737,18 @@ function wire() {
     const th = ev.target.closest?.("[data-thumb]"), sp = ev.target.closest?.("[data-spare]"), bk = ev.target.closest?.(".blk.photo");
     drag = th ? { kind: "thumb", i: +th.dataset.thumb } : sp ? { kind: "spare", pid: +sp.dataset.spare } : bk ? { kind: "blk", i: +bk.dataset.i } : null;
     if (!drag) return;
-    ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", "pallo");
+    // 네이버 글쓰기로 끌 때: 크롬 기본값은 blob: 주소라 네이버가 거부 → 미리 올려 둔 https 주소로 바꿔 실음 (다른 사이트 사진 끌어오기와 같은 방식)
+    // 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
+    ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("application/x-pallo", "1");
+    const p = photoOf(drag.kind === "spare" ? drag.pid : drag.kind === "blk" ? BL.post?.blocks[drag.i]?.pid : 0);
+    if (p?.pub && p.pubOf === p.url) { ev.dataTransfer.setData("text/uri-list", p.pub); ev.dataTransfer.setData("text/html", `<img src="${p.pub}" alt="">`); }
+    else if (p) { publish(p).catch(() => {}); toast("사진을 준비하는 중이에요. 2~3초 뒤 다시 끌어 주세요"); }
     (th || sp || bk).classList.add("dragging");
   });
   v.addEventListener("dragend", () => { drag = null; v.querySelectorAll(".dragging, .dropbefore, .dropon").forEach((x) => x.classList.remove("dragging", "dropbefore", "dropon")); });
   v.addEventListener("dragover", (ev) => {
     const drop = ev.target.closest?.("#blDrop, #blThumbs");
-    if (ev.dataTransfer.types.includes("Files") && drop) { ev.preventDefault(); $b("#blDrop")?.classList.add("over"); return; }
+    if (!drag && ev.dataTransfer.types.includes("Files") && drop) { ev.preventDefault(); $b("#blDrop")?.classList.add("over"); return; }
     if (!drag) return;
     const th = ev.target.closest?.("[data-thumb]"), bk = ev.target.closest?.(".blk"), paper = ev.target.closest?.("#blPaper");
     if (drag.kind === "thumb" && th) { ev.preventDefault(); return; }
@@ -692,7 +761,7 @@ function wire() {
   v.addEventListener("dragleave", (ev) => { if (ev.target.id === "blDrop") ev.target.classList.remove("over"); });
   v.addEventListener("drop", (ev) => {
     $b("#blDrop")?.classList.remove("over");
-    if (ev.dataTransfer.files?.length && ev.target.closest?.("#blDrop, #blThumbs")) { ev.preventDefault(); return addFiles([...ev.dataTransfer.files]); }
+    if (!drag && ev.dataTransfer.files?.length && ev.target.closest?.("#blDrop, #blThumbs")) { ev.preventDefault(); return addFiles([...ev.dataTransfer.files]); }
     if (!drag) return;
     ev.preventDefault();
     const X = BL.post, th = ev.target.closest?.("[data-thumb]"), bk = ev.target.closest?.(".blk");
