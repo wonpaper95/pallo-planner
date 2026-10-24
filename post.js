@@ -243,12 +243,13 @@ async function renderList() {
   const { data, error } = await sb.from("sns_posts").select("id, topic, draft, photos, created_at, sns_jobs(channel, status, run_at, result_url, error_ko)")
     .eq("team_id", PS.team).order("created_at", { ascending: false }).limit(60);
   if (fail(error)) return;
+  if (PS.tab !== "list") return; // 기다리는 사이 [만들기]로 옮겼으면 덮어쓰지 않는다
   $p("#psBody").innerHTML = data.length ? `<div class="bllist">${data.map((x) => {
     const jobs = [...x.sns_jobs].sort((a, b) => ORDER[a.channel] - ORDER[b.channel]);
     return `<div class="card">
       ${x.photos?.[0] ? `<img class="psthumb" src="${esc(pub(x.photos[0].path))}" alt="" loading="lazy">` : `<div class="psthumb">📝</div>`}
-      <div class="t"><b>${esc(C.titleOf(x))}</b><span class="mut">${x.created_at.slice(0, 10)} · 사진 ${x.photos?.length ?? 0}장</span>
-        <div class="psbadges">${jobs.map((j) => { const b = C.badge(j); return j.result_url
+      <div class="t"><b>${esc(C.titleOf(x))}</b><span class="mut">${new Date(Date.parse(x.created_at) + 9 * 3600e3).toISOString().slice(0, 10)} · 사진 ${x.photos?.length ?? 0}장</span>
+        <div class="psbadges">${jobs.map((j) => { const b = C.badge(j); return /^https?:\/\//i.test(j.result_url)
           ? `<a class="blbadge ${b.cls}" href="${esc(j.result_url)}" target="_blank" rel="noopener">${esc(chOf(j.channel).label)} ${esc(b.text)} ↗</a>`
           : `<span class="blbadge ${b.cls}">${esc(chOf(j.channel).label)} ${esc(b.text)}</span>`; }).join("") || `<span class="mut">고른 채널 없음</span>`}</div></div>
       <button type="button" class="btn ghost small" data-open="${x.id}">열기</button><button type="button" class="btn ghost small" data-delp="${x.id}">삭제</button></div>`; }).join("")}</div>`

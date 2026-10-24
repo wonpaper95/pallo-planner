@@ -60,6 +60,12 @@ begin
     raise exception '게시물과 작업의 지점이 달라요';
   end if;
   if current_user in ('service_role', 'postgres', 'supabase_admin') then return new; end if;
+  -- 결과 주소·오류·시도 횟수 등은 서버(자동 게시)만 쓰는 칸이라 사람은 못 바꾼다
+  if tg_op = 'INSERT' then
+    new.result_url := null; new.external_id := null; new.error := null; new.error_ko := null; new.next_try_at := null; new.tries := 0;
+  else
+    new.result_url := old.result_url; new.external_id := old.external_id; new.error := old.error; new.error_ko := old.error_ko; new.next_try_at := old.next_try_at; new.tries := old.tries;
+  end if;
   if new.method <> 'manual' or new.status not in ('waiting_copy', 'done_manual') then
     raise exception '자동 게시 상태는 서버만 바꿀 수 있어요';
   end if;
