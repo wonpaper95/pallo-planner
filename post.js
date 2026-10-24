@@ -116,18 +116,18 @@ async function faceAll() {
 async function generate() {
   if (!PS.photos.length && !PS.topic.trim()) return toast("사진을 올리거나 주제를 적어 주세요");
   if (PS.post && !confirm("지금 문구를 새로 만든 문구로 바꿀까요? (고친 내용은 사라져요)")) return;
-  const team = PS.team; // 기다리는 사이 대표가 지점을 바꾸면 결과를 버린다
+  const team = PS.team, X0 = PS.post; // 기다리는 사이 대표가 지점을 바꾸거나 다른 게시물을 열면 결과를 버린다
   const btn = $p("#psGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초 안팎)";
   $p("#psGoNote").textContent = "공통 원고 → 인스타 · 구글 · 네이버 · 당근 순서로 다시 써요";
   try {
     const r = await call("sns", { photos: PS.photos.map((p) => ({ data: p.ai, media_type: "image/jpeg", note: p.note })), topic: PS.topic, tone: PS.tone });
     if (!r) return;
+    if (PS.team !== team || PS.post !== X0) return;
     setQuota(r.quota);
-    if (PS.team !== team) return;
     const n = C.normalizeAi(r.result);
     PS.post = { ...(PS.post ?? {}), topic: PS.topic, tone: PS.tone, draft: n.draft, channels: n.channels, self_review: n.self_review };
     renderOut(); await save(); renderOut();
-    $p("#psOut").scrollIntoView({ behavior: "smooth", block: "start" });
+    $p("#psOut")?.scrollIntoView({ behavior: "smooth", block: "start" });
   } finally {
     const b = $p("#psGo"), note = $p("#psGoNote"); // 화면이 다시 그려졌을 수 있어 다시 찾는다
     if (b) { b.disabled = false; b.textContent = "✨ 문구 만들기"; }
@@ -198,14 +198,14 @@ async function uploadPhotos(team) {
   }
   const out = [];
   for (const p of [...PS.photos]) {
-    if (!(p.path && p.pathOf === p.url)) {
-      const url = p.url, blob = p.blob; // 올리는 동안 [편집]으로 사진이 바뀌어도 올린 것과 같은 걸로 기록한다
+    const url = p.url, blob = p.blob, w = p.w, h = p.h; // 올리는 동안 [편집]으로 사진이 바뀌어도 올린 것과 같은 걸로 기록한다
+    if (!(p.path && p.pathOf === url)) {
       const path = `${team}/${crypto.randomUUID()}.jpg`;
       const { error } = await sb.storage.from("sns").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
       p.path = path; p.pathOf = url;
     }
-    out.push({ path: p.path, w: p.w, h: p.h });
+    out.push({ path: p.path, w, h });
   }
   return out;
 }
@@ -220,7 +220,10 @@ async function save() {
     if (PS.team !== team) return;
     const row = { topic: X.topic ?? "", tone: X.tone ?? "friendly", draft: X.draft ?? "", photos, channels: X.channels, updated_at: new Date().toISOString() };
     let ok = false;
-    if (X.id) ok = !fail((await sb.from("sns_posts").update(row).eq("id", X.id)).error);
+    if (X.id) { // 고친 줄이 정확히 1개일 때만 성공으로 본다 (0개면 남의 지점·삭제된 글이라 저장이 안 된 것)
+      const { data, error } = await sb.from("sns_posts").update(row).eq("id", X.id).select("id");
+      if (!fail(error)) { ok = data?.length === 1; if (!ok) toast("저장하지 못했어요. 새로고침 후 다시 해 주세요"); }
+    }
     else {
       const { data, error } = await sb.from("sns_posts").insert({ team_id: team, ...row }).select("id").single();
       if (!fail(error)) { ok = true; X.id = data.id; if (PS.post === X) { await syncJobs(team); renderOut(); } }

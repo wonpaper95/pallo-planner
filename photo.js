@@ -113,7 +113,7 @@ async function findFaces(p) {
 // 아직 확인 안 한 사진만 돌림. 찾은 얼굴 수를 돌려준다 (불러오기 실패면 throw)
 async function faceAll(list) {
   let n = 0;
-  for (const p of list.filter((x) => !x.faced)) { const f = await findFaces(p); p.edits.blurs.push(...f); p.faced = true; n += f.length; await bake(p); }
+  for (const p of list.filter((x) => !x.faced)) { const f = await findFaces(p); p.edits.blurs.push(...f); n += f.length; await bake(p); p.faced = true; /* 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감 */ }
   return n;
 }
 
@@ -196,8 +196,9 @@ function wireEditor() {
   };
   $e("#phEdCancel").onclick = () => dlg.close();
   $e("#phEdSave").onclick = async () => {
-    const p = ED.p; p.edits = ED.e; p.note = $e("#phEdNote").value.trim(); p.faced = true; // 편집 창에서 직접 봤으면 확인한 것으로
-    await bake(p); dlg.close(); ED.onSave?.(p);
+    const p = ED.p; p.edits = ED.e; p.note = $e("#phEdNote").value.trim();
+    await bake(p); p.faced = true; // 편집 창에서 직접 봤으면 확인한 것으로. 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감
+    dlg.close(); ED.onSave?.(p);
   };
 }
 
