@@ -18,6 +18,8 @@
 - 권한: 매니저 = 자기 지점 읽기만, 대표(role=admin) = 전 지점 + CSV 업로드. 리포트·리드 쓰기는 서비스 키(스킬)만.
 - 서비스 키는 채팅에 붙여넣지 않는다. `~/.config/pallo/marketing.env` (권한 600)에 대표가 직접 넣는다.
 - 코드 스타일은 `blog.js` 를 따른다: IIFE 로 감싸 `window.MK`, index.html 전역(`sb`·`me`·`$`·`esc`·`toast`·`fail`·`isBoss`·`previewTeam`·`teams`) 사용, 한국어 주석.
+- **광고 계정은 1개를 4개 지점이 같이 쓴다.** 광고 행의 지점은 캠페인 이름(없으면 광고 이름·광고 세트 이름)으로 자동 판별(`MKCORE.teamKeyOf`). 판별 못 한 행은 빼고 올리고 화면에 알린다.
+- **광고비는 달러(USD) 그대로** 저장·표시하고 판정 기준도 달러다 (원화 환산 안 함).
 - 캐시 버스터: index.html 의 `?v=` 를 새 날짜로 (`202610251200`).
 
 ## File Structure
@@ -470,6 +472,130 @@ cd ~/pallo-planner-marketing && git add mk-core.js tests/mk-core.test.mjs && git
 
 ---
 
+### Task 2b: 실제 메타 내보내기 형식 대응 + Task 2 검토 수정
+
+대표가 준 실제 광고관리자 CSV를 보니 계획과 다른 점이 있었다. 사용자 결정: **광고 계정 1개를 4개 지점이 같이 씀**, **광고비는 달러(USD) 그대로**.
+
+실제 헤더 (광고 일별 — 분석 데이터 "일" 이지만 `일` 열이 없고 보고 시작 = 보고 종료 = 그 날):
+`"보고 시작","보고 종료","광고 이름","광고 게재","기여 설정",결과,"결과 표시 도구","결과당 비용","광고 세트 예산","광고 세트 예산 유형","지출 금액 (USD)",노출,도달,빈도,"CPM(1,000회 노출당 비용) (USD)","링크 클릭",종료,입찰,"입찰 유형","최근 영향이 큰 변경","품질 순위","참여율 순위","전환율 순위","광고 세트 이름",결과(초기),"결과(초기) 표시 도구"`
+실제 헤더 (연령·성별): 위와 같고 `"광고 이름"` 뒤에 `연령,성` (성별 열 이름이 `성`). 보고 시작 2026-07-26, 보고 종료 2026-10-23.
+`결과 표시 도구` 값: `actions:leadgen.other`, `actions:onsite_conversion.lead_grouped` (= 리드), `actions:omni_landing_page_view` (랜딩페이지 조회 — 리드 아님), 빈칸(결과 없음). `리드` 열은 없다. 파일은 UTF-8 BOM. (인사이트·리드 다운로드는 UTF-16LE 일 수 있다.)
+대표에게 다음부터 `캠페인 이름` 열을 추가해 내보내 달라고 한다(캠페인 이름 예: `대구 영어`, `대구 스페인어`, `울산 일본어`, `울산 영어`, `팔로 울산점`).
+
+**Files:**
+- Modify: `mk-core.js`
+- Test: `tests/mk-core.test.mjs`
+
+**Interfaces (Produces — 다음 작업이 그대로 씀):**
+- `MKCORE.decode(arrayBufferOrUint8Array) → string` — FF FE 로 시작하면 UTF-16LE, FE FF 면 UTF-16BE, 아니면 UTF-8 (BOM 제거). `TextDecoder` 사용 (브라우저·Node 22 둘 다 있음).
+- `MKCORE.teamKeyOf(text) → "dsr" | "jpcn" | "ulsan" | "gumi" | null`
+- `MKCORE.normalize(text)` 반환에 `currency: "USD" | "KRW" | null` 추가 (지출 금액 헤더의 `(usd)`/`(krw)` 에서).
+- 광고 행(ads_daily, ads_demo)에 `team_key` 필드 추가 = `teamKeyOf(캠페인) ?? teamKeyOf(광고 이름) ?? teamKeyOf(광고 세트 이름)`. 오가닉 행에는 없음.
+- `MKCORE.ZERO_LEAD_SPEND` = `70` (달러).
+
+**변경 내용 (정확히 이대로):**
+
+1. `ALIAS` 추가:
+   - `gender` 에 `"성"` 추가
+   - `spend` 에 `"지출금액(usd)"`, `"amountspent(usd)"` 추가 (기존 원화·무표기 별칭 유지)
+   - 새 필드 `result_type: ["결과표시도구", "resultindicator"]`
+2. `teamKeyOf`:
+   ```js
+   // 광고 계정 하나를 4개 지점이 같이 써서, 캠페인·광고 이름의 지역 단어로 지점을 고른다. 키는 blog.js DEF 와 같다.
+   function teamKeyOf(text) {
+     const s = String(text ?? "");
+     if (/울산/.test(s)) return "ulsan";
+     if (/구미/.test(s)) return "gumi";
+     if (/대구|동성로|대일/.test(s)) return /일본어|중국어|대일|JLPT|HSK/i.test(s) ? "jpcn" : "dsr";
+     return null;
+   }
+   ```
+3. `normalize`:
+   - ads_daily 날짜: `date` 열이 있으면 그 값, 없으면 `보고 시작 === 보고 종료` 일 때 그 날짜, 아니면 null(그 행은 버림).
+   - ads_daily 필수 열: `date` 열이 없어도 `period_from`·`period_to` 둘 다 있으면 `missing` 에 `date` 를 넣지 않는다.
+   - 리드 수: `leads` 열이 있으면 그 값. 없고 `result_type` 열이 있으면 그 행의 표시 도구가 `/lead/i` 에 맞을 때만 `결과` 값, 아니면 0. 둘 다 없으면 `결과` 값.
+   - `currency`: spend 로 매칭된 헤더를 `key()` 한 문자열에 `(usd)` 가 있으면 `"USD"`, `(krw)` 면 `"KRW"`, 아니면 `null`. kind null 일 때도 필드는 `null` 로 둔다.
+   - 광고 행에 `team_key`.
+4. Task 2 검토 수정:
+   - **전화번호 검사**: `PHONE` 을 `/(?<!\d)01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}(?!\d)/` 로 바꾸고, 검사 대상을 `ad_name`·`subject`·`age_band` 로만 한정 (`source_key` 는 숫자 ID 라 검사하지 않는다).
+   - **등록 데이터 누락**: 규칙 2와 `flags.noLeads` 를 "전체 leads 배열이 비었음"이 아니라 **4주 창 안의 리드(`leads4`)가 0건**일 때로 바꾼다.
+   - `ZERO_LEAD_SPEND = 70` (주석: 달러), 이유 문구를 `4주 지출 $120, 리드 0` 형식으로 (`"$" + Math.round(n).toLocaleString("en-US")`). 기존 `won` 헬퍼는 이 용도로 바꾸거나 이름을 `usd` 로.
+5. return 목록에 `decode`, `teamKeyOf` 추가.
+
+**테스트 (tests/mk-core.test.mjs):**
+- 기존 테스트 "buildWeekly: 판정 규칙"의 B 광고 지출을 `60000`·`60000` → `60`·`60` 으로, 기대값을 `["cut", "4주 지출 $120, 리드 0"]` 로 바꾼다. 다른 기존 기대값은 그대로 통과해야 한다.
+- 새 테스트 (모두 추가):
+```js
+test("decode: UTF-8 BOM · UTF-16LE", () => {
+  const u8 = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode("광고 이름,x")]);
+  assert.equal(MK.decode(u8), "광고 이름,x");
+  const s = "id\tad_name";
+  const u16 = new Uint8Array(2 + s.length * 2); u16[0] = 0xff; u16[1] = 0xfe;
+  for (let i = 0; i < s.length; i++) { u16[2 + i * 2] = s.charCodeAt(i) & 255; u16[3 + i * 2] = s.charCodeAt(i) >> 8; }
+  assert.equal(MK.decode(u16.buffer), s);
+});
+
+test("teamKeyOf: 지역 단어로 지점", () => {
+  assert.equal(MK.teamKeyOf("울산 일본어"), "ulsan");
+  assert.equal(MK.teamKeyOf("[일본어] 울산_AI와앙 261013"), "ulsan");
+  assert.equal(MK.teamKeyOf("대구 영어"), "dsr");
+  assert.equal(MK.teamKeyOf("[스페인어][멤버모집] 261021 대구 영상_틀려도괜찮아"), "dsr");
+  assert.equal(MK.teamKeyOf("대구 일본어"), "jpcn");
+  assert.equal(MK.teamKeyOf("260629 대일 세연마츠리"), "jpcn");
+  assert.equal(MK.teamKeyOf("구미 오픈"), "gumi");
+  assert.equal(MK.teamKeyOf("261012 팔로첫광고"), null);
+});
+
+test("normalize: 실제 광고관리자 일별 (USD, 일 열 없음, 결과 표시 도구)", () => {
+  const csv = [
+    '"보고 시작","보고 종료","캠페인 이름","광고 이름",결과,"결과 표시 도구","지출 금액 (USD)",노출,도달,"링크 클릭","광고 세트 이름"',
+    "2026-10-23,2026-10-23,대구 스페인어,[스페인어][멤버모집] 261021 대구 영상_틀려도괜찮아,1,actions:leadgen.other,3.29,630,500,20,[스페인어] 대구 영상소재",
+    "2026-10-23,2026-10-23,울산 영어,팔로_랜딩_IMG1378,7,actions:omni_landing_page_view,2.10,300,250,9,랜딩홈페이지",
+    "2026-10-22,2026-10-22,,261012 팔로첫광고,,,1.00,100,90,1,베스트소재",
+  ].join("\n");
+  const r = MK.normalize(csv);
+  assert.equal(r.kind, "ads_daily");
+  assert.equal(r.currency, "USD");
+  assert.deepEqual(r.missing, []);
+  assert.deepEqual(r.rows.map((x) => [x.date, x.leads, x.spend, x.team_key]), [
+    ["2026-10-23", 1, 3.29, "dsr"],
+    ["2026-10-23", 0, 2.1, "ulsan"],
+    ["2026-10-22", 0, 1, null],
+  ]);
+});
+
+test("normalize: 실제 연령·성별 (성 열, 기간)", () => {
+  const csv = [
+    '"보고 시작","보고 종료","광고 이름",연령,성,결과,"결과 표시 도구","지출 금액 (USD)",노출,"링크 클릭","광고 세트 이름"',
+    "2026-07-26,2026-10-23,250415 울산 feelfree - 사본,25-34,female,5,actions:leadgen.other,44.82,8111,72,테스트1(맞춤타겟)",
+  ].join("\n");
+  const r = MK.normalize(csv);
+  assert.equal(r.kind, "ads_demo");
+  assert.deepEqual(r.rows[0], { period_from: "2026-07-26", period_to: "2026-10-23", ad_name: "250415 울산 feelfree - 사본", age: "25-34", gender: "female", impressions: 8111, clicks: 72, leads: 5, spend: 44.82, team_key: "ulsan" });
+});
+
+test("normalize: 원화 파일은 currency KRW", () => {
+  assert.equal(MK.normalize("광고 이름,일,지출 금액 (KRW)\nA,2026-10-20,1000").currency, "KRW");
+});
+
+test("sanitizeLead: 긴 숫자 리드 번호는 전화번호로 오인하지 않음", () => {
+  assert.equal(MK.sanitizeLead({ source_key: "90106123456789", ad_name: "A", lead_date: "2026-10-20", status: "lead" }).ok, true);
+  assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "lead", subject: "01012345678" }).ok, false);
+});
+
+test("buildWeekly: 4주 안에 리드가 없으면(오래된 리드만) 등록 데이터 누락", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [{ date: "2026-10-20", ad_name: "A", campaign: "", adset: "", impressions: 0, reach: 0, clicks: 0, leads: 10, spend: 50 }], organic: [],
+    leads: [{ source_key: "1", ad_name: "A", lead_date: "2025-01-01", status: "enroll" }] });
+  assert.equal(r.flags.noLeads, true);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
+});
+```
+- 기존 Task 1 테스트 중 ads_daily·ads_demo 행을 `deepEqual` 로 비교하는 것은 이제 `team_key` 필드가 붙는다. 기대 객체에 `team_key` 를 추가해 맞춘다 (ads_daily 테스트: 캠페인 `동성로 리드` → `"dsr"`; ads_demo 영어 헤더 테스트: 광고 이름 `퇴근후영어A` 에 지역 없음 → `null`).
+
+**완료 조건:** `node --test 'tests/*.test.mjs'` 전부 통과 (기존 13 + 새 7 = 20), 출력에 경고 없음. 커밋 메시지: `📣 마케팅: 실제 메타 CSV 형식(USD·결과 표시 도구·지점 판별) + 리드 검사 수정`
+
+---
+
 ### Task 3: Supabase 테이블 + RLS
 
 **Files:**
@@ -533,7 +659,7 @@ create table if not exists public.mk_ad_daily (
   reach int not null default 0,
   clicks int not null default 0,
   leads int not null default 0,
-  spend numeric(12, 0) not null default 0,
+  spend numeric(12, 2) not null default 0,   -- 달러(USD)
   primary key (team_id, date, ad_name)
 );
 
@@ -547,7 +673,7 @@ create table if not exists public.mk_ad_demo (
   impressions int not null default 0,
   clicks int not null default 0,
   leads int not null default 0,
-  spend numeric(12, 0) not null default 0,
+  spend numeric(12, 2) not null default 0,   -- 달러(USD)
   primary key (team_id, period_from, period_to, ad_name, age, gender)
 );
 
@@ -737,7 +863,7 @@ const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
 const $m = (s) => V().querySelector(s);
-const won = (n) => (n === null || n === undefined ? "–" : Math.round(n).toLocaleString("ko-KR") + "원");
+const usd = (n) => (n === null || n === undefined ? "–" : "$" + (Math.round(n * 100) / 100).toLocaleString("en-US"));
 const pct = (n) => (Math.round(n * 1000) / 10) + "%";
 let parsed = [];
 
@@ -776,14 +902,14 @@ function weeklyHtml(d) {
   const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "등록 데이터 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
   const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${n.ads?.[a.ad_name] ? `<div class="mut">${esc(n.ads[a.ad_name])}</div>` : ""}</td>
     <td><span class="vd ${a.verdict}">${VERDICT[a.verdict] ?? a.verdict}</span><div class="mut">${esc(a.reason)}</div></td>
-    <td>${won(a.spend)}</td><td>${a.leads}</td><td>${won(a.cpl)}</td><td>${a.leads4w}</td><td>${a.enrolls4w}</td><td>${won(a.cpe4w)}</td></tr>`).join("");
+    <td>${usd(a.spend)}</td><td>${a.leads}</td><td>${usd(a.cpl)}</td><td>${a.leads4w}</td><td>${a.enrolls4w}</td><td>${usd(a.cpe4w)}</td></tr>`).join("");
   const posts = (arr) => (arr ?? []).map((p) => `<tr><td>${p.permalink ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(p.caption || p.post_id)}</a>` : esc(p.caption || p.post_id)}<div class="mut">${esc(p.type)} · ${esc(p.published_at)}</div></td>
     <td>${p.reach.toLocaleString("ko-KR")}</td><td>${p.saves}</td><td>${p.shares}</td><td>${pct(p.score)}</td></tr>`).join("");
   const ptable = (arr) => `<div class="tw"><table><tr><th>게시물</th><th>도달</th><th>저장</th><th>공유</th><th>저장+공유율</th></tr>${posts(arr)}</table></div>`;
   return warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
     + (n.summary ? `<div class="card"><b>이번 주 한 줄</b><p>${esc(n.summary)}</p>${n.tests?.length ? `<b>새로 테스트할 방향</b><ul>${n.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "")
-    + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${won(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${t.leads ?? 0}</b></div>
-       <div class="kpi"><span class="mut">리드당 비용</span><b>${won(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 등록</span><b>${t.enrolls4w ?? 0}</b></div><div class="kpi"><span class="mut">4주 등록당 비용</span><b>${won(t.cpe4w)}</b></div></div>`
+    + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${usd(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${t.leads ?? 0}</b></div>
+       <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 등록</span><b>${t.enrolls4w ?? 0}</b></div><div class="kpi"><span class="mut">4주 등록당 비용</span><b>${usd(t.cpe4w)}</b></div></div>`
     + `<div class="card"><b>소재 판정</b><div class="tw"><table><tr><th>광고</th><th>판정</th><th>이번 주 지출</th><th>리드</th><th>리드당</th><th>4주 리드</th><th>4주 등록</th><th>등록당</th></tr>${ads || `<tr><td colspan="8">광고 없음</td></tr>`}</table></div></div>`
     + `<div class="card"><b>오가닉 잘 된 게시물</b>${ptable(d.organic?.top)}</div><div class="card"><b>오가닉 아쉬운 게시물</b>${ptable(d.organic?.bottom)}</div>`;
 }
@@ -801,36 +927,55 @@ function personaHtml(d) {
 }
 
 // ── CSV 올리기 (대표) ──
+// 광고는 계정 하나를 4개 지점이 같이 써서, 행마다 mk-core 가 캠페인 이름으로 판별한 team_key 를 지점 id 로 바꾼다.
+// 게시물(오가닉)은 지점 인스타·페북 계정별 파일이라 위에서 고른 지점으로 올린다.
+const TEAM_RE = { dsr: /동성로/, jpcn: /일본어|중국어/, ulsan: /울산/, gumi: /구미/ };
+const teamIdOf = (key) => teams.find((t) => TEAM_RE[key]?.test(t.name))?.id ?? null;
+const teamName = (id) => teams.find((t) => t.id === +id)?.name ?? "";
+const dateOf = (r) => r.date ?? r.period_from ?? r.published_at;
+function assign(p) {
+  if (p.kind === "organic") return { byTeam: { [MK.team]: p.rows }, unknown: [] };
+  const byTeam = {}, unknown = [];
+  for (const { team_key, ...r } of p.rows) { const id = teamIdOf(team_key); if (id) (byTeam[id] ??= []).push(r); else unknown.push(r); }
+  return { byTeam, unknown };
+}
+const usable = (p) => p.kind && !p.missing.length && p.currency !== "KRW";
+
 async function renderUpload() {
-  const { data: ups } = await sb.from("mk_uploads").select("kind, filename, rows, date_from, date_to, created_at").eq("team_id", MK.team).order("created_at", { ascending: false }).limit(10);
-  $m("#mkBody").innerHTML = `<div class="card"><b>${esc(teams.find((t) => t.id === MK.team)?.name ?? "")} CSV 올리기</b>
-      <p class="mut">광고관리자(광고 일별 · 연령+성별)와 비즈니스 인사이트(콘텐츠) CSV를 같이 골라도 돼요. 종류는 자동으로 알아봐요. 같은 줄은 덮어써서 여러 번 올려도 안전해요.</p>
+  const { data: ups } = await sb.from("mk_uploads").select("team_id, kind, filename, rows, date_from, date_to, created_at").order("created_at", { ascending: false }).limit(12);
+  $m("#mkBody").innerHTML = `<div class="card"><b>CSV 올리기</b>
+      <p class="mut">광고관리자 CSV(광고 일별 · 연령+성별, <b>캠페인 이름 열 포함</b>)는 캠페인 이름으로 지점을 자동으로 나눠요. 게시물(인사이트) CSV는 위에서 고른 <b>${esc(teamName(MK.team))}</b>으로 올라가요. 같은 줄은 덮어써서 여러 번 올려도 안전해요.</p>
       <input type="file" id="mkFiles" accept=".csv,text/csv" multiple><div id="mkPrev"></div></div>
-    <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${u.rows}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
+    <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(teamName(u.team_id))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${u.rows}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
   $m("#mkFiles").addEventListener("change", async (e) => {
-    parsed = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, ...MKCORE.normalize(await f.text()) })));
-    const dates = (p) => p.rows.map((r) => r.date ?? r.period_from ?? r.published_at).filter(Boolean).sort();
+    parsed = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, ...MKCORE.normalize(MKCORE.decode(await f.arrayBuffer())) })));
     $m("#mkPrev").innerHTML = parsed.map((p) => {
       if (!p.kind) return `<div class="card warn">❌ ${esc(p.name)}: 어떤 파일인지 모르겠어요. 광고 이름 / 게시물 ID 열이 있는 CSV인지 확인해 주세요.</div>`;
-      const d = dates(p);
-      return `<div class="card ${p.missing.length ? "warn" : ""}">✅ ${esc(p.name)} → ${KIND[p.kind][2]} ${p.rows.length}줄 (${esc(d[0] ?? "")}~${esc(d.at(-1) ?? "")})
+      if (p.currency === "KRW") return `<div class="card warn">❌ ${esc(p.name)}: 원화 파일이에요. 광고 계정 통화(달러)로 내보내 주세요.</div>`;
+      const d = p.rows.map(dateOf).filter(Boolean).sort(), a = assign(p);
+      const per = Object.entries(a.byTeam).map(([id, rows]) => `${esc(teamName(id))} ${rows.length}줄${p.kind === "organic" ? "" : ` ($${Math.round(rows.reduce((s, r) => s + r.spend, 0)).toLocaleString("en-US")})`}`).join(" · ");
+      const unk = [...new Set(a.unknown.map((r) => r.campaign || r.ad_name))].slice(0, 5);
+      return `<div class="card ${p.missing.length || a.unknown.length ? "warn" : ""}">✅ ${esc(p.name)} → ${KIND[p.kind][2]} ${p.rows.length}줄 (${esc(d[0] ?? "")}~${esc(d.at(-1) ?? "")})<div>${per}</div>
+        ${a.unknown.length ? `<div>⚠️ 지점을 모르는 ${a.unknown.length}줄은 빼고 올려요 (예: ${unk.map(esc).join(", ")}). 캠페인 이름 열이 빠졌거나 이름에 지역이 없어요.</div>` : ""}
         ${p.missing.length ? `<div>⚠️ 못 찾은 열: ${esc(p.missing.join(", "))} — 광고관리자에서 이 열을 추가해 다시 내보내 주세요.</div>` : ""}</div>`;
-    }).join("") + (parsed.some((p) => p.kind && !p.missing.length) ? `<button class="btn" id="mkSend">올리기</button>` : "");
+    }).join("") + (parsed.some(usable) ? `<button class="btn" id="mkSend">올리기</button>` : "");
     $m("#mkSend")?.addEventListener("click", send);
   });
 }
 
 async function send() {
   const btn = $m("#mkSend"); btn.disabled = true; btn.textContent = "올리는 중…";
-  for (const p of parsed.filter((x) => x.kind && !x.missing.length)) {
+  for (const p of parsed.filter(usable)) {
     const [table, onConflict] = KIND[p.kind];
-    const rows = p.rows.map((r) => ({ team_id: MK.team, ...r }));
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await sb.from(table).upsert(rows.slice(i, i + 500), { onConflict });
-      if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
+    for (const [id, list] of Object.entries(assign(p).byTeam)) {
+      const rows = list.map((r) => ({ team_id: +id, ...r }));
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await sb.from(table).upsert(rows.slice(i, i + 500), { onConflict });
+        if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
+      }
+      const d = list.map(dateOf).filter(Boolean).sort();
+      await sb.from("mk_uploads").insert({ team_id: +id, kind: p.kind, filename: p.name, rows: rows.length, date_from: d[0] ?? null, date_to: d.at(-1) ?? null });
     }
-    const d = p.rows.map((r) => r.date ?? r.period_from ?? r.published_at).filter(Boolean).sort();
-    await sb.from("mk_uploads").insert({ team_id: MK.team, kind: p.kind, filename: p.name, rows: rows.length, date_from: d[0] ?? null, date_to: d.at(-1) ?? null });
   }
   toast("올렸어요. Claude에게 \"메타 주간 분석 돌려줘\"라고 하면 리포트가 만들어져요.");
   renderUpload();
