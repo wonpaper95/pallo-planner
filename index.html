@@ -187,7 +187,7 @@ body.is-admin #assignbox { display: block; }
 .qb { font-size: 13px; padding: 1px 8px; border-radius: 6px; white-space: nowrap; border: 1px solid var(--line); color: var(--text); font-variant-numeric: tabular-nums; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
-body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm, body.off-dl .row .chip,
+body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm:not(.cd), body.off-dl .row .chip,
 body.off-routine #routinebox, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
@@ -1209,7 +1209,7 @@ function chip(t) {
 const pad = (n) => String(n).padStart(2, "0");
 const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
 function hms(sec, withSec) { sec = Math.floor(sec); const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60); return withSec ? `${h}:${pad(m)}:${pad(sec % 60)}` : `${h}:${pad(m)}`; }
-// ⏳ 해결목표 카운트다운: 해결목표 정할 때 '네'를 고른 일만 남은 시간이 줄어듦. 0 되면 알림창·소리 + 서버 푸시
+// ⏳ 해결목표 카운트다운(⚙️ 타이머 꺼도 보임 .cd): 해결목표 정할 때 '네'를 고른 일만 남은 시간이 줄어듦. 0 되면 알림창·소리 + 서버 푸시
 const cdOn = (t) => !!(t.countdown && t.estimate_min);
 const mmss = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return h ? `${h}:${pad(m)}:${pad(s % 60)}` : `${m}:${pad(s % 60)}`; };
 function tmText(t) {
@@ -1220,10 +1220,10 @@ function tmText(t) {
 function timeBtn(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
   if (t.done && !sec) return "";
-  if (!run && !sec) return cdOn(t) ? `<button class="tm" data-act="timer" data-tid="${t.id}" title="${minLabel(est)} 카운트다운 시작"><b>${tmText(t)}</b></button>`
+  if (!run && !sec) return cdOn(t) ? `<button class="tm cd" data-act="timer" data-tid="${t.id}" title="${minLabel(est)} 카운트다운 시작"><b>${tmText(t)}</b></button>`
     : `<button class="tm none" data-act="timer" title="타이머 시작">▶</button>`;
   const over = est && sec > est * 60;
-  return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}"><b>${tmText(t)}</b></button>`;
+  return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""} ${cdOn(t) ? "cd" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}"><b>${tmText(t)}</b></button>`;
 }
 const tuSeen = new Set((() => { try { return JSON.parse(localStorage.getItem("timeup-seen") || "[]"); } catch { return []; } })());
 function timeUp(t) { // 해결목표 끝: 소리·진동·알림창 (같은 일·같은 예상시간엔 한 번)

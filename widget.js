@@ -94,7 +94,7 @@ function qbtns(t) {
   const b = (act, on, label, cls = "", extra = "") => t.done && !on ? "" : `<button class="qb ${on ? "" : "empty"} ${cls}" data-act="${act}" data-id="${t.id}" ${extra}>${label}</button>`;
   return b("start", st, `🕐${st ? ` ${st}(시작!)` : ""}`)
     + b("est", est, `${t.countdown && est ? "⏰" : "⏳"}${est ? ` ${minLabel(est)} 해결목표` : ""}`)
-    + b("timer", sec, sec || run || (t.countdown && est) ? tmLabel(t) : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
+    + b("timer", sec, sec || run || (t.countdown && est) ? tmLabel(t) : "▶", `${run ? "run" : ""} ${t.countdown && est ? "cd" : ""}`, run ? `data-run="${t.id}"` : "")
     + b("dl", t.deadline, t.deadline ? `📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + W.due(t.deadline).text}` : "📅", t.deadline && !t.done ? W.due(t.deadline).cls : "");
 }
 async function save(id, patch) {

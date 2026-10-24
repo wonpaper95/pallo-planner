@@ -43,7 +43,7 @@ footer { color: var(--sub); font-size: 11px; text-align: center; padding: 4px 0 
 .qb.empty { opacity: .45; border-color: transparent; padding: 0 3px; } .it:hover .qb.empty { opacity: 1; border-color: var(--line); }
 .qb.soon { background: var(--orange); border-color: var(--orange); color: #fff; } .qb.over { background: var(--red); border-color: var(--red); color: #fff; } .qb.run { background: var(--green); border-color: var(--green); color: #fff; }
 .star { flex: none; font-size: 15px; line-height: 1.2; color: var(--sub); padding: 0 2px; } .star.on { color: #ff8c1a; }
-body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer [data-act=timer], body.off-dl [data-act=dl], body.off-star .star { display: none; }
+body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer [data-act=timer]:not(.cd), body.off-dl [data-act=dl], body.off-star .star { display: none; }
 .pop { position: fixed; z-index: 40; width: 236px; padding: 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.45); }
 .pop.dlpop { width: 300px; } .pop.dlpop .grid button { font-size: 12.5px; }
 .pop h4 { margin: 0 0 8px; font-size: 12.5px; color: var(--sub); font-weight: 600; }
