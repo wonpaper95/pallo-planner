@@ -50,7 +50,8 @@ function channelText(key, ch = {}) {
 
 function checkChannel(key, ch = {}, { photos = 0, unfaced = 0 } = {}) {
   const L = [], add = (lv, txt) => L.push({ lv, txt }), text = channelText(key, ch), lim = LIMITS[key] ?? {};
-  const hits = BANNED.filter((w) => text.includes(w));
+  // 대소문자 무시. 같은 글자(CULCOM·culcom)는 목록에서 첫 표기 하나만 보고한다.
+  const low = text.toLowerCase(), hits = BANNED.filter((w, i) => low.includes(w.toLowerCase()) && BANNED.findIndex((x) => x.toLowerCase() === w.toLowerCase()) === i);
   add(hits.some((h) => /컬컴|culcom/i.test(h)) ? "bad" : hits.length ? "warn" : "ok", hits.length ? `과장·금지 표현: ${hits.join(", ")}` : "과장·금지 표현 없음");
   const todo = text.split("[확인 필요").length - 1;
   add(todo ? "bad" : "ok", todo ? `[확인 필요] ${todo}곳 — 채우거나 지우고 올리세요` : "[확인 필요] 없음");
@@ -78,7 +79,9 @@ function checkChannel(key, ch = {}, { photos = 0, unfaced = 0 } = {}) {
 const jobRows = (post, keys) => keys.map((k) => ({ post_id: post.id, team_id: post.team_id, channel: k, method: "manual", status: "waiting_copy" }));
 
 function fmtKst(iso) {
-  const t = new Date(Date.parse(iso) + 9 * 3600e3).toISOString();
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return "-"; // 날짜 없는 예약 한 줄 때문에 목록 렌더가 죽지 않게
+  const t = new Date(ms + 9 * 3600e3).toISOString();
   return `${t.slice(5, 7)}/${t.slice(8, 10)} ${t.slice(11, 16)}`;
 }
 function badge(j) {

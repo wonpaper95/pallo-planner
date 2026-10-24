@@ -71,6 +71,13 @@ test("checkChannel: 컬컴·[확인 필요]는 막힘, 과장 표현은 경고",
   assert.equal(lv(C.checkChannel("daangn", { title: "t", body: "[확인 필요: 시간] 시작" }, {}), /\[확인 필요\] 1곳/), "bad");
 });
 
+test("checkChannel: 대소문자 섞인 Culcom 도 막힘", () => {
+  const L = C.checkChannel("daangn", { title: "소식", body: "예전 CulCom 시절" }, {});
+  assert.equal(L[0].lv, "bad");
+  assert.match(L[0].txt, /CULCOM/);
+  assert.doesNotMatch(L[0].txt, /CULCOM, culcom/);
+});
+
 test("checkChannel 구글: 1,500자 넘으면 막힘, 사진 여러 장은 안내", () => {
   const L = C.checkChannel("google", { body: "가".repeat(1600), type: "standard", button: "none" }, { photos: 3 });
   assert.equal(lv(L, /본문 1,600자/), "bad");
@@ -93,6 +100,12 @@ test("jobRows: 고른 채널마다 수동 작업", () => {
 test("fmtKst: UTC → 한국 시간", () => {
   assert.equal(C.fmtKst("2026-10-27T10:00:00Z"), "10/27 19:00");
   assert.equal(C.fmtKst("2026-12-31T15:30:00Z"), "01/01 00:30");
+});
+
+test("fmtKst: 잘못된 값은 -", () => {
+  assert.equal(C.fmtKst(undefined), "-");
+  assert.equal(C.fmtKst("abc"), "-");
+  assert.deepEqual(C.badge({ status: "queued" }), { cls: "", text: "예약됨 -" });
 });
 
 test("badge: 상태별 뱃지", () => {
