@@ -107,7 +107,8 @@ function teamKeyOf(text) {
   const s = String(text ?? "");
   if (/울산/.test(s)) return "ulsan";
   if (/구미/.test(s)) return "gumi";
-  if (/대구|동성로|대일|일중/.test(s)) return /일본|중국|대일|일중|JLPT|HSK/i.test(s) ? "jpcn" : "dsr";
+  // '평일중'(평일 중) 안의 '일중'은 일중 표기가 아니고, 영어·스페인어 말이 함께 있으면 '일본여행' 같은 말로 jpcn 이 되지 않는다
+  if (/대구|동성로|대일|(?<!평)일중/.test(s)) return /일본|중국|대일|(?<!평)일중|JLPT|HSK/i.test(s) && !/영어|스페인어/.test(s) ? "jpcn" : "dsr";
   // 지역 없는 일본어·중국어 캠페인(예: "팔로 일본어 잠재고객")은 대구일본어중국어점 — 울산·구미 캠페인은 이름에 지역이 붙는다
   if (/일본어|중국어/.test(s)) return "jpcn";
   return null;
@@ -176,25 +177,29 @@ function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
   const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
   const ads4 = ads.filter((r) => inRange(r.date, from4, end));
   const leads4 = leads.filter((l) => inRange(l.lead_date, from4, end));
-  const enrolls = (name) => leads4.filter((l) => l.status === "enroll" && (name === undefined || l.ad_name === name)).length;
+  const names = [...new Set(ads4.map((r) => r.ad_name))], adSet = new Set(names);
+  // 지점 평균·합계의 등록은 4주 안에 광고가 돈 소재의 등록만. 광고 이름이 비었거나 안 맞는 등록(광고 밖 경로)은 따로 센다.
+  const enrolls = (name) => leads4.filter((l) => l.status === "enroll" && (name === undefined ? adSet.has(l.ad_name) : l.ad_name === name)).length;
+  const otherEnrolls4w = leads4.filter((l) => l.status === "enroll" && !adSet.has(l.ad_name)).length;
   const teamSpend4 = sum(ads4, "spend"), teamEnroll4 = enrolls(), teamCpe = teamEnroll4 ? teamSpend4 / teamEnroll4 : null;
-  const names = [...new Set(ads4.map((r) => r.ad_name))];
   const out = names.map((ad_name) => {
     const mine = ads4.filter((r) => r.ad_name === ad_name);
     const wk = mine.filter((r) => r.date >= week), prev = mine.filter((r) => r.date <= prevEnd);
     const spend = sum(wk, "spend"), lw = sum(wk, "leads"), spend4w = sum(mine, "spend"), leads4w = sum(mine, "leads");
     const cpl = lw ? spend / lw : null, prevCpl = sum(prev, "leads") ? sum(prev, "spend") / sum(prev, "leads") : null;
     const enrolls4w = enrolls(ad_name), cpe4w = enrolls4w ? spend4w / enrolls4w : null;
+    const myLeads = leads4.filter((l) => l.ad_name === ad_name), young = myLeads.filter((l) => l.lead_date > addDays(end, -7)).length; // 7일 이내 리드는 아직 등록 전일 수 있음
+    const zeroWeek = spend > 0 && lw === 0 && prevCpl !== null; // 이번 주 돈만 쓰고 리드 0
     const cheap = enrolls4w >= 1 && teamCpe !== null && cpe4w <= teamCpe;
     let verdict, reason;
     if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${usd(spend4w)}, 리드 0`];
     else if (!leads4.length) [verdict, reason] = ["hold", "등록 데이터 누락"];
     else if (leads4w < MIN_SAMPLE) [verdict, reason] = ["hold", `판단 보류 (표본 ${leads4w}건)`];
-    else if (cpl !== null && prevCpl !== null && cpl >= prevCpl * FATIGUE) {
-      const up = `리드당 비용 ${Math.round((cpl / prevCpl - 1) * 100)}% 상승(피로도)`;
+    else if (zeroWeek || (cpl !== null && prevCpl !== null && cpl >= prevCpl * FATIGUE)) {
+      const up = zeroWeek ? `이번 주 지출 ${usd(spend)}, 리드 0 (피로도)` : `리드당 비용 ${Math.round((cpl / prevCpl - 1) * 100)}% 상승(피로도)`;
       [verdict, reason] = cheap ? ["watch", `등록은 좋지만 ${up}`] : ["cut", up];
     } else if (cheap) [verdict, reason] = ["keep", "등록당 비용 지점 평균 이하"];
-    else if (!enrolls4w) [verdict, reason] = ["watch", "리드는 있으나 4주 등록 0"];
+    else if (!enrolls4w) [verdict, reason] = young * 2 > myLeads.length ? ["hold", `판단 보류 (최근 7일 리드 ${young}/${myLeads.length}건)`] : ["watch", "리드는 있으나 4주 등록 0"];
     else [verdict, reason] = ["watch", "등록당 비용 지점 평균 초과"];
     return { ad_name, spend, leads: lw, cpl, prevCpl, spend4w, leads4w, enrolls4w, cpe4w, verdict, reason };
   }).sort((a, b) => b.spend4w - a.spend4w);
@@ -205,9 +210,9 @@ function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
     week,
     flags: { noAds: !ads4.length, noLeads: !leads4.length, noOrganic: !organic.length },
     totals: { spend: sum(wkAds, "spend"), leads: sum(wkAds, "leads"), cpl: sum(wkAds, "leads") ? sum(wkAds, "spend") / sum(wkAds, "leads") : null,
-      spend4w: teamSpend4, leads4w: sum(ads4, "leads"), enrolls4w: teamEnroll4, cpe4w: teamCpe },
+      spend4w: teamSpend4, leads4w: sum(ads4, "leads"), enrolls4w: teamEnroll4, otherEnrolls4w, cpe4w: teamCpe },
     ads: out,
-    organic: { top: posts.slice(0, 3), bottom: posts.slice(-3).reverse() },
+    organic: { top: posts.slice(0, 3), bottom: posts.slice(3).slice(-3).reverse() }, // top 과 겹치지 않게 (게시물 6개 미만이면 bottom 이 짧다)
   };
 }
 

@@ -111,8 +111,50 @@ test("buildWeekly: 오가닉 상위·하위", () => {
   const p = (id, reach, saves, shares) => ({ platform: "instagram", post_id: id, published_at: "2026-10-20", type: "릴스", permalink: "", caption: id, views: 0, reach, likes: 0, comments: 0, saves, shares, follows: 0 });
   const r = MK.buildWeekly({ week: "2026-10-19", ads: [], leads: [], organic: [p("a", 1000, 50, 10), p("b", 1000, 1, 0), p("c", 50, 40, 40), p("d", 1000, 10, 5)] });
   assert.deepEqual(r.organic.top.map((x) => x.post_id), ["a", "d", "b"]);
-  assert.deepEqual(r.organic.bottom.map((x) => x.post_id), ["b", "d", "a"]);
+  assert.deepEqual(r.organic.bottom.map((x) => x.post_id), []); // 3개뿐이면 전부 top 이라 bottom 은 비움
   assert.equal(r.flags.noAds, true);
+});
+
+test("buildWeekly: 오가닉 bottom 은 top 과 겹치지 않음", () => {
+  const p = (id, saves) => ({ platform: "instagram", post_id: id, published_at: "2026-10-20", type: "릴스", permalink: "", caption: id, views: 0, reach: 1000, likes: 0, comments: 0, saves, shares: 0, follows: 0 });
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [], leads: [], organic: [p("a", 60), p("b", 50), p("c", 40), p("d", 30), p("e", 20)] });
+  assert.deepEqual(r.organic.top.map((x) => x.post_id), ["a", "b", "c"]);
+  assert.deepEqual(r.organic.bottom.map((x) => x.post_id), ["e", "d"]);
+});
+
+test("buildWeekly: 광고 밖 등록은 지점 평균·합계에서 빼고 otherEnrolls4w 로 따로 센다", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-01", "A", 30000, 3), day("2026-10-20", "A", 30000, 3)], organic: [],
+    leads: [lead("1", "A", "2026-10-20", "enroll"), lead("2", "", "2026-10-20", "enroll"), lead("3", "", "2026-10-10", "enroll")] });
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["keep", "등록당 비용 지점 평균 이하"]);
+  assert.equal(r.totals.enrolls4w, 1);
+  assert.equal(r.totals.otherEnrolls4w, 2);
+  assert.equal(r.totals.cpe4w, 60000);
+});
+
+test("buildWeekly: 이번 주 지출 있고 리드 0 이면 피로도 (cheap 이면 watch, 아니면 cut)", () => {
+  const ads = [day("2026-10-01", "X", 50000, 5), day("2026-10-20", "X", 20000, 0), day("2026-10-01", "Y", 50000, 5), day("2026-10-20", "Y", 20000, 0)];
+  const leads = [lead("1", "Y", "2026-10-02", "enroll")];
+  const r = MK.buildWeekly({ week: "2026-10-19", ads, organic: [], leads });
+  const v = Object.fromEntries(r.ads.map((a) => [a.ad_name, [a.verdict, a.reason]]));
+  assert.deepEqual(v.X, ["cut", "이번 주 지출 $20,000, 리드 0 (피로도)"]);
+  assert.deepEqual(v.Y, ["watch", "등록은 좋지만 이번 주 지출 $20,000, 리드 0 (피로도)"]);
+});
+
+test("buildWeekly: 리드 대부분이 7일 이내면 등록 0 이어도 판단 보류", () => {
+  const ads = [day("2026-10-20", "M", 30000, 6)];
+  const leads = [lead("1", "M", "2026-10-10", "lead"), ...["2026-10-19", "2026-10-20", "2026-10-22", "2026-10-24"].map((d, i) => lead("y" + i, "M", d, "lead"))];
+  const r = MK.buildWeekly({ week: "2026-10-19", ads, organic: [], leads });
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "판단 보류 (최근 7일 리드 4/5건)"]);
+  // 오래된 리드가 더 많으면 기존 규칙 그대로
+  const r2 = MK.buildWeekly({ week: "2026-10-19", ads, organic: [], leads: [lead("1", "M", "2026-10-02", "lead"), lead("2", "M", "2026-10-05", "lead"), lead("3", "M", "2026-10-20", "lead")] });
+  assert.deepEqual([r2.ads[0].verdict, r2.ads[0].reason], ["watch", "리드는 있으나 4주 등록 0"]);
+});
+
+test("teamKeyOf: 평일중·일본여행 영어회화는 일본어중국어점이 아님", () => {
+  assert.equal(MK.teamKeyOf("대구 평일중 직장인 영어"), "dsr");
+  assert.equal(MK.teamKeyOf("대구 일본여행 영어회화"), "dsr");
+  assert.equal(MK.teamKeyOf("대구 일중 모집"), "jpcn");
+  assert.equal(MK.teamKeyOf("250917 대구 일본여행자 - 사본"), "jpcn");
 });
 
 test("buildPersonaInputs: 퍼널·등록자 분포", () => {
