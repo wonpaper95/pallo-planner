@@ -31,7 +31,7 @@ test("normalize: 광고 일별 (한국어 헤더), 합계 줄 무시", () => {
   const r = MK.normalize(csv);
   assert.equal(r.kind, "ads_daily");
   assert.deepEqual(r.missing, []);
-  assert.deepEqual(r.rows, [{ date: "2026-10-20", campaign: "동성로 리드", adset: "직장인", ad_name: "퇴근후영어A", impressions: 1200, reach: 900, clicks: 30, leads: 4, spend: 40000 }]);
+  assert.deepEqual(r.rows, [{ date: "2026-10-20", campaign: "동성로 리드", adset: "직장인", ad_name: "퇴근후영어A", impressions: 1200, reach: 900, clicks: 30, leads: 4, spend: 40000, team_key: "dsr" }]);
 });
 
 test("normalize: 광고 연령·성별 (영어 헤더, 리드 없으면 결과)", () => {
@@ -41,7 +41,7 @@ test("normalize: 광고 연령·성별 (영어 헤더, 리드 없으면 결과)"
   ].join("\n");
   const r = MK.normalize(csv);
   assert.equal(r.kind, "ads_demo");
-  assert.deepEqual(r.rows[0], { period_from: "2026-07-27", period_to: "2026-10-25", ad_name: "퇴근후영어A", age: "25-34", gender: "female", impressions: 500, clicks: 12, leads: 3, spend: 15000 });
+  assert.deepEqual(r.rows[0], { period_from: "2026-07-27", period_to: "2026-10-25", ad_name: "퇴근후영어A", age: "25-34", gender: "female", impressions: 500, clicks: 12, leads: 3, spend: 15000, team_key: null });
 });
 
 test("normalize: 인스타 오가닉", () => {
@@ -84,7 +84,7 @@ test("buildWeekly: 판정 규칙", () => {
     // A: 싸게 등록 → keep
     day("2026-10-01", "A", 30000, 3), day("2026-10-20", "A", 30000, 3),
     // B: 돈만 쓰고 리드 0 → cut
-    day("2026-10-02", "B", 60000, 0), day("2026-10-21", "B", 60000, 0),
+    day("2026-10-02", "B", 60, 0), day("2026-10-21", "B", 60, 0),
     // C: 리드 2건 → hold
     day("2026-10-21", "C", 20000, 2),
     // D: 이전 리드당 1만 → 이번주 3만, 등록 0 → cut(피로도)
@@ -94,7 +94,7 @@ test("buildWeekly: 판정 규칙", () => {
   const r = MK.buildWeekly({ week, ads, organic: [], leads });
   const v = Object.fromEntries(r.ads.map((a) => [a.ad_name, [a.verdict, a.reason]]));
   assert.deepEqual(v.A, ["keep", "등록당 비용 지점 평균 이하"]);
-  assert.deepEqual(v.B, ["cut", "4주 지출 120,000원, 리드 0"]);
+  assert.deepEqual(v.B, ["cut", "4주 지출 $120, 리드 0"]);
   assert.deepEqual(v.C, ["hold", "판단 보류 (표본 2건)"]);
   assert.deepEqual(v.D, ["cut", "리드당 비용 200% 상승(피로도)"]);
   assert.equal(r.totals.enrolls4w, 2);
@@ -128,4 +128,68 @@ test("buildPersonaInputs: 퍼널·등록자 분포", () => {
   assert.deepEqual(r.enrolledByAge, { "30대": 2 });
   assert.deepEqual(r.enrolledBySubject, { 영어: 1, 스페인어: 1 });
   assert.deepEqual(r.leadsByAgeGender, [{ age: "25-34", gender: "female", leads: 6, share: 0.75 }, { age: "25-34", gender: "male", leads: 2, share: 0.25 }]);
+});
+
+test("decode: UTF-8 BOM · UTF-16LE", () => {
+  const u8 = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode("광고 이름,x")]);
+  assert.equal(MK.decode(u8), "광고 이름,x");
+  const s = "id\tad_name";
+  const u16 = new Uint8Array(2 + s.length * 2); u16[0] = 0xff; u16[1] = 0xfe;
+  for (let i = 0; i < s.length; i++) { u16[2 + i * 2] = s.charCodeAt(i) & 255; u16[3 + i * 2] = s.charCodeAt(i) >> 8; }
+  assert.equal(MK.decode(u16.buffer), s);
+});
+
+test("teamKeyOf: 지역 단어로 지점", () => {
+  assert.equal(MK.teamKeyOf("울산 일본어"), "ulsan");
+  assert.equal(MK.teamKeyOf("[일본어] 울산_AI와앙 261013"), "ulsan");
+  assert.equal(MK.teamKeyOf("대구 영어"), "dsr");
+  assert.equal(MK.teamKeyOf("[스페인어][멤버모집] 261021 대구 영상_틀려도괜찮아"), "dsr");
+  assert.equal(MK.teamKeyOf("대구 일본어"), "jpcn");
+  assert.equal(MK.teamKeyOf("260629 대일 세연마츠리"), "jpcn");
+  assert.equal(MK.teamKeyOf("구미 오픈"), "gumi");
+  assert.equal(MK.teamKeyOf("261012 팔로첫광고"), null);
+});
+
+test("normalize: 실제 광고관리자 일별 (USD, 일 열 없음, 결과 표시 도구)", () => {
+  const csv = [
+    '"보고 시작","보고 종료","캠페인 이름","광고 이름",결과,"결과 표시 도구","지출 금액 (USD)",노출,도달,"링크 클릭","광고 세트 이름"',
+    "2026-10-23,2026-10-23,대구 스페인어,[스페인어][멤버모집] 261021 대구 영상_틀려도괜찮아,1,actions:leadgen.other,3.29,630,500,20,[스페인어] 대구 영상소재",
+    "2026-10-23,2026-10-23,울산 영어,팔로_랜딩_IMG1378,7,actions:omni_landing_page_view,2.10,300,250,9,랜딩홈페이지",
+    "2026-10-22,2026-10-22,,261012 팔로첫광고,,,1.00,100,90,1,베스트소재",
+  ].join("\n");
+  const r = MK.normalize(csv);
+  assert.equal(r.kind, "ads_daily");
+  assert.equal(r.currency, "USD");
+  assert.deepEqual(r.missing, []);
+  assert.deepEqual(r.rows.map((x) => [x.date, x.leads, x.spend, x.team_key]), [
+    ["2026-10-23", 1, 3.29, "dsr"],
+    ["2026-10-23", 0, 2.1, "ulsan"],
+    ["2026-10-22", 0, 1, null],
+  ]);
+});
+
+test("normalize: 실제 연령·성별 (성 열, 기간)", () => {
+  const csv = [
+    '"보고 시작","보고 종료","광고 이름",연령,성,결과,"결과 표시 도구","지출 금액 (USD)",노출,"링크 클릭","광고 세트 이름"',
+    "2026-07-26,2026-10-23,250415 울산 feelfree - 사본,25-34,female,5,actions:leadgen.other,44.82,8111,72,테스트1(맞춤타겟)",
+  ].join("\n");
+  const r = MK.normalize(csv);
+  assert.equal(r.kind, "ads_demo");
+  assert.deepEqual(r.rows[0], { period_from: "2026-07-26", period_to: "2026-10-23", ad_name: "250415 울산 feelfree - 사본", age: "25-34", gender: "female", impressions: 8111, clicks: 72, leads: 5, spend: 44.82, team_key: "ulsan" });
+});
+
+test("normalize: 원화 파일은 currency KRW", () => {
+  assert.equal(MK.normalize("광고 이름,일,지출 금액 (KRW)\nA,2026-10-20,1000").currency, "KRW");
+});
+
+test("sanitizeLead: 긴 숫자 리드 번호는 전화번호로 오인하지 않음", () => {
+  assert.equal(MK.sanitizeLead({ source_key: "90106123456789", ad_name: "A", lead_date: "2026-10-20", status: "lead" }).ok, true);
+  assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "lead", subject: "01012345678" }).ok, false);
+});
+
+test("buildWeekly: 4주 안에 리드가 없으면(오래된 리드만) 등록 데이터 누락", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [{ date: "2026-10-20", ad_name: "A", campaign: "", adset: "", impressions: 0, reach: 0, clicks: 0, leads: 10, spend: 50 }], organic: [],
+    leads: [{ source_key: "1", ad_name: "A", lead_date: "2025-01-01", status: "enroll" }] });
+  assert.equal(r.flags.noLeads, true);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
 });

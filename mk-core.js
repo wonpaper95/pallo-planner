@@ -19,9 +19,10 @@ const ALIAS = {
   clicks: ["링크클릭", "linkclicks", "클릭(전체)", "clicks(all)"],
   leads: ["리드", "leads", "잠재고객", "잠재고객(양식)", "on-facebookleads"],
   results: ["결과", "results"],
-  spend: ["지출금액(krw)", "amountspent(krw)", "지출금액", "amountspent"],
+  result_type: ["결과표시도구", "resultindicator"],
+  spend: ["지출금액(usd)", "amountspent(usd)", "지출금액(krw)", "amountspent(krw)", "지출금액", "amountspent"],
   age: ["연령", "age"],
-  gender: ["성별", "gender"],
+  gender: ["성별", "성", "gender"],
   // 오가닉
   post_id: ["게시물id", "postid"],
   account: ["계정사용자이름", "accountusername"],
@@ -91,22 +92,45 @@ function detectKind(headers) {
   return null;
 }
 
+// 파일 바이트 → 문자열. 인사이트·리드 다운로드는 UTF-16LE 일 수 있어 BOM 으로 가린다.
+function decode(buf) {
+  const u = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+  if (u[0] === 0xff && u[1] === 0xfe) return new TextDecoder("utf-16le").decode(u.subarray(2));
+  if (u[0] === 0xfe && u[1] === 0xff) return new TextDecoder("utf-16be").decode(u.subarray(2));
+  return new TextDecoder("utf-8").decode(u).replace(/^﻿/, "");
+}
+
+// 광고 계정 하나를 4개 지점이 같이 써서, 캠페인·광고 이름의 지역 단어로 지점을 고른다. 키는 blog.js DEF 와 같다.
+function teamKeyOf(text) {
+  const s = String(text ?? "");
+  if (/울산/.test(s)) return "ulsan";
+  if (/구미/.test(s)) return "gumi";
+  if (/대구|동성로|대일/.test(s)) return /일본어|중국어|대일|JLPT|HSK/i.test(s) ? "jpcn" : "dsr";
+  return null;
+}
+
 function normalize(text) {
   const [headers = [], ...body] = parseCsv(text);
   const kind = detectKind(headers), c = columns(headers);
-  if (!kind) return { kind: null, rows: [], missing: [], headers };
-  const missing = REQUIRED[kind].filter((f) => c[f] === undefined);
+  if (!kind) return { kind: null, rows: [], missing: [], headers, currency: null };
+  // 일 열이 없는 내보내기는 보고 시작·종료 기간이 있으면 통과 (하루짜리 행만 날짜로 씀)
+  const missing = REQUIRED[kind].filter((f) => c[f] === undefined && !(kind === "ads_daily" && f === "date" && c.period_from !== undefined && c.period_to !== undefined));
+  const sk = c.spend !== undefined ? key(headers[c.spend]) : "";
+  const currency = sk.includes("(usd)") ? "USD" : sk.includes("(krw)") ? "KRW" : null;
   const get = (r, f) => (c[f] === undefined ? "" : (r[c[f]] ?? "").trim());
   const num = (r, f) => toNumber(get(r, f));
-  const leads = (r) => (c.leads !== undefined ? num(r, "leads") : num(r, "results"));
+  // 리드 열이 없으면 결과 값을 쓰되, 결과 표시 도구가 있으면 리드 종류(lead)일 때만 센다 (랜딩페이지 조회 등은 제외)
+  const leads = (r) => (c.leads !== undefined ? num(r, "leads") : c.result_type !== undefined ? (/lead/i.test(get(r, "result_type")) ? num(r, "results") : 0) : num(r, "results"));
+  const team = (r) => teamKeyOf(get(r, "campaign")) ?? teamKeyOf(get(r, "ad_name")) ?? teamKeyOf(get(r, "adset"));
+  const dayOf = (r) => (c.date !== undefined ? toDate(get(r, "date")) : (toDate(get(r, "period_from")) === toDate(get(r, "period_to")) ? toDate(get(r, "period_from")) : null));
   let rows;
   if (kind === "ads_daily") {
-    rows = body.map((r) => ({ date: toDate(get(r, "date")), campaign: get(r, "campaign"), adset: get(r, "adset"), ad_name: get(r, "ad_name"),
-      impressions: num(r, "impressions"), reach: num(r, "reach"), clicks: num(r, "clicks"), leads: leads(r), spend: num(r, "spend") }))
+    rows = body.map((r) => ({ date: dayOf(r), campaign: get(r, "campaign"), adset: get(r, "adset"), ad_name: get(r, "ad_name"),
+      impressions: num(r, "impressions"), reach: num(r, "reach"), clicks: num(r, "clicks"), leads: leads(r), spend: num(r, "spend"), team_key: team(r) }))
       .filter((r) => r.ad_name && r.date);
   } else if (kind === "ads_demo") {
     rows = body.map((r) => ({ period_from: toDate(get(r, "period_from")), period_to: toDate(get(r, "period_to")), ad_name: get(r, "ad_name"),
-      age: get(r, "age"), gender: get(r, "gender"), impressions: num(r, "impressions"), clicks: num(r, "clicks"), leads: leads(r), spend: num(r, "spend") }))
+      age: get(r, "age"), gender: get(r, "gender"), impressions: num(r, "impressions"), clicks: num(r, "clicks"), leads: leads(r), spend: num(r, "spend"), team_key: team(r) }))
       .filter((r) => r.ad_name);
   } else {
     const platform = c.account !== undefined ? "instagram" : "facebook";
@@ -115,14 +139,14 @@ function normalize(text) {
       likes: num(r, "likes"), comments: num(r, "comments"), saves: num(r, "saves"), shares: num(r, "shares"), follows: num(r, "follows") }))
       .filter((r) => r.post_id && r.published_at);
   }
-  return { kind, rows, missing, headers };
+  return { kind, rows, missing, headers, currency };
 }
 
 // ── 리드 (전산) ── 이름·전화번호는 받지 않는다. 화이트리스트 밖 필드는 버린다.
 const STATUS = ["lead", "consult", "visit", "enroll", "lost"];
 // 전산 표시값 → 표준값. 실제 값은 docs/meta-marketing/jeonsan-leads.md 조사 후 보강.
 const STATUS_MAP = { 신규: "lead", 리드: "lead", 접수: "lead", 상담: "consult", 상담완료: "consult", 방문: "visit", 방문완료: "visit", 등록: "enroll", 결제: "enroll", 결제완료: "enroll", 취소: "lost", 이탈: "lost", 부재: "lost" };
-const PHONE = /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/;
+const PHONE = /(?<!\d)01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}(?!\d)/;
 function sanitizeLead(raw) {
   const status = STATUS.includes(raw?.status) ? raw.status : STATUS_MAP[String(raw?.status ?? "").replace(/\s+/g, "")];
   const lead = { source_key: String(raw?.source_key ?? "").trim(), ad_name: String(raw?.ad_name ?? "").trim(), lead_date: toDate(raw?.lead_date),
@@ -130,7 +154,7 @@ function sanitizeLead(raw) {
   if (!lead.source_key) return { ok: false, reason: "source_key 없음" };
   if (!lead.lead_date) return { ok: false, reason: "날짜 없음" };
   if (!status) return { ok: false, reason: `모르는 상태값: ${raw?.status}` };
-  if (Object.values(lead).some((v) => v && PHONE.test(v))) return { ok: false, reason: "전화번호로 보이는 값" };
+  if ([lead.ad_name, lead.subject, lead.age_band].some((v) => v && PHONE.test(v))) return { ok: false, reason: "전화번호로 보이는 값" };
   return { ok: true, lead };
 }
 
@@ -138,10 +162,11 @@ function sanitizeLead(raw) {
 const addDays = (d, n) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const weekStart = (d) => { const t = new Date(d + "T00:00:00Z"); return addDays(d, -((t.getUTCDay() + 6) % 7)); };
 const inRange = (d, from, to) => d && d >= from && d <= to;
-const won = (n) => Math.round(n).toLocaleString("en-US");
+const usd = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
 // ── 주간 리포트 ──
-const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 100000, FATIGUE = 1.3;
+const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 70, // 달러
+   FATIGUE = 1.3;
 function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
   const end = addDays(week, 6), from4 = addDays(week, -21), prevEnd = addDays(week, -1);
   const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
@@ -158,8 +183,8 @@ function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
     const enrolls4w = enrolls(ad_name), cpe4w = enrolls4w ? spend4w / enrolls4w : null;
     const cheap = enrolls4w >= 1 && teamCpe !== null && cpe4w <= teamCpe;
     let verdict, reason;
-    if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${won(spend4w)}원, 리드 0`];
-    else if (!leads.length) [verdict, reason] = ["hold", "등록 데이터 누락"];
+    if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${usd(spend4w)}, 리드 0`];
+    else if (!leads4.length) [verdict, reason] = ["hold", "등록 데이터 누락"];
     else if (leads4w < MIN_SAMPLE) [verdict, reason] = ["hold", `판단 보류 (표본 ${leads4w}건)`];
     else if (cpl !== null && prevCpl !== null && cpl >= prevCpl * FATIGUE) {
       const up = `리드당 비용 ${Math.round((cpl / prevCpl - 1) * 100)}% 상승(피로도)`;
@@ -174,7 +199,7 @@ function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
     .map((p) => ({ ...p, score: (p.saves + p.shares) / p.reach })).sort((a, b) => b.score - a.score);
   return {
     week,
-    flags: { noAds: !ads4.length, noLeads: !leads.length, noOrganic: !organic.length },
+    flags: { noAds: !ads4.length, noLeads: !leads4.length, noOrganic: !organic.length },
     totals: { spend: sum(wkAds, "spend"), leads: sum(wkAds, "leads"), cpl: sum(wkAds, "leads") ? sum(wkAds, "spend") / sum(wkAds, "leads") : null,
       spend4w: teamSpend4, leads4w: sum(ads4, "leads"), enrolls4w: teamEnroll4, cpe4w: teamCpe },
     ads: out,
@@ -195,6 +220,6 @@ function buildPersonaInputs({ leads = [], demo = [] }) {
   return { sample: leads.length, funnel, enrolledBySubject: count(enrolled, "subject"), enrolledByAge: count(enrolled, "age_band"), leadsByAgeGender };
 }
 
-return { ALIAS, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
+return { ALIAS, decode, teamKeyOf, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
   MIN_SAMPLE, ZERO_LEAD_SPEND, FATIGUE, buildWeekly, buildPersonaInputs };
 });
