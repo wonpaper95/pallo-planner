@@ -21,7 +21,11 @@ class HttpError extends Error { constructor(public status: number, msg: string) 
 
 const URL_ = Deno.env.get("SUPABASE_URL")!;
 const admin = createClient(URL_, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const anthropic = new Anthropic(); // ANTHROPIC_API_KEY
+let client: Anthropic | null = null; // 키가 없어도 usage·similar 는 돌도록 쓸 때 만든다
+const anthropic = () => {
+  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new HttpError(503, "AI 키(ANTHROPIC_API_KEY)가 아직 연결되지 않았어요");
+  return (client ??= new Anthropic());
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -89,7 +93,7 @@ async function record(who: Who, team: number, kind: string, u?: Anthropic.Beta.B
 
 // ── Claude 호출 (구조화 출력 + 거절 시 서버 측 대체 모델) ──
 async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high") {
-  const msg = await anthropic.beta.messages.stream({
+  const msg = await anthropic().beta.messages.stream({
     model: MODEL,
     max_tokens: 32000,
     betas: ["server-side-fallback-2026-07-01"],
