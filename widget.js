@@ -82,13 +82,19 @@ function render() {
   if (globalThis.chrome?.runtime?.id) chrome.runtime.sendMessage("badge").catch(() => {}); // 확장 배지
 }
 
+// ⏳ 해결목표 카운트다운(플래너와 같음): 예상시간 있으면 남은 시간, 넘으면 +초과
+function tmLabel(t) {
+  const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
+  if (est && me?.user_metadata?.prefs?.countdown !== false && !t.done) { const left = est * 60 - sec, a = Math.abs(Math.floor(left)), mm = `${Math.floor(a / 60)}:${pad(a % 60)}`; return `${run ? "⏸" : "▶"} ${left > 0 ? `⏳ ${mm}` : `⏰ +${mm}`}`; }
+  return `${t.done ? "⏱" : run ? "⏸" : "▶"} ${hms(sec)}`;
+}
 // 줄 버튼: 플래너와 같은 🕐 시작 · ⏳ 예상 · ▶ 타이머 · 📅 데드라인 (끝낸 일은 값 있는 것만)
 function qbtns(t) {
   const st = t.start_time?.slice(0, 5), est = t.estimate_min, sec = elapsed(t), run = !!t.started_at;
   const b = (act, on, label, cls = "", extra = "") => t.done && !on ? "" : `<button class="qb ${on ? "" : "empty"} ${cls}" data-act="${act}" data-id="${t.id}" ${extra}>${label}</button>`;
   return b("start", st, `🕐${st ? ` ${st}(시작!)` : ""}`)
     + b("est", est, `⏳${est ? ` ${minLabel(est)} 해결목표` : ""}`)
-    + b("timer", sec, run ? `⏸ ${hms(sec)}` : sec ? `${t.done ? "⏱" : "▶"} ${hms(sec)}` : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
+    + b("timer", sec, sec || run ? tmLabel(t) : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
     + b("dl", t.deadline, t.deadline ? `📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + W.due(t.deadline).text}` : "📅", t.deadline && !t.done ? W.due(t.deadline).cls : "");
 }
 async function save(id, patch) {
@@ -151,7 +157,7 @@ let t0;
 const soft = () => { clearTimeout(t0); t0 = setTimeout(load, 300); };
 setInterval(() => {
   const d = new Date(); $("#clock").textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  document.querySelectorAll("[data-run]").forEach((el) => { const t = state.tasks.find((x) => x.id == el.dataset.run); if (t) el.textContent = `⏸ ${hms(elapsed(t))}`; });
+  document.querySelectorAll("[data-run]").forEach((el) => { const t = state.tasks.find((x) => x.id == el.dataset.run); if (t) el.textContent = tmLabel(t); });
   if (me && today() !== day) load(); // 자정 넘으면 새 날
 }, 1000);
 setInterval(() => me && load(), 5 * 60000); // 실시간이 끊겨도 5분마다 확인
