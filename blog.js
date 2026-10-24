@@ -217,7 +217,7 @@ function presetWhy() {
 // 사진 썸네일
 function renderThumbs() {
   const el = $b("#blThumbs"); if (!el) return;
-  el.innerHTML = BL.photos.map((p, i) => `<div class="blthumb" draggable="true" data-thumb="${i}"><img src="${p.url}" alt=""><span class="no">${pad(i + 1)}</span>
+  el.innerHTML = BL.photos.map((p, i) => `<div class="blthumb" draggable="true" data-thumb="${i}"><img src="${p.url}" alt="" draggable="false"><span class="no">${pad(i + 1)}</span>
     <button type="button" class="x" data-rm="${p.id}" title="빼기">✕</button><button type="button" class="ed" data-ed="${p.id}">편집</button>${p.faced ? `<span class="face">🙂${p.edits.blurs.length || ""}</span>` : ""}
     <input data-note="${p.id}" value="${esc(p.note)}" placeholder="메모"></div>`).join("");
   const n = BL.photos.length, unchecked = BL.photos.filter((p) => !p.faced).length;
@@ -435,6 +435,7 @@ function renderOut() {
     <div class="blchips">${(X.thumbnail_texts ?? []).map((t) => `<button type="button" class="blchip" data-copy="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="mut" style="margin-top:10px">메인 <b>${esc(X.main_keyword)}</b> · 서브 ${esc((X.sub_keywords ?? []).join(", "))} · ${esc(presetName(X.opts?.preset))}</div>
     ${spare.length ? `<div class="mut" style="margin-top:10px">안 쓴 사진 — 본문으로 끌어다 놓으세요</div><div class="bltray">${spare.map((p) => `<div class="blthumb" draggable="true" data-spare="${p.id}"><img src="${p.url}" alt=""></div>`).join("")}</div>` : ""}
+    <div class="mut" style="margin-top:10px">💡 시안의 사진은 네이버 글쓰기 창으로 바로 끌어다 놓을 수 있어요 (크롬)</div>
     <div class="blpaper" id="blPaper">${X.blocks.map((b, i) => blockHtml(b, i, b.type === "photo" ? ++n : n)).join("")}</div>
     <div class="bltags" id="blTags" contenteditable="true">${esc((X.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" "))}</div>
     <details style="margin-top:10px"><summary class="mut">🔁 AI 자체 검수 메모</summary><div class="mut" style="white-space:pre-wrap;margin-top:6px">${esc(X.self_review)}</div></details>
@@ -456,16 +457,27 @@ function plainText() {
   return BL.post.blocks.map((b) => b.type === "photo" ? `📷 사진 ${pad(++n)}${b.caption ? ` — ${b.caption}` : ""}` : b.type === "divider" ? "────────" : b.type === "map" ? `📍 [지도: ${P().display || BL.teamName}]` : b.text).join("\n\n") + "\n\n" + tagsText();
 }
 const tagsText = () => (BL.post.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
-const dataUrl = (blob) => new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(blob); });
+// 통째 복사용 사진: 스마트에디터 붙여넣기 한도 5MB → 블로그 크기(긴 변 1280px)로 줄이고, 넘치면 크기·화질을 낮춰 다시
+const PASTE_MAX = 4.6e6;
+function embedSizes() {
+  const ps = BL.post.blocks.filter((b) => b.type === "photo").map((b) => photoOf(b.pid)).filter(Boolean);
+  for (let side = 1280, q = 0.82; side >= 480; side = Math.round(side * 0.8), q = Math.max(0.6, q - 0.06)) {
+    const urls = new Map(ps.map((p) => [p.id, draw(p, side).cv.toDataURL("image/jpeg", q)]));
+    if ([...urls.values()].reduce((s, u) => s + u.length, 0) <= PASTE_MAX) return urls;
+  }
+  return null; // 사진이 너무 많아 한도 안에 못 넣음
+}
 async function richHtml(embed) {
   const lines = (t) => String(t).split("\n").map((l) => `<p>${l.trim() ? esc(l) : "<br>"}</p>`).join("");
+  const urls = embed ? embedSizes() : null;
+  if (embed && !urls) throw new Error("too-big");
   let n = 0; const out = [];
   for (const b of BL.post.blocks) {
     if (b.type === "text") out.push(lines(b.text));
     else if (b.type === "quote") out.push(`<blockquote><p><b>${esc(b.text)}</b></p></blockquote>`);
     else if (b.type === "divider") out.push("<hr>");
     else if (b.type === "map") out.push(`<p>📍 [지도: ${esc(P().display || BL.teamName)}]</p>`);
-    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${await dataUrl(p.blob)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
+    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${urls.get(p.id)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
     out.push("<p><br></p>");
   }
   out.push(`<p>${esc(tagsText())}</p>`);
@@ -477,7 +489,8 @@ async function copy(text, html) {
     if (html && window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ "text/html": html.then((h) => new Blob([h], { type: "text/html" })), "text/plain": new Blob([text], { type: "text/plain" }) })]);
     else await navigator.clipboard.writeText(text);
     return true;
-  } catch {
+  } catch (e) {
+    console.warn("clipboard.write 실패 → 글자만 복사", e);
     const t = document.createElement("textarea"); t.value = text; document.body.append(t); t.select();
     const ok = document.execCommand("copy"); t.remove(); if (!ok) toast("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"); return ok;
   }
@@ -666,7 +679,13 @@ function wire() {
     if (d.add) { X.blocks.splice(+d.add + 1, 0, { type: "text", text: "", photo: 0, caption: "", pid: 0 }); renderOut(); v.querySelector(`[data-tx="${+d.add + 1}"]`)?.focus(); return; }
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
     if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 스마트에디터 본문에 붙여넣고 📷 사진 01 자리에 01번 사진을 올리세요"); return; }
-    if (t.id === "blCopyAll") { t.textContent = "🧪 준비 중…"; const ok = await copy(plainText(), richHtml(true)); t.textContent = "🧪 사진까지 통째 복사"; if (ok) toast("사진까지 복사했어요. 스마트에디터에서 사진이 빠지면 [본문 복사]로 해 주세요"); return; }
+    if (t.id === "blCopyAll") {
+      t.textContent = "🧪 준비 중…"; let big = false;
+      const html = richHtml(true); html.catch(() => { big = true; });
+      const ok = await copy(plainText(), html); t.textContent = "🧪 사진까지 통째 복사";
+      if (ok) toast(big ? "사진이 많아 5MB를 넘어서 글자만 복사했어요. 사진은 시안에서 네이버 글쓰기로 끌어다 놓아 주세요" : "사진까지 복사했어요 (5MB 안으로 줄임). 사진이 빠지면 시안의 사진을 네이버로 끌어다 놓아 주세요");
+      return;
+    }
     if (t.id === "blCopyTitle") { if (await copy(X.titles[X.sel])) toast("제목 복사했어요"); return; }
     if (t.id === "blTagsCopy") { if (await copy(tagsText())) toast("해시태그 복사했어요"); return; }
     if (t.id === "blPhotos") return photosOut();
@@ -715,13 +734,15 @@ function wire() {
     const th = ev.target.closest?.("[data-thumb]"), sp = ev.target.closest?.("[data-spare]"), bk = ev.target.closest?.(".blk.photo");
     drag = th ? { kind: "thumb", i: +th.dataset.thumb } : sp ? { kind: "spare", pid: +sp.dataset.spare } : bk ? { kind: "blk", i: +bk.dataset.i } : null;
     if (!drag) return;
-    ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", "pallo");
+    // 사진(<img>)을 잡고 끌면 크롬이 실제 이미지 파일을 같이 실어 줌 → 네이버 글쓰기 창에 바로 놓을 수 있다.
+    // 그 데이터를 덮어쓰지 않도록 text/plain 은 건드리지 않고, 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
+    ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("application/x-pallo", "1");
     (th || sp || bk).classList.add("dragging");
   });
   v.addEventListener("dragend", () => { drag = null; v.querySelectorAll(".dragging, .dropbefore, .dropon").forEach((x) => x.classList.remove("dragging", "dropbefore", "dropon")); });
   v.addEventListener("dragover", (ev) => {
     const drop = ev.target.closest?.("#blDrop, #blThumbs");
-    if (ev.dataTransfer.types.includes("Files") && drop) { ev.preventDefault(); $b("#blDrop")?.classList.add("over"); return; }
+    if (!drag && ev.dataTransfer.types.includes("Files") && drop) { ev.preventDefault(); $b("#blDrop")?.classList.add("over"); return; }
     if (!drag) return;
     const th = ev.target.closest?.("[data-thumb]"), bk = ev.target.closest?.(".blk"), paper = ev.target.closest?.("#blPaper");
     if (drag.kind === "thumb" && th) { ev.preventDefault(); return; }
@@ -734,7 +755,7 @@ function wire() {
   v.addEventListener("dragleave", (ev) => { if (ev.target.id === "blDrop") ev.target.classList.remove("over"); });
   v.addEventListener("drop", (ev) => {
     $b("#blDrop")?.classList.remove("over");
-    if (ev.dataTransfer.files?.length && ev.target.closest?.("#blDrop, #blThumbs")) { ev.preventDefault(); return addFiles([...ev.dataTransfer.files]); }
+    if (!drag && ev.dataTransfer.files?.length && ev.target.closest?.("#blDrop, #blThumbs")) { ev.preventDefault(); return addFiles([...ev.dataTransfer.files]); }
     if (!drag) return;
     ev.preventDefault();
     const X = BL.post, th = ev.target.closest?.("[data-thumb]"), bk = ev.target.closest?.(".blk");
