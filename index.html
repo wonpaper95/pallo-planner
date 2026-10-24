@@ -1220,7 +1220,8 @@ function tmText(t) {
 function timeBtn(t) {
   const run = !!t.started_at, sec = elapsed(t), est = t.estimate_min;
   if (t.done && !sec) return "";
-  if (!run && !sec) return `<button class="tm none" data-act="timer" title="${cdOn(t) ? `${minLabel(est)} 카운트다운 시작` : "타이머 시작"}">▶</button>`;
+  if (!run && !sec) return cdOn(t) ? `<button class="tm" data-act="timer" data-tid="${t.id}" title="${minLabel(est)} 카운트다운 시작"><b>${tmText(t)}</b></button>`
+    : `<button class="tm none" data-act="timer" title="타이머 시작">▶</button>`;
   const over = est && sec > est * 60;
   return `<button class="tm ${run ? "run" : ""} ${over ? "over" : ""}" data-act="timer" data-tid="${t.id}" title="${t.done ? "수행시간" : run ? "타이머 정지" : "타이머 시작"}"><b>${tmText(t)}</b></button>`;
 }
@@ -1320,7 +1321,8 @@ $("#pop").onclick = async (e) => {
   const { t, kind } = popFor, b = e.target.closest("button"); if (!b) return;
   const patch = pickPatch(t, kind, b, $("#pop")); if (!patch) return;
   closePop();
-  if (await save(t.id, patch)) { renderWeek(); if (kind === "dl") toast(patch.deadline ? `📅 ${fmtDl(patch.deadline)}까지` : "데드라인을 지웠어요"); }
+  if (await save(t.id, patch)) { if (patch.countdown && !t.started_at && !t.done) return toggleTimer({ ...t, ...patch }); // '네' 고르면 바로 카운트다운 시작
+    renderWeek(); if (kind === "dl") toast(patch.deadline ? `📅 ${fmtDl(patch.deadline)}까지` : "데드라인을 지웠어요"); }
 };
 document.addEventListener("pointerdown", (e) => { if (popFor && !e.target.closest("#pop, [data-act=est], [data-act=start], [data-act=dl], #prefBtn")) closePop(); });
 document.addEventListener("keydown", (e) => e.key === "Escape" && closePop());
@@ -1595,7 +1597,7 @@ async function sheetSave(patch) {
   if (d) { openSheet(d); renderWeek(); }
 }
 $("#sTitle").onchange = () => sheetSave({ title: $("#sTitle").value.trim() });
-$("#sCd").onchange = () => sheetSave({ countdown: $("#sCd").checked });
+$("#sCd").onchange = async () => { await sheetSave({ countdown: $("#sCd").checked }); const t = cur(); if (t?.countdown && t.estimate_min && !t.started_at && !t.done) toggleTimer(t); };
 $("#sDone").onchange = () => sheetSave({ done: $("#sDone").checked }).then(bumpStats);
 $("#sNote").onchange = () => sheetSave({ note: $("#sNote").value });
 $("#sStart").onclick = (e) => {

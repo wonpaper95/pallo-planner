@@ -94,7 +94,7 @@ function qbtns(t) {
   const b = (act, on, label, cls = "", extra = "") => t.done && !on ? "" : `<button class="qb ${on ? "" : "empty"} ${cls}" data-act="${act}" data-id="${t.id}" ${extra}>${label}</button>`;
   return b("start", st, `🕐${st ? ` ${st}(시작!)` : ""}`)
     + b("est", est, `${t.countdown && est ? "⏰" : "⏳"}${est ? ` ${minLabel(est)} 해결목표` : ""}`)
-    + b("timer", sec, sec || run ? tmLabel(t) : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
+    + b("timer", sec, sec || run || (t.countdown && est) ? tmLabel(t) : "▶", run ? "run" : "", run ? `data-run="${t.id}"` : "")
     + b("dl", t.deadline, t.deadline ? `📅 ${fmtDl(t.deadline)}${t.done ? "" : " · " + W.due(t.deadline).text}` : "📅", t.deadline && !t.done ? W.due(t.deadline).cls : "");
 }
 async function save(id, patch) {
@@ -106,7 +106,7 @@ let popFor = null;
 const pop = $("#pop"), closePop = () => { pop.classList.add("hidden"); popFor = null; };
 document.addEventListener("click", async (e) => {
   const pb = e.target.closest("#pop button");
-  if (pb && popFor) { const patch = pickPatch(popFor.t, popFor.kind, pb, pop); if (patch) { const id = popFor.t.id; closePop(); save(id, patch); } return; }
+  if (pb && popFor) { const patch = pickPatch(popFor.t, popFor.kind, pb, pop); if (patch) { const t = popFor.t; closePop(); await save(t.id, patch); if (patch.countdown && !t.started_at && !t.done) { await sb.rpc("timer", { p_id: t.id, p_on: true }); load(); } } return; } // '네' 고르면 바로 카운트다운 시작
   const b = e.target.closest("#tdList [data-act]"); if (!b) return;
   const t = state.tasks.find((x) => x.id == b.dataset.id), act = b.dataset.act; if (!t) return;
   if (act === "star") return save(t.id, { important: !t.important });
