@@ -325,7 +325,7 @@ body:not(.sv) #salesView { display: none; }
 .bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
 @media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; }
-  #fbBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
+  #fbBtn .lbl, #consultBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -436,6 +436,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <span id="previewBar" class="hidden" style="padding:2px 10px;border-radius:99px;background:var(--orange);color:#fff;font-size:12px;font-weight:600;cursor:pointer" title="누르면 대표 화면으로">👀 매니저 화면 미리보기 중 · 끄기</span>
     <span id="me"></span>
     <button id="todayBtn" class="btn ghost">오늘</button>
+    <a id="consultBtn" class="btn ghost" href="https://magical-buttercream-d5b901.netlify.app/" target="_blank" rel="noopener" title="상담 녹음·AI 피드백 (새 탭)" style="text-decoration:none">🎙️<span class="lbl"> 상담 AI</span></a>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
