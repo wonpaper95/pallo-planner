@@ -35,7 +35,7 @@ async function renderReport(kind) {
   if (fail(error)) return;
   if (!list?.length) { $m("#mkBody").innerHTML = `<div class="card">아직 ${kind === "weekly" ? "주간 리포트" : "페르소나"}가 없어요. 대표님이 데이터를 올리고 Claude에게 "메타 주간 분석 돌려줘"라고 하면 생겨요.</div>`; return; }
   const cur = list.find((r) => r.week === MK.week) ?? list[0]; MK.week = cur.week;
-  const pick = `<select id="mkWeek">${list.map((r) => `<option value="${r.week}" ${r.week === cur.week ? "selected" : ""}>${r.week}${kind === "weekly" ? " 주" : " 월"}</option>`).join("")}</select>
+  const pick = `<select id="mkWeek">${list.map((r) => `<option value="${r.week}" ${r.week === cur.week ? "selected" : ""}>${esc(r.week)}${kind === "weekly" ? " 주" : " 월"}</option>`).join("")}</select>
     <span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span>`;
   $m("#mkBody").innerHTML = `<div class="mkbar">${pick}</div>` + (kind === "weekly" ? weeklyHtml(cur.data) : personaHtml(cur.data));
   $m("#mkWeek").addEventListener("change", (e) => { MK.week = e.target.value; renderReport(kind); });
@@ -45,10 +45,10 @@ function weeklyHtml(d) {
   const f = d.flags ?? {}, t = d.totals ?? {}, n = d.notes ?? {};
   const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "등록 데이터 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
   const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${n.ads?.[a.ad_name] ? `<div class="mut">${esc(n.ads[a.ad_name])}</div>` : ""}</td>
-    <td><span class="vd ${a.verdict}">${VERDICT[a.verdict] ?? a.verdict}</span><div class="mut">${esc(a.reason)}</div></td>
+    <td><span class="vd ${esc(a.verdict)}">${VERDICT[a.verdict] ?? a.verdict}</span><div class="mut">${esc(a.reason)}</div></td>
     <td>${usd(a.spend)}</td><td>${a.leads}</td><td>${usd(a.cpl)}</td><td>${a.leads4w}</td><td>${a.enrolls4w}</td><td>${usd(a.cpe4w)}</td></tr>`).join("");
   const posts = (arr) => (arr ?? []).map((p) => `<tr><td>${p.permalink ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(p.caption || p.post_id)}</a>` : esc(p.caption || p.post_id)}<div class="mut">${esc(p.type)} · ${esc(p.published_at)}</div></td>
-    <td>${p.reach.toLocaleString("ko-KR")}</td><td>${p.saves}</td><td>${p.shares}</td><td>${pct(p.score)}</td></tr>`).join("");
+    <td>${(p.reach ?? 0).toLocaleString("ko-KR")}</td><td>${p.saves ?? 0}</td><td>${p.shares ?? 0}</td><td>${p.score == null ? "–" : pct(p.score)}</td></tr>`).join("");
   const ptable = (arr) => `<div class="tw"><table><tr><th>게시물</th><th>도달</th><th>저장</th><th>공유</th><th>저장+공유율</th></tr>${posts(arr)}</table></div>`;
   return warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
     + (n.summary ? `<div class="card"><b>이번 주 한 줄</b><p>${esc(n.summary)}</p>${n.tests?.length ? `<b>새로 테스트할 방향</b><ul>${n.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : "")
@@ -61,7 +61,7 @@ function weeklyHtml(d) {
 function personaHtml(d) {
   const p = d.persona ?? {};
   const dist = (o) => Object.entries(o ?? {}).map(([k, v]) => `${esc(k)} ${v}명`).join(" · ") || "–";
-  return (d.borrowed ? `<div class="card warn">⚠️ 이 지점은 표본이 적어서 다른 지점 패턴을 빌려 썼어요 (표본 ${d.sample}건)</div>` : "")
+  return (d.borrowed ? `<div class="card warn">⚠️ 이 지점은 표본이 적어서 다른 지점 패턴을 빌려 썼어요 (표본 ${esc(d.sample)}건)</div>` : "")
     + `<div class="card"><h3>${esc(p.title ?? "페르소나")}</h3><p>${esc(p.who ?? "")}</p><p><b>원하는 것</b> ${esc(p.wants ?? "")}</p>
        ${p.messages?.length ? `<b>반응한 메시지</b><ul>${p.messages.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
        <p><b>활동 시간</b> ${esc(p.times ?? "")}</p>${p.caution ? `<p class="mut">${esc(p.caution)}</p>` : ""}</div>`
@@ -90,7 +90,7 @@ async function renderUpload() {
   $m("#mkBody").innerHTML = `<div class="card"><b>CSV 올리기</b>
       <p class="mut">광고관리자 CSV(광고 일별 · 연령+성별, <b>캠페인 이름 열 포함</b>)는 캠페인 이름으로 지점을 자동으로 나눠요. 게시물(인사이트) CSV는 위에서 고른 <b>${esc(teamName(MK.team))}</b>으로 올라가요. 같은 줄은 덮어써서 여러 번 올려도 안전해요.</p>
       <input type="file" id="mkFiles" accept=".csv,text/csv" multiple><div id="mkPrev"></div></div>
-    <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(teamName(u.team_id))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${u.rows}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
+    <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(teamName(u.team_id))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${esc(u.rows)}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
   $m("#mkFiles").addEventListener("change", async (e) => {
     parsed = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, ...MKCORE.normalize(MKCORE.decode(await f.arrayBuffer())) })));
     $m("#mkPrev").innerHTML = parsed.map((p) => {
@@ -107,21 +107,37 @@ async function renderUpload() {
   });
 }
 
+// 같은 광고 이름이 광고세트 여러 개에 걸쳐 CSV에 여러 줄 나오면 한 upsert 안에서 키가 겹쳐 Postgres 가 거부한다 → 키가 같은 줄을 먼저 합친다.
+const NUM = ["impressions", "reach", "clicks", "leads", "spend"];
+function mergeByKey(rows, onConflict, kind) {
+  const keys = onConflict.split(","), map = new Map();
+  for (const r of rows) {
+    const k = JSON.stringify(keys.map((c) => r[c] ?? null)), prev = map.get(k);
+    if (!prev) { map.set(k, { ...r }); continue; }
+    if (kind === "organic") map.set(k, { ...r }); // 오가닉은 마지막 줄 우선
+    else for (const f of NUM) if (f in r || f in prev) prev[f] = (prev[f] ?? 0) + (r[f] ?? 0); // 광고는 숫자 합산, 글자 칸은 첫 줄 유지
+  }
+  return [...map.values()];
+}
+
 async function send() {
   const btn = $m("#mkSend"); btn.disabled = true; btn.textContent = "올리는 중…";
+  let excluded = 0;
   for (const p of parsed.filter(usable)) {
-    const [table, onConflict] = KIND[p.kind];
-    for (const [id, list] of Object.entries(assign(p).byTeam)) {
-      const rows = list.map((r) => ({ team_id: +id, ...r }));
+    const [table, onConflict] = KIND[p.kind], a = assign(p);
+    excluded += a.unknown.length;
+    for (const [id, list] of Object.entries(a.byTeam)) {
+      const rows = mergeByKey(list.map((r) => ({ team_id: +id, ...r })), onConflict, p.kind);
       for (let i = 0; i < rows.length; i += 500) {
         const { error } = await sb.from(table).upsert(rows.slice(i, i + 500), { onConflict });
         if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
       }
       const d = list.map(dateOf).filter(Boolean).sort();
-      await sb.from("mk_uploads").insert({ team_id: +id, kind: p.kind, filename: p.name, rows: rows.length, date_from: d[0] ?? null, date_to: d.at(-1) ?? null });
+      const { error } = await sb.from("mk_uploads").insert({ team_id: +id, kind: p.kind, filename: p.name, rows: rows.length, date_from: d[0] ?? null, date_to: d.at(-1) ?? null });
+      if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
     }
   }
-  toast("올렸어요. Claude에게 \"메타 주간 분석 돌려줘\"라고 하면 리포트가 만들어져요.");
+  toast(`올렸어요${excluded ? ` (지점 모르는 ${excluded}줄 제외)` : ""}. Claude에게 \"메타 주간 분석 돌려줘\"라고 하면 리포트가 만들어져요.`);
   renderUpload();
 }
 })();
