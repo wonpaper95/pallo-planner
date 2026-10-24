@@ -148,6 +148,12 @@ test("teamKeyOf: 지역 단어로 지점", () => {
   assert.equal(MK.teamKeyOf("260629 대일 세연마츠리"), "jpcn");
   assert.equal(MK.teamKeyOf("구미 오픈"), "gumi");
   assert.equal(MK.teamKeyOf("261012 팔로첫광고"), null);
+  assert.equal(MK.teamKeyOf("팔로 일본어 잠재고객"), "jpcn");
+  assert.equal(MK.teamKeyOf("팔로 중국어 잠재고객 니쩐빵워쩐빵"), "jpcn");
+  assert.equal(MK.teamKeyOf("대*일중*landing or Naver"), "jpcn");
+  assert.equal(MK.teamKeyOf("250917 대구 일본여행자 - 사본"), "jpcn");
+  assert.equal(MK.teamKeyOf("울산 일본어"), "ulsan");
+  assert.equal(MK.teamKeyOf("대구 영어"), "dsr");
 });
 
 test("normalize: 실제 광고관리자 일별 (USD, 일 열 없음, 결과 표시 도구)", () => {

@@ -101,11 +101,15 @@ function decode(buf) {
 }
 
 // 광고 계정 하나를 4개 지점이 같이 써서, 캠페인·광고 이름의 지역 단어로 지점을 고른다. 키는 blog.js DEF 와 같다.
+// 대구 계열: 일본·중국 표기(일본어·일본여행자·대일·일중 등)면 jpcn(대구일본어중국어점), 그 밖의 대구·동성로 는 dsr(대구동성로점).
+// 지역 없는 일본어·중국어 캠페인(예: "팔로 일본어 잠재고객")은 대구일본어중국어점 — 울산·구미 캠페인은 이름에 지역이 붙는다.
 function teamKeyOf(text) {
   const s = String(text ?? "");
   if (/울산/.test(s)) return "ulsan";
   if (/구미/.test(s)) return "gumi";
-  if (/대구|동성로|대일/.test(s)) return /일본어|중국어|대일|JLPT|HSK/i.test(s) ? "jpcn" : "dsr";
+  if (/대구|동성로|대일|일중/.test(s)) return /일본|중국|대일|일중|JLPT|HSK/i.test(s) ? "jpcn" : "dsr";
+  // 지역 없는 일본어·중국어 캠페인(예: "팔로 일본어 잠재고객")은 대구일본어중국어점 — 울산·구미 캠페인은 이름에 지역이 붙는다
+  if (/일본어|중국어/.test(s)) return "jpcn";
   return null;
 }
 
