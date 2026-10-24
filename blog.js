@@ -54,7 +54,8 @@ const VOL = { 대구영어회화: 1370, 대구영어회화학원: 560, 대구오
   구미영어학원: 220, 구미일본어학원: 100, 구미일본어: 90, 구미영어회화: 80, 구미영어회화학원: 65, 옥계영어: 60, 구미오픽: 30, 구미토익스피킹: 15, 구미성인영어회화: 15, 구미성인영어학원: 15,
   구미성인영어: 15, 구미JLPT: 10, 구미언어교환: 10 };
 const vol = (k) => VOL[k.replace(/\s/g, "")] ?? BL.kw?.find((x) => x.keyword === k.replace(/\s/g, ""))?.total;
-const defKey = (n) => /일본어|중국어/.test(n) ? "jpcn" : /울산/.test(n) ? "ulsan" : /구미/.test(n) ? "gumi" : /동성로|대구/.test(n) ? "dsr" : null;
+// 운영 지점 이름: 구미점·대구영어점·울산점·대구일중점
+const defKey = (n) => /일본어|중국어|일중/.test(n) ? "jpcn" : /울산/.test(n) ? "ulsan" : /구미/.test(n) ? "gumi" : /동성로|대구/.test(n) ? "dsr" : null;
 
 const V = () => document.getElementById("blogView");
 const $b = (s) => V().querySelector(s);
