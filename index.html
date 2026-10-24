@@ -414,6 +414,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
 <link rel="stylesheet" href="blog.css?v=202610222211">
+<link rel="stylesheet" href="marketing.css?v=202610251200">
 </head>
 <body>
 
@@ -442,7 +443,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -473,6 +474,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="boardView"></section>
   <section id="salesView"></section>
   <section id="blogView"></section>
+  <section id="mkView"></section>
 </div>
 
 <dialog id="fbDlg" class="wide"><h3 style="margin:0 0 4px">🐞 버그 신고 · 💡 개선 제안</h3>
@@ -629,6 +631,7 @@ async function boot() {
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
   if (view === "sales") window.SL?.load();
   if (view === "blog") window.BL?.load();
+  if (view === "mk") window.MK?.load();
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -1185,11 +1188,12 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
   if (v === "blog" && me && window.BL) BL.load();
+  if (v === "mk" && me && window.MK) MK.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
@@ -1712,5 +1716,7 @@ boot();
 </script>
 <script src="sales.js?v=202610222211"></script>
 <script src="blog.js?v=202610222211"></script>
+<script src="mk-core.js?v=202610251200"></script>
+<script src="marketing.js?v=202610251200"></script>
 </body>
 </html>

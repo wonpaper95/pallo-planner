@@ -1,0 +1,25 @@
+/* 📣 마케팅 탭 (marketing.js). index.html 색 토큰 사용 */
+body:not(.mkv) #mkView { display: none; }
+#mkView { max-width: 1100px; margin: 0 auto; padding: 16px 20px 100px; }
+#mkView .mkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+#mkView .mkbar h2 { margin: 0 auto 0 0; }
+#mkView .mktabs { display: flex; gap: 4px; }
+#mkView .mktabs button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
+#mkView .mktabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#mkView select, #mkView input[type=file] { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
+#mkView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+#mkView .warn { border-color: #e0a100; background: color-mix(in srgb, #e0a100 10%, var(--panel)); }
+#mkView .mut { color: var(--sub); font-size: 12.5px; }
+#mkView .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+#mkView .kpi b { display: block; font-size: 20px; }
+#mkView .tw { overflow-x: auto; }
+#mkView table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+#mkView th, #mkView td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+#mkView th:first-child, #mkView td:first-child { text-align: left; white-space: normal; }
+#mkView .vd { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+#mkView .vd.keep { background: #d9f5df; color: #13692a; }
+#mkView .vd.cut { background: #fde0de; color: #a3201a; }
+#mkView .vd.watch { background: #fff1c9; color: #7a5800; }
+#mkView .vd.hold { background: var(--bg); color: var(--sub); }
+#mkView .btn { padding: 7px 14px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; }
+@media (max-width: 640px) { #mkView { padding: 12px 16px 100px; } }
