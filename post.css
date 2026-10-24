@@ -1,0 +1,33 @@
+/* 📸 게시물 탭 (post.js). 썸네일·점검·목록·뱃지는 blog.css 의 전역 클래스(blgrid·bldrop·blthumb·blcheck·bllist·blbadge)를 같이 씀 */
+body:not(.psv) #postView { display: none; }
+#postView { max-width: 1240px; margin: 0 auto; padding: 16px 20px 100px; }
+#postView .psbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+#postView .psbar h2 { margin: 0 auto 0 0; }
+#postView .pstabs { display: flex; flex-wrap: wrap; gap: 4px; }
+#postView .pstabs button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
+#postView .pstabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#postView .pschs { margin-top: 14px; }
+#postView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+#postView select, #postView input:not([type=checkbox]), #postView textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+#postView textarea { width: 100%; resize: vertical; field-sizing: content; min-height: 3.2em; }
+#postView label { display: block; font-size: 12.5px; color: var(--sub); margin: 12px 0 4px; }
+#postView .mut { color: var(--sub); font-size: 12.5px; }
+#postView .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } #postView .row2 select { width: 100%; }
+#postView .btn.small { padding: 5px 9px; font-size: 13px; }
+#postView a.btn { display: inline-block; text-decoration: none; }
+#postView .psgo { width: 100%; margin-top: 14px; }
+#postView .psratio { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+#postView .psratio .blseg button { flex: none; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+#postView .blthumb { cursor: default; }
+#postView .blthumb .psmv { display: flex; border-top: 1px solid var(--line); }
+#postView .blthumb .psmv button { flex: 1; padding: 3px 0; font-size: 12px; color: var(--sub); }
+#postView .blthumb .ed, #postView .blthumb .face { bottom: 27px; }
+#postView .psdraft { white-space: pre-wrap; margin-top: 6px; font-size: 13.5px; }
+#postView .pssel { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+#postView .pssel label { display: flex; align-items: center; gap: 6px; margin: 4px 0; font-size: 14px; color: var(--text); }
+#postView .blacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+#postView .blempty { text-align: center; color: var(--sub); padding: 30px 14px; }
+#postView .psthumb { width: 56px; height: 56px; flex: none; border-radius: 8px; object-fit: cover; background: var(--bg); display: grid; place-items: center; }
+#postView .psbadges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.blbadge.bad { color: var(--red); border-color: var(--red); }
+@media (max-width: 560px) { #postView { padding: 12px 12px 100px; } }
