@@ -118,5 +118,83 @@ function normalize(text) {
   return { kind, rows, missing, headers };
 }
 
-return { ALIAS, parseCsv, toNumber, toDate, detectKind, normalize };
+// ── 리드 (전산) ── 이름·전화번호는 받지 않는다. 화이트리스트 밖 필드는 버린다.
+const STATUS = ["lead", "consult", "visit", "enroll", "lost"];
+// 전산 표시값 → 표준값. 실제 값은 docs/meta-marketing/jeonsan-leads.md 조사 후 보강.
+const STATUS_MAP = { 신규: "lead", 리드: "lead", 접수: "lead", 상담: "consult", 상담완료: "consult", 방문: "visit", 방문완료: "visit", 등록: "enroll", 결제: "enroll", 결제완료: "enroll", 취소: "lost", 이탈: "lost", 부재: "lost" };
+const PHONE = /01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/;
+function sanitizeLead(raw) {
+  const status = STATUS.includes(raw?.status) ? raw.status : STATUS_MAP[String(raw?.status ?? "").replace(/\s+/g, "")];
+  const lead = { source_key: String(raw?.source_key ?? "").trim(), ad_name: String(raw?.ad_name ?? "").trim(), lead_date: toDate(raw?.lead_date),
+    status, age_band: raw?.age_band ? String(raw.age_band).trim() : null, subject: raw?.subject ? String(raw.subject).trim() : null };
+  if (!lead.source_key) return { ok: false, reason: "source_key 없음" };
+  if (!lead.lead_date) return { ok: false, reason: "날짜 없음" };
+  if (!status) return { ok: false, reason: `모르는 상태값: ${raw?.status}` };
+  if (Object.values(lead).some((v) => v && PHONE.test(v))) return { ok: false, reason: "전화번호로 보이는 값" };
+  return { ok: true, lead };
+}
+
+// ── 날짜 ──
+const addDays = (d, n) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const weekStart = (d) => { const t = new Date(d + "T00:00:00Z"); return addDays(d, -((t.getUTCDay() + 6) % 7)); };
+const inRange = (d, from, to) => d && d >= from && d <= to;
+const won = (n) => Math.round(n).toLocaleString("en-US");
+
+// ── 주간 리포트 ──
+const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 100000, FATIGUE = 1.3;
+function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
+  const end = addDays(week, 6), from4 = addDays(week, -21), prevEnd = addDays(week, -1);
+  const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
+  const ads4 = ads.filter((r) => inRange(r.date, from4, end));
+  const leads4 = leads.filter((l) => inRange(l.lead_date, from4, end));
+  const enrolls = (name) => leads4.filter((l) => l.status === "enroll" && (name === undefined || l.ad_name === name)).length;
+  const teamSpend4 = sum(ads4, "spend"), teamEnroll4 = enrolls(), teamCpe = teamEnroll4 ? teamSpend4 / teamEnroll4 : null;
+  const names = [...new Set(ads4.map((r) => r.ad_name))];
+  const out = names.map((ad_name) => {
+    const mine = ads4.filter((r) => r.ad_name === ad_name);
+    const wk = mine.filter((r) => r.date >= week), prev = mine.filter((r) => r.date <= prevEnd);
+    const spend = sum(wk, "spend"), lw = sum(wk, "leads"), spend4w = sum(mine, "spend"), leads4w = sum(mine, "leads");
+    const cpl = lw ? spend / lw : null, prevCpl = sum(prev, "leads") ? sum(prev, "spend") / sum(prev, "leads") : null;
+    const enrolls4w = enrolls(ad_name), cpe4w = enrolls4w ? spend4w / enrolls4w : null;
+    const cheap = enrolls4w >= 1 && teamCpe !== null && cpe4w <= teamCpe;
+    let verdict, reason;
+    if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${won(spend4w)}원, 리드 0`];
+    else if (!leads.length) [verdict, reason] = ["hold", "등록 데이터 누락"];
+    else if (leads4w < MIN_SAMPLE) [verdict, reason] = ["hold", `판단 보류 (표본 ${leads4w}건)`];
+    else if (cpl !== null && prevCpl !== null && cpl >= prevCpl * FATIGUE) {
+      const up = `리드당 비용 ${Math.round((cpl / prevCpl - 1) * 100)}% 상승(피로도)`;
+      [verdict, reason] = cheap ? ["watch", `등록은 좋지만 ${up}`] : ["cut", up];
+    } else if (cheap) [verdict, reason] = ["keep", "등록당 비용 지점 평균 이하"];
+    else if (!enrolls4w) [verdict, reason] = ["watch", "리드는 있으나 4주 등록 0"];
+    else [verdict, reason] = ["watch", "등록당 비용 지점 평균 초과"];
+    return { ad_name, spend, leads: lw, cpl, prevCpl, spend4w, leads4w, enrolls4w, cpe4w, verdict, reason };
+  }).sort((a, b) => b.spend4w - a.spend4w);
+  const wkAds = ads.filter((r) => inRange(r.date, week, end));
+  const posts = organic.filter((p) => inRange(p.published_at, from4, end) && p.reach >= 100)
+    .map((p) => ({ ...p, score: (p.saves + p.shares) / p.reach })).sort((a, b) => b.score - a.score);
+  return {
+    week,
+    flags: { noAds: !ads4.length, noLeads: !leads.length, noOrganic: !organic.length },
+    totals: { spend: sum(wkAds, "spend"), leads: sum(wkAds, "leads"), cpl: sum(wkAds, "leads") ? sum(wkAds, "spend") / sum(wkAds, "leads") : null,
+      spend4w: teamSpend4, leads4w: sum(ads4, "leads"), enrolls4w: teamEnroll4, cpe4w: teamCpe },
+    ads: out,
+    organic: { top: posts.slice(0, 3), bottom: posts.slice(-3).reverse() },
+  };
+}
+
+// ── 페르소나 입력 (문장은 Claude 가 쓴다) ──
+function buildPersonaInputs({ leads = [], demo = [] }) {
+  const count = (arr, f) => arr.reduce((o, x) => (x[f] ? ((o[x[f]] = (o[x[f]] || 0) + 1), o) : o), {});
+  const funnel = Object.fromEntries(STATUS.map((s) => [s, leads.filter((l) => l.status === s).length]));
+  const enrolled = leads.filter((l) => l.status === "enroll");
+  const g = {};
+  for (const d of demo) { const k = `${d.age}|${d.gender}`; g[k] = (g[k] || 0) + (d.leads || 0); }
+  const total = Object.values(g).reduce((a, b) => a + b, 0);
+  const leadsByAgeGender = Object.entries(g).map(([k, n]) => { const [age, gender] = k.split("|"); return { age, gender, leads: n, share: total ? Math.round((n / total) * 1000) / 1000 : 0 }; })
+    .sort((a, b) => b.leads - a.leads);
+  return { sample: leads.length, funnel, enrolledBySubject: count(enrolled, "subject"), enrolledByAge: count(enrolled, "age_band"), leadsByAgeGender };
+}
+
+return { ALIAS, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
+  MIN_SAMPLE, ZERO_LEAD_SPEND, FATIGUE, buildWeekly, buildPersonaInputs };
 });

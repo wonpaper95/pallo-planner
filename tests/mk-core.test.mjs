@@ -60,3 +60,72 @@ test("normalize: 모르는 파일은 kind null, 필수 열 빠지면 missing", (
   assert.equal(r.kind, "ads_daily");
   assert.deepEqual(r.missing, ["spend"]);
 });
+
+test("sanitizeLead: 허용 필드만, 전화번호·이름 거부", () => {
+  const ok = MK.sanitizeLead({ source_key: "1234", ad_name: "퇴근후영어A", lead_date: "2026-10-20", status: "등록", name: "홍길동", phone: "010-1234-5678" });
+  assert.deepEqual(ok, { ok: true, lead: { source_key: "1234", ad_name: "퇴근후영어A", lead_date: "2026-10-20", status: "enroll", age_band: null, subject: null } });
+  assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "010-1234-5678", lead_date: "2026-10-20", status: "lead" }).ok, false);
+  assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "알수없음" }).ok, false);
+  assert.equal(MK.sanitizeLead({ ad_name: "A", lead_date: "2026-10-20", status: "lead" }).ok, false);
+});
+
+test("weekStart: 월요일", () => {
+  assert.equal(MK.weekStart("2026-10-25"), "2026-10-19"); // 일요일
+  assert.equal(MK.weekStart("2026-10-19"), "2026-10-19");
+  assert.equal(MK.addDays("2026-10-19", -21), "2026-09-28");
+});
+
+const day = (date, ad_name, spend, leads) => ({ date, ad_name, campaign: "", adset: "", impressions: 0, reach: 0, clicks: 0, leads, spend });
+const lead = (k, ad_name, lead_date, status) => ({ source_key: k, ad_name, lead_date, status });
+
+test("buildWeekly: 판정 규칙", () => {
+  const week = "2026-10-19";
+  const ads = [
+    // A: 싸게 등록 → keep
+    day("2026-10-01", "A", 30000, 3), day("2026-10-20", "A", 30000, 3),
+    // B: 돈만 쓰고 리드 0 → cut
+    day("2026-10-02", "B", 60000, 0), day("2026-10-21", "B", 60000, 0),
+    // C: 리드 2건 → hold
+    day("2026-10-21", "C", 20000, 2),
+    // D: 이전 리드당 1만 → 이번주 3만, 등록 0 → cut(피로도)
+    day("2026-09-30", "D", 50000, 5), day("2026-10-22", "D", 30000, 1),
+  ];
+  const leads = [lead("1", "A", "2026-10-01", "enroll"), lead("2", "A", "2026-10-20", "enroll"), lead("3", "D", "2026-09-30", "consult")];
+  const r = MK.buildWeekly({ week, ads, organic: [], leads });
+  const v = Object.fromEntries(r.ads.map((a) => [a.ad_name, [a.verdict, a.reason]]));
+  assert.deepEqual(v.A, ["keep", "등록당 비용 지점 평균 이하"]);
+  assert.deepEqual(v.B, ["cut", "4주 지출 120,000원, 리드 0"]);
+  assert.deepEqual(v.C, ["hold", "판단 보류 (표본 2건)"]);
+  assert.deepEqual(v.D, ["cut", "리드당 비용 200% 상승(피로도)"]);
+  assert.equal(r.totals.enrolls4w, 2);
+  assert.equal(r.flags.noOrganic, true);
+});
+
+test("buildWeekly: 등록 데이터 없으면 보류, 리드당 비용으로 대체 안 함", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "A", 50000, 10)], organic: [], leads: [] });
+  assert.equal(r.flags.noLeads, true);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
+});
+
+test("buildWeekly: 오가닉 상위·하위", () => {
+  const p = (id, reach, saves, shares) => ({ platform: "instagram", post_id: id, published_at: "2026-10-20", type: "릴스", permalink: "", caption: id, views: 0, reach, likes: 0, comments: 0, saves, shares, follows: 0 });
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [], leads: [], organic: [p("a", 1000, 50, 10), p("b", 1000, 1, 0), p("c", 50, 40, 40), p("d", 1000, 10, 5)] });
+  assert.deepEqual(r.organic.top.map((x) => x.post_id), ["a", "d", "b"]);
+  assert.deepEqual(r.organic.bottom.map((x) => x.post_id), ["b", "d", "a"]);
+  assert.equal(r.flags.noAds, true);
+});
+
+test("buildPersonaInputs: 퍼널·등록자 분포", () => {
+  const leads = [
+    { ...lead("1", "A", "2026-10-01", "enroll"), age_band: "30대", subject: "영어" },
+    { ...lead("2", "A", "2026-10-02", "enroll"), age_band: "30대", subject: "스페인어" },
+    { ...lead("3", "B", "2026-10-03", "consult"), age_band: "20대", subject: "영어" },
+  ];
+  const demo = [{ ad_name: "A", age: "25-34", gender: "female", leads: 6 }, { ad_name: "A", age: "25-34", gender: "male", leads: 2 }];
+  const r = MK.buildPersonaInputs({ leads, demo });
+  assert.equal(r.sample, 3);
+  assert.deepEqual(r.funnel, { lead: 0, consult: 1, visit: 0, enroll: 2, lost: 0 });
+  assert.deepEqual(r.enrolledByAge, { "30대": 2 });
+  assert.deepEqual(r.enrolledBySubject, { 영어: 1, 스페인어: 1 });
+  assert.deepEqual(r.leadsByAgeGender, [{ age: "25-34", gender: "female", leads: 6, share: 0.75 }, { age: "25-34", gender: "male", leads: 2, share: 0.25 }]);
+});
