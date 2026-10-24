@@ -1,0 +1,95 @@
+/* ✍️ 블로그 탭 (blog.js). index.html 의 색 토큰(--bg, --panel, --line, --sub, --accent …)을 그대로 씀 */
+body:not(.blv) #blogView { display: none; }
+#blogView { max-width: 1240px; margin: 0 auto; padding: 16px 20px 100px; }
+#blogView .blbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+#blogView .blbar h2 { margin: 0 auto 0 0; }
+#blogView .bltabs { display: flex; gap: 4px; }
+#blogView .bltabs button, .blseg button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
+#blogView .bltabs button.on, .blseg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#blogView select, #blogView input:not([type=checkbox]):not([type=range]), #blogView textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+#blogView textarea { width: 100%; resize: vertical; field-sizing: content; min-height: 3.2em; }
+#blogView label { display: block; font-size: 12.5px; color: var(--sub); margin: 12px 0 4px; }
+#blogView .mut { color: var(--sub); font-size: 12.5px; }
+#blogView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+#blogView .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } #blogView .row2 select, #blogView .row2 input { width: 100%; }
+#blogView .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; } #blogView .row3 select { width: 100%; }
+#blogView .btn.small { padding: 5px 9px; font-size: 13px; }
+
+.blgrid { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.blform { position: sticky; top: 112px; max-height: calc(100vh - 124px); overflow: auto; }
+.blseg { display: flex; gap: 4px; } .blseg button { flex: 1; }
+
+/* 사진 올리기 */
+.bldrop { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; text-align: center; color: var(--sub); cursor: pointer; margin-top: 10px; }
+.bldrop.over { border-color: var(--accent); background: var(--hover); }
+.blthumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 10px; }
+.blthumb { position: relative; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); cursor: grab; }
+.blthumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; pointer-events: none; }
+.blthumb .no { position: absolute; left: 4px; top: 4px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+.blthumb .x { position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; line-height: 20px; }
+.blthumb .ed { position: absolute; right: 3px; bottom: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; }
+.blthumb .face { position: absolute; left: 4px; bottom: 4px; font-size: 11px; background: rgba(0,0,0,.65); color: #fff; padding: 0 4px; border-radius: 5px; }
+.blthumb.dragging { opacity: .4; }
+.blthumb input { width: 100%; border: 0 !important; border-top: 1px solid var(--line) !important; border-radius: 0 !important; font-size: 11.5px; padding: 4px 6px !important; }
+
+/* 키워드 칩 */
+.blchips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.blchip { padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-size: 12.5px; }
+.blchip.main { background: var(--accent); border-color: var(--accent); color: #fff; } .blchip.sub { border-color: var(--accent); color: var(--accent); }
+.blkw { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; } .blkw td, .blkw th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+.blkw td:first-child, .blkw th:first-child { text-align: left; } .blkw tr { cursor: pointer; } .blkw tr:hover td { background: var(--hover); }
+
+.blgo { width: 100%; margin-top: 14px; padding: 12px; font-size: 16px; }
+.blgo[disabled] { opacity: .6; cursor: wait; }
+
+/* 시안 */
+.blempty { padding: 60px 20px; text-align: center; color: var(--sub); }
+.bltitles label.t { display: flex; gap: 8px; align-items: center; margin: 4px 0; color: var(--text); font-size: 15px; }
+.bltitles label.t input[type=text] { flex: 1; } .bltitles small { color: var(--sub); white-space: nowrap; }
+.blpaper { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-top: 12px; max-width: 720px; }
+.blk { position: relative; margin: 0 0 10px; border-radius: 8px; }
+.blk.text .tx, .blk.quote .tx { white-space: pre-wrap; line-height: 1.85; padding: 4px 6px; border-radius: 6px; outline: none; }
+.blk .tx:focus { background: var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.blk.quote .tx { border-left: 4px solid var(--accent); background: var(--panel); padding: 10px 12px; font-weight: 700; font-size: 16.5px; }
+.blk.divider hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.blk.map .mapbox { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; color: var(--sub); text-align: center; }
+.blk.photo figure { margin: 0; text-align: center; }
+.blk.photo img { max-width: 100%; max-height: 420px; border-radius: 6px; display: block; margin: 0 auto; }
+.blk.photo .ph { border: 2px dashed var(--line); border-radius: 8px; padding: 28px 12px; color: var(--sub); }
+.blk.photo .cap { font-size: 13px; color: var(--sub); padding: 4px 6px; outline: none; }
+.blk.photo .tag { position: absolute; left: 6px; top: 6px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 6px; }
+.blk .tools { position: absolute; right: -2px; top: -2px; display: none; gap: 2px; }
+.blk:hover .tools, .blk:focus-within .tools { display: flex; }
+.blk .tools button { width: 24px; height: 24px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
+.blk.photo { cursor: grab; } .blk.dragging { opacity: .35; }
+.blk.dropbefore { box-shadow: 0 -3px 0 var(--accent); } .blk.dropon { box-shadow: 0 0 0 3px var(--accent); }
+.bltray { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; } .bltray .blthumb { width: 64px; }
+.bltags { color: var(--blue); font-size: 14px; margin-top: 12px; line-height: 1.8; word-break: keep-all; }
+.blacts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; position: sticky; bottom: 0; background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); }
+
+/* 발행 전 점검기 */
+.blcheck { display: grid; gap: 4px; margin-top: 12px; font-size: 13.5px; }
+.blcheck div { display: flex; gap: 8px; align-items: baseline; } .blcheck b { min-width: 18px; }
+.blcheck .ok b { color: var(--green); } .blcheck .warn b { color: var(--orange); } .blcheck .bad b { color: var(--red); } .blcheck .info b { color: var(--sub); }
+
+/* 보관함·설정 */
+.bllist { display: grid; gap: 8px; } .bllist .card { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.bllist .card .t { flex: 1; min-width: 200px; } .bllist .card .t b { display: block; }
+.blbadge { font-size: 11.5px; padding: 1px 7px; border-radius: 6px; border: 1px solid var(--line); color: var(--sub); }
+.blbadge.pub { color: var(--green); border-color: var(--green); }
+.blset { max-width: 760px; } .blset textarea { min-height: 4.5em; }
+.blusage { width: 100%; border-collapse: collapse; } .blusage td, .blusage th { padding: 8px; border-bottom: 1px solid var(--line); text-align: right; } .blusage td:first-child, .blusage th:first-child { text-align: left; }
+.blusage input { width: 70px; text-align: right; }
+
+/* 사진 편집 */
+#blEditDlg { width: min(980px, calc(100vw - 24px)); }
+#blEditDlg .cv { position: relative; background: #111; border-radius: 8px; overflow: hidden; touch-action: none; }
+#blEditDlg canvas { display: block; max-width: 100%; margin: 0 auto; cursor: crosshair; }
+#blEditDlg .tb { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
+#blEditDlg .tb input[type=range] { width: 120px; }
+#blConvDlg textarea, #blStyleDlg textarea { width: 100%; min-height: 9em; }
+
+@media (max-width: 900px) {
+  .blgrid { grid-template-columns: minmax(0, 1fr); } .blform { position: static; max-height: none; }
+  #blogView { padding: 10px 10px 80px; } .blpaper { padding: 12px; } .blk .tools { display: flex; }
+}
