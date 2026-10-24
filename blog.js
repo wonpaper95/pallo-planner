@@ -117,11 +117,31 @@ BL.load = async function () {
     BL.profileSaved = !!row && Object.keys(row.data ?? {}).some((k) => k !== "links"); // 게시물 탭 바로가기(links)만 저장된 행은 아직 지점 설정 전
     if (prev !== undefined && prev !== BL.team) { BL.post = null; BL.postId = null; }
     BL.opts = { mode: "photo", topic: "", facts: "", subject: "", preset: "auto", writer: P().writer || "director", age: "30대", reader: "worker", readerAge: "30대", tone: "friendly", concept: P().concept || "class", main_keyword: "", sub_keywords: [] };
+    if (BL.prefs === undefined) BL.prefs = (await sb.from("blog_prefs").select("data, updated_at").eq("user_id", me.id).maybeSingle()).data ?? null;
+    applyPrefs();
   }
   BL.styles = (await sb.from("blog_styles").select("id, name, team_id").order("created_at")).data ?? [];
   call("usage").then((r) => r && setQuota(r.quota));
   renderTab();
 };
+// ── 내 기본값 (blog_prefs, 사람마다 1줄): 새 글 옵션을 지점 기본값 위에 덮어씀. 지점에 없는 과목은 건너뜀 ──
+const PREF_KEYS = ["mode", "subject", "concept", "preset", "writer", "age", "reader", "readerAge", "tone"];
+function applyPrefs() {
+  const d = BL.prefs?.data ?? {};
+  for (const k of PREF_KEYS) if (d[k] != null && (k !== "subject" || !d[k] || (P().subjects ?? []).includes(d[k]))) BL.opts[k] = d[k];
+}
+async function savePrefs() {
+  const data = Object.fromEntries(PREF_KEYS.map((k) => [k, BL.opts[k]]));
+  const { data: row, error } = await sb.from("blog_prefs").upsert({ user_id: me.id, data, updated_at: new Date().toISOString() }).select("data, updated_at").single();
+  if (fail(error)) return;
+  BL.prefs = row; toast("내 기본값을 저장했어요. 다음부터 이 옵션으로 시작해요"); renderNew();
+}
+async function resetPrefs() {
+  if (!confirm("내 기본값을 지울까요? 다음부터 지점 기본 옵션으로 시작해요.")) return;
+  const { error } = await sb.from("blog_prefs").delete().eq("user_id", me.id);
+  if (fail(error)) return;
+  BL.prefs = null; toast("내 기본값을 지웠어요"); renderNew();
+}
 function setQuota(q) { BL.quota = q; const el = $b("#blQuota"); if (el && q) el.textContent = `오늘 남은 생성 ${Math.max(0, q.limit - q.used)}/${q.limit}회`; }
 
 function renderTab() {
@@ -159,6 +179,7 @@ async function sendFb() {
 function renderNew() {
   const o = BL.opts, subs = P().subjects ?? [];
   const styles = [...PRESETS, ...BL.styles.map((s) => [`custom:${s.id}`, `⭐ ${s.name}${s.team_id ? "" : " (공용)"}`])];
+  if (!styles.some(([k]) => k === o.preset)) o.preset = "auto"; // 기본값에 저장된 스타일이 이 지점에서 안 보이면
   $b("#blBody").innerHTML = `<div class="blgrid"><div class="blform card">
     <div class="blseg" id="blMode"><button type="button" data-mode="photo">📷 사진 보고 쓰기</button><button type="button" data-mode="topic">📝 주제 주고 쓰기</button></div>
     <div class="bldrop" id="blDrop">📷 사진을 끌어다 놓거나 눌러서 고르세요<br><small>올린 순서대로 번호가 붙어요 · 끌어서 순서 바꾸기</small></div>
@@ -173,6 +194,8 @@ function renderNew() {
     <div class="row2"><div><label>글쓴이</label><select data-o="writer">${opt(WRITERS, o.writer)}</select></div><div><label>글쓴이 나이대</label><select data-o="age">${opt(AGES, o.age)}</select></div></div>
     <div class="row2"><div><label>타깃 독자</label><select data-o="reader">${opt(READERS, o.reader)}</select></div><div><label>독자 나이대</label><select data-o="readerAge">${opt(AGES, o.readerAge)}</select></div></div>
     <label>어투</label><select data-o="tone" style="width:100%">${opt(TONES, o.tone)}</select>
+    <div class="blpref"><button type="button" class="btn ghost small" id="blPrefSave">⭐ 지금 옵션을 내 기본값으로</button>${BL.prefs ? `<button type="button" class="btn ghost small" id="blPrefReset">기본값 지우기</button>` : ""}
+      <div class="mut" style="margin-top:4px">${BL.prefs ? `⭐ 내 기본값으로 시작했어요 (${new Date(BL.prefs.updated_at).getMonth() + 1}/${new Date(BL.prefs.updated_at).getDate()} 저장)` : "자주 쓰는 글쓴이·어투·타깃을 저장해 두면 다음부터 그 값으로 시작해요"}</div></div>
     <label>메인 키워드 <small>(비우면 AI가 골라요 · 칩 한 번=서브, 두 번=메인)</small></label><input data-o="main_keyword" value="${esc(o.main_keyword)}" style="width:100%" placeholder="예) 동성로 영어회화">
     <div class="blchips" id="blChips"></div>
     <button type="button" class="btn ghost small" id="blKwBtn" style="margin-top:8px">🔍 네이버 검색량 보기</button><div id="blKw"></div>
@@ -537,6 +560,8 @@ function wire() {
       if (!fail(error)) { if (BL.postId === +d.delp) { BL.postId = null; } renderList(); } return;
     }
     if (t.id === "blPfSave") return saveProfile();
+    if (t.id === "blPrefSave") return savePrefs();
+    if (t.id === "blPrefReset") return resetPrefs();
     if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
     if (t.id === "blFbSend") return sendFb();
   });
