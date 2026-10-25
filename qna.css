@@ -1,0 +1,35 @@
+/* 💬 Q&A 탭 (qna.js) */
+body:not(.qav) #qaView { display: none; }
+#qaView { max-width: 820px; margin: 0 auto; padding: 16px 20px 100px; }
+#qaView .mut { color: var(--sub); font-size: 12.5px; }
+#qaView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+#qaView .card + .card { margin-top: 10px; }
+#qaView textarea, #qaView input[type=text], #qaView input[type=search], #qaView select { width: 100%; box-sizing: border-box; padding: 9px 11px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+#qaView textarea { min-height: 84px; resize: vertical; line-height: 1.55; }
+#qaView .qarow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+#qaView .qarow .sp { flex: 1; }
+#qaView .qarow label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+#qaView .qarow select { width: auto; }
+#qaView .btn.small { padding: 6px 10px; font-size: 13px; }
+#qaView .qatabs { display: flex; gap: 6px; margin: 18px 0 12px; flex-wrap: wrap; }
+#qaView .qatabs button { padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--sub); }
+#qaView .qatabs button.on { color: var(--text); background: var(--hover); font-weight: 600; }
+#qaView .qatabs .n { margin-left: 4px; font-size: 12px; color: var(--orange); }
+#qaView .qaq { font-weight: 600; white-space: pre-wrap; word-break: break-word; }
+#qaView .qaa { margin-top: 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.6; }
+#qaView .qameta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 12.5px; color: var(--sub); }
+#qaView .qbadge { font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+#qaView .qbadge.ai { color: var(--blue); border-color: var(--blue); }
+#qaView .qbadge.waiting { color: var(--orange); border-color: var(--orange); }
+#qaView .qbadge.final { color: var(--green); border-color: var(--green); }
+#qaView .qbadge.warn { color: var(--red); border-color: var(--red); }
+#qaView .qahits { margin-top: 10px; }
+#qaView .qahits details { border-top: 1px solid var(--line); padding: 8px 2px; }
+#qaView .qahits summary { cursor: pointer; }
+#qaView .qarefs { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--line); font-size: 13.5px; }
+#qaView .qarefs p { margin: 0 0 8px; white-space: pre-wrap; }
+#qaView .qashots { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+#qaView .qashots img { width: 72px; height: 128px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+#qaView .qaempty { color: var(--sub); text-align: center; padding: 26px 10px; }
+.seg .qabadge { margin-left: 4px; min-width: 16px; padding: 0 5px; border-radius: 99px; background: var(--orange); color: #fff; font-size: 11px; font-weight: 700; }
+.seg .qabadge.hidden { display: none; }
