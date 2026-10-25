@@ -73,9 +73,9 @@ do $$ begin
   end if;
 end $$;
 -- 같은 신입·시도의 같은 이벤트는 한 번만 (브라우저 재전송·옛 기록 재전송 대비)
-drop index if exists public.training_events_once;
-create unique index training_events_once
+create unique index if not exists training_events_once_v2
   on public.training_events (trainee_id, attempt_id, kind, coalesce(step, -1), coalesce(mistake_id, ''));
+drop index if exists public.training_events_once;
 create index if not exists training_events_trainee_idx on public.training_events (trainee_id, created_at desc);
 
 alter table public.training_trainees enable row level security;
@@ -162,10 +162,10 @@ declare t record; tok text; nm text := left(btrim(coalesce(p_name, '')), 40);
         hdrs json := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json;
         client_ip text;
 begin
-  client_ip := left(coalesce(hdrs->>'cf-connecting-ip', btrim(split_part(hdrs->>'x-forwarded-for', ',', 1)), 'unknown'), 64);
-  if client_ip = '' then client_ip := 'unknown'; end if;
+  -- cf-connecting-ip 만 믿는다(Cloudflare 가 덮어씀. x-forwarded-for 는 클라이언트가 꾸밀 수 있음). 없으면 IP 제한은 건너뛴다
+  client_ip := nullif(left(btrim(coalesce(hdrs->>'cf-connecting-ip', '')), 64), '');
   -- 같은 IP 10분에 20번, 같은 이름 10분에 10번 틀리면 막는다. 전체 1분 600번은 비상 차단(한 곳이 모두를 잠그지 못하게 높게)
-  if (select count(*) from training_enter_fails f where f.ip = client_ip and f.at > now() - interval '10 minutes') >= 20
+  if (client_ip is not null and (select count(*) from training_enter_fails f where f.ip = client_ip and f.at > now() - interval '10 minutes') >= 20)
      or (select count(*) from training_enter_fails f where f.name = nm and f.at > now() - interval '10 minutes') >= 10
      or (select count(*) from training_enter_fails f where f.at > now() - interval '1 minute') >= 600 then
     raise exception 'too_many_attempts';
@@ -174,7 +174,7 @@ begin
     from training_trainees tr join teams tm on tm.id = tr.team_id
    where tr.active and tr.name = nm and tr.code_hash = encode(digest(btrim(coalesce(p_code, '')), 'sha256'), 'hex');
   if not found then
-    insert into training_enter_fails (name, ip) values (nm, client_ip);
+    insert into training_enter_fails (name, ip) values (nm, coalesce(client_ip, 'unknown'));
     delete from training_enter_fails f where f.at < now() - interval '1 day';
     return;
   end if;
@@ -209,10 +209,22 @@ begin
   if jsonb_typeof(p_events) <> 'array' or jsonb_array_length(p_events) > 50 then
     raise exception 'bad_events' using errcode = '22023';
   end if;
+  -- 이상한 원소 하나가 묶음 전체를 막지 않도록 여기서 거르고 다듬는다(테이블 제약은 마지막 안전망):
+  -- 잘못된 attemptId·missionId·kind 는 건너뛰고, seconds 는 0..86400 으로 자르고, step 이 범위 밖이면 null.
   insert into training_events (trainee_id, attempt_id, mission_id, kind, step, mistake_id, seconds, client_at)
-  select tid, (e->>'attemptId')::uuid, e->>'missionId', e->>'kind', (e->>'step')::int, e->>'mistakeId',
-         (e->>'seconds')::int, to_timestamp((e->>'at')::double precision / 1000)
+  select tid,
+         (e->>'attemptId')::uuid,
+         e->>'missionId',
+         e->>'kind',
+         case when e->>'step' ~ '^[0-9]{1,9}$' and (e->>'step')::bigint <= 100 then (e->>'step')::int end,
+         left(e->>'mistakeId', 60),
+         case when e->>'seconds' ~ '^[0-9]{1,12}$' then least((e->>'seconds')::bigint, 86400)::int end,
+         case when e->>'at' ~ '^[0-9]{1,15}$' then to_timestamp((e->>'at')::double precision / 1000) else now() end
     from jsonb_array_elements(p_events) e
+   where jsonb_typeof(e) = 'object'
+     and coalesce(e->>'attemptId', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     and coalesce(e->>'missionId', '') ~ '^[a-z0-9-]{1,40}$'
+     and coalesce(e->>'kind', '') in ('start', 'step', 'mistake', 'pass')
   on conflict do nothing;
   get diagnostics n = row_count;
   update training_trainees set last_seen_at = now() where id = tid;

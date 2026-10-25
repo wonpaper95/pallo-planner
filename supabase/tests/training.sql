@@ -63,6 +63,14 @@ do $$ declare ev jsonb; n int; begin
   assert n = 4, '처음엔 4행';
   n := public.training_log_events(current_setting('t.tok'), ev);
   assert n = 0, '같은 이벤트는 다시 안 들어감';
+  -- 이상한 원소가 섞여도 오류 없이 멀쩡한 것만 저장: 큰 seconds(86400 으로 자름) + 나쁜 missionId + 나쁜 attemptId + 나쁜 kind + 정상 step
+  n := public.training_log_events(current_setting('t.tok'), jsonb_build_array(
+    jsonb_build_object('attemptId', '00000000-0000-4000-8000-000000000002', 'missionId', 'call-03', 'kind', 'pass', 'seconds', 200000, 'at', 1793000004000),
+    jsonb_build_object('attemptId', '00000000-0000-4000-8000-000000000002', 'missionId', 'BAD ID!', 'kind', 'step', 'step', 1, 'at', 1793000005000),
+    jsonb_build_object('attemptId', 'not-a-uuid', 'missionId', 'call-03', 'kind', 'step', 'step', 2, 'at', 1793000006000),
+    jsonb_build_object('attemptId', '00000000-0000-4000-8000-000000000002', 'missionId', 'call-03', 'kind', 'bogus', 'at', 1793000007000),
+    jsonb_build_object('attemptId', '00000000-0000-4000-8000-000000000002', 'missionId', 'call-03', 'kind', 'step', 'step', 7, 'at', 1793000008000)));
+  assert n = 2, '이상한 원소는 건너뛰고 정상 2행만 저장';
   begin
     perform public.training_log_events('bad', ev);
     raise exception '무효 세션이 막히지 않음';
@@ -79,7 +87,7 @@ do $$ begin
   end;
 end $$;
 -- 6b) IP 단위 제한: 한 IP 가 다른 이름으로 20번 틀리면 그 IP 만 막히고, 다른 IP 는 정상 입장
-select set_config('request.headers', '{"x-forwarded-for":"1.2.3.4, 10.0.0.1"}', true);
+select set_config('request.headers', '{"cf-connecting-ip":"1.2.3.4","x-forwarded-for":"9.9.9.9"}', true);
 do $$ declare i int; begin
   for i in 1..20 loop perform * from public.training_enter('없는사람' || i, '999999'); end loop;
   begin
@@ -89,10 +97,17 @@ do $$ declare i int; begin
     if sqlerrm <> 'too_many_attempts' then raise; end if;
   end;
 end $$;
-select set_config('request.headers', '{"x-forwarded-for":"5.6.7.8"}', true);
+select set_config('request.headers', '{"cf-connecting-ip":"5.6.7.8"}', true);
 do $$ declare r record; begin
   select * into r from public.training_enter('김신입', current_setting('t.code'));
   assert r.token is not null, '다른 IP 는 들어가져야 함';
+end $$;
+-- 6c) cf-connecting-ip 가 없으면 IP 제한은 적용하지 않는다(x-forwarded-for 는 믿지 않음): 20번 넘게 틀려도 다른 이름의 정상 입장은 된다
+select set_config('request.headers', '{"x-forwarded-for":"7.7.7.7"}', true);
+do $$ declare i int; r record; begin
+  for i in 1..21 loop perform * from public.training_enter('무헤더' || i, '999999'); end loop;
+  select * into r from public.training_enter('김신입', current_setting('t.code'));
+  assert r.token is not null, '헤더 없을 땐 IP 제한이 걸리면 안 됨';
 end $$;
 select set_config('request.headers', '{}', true);
 
@@ -116,6 +131,8 @@ do $$ declare r record; begin
   select * into r from public.training_progress where trainee_id = current_setting('t.tid')::uuid and mission_id = 'call-03';
   assert r.attempts = 1 and r.passed and r.best_seconds = 95 and r.mistakes = 1, '진행률 집계';
   assert r.mistake_ids = array['absent-as-nocall'], '실수 id';
+  assert (select seconds from public.training_events where attempt_id = '00000000-0000-4000-8000-000000000002' and kind = 'pass') = 86400, 'seconds 는 86400 으로 잘림';
+  assert (select count(*) from public.training_events where attempt_id = '00000000-0000-4000-8000-000000000002') = 2, '시도 2 는 정상 2행만';
 end $$;
 select set_config('request.jwt.claims', json_build_object('sub', current_setting('t.boss'), 'role', 'authenticated')::text, true);
 do $$ begin
