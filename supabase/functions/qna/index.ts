@@ -162,5 +162,20 @@ async function extract(who: Who, b: { images?: Shot[] }) {
   await record(who, "extract", u, { shots: imgs.length, pairs: pairs.length });
   return { pairs };
 }
-// ── suggest: 대표가 고친 답 → 말투 메모 제안 (Task 8) ──
-async function suggest(who: Who, _b: unknown): Promise<unknown> { bossOnly(who); throw new HttpError(501, "말투 제안은 다음 단계에서 붙여요"); }
+// ── suggest: 대표가 AI 초안을 많이 고쳤으면(0.15 이상) 말투 메모에 넣을 한 줄 제안 ──
+async function suggest(who: Who, b: { item_id?: number }) {
+  bossOnly(who);
+  const it = (await admin.from("qna_items").select("id, question, ai_answer, answer, status").eq("id", Number(b.item_id)).maybeSingle()).data;
+  if (!it) throw new HttpError(404, "질문을 찾을 수 없어요");
+  if (it.status !== "final" || !it.ai_answer || editRatio(it.ai_answer, it.answer) < 0.15) return { suggestion: null };
+  const memo = await memoOf();
+  const { out, usage: u } = await claude(sys(SUGGEST_SYSTEM),
+    [{ type: "text", text: `# 지금 말투·원칙 메모\n${memo || "(비어 있음)"}\n\n# 질문\n${it.question}\n\n# AI 초안 (고치기 전)\n${it.ai_answer}\n\n# 대표 확정 답 (고친 뒤)\n${it.answer}` }],
+    SUGGEST_SCHEMA, "low");
+  await record(who, "suggest", u);
+  const line = String((out as { line?: string }).line ?? "").trim(), why = String((out as { why?: string }).why ?? "").trim();
+  if (!line || memo.includes(line)) return { suggestion: null };
+  const { data, error } = await admin.from("qna_suggestions").insert({ item_id: it.id, line: line.slice(0, 200), why: why.slice(0, 300) }).select("id, line, why").single();
+  if (error) throw error;
+  return { suggestion: data };
+}

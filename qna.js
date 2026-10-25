@@ -142,8 +142,8 @@ async function renderFaq() {
 }
 
 // ── 대표 화면 (Task 5) ──
-const BOSS_TABS = [["inbox", "📥 확인할 것"], ["lib", "📚 확정 답변"], ["cap", "📸 캡처로 학습"]];
-const BOSS_VIEWS = { inbox: renderInbox, lib: renderLib, cap: renderCap };
+const BOSS_TABS = [["inbox", "📥 확인할 것"], ["lib", "📚 확정 답변"], ["cap", "📸 캡처로 학습"], ["memo", "✍️ 말투 메모"]];
+const BOSS_VIEWS = { inbox: renderInbox, lib: renderLib, cap: renderCap, memo: renderMemo };
 async function renderBoss() {
   V().innerHTML = `<nav class="qatabs" style="margin-top:0">${BOSS_TABS.map(([k, l]) => `<button data-tab="${k}" class="${QA.tab === k ? "on" : ""}">${l}${k === "inbox" ? `<span class="n" id="qaInN"></span>` : ""}</button>`).join("")}</nav><div id="qaBody"><div class="mut">불러오는 중…</div></div>`;
   V().querySelectorAll(".qatabs [data-tab]").forEach((b) => (b.onclick = () => { QA.tab = b.dataset.tab; renderBoss(); }));
@@ -267,6 +267,30 @@ function drawPairs() {
   });
   $q("#qaSaveAll")?.addEventListener("click", () => save([...el.querySelectorAll(".card[data-i]")]));
 }
-// 확정 직후 (Task 8 에서 말투 제안을 붙임)
-function afterFinal(_r, _answer) {}
+// 확정 직후: AI 초안을 많이 고쳤으면 서버가 말투 메모 제안을 하나 만든다 (기다리지 않음)
+function afterFinal(r, answer) {
+  if (!r.ai_answer || r.ai_answer.trim() === answer) return;
+  call("suggest", { item_id: r.id }).then((x) => x?.suggestion && toast("✍️ 말투 메모에 넣을 제안이 생겼어요 (✍️ 말투 메모 탭)"));
+}
+async function renderMemo() {
+  const box = $q("#qaBody"); if (!box) return;
+  const [st, sg] = await Promise.all([sb.from("qna_style").select("memo, updated_at").eq("id", 1).maybeSingle(),
+    sb.from("qna_suggestions").select("id, line, why, created_at").eq("status", "pending").order("created_at", { ascending: false })]);
+  if (fail(st.error) || fail(sg.error)) return;
+  box.innerHTML = `<div class="card"><div class="mut">AI가 답할 때 항상 지키는 대표님 말투·원칙이에요. 한 줄에 하나씩 적어 주세요. 예: 존댓말, 결론 먼저 / 환불·할인 얘기는 저한테 넘기기 / 이모지는 거의 안 씀</div>
+      <textarea id="qaMemo" style="margin-top:8px;min-height:180px">${esc(st.data?.memo ?? "")}</textarea>
+      <div class="qarow"><span class="mut">${st.data?.updated_at ? `마지막 저장 ${when(st.data.updated_at)}` : ""}</span><span class="sp"></span><button type="button" class="btn small" id="qaMemoSave">저장</button></div></div>
+    <h3 style="margin:20px 0 8px">AI 제안 ${sg.data.length ? `<span class="mut">${sg.data.length}개</span>` : ""}</h3>
+    ${sg.data.length ? sg.data.map((x) => `<div class="card" data-id="${x.id}"><div class="qaq">${esc(x.line)}</div><div class="mut" style="margin-top:4px">${esc(x.why)}</div>
+      <div class="qarow"><span class="sp"></span><button type="button" class="btn ghost small" data-act="no">거절</button><button type="button" class="btn small" data-act="yes">수락 (메모에 추가)</button></div></div>`).join("")
+      : `<div class="card qaempty">아직 제안이 없어요. 📥 에서 AI 답을 고쳐서 확정하면 생겨요.</div>`}`;
+  const saveMemo = async (memo) => { const { error } = await sb.from("qna_style").update({ memo, updated_at: new Date().toISOString() }).eq("id", 1); return !fail(error); };
+  $q("#qaMemoSave").onclick = async () => { if (await saveMemo($q("#qaMemo").value.trim())) { toast("말투 메모를 저장했어요"); renderMemo(); } };
+  box.querySelectorAll(".card[data-id]").forEach((c) => c.querySelectorAll("[data-act]").forEach((b) => (b.onclick = async () => {
+    const x = sg.data.find((s) => s.id === +c.dataset.id), yes = b.dataset.act === "yes";
+    if (yes) { const cur = $q("#qaMemo").value.trim(); if (!(await saveMemo(cur ? `${cur}\n- ${x.line}` : `- ${x.line}`))) return; }
+    const { error } = await sb.from("qna_suggestions").update({ status: yes ? "accepted" : "rejected" }).eq("id", x.id); if (fail(error)) return;
+    toast(yes ? "메모에 넣었어요" : "거절했어요"); renderMemo();
+  })));
+}
 })();
