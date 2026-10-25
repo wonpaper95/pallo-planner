@@ -55,8 +55,8 @@ function render() {
     $("#rtN").textContent = `${n}/${routine.length}`;
     $("#rtBar").style.width = (routine.length ? (n / routine.length) * 100 : 0) + "%";
     const row = (it, ck, from) => `<label class="it ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" ${from ? `data-day="${from}"` : ""} ${ck ? "checked" : ""}>`
-      + `${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${from ? `<b style="color:var(--orange)">↪ ${from.slice(5).replace("-", "/")} 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_link && !ck ? ` <small style="color:var(--sub)">🔗 링크</small>` : ""}</span>`
-      + `${ck?.link ? `<a href="${esc(ck.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">🔗</a>` : ""}</label>`;
+      + `${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${from ? `<b style="color:var(--orange)">↪ ${from.slice(5).replace("-", "/")} 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small style="color:var(--sub)">📷 인증샷</small>` : it.need_link && !ck ? ` <small style="color:var(--sub)">🔗 링크</small>` : ""}</span>`
+      + `${ck?.link ? `<a href="${esc(ck.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">${isPhotoLink(ck.link) ? "📷" : "🔗"}</a>` : ""}</label>`;
     $("#rtList").innerHTML = state.carried.map((x) => row(x.it, null, x.from)).join("") + routine.map((it) => row(it, checks.get(it.id))).join("")
       + (routine.length && n === routine.length ? `<div class="done-all">🎉 고정업무 끝! 보고하고 퇴근하세요</div>` : "");
   }
@@ -128,8 +128,13 @@ document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && clos
 document.addEventListener("change", async (e) => {
   const el = e.target, on = el.checked; let r;
   if (el.dataset.rt) {
-    let link = null;
-    if (on && state.all.find((x) => x.id === +el.dataset.rt)?.need_link) { // 🔗 링크를 올려야 완료
+    const it = state.all.find((x) => x.id === +el.dataset.rt); let link = null;
+    if (on && it?.need_photo) { // 📷 인증샷을 올려야 완료
+      el.checked = false;
+      const f = await pickPhoto(); if (!f) { $("#foot").textContent = "인증샷을 올려야 완료돼요"; return; }
+      $("#foot").textContent = "📷 인증샷 올리는 중…";
+      try { link = await uploadRoutinePhoto(sb, f, +el.dataset.rt); } catch (err) { $("#foot").textContent = "업로드 실패: " + err.message; return; }
+    } else if (on && it?.need_link) { // 🔗 링크를 올려야 완료
       link = (prompt("작성한 글의 링크를 붙여넣어 주세요 (https://...)") || "").trim();
       if (!/^https?:\/\/\S+$/i.test(link)) { el.checked = false; $("#foot").textContent = "링크를 올려야 완료돼요"; return; }
     }
