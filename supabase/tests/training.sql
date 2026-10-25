@@ -31,6 +31,11 @@ do $$ begin
     raise exception 'code_hash 수정이 막히지 않음';
   exception when insufficient_privilege then null;
   end;
+  begin
+    perform code_hash from public.training_trainees;
+    raise exception 'code_hash 조회가 막히지 않음';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
 
 -- 4) 신입(anon): 틀린 코드 → 0행, 맞는 코드 → 토큰
@@ -73,6 +78,24 @@ do $$ begin
   exception when insufficient_privilege then null;
   end;
 end $$;
+-- 6b) IP 단위 제한: 한 IP 가 다른 이름으로 20번 틀리면 그 IP 만 막히고, 다른 IP 는 정상 입장
+select set_config('request.headers', '{"x-forwarded-for":"1.2.3.4, 10.0.0.1"}', true);
+do $$ declare i int; begin
+  for i in 1..20 loop perform * from public.training_enter('없는사람' || i, '999999'); end loop;
+  begin
+    perform * from public.training_enter('김신입', current_setting('t.code'));
+    raise exception 'IP 시도 제한이 동작하지 않음';
+  exception when raise_exception then
+    if sqlerrm <> 'too_many_attempts' then raise; end if;
+  end;
+end $$;
+select set_config('request.headers', '{"x-forwarded-for":"5.6.7.8"}', true);
+do $$ declare r record; begin
+  select * into r from public.training_enter('김신입', current_setting('t.code'));
+  assert r.token is not null, '다른 IP 는 들어가져야 함';
+end $$;
+select set_config('request.headers', '{}', true);
+
 -- 7) 같은 이름 10번 틀리면 막힌다
 do $$ declare i int; begin
   -- 4) 에서 이미 1번 틀렸으므로 9번 더 틀리면 10번이 된다

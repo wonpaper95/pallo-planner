@@ -14,7 +14,9 @@ $$ select exists (select 1 from profiles where user_id = auth.uid() and role = '
 
 create or replace function public.training_can_manage(p_team bigint) returns boolean
 language sql stable security definer set search_path = public as
-$$ select public.training_is_admin() or (p_team is not null and p_team = public.training_my_team()) $$;
+$$ select public.training_is_admin()
+       or (p_team is not null and p_team = public.training_my_team()
+           and exists (select 1 from profiles where user_id = auth.uid() and role = 'manager')) $$;
 
 create table if not exists public.training_trainees (
   id uuid primary key default gen_random_uuid(),
@@ -41,13 +43,15 @@ create table if not exists public.training_enter_fails (
   name text not null,
   at timestamptz not null default now()
 );
+alter table public.training_enter_fails add column if not exists ip text not null default 'unknown';
 create index if not exists training_enter_fails_at_idx on public.training_enter_fails (at);
+create index if not exists training_enter_fails_ip_idx on public.training_enter_fails (ip, at);
 
 create table if not exists public.training_events (
   id bigint generated always as identity primary key,
   trainee_id uuid not null references public.training_trainees(id) on delete cascade,
   attempt_id uuid not null,
-  mission_id text not null check (length(mission_id) between 1 and 40),
+  mission_id text not null,
   kind text not null check (kind in ('start', 'step', 'mistake', 'pass')),
   step int,
   mistake_id text check (mistake_id is null or length(mistake_id) <= 60),
@@ -55,9 +59,23 @@ create table if not exists public.training_events (
   client_at timestamptz not null,
   created_at timestamptz not null default now()
 );
--- 같은 시도의 같은 이벤트는 한 번만 (브라우저 재전송·옛 기록 재전송 대비)
-create unique index if not exists training_events_once
-  on public.training_events (attempt_id, kind, coalesce(step, -1), coalesce(mistake_id, ''));
+-- 값 범위 제한 (이미 만들어진 테이블에도 다시 적용 가능하게 가드)
+alter table public.training_events drop constraint if exists training_events_mission_id_check;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conrelid = 'public.training_events'::regclass and conname = 'training_events_mission_fmt') then
+    alter table public.training_events add constraint training_events_mission_fmt check (mission_id ~ '^[a-z0-9-]{1,40}$');
+  end if;
+  if not exists (select 1 from pg_constraint where conrelid = 'public.training_events'::regclass and conname = 'training_events_seconds_range') then
+    alter table public.training_events add constraint training_events_seconds_range check (seconds is null or seconds between 0 and 86400);
+  end if;
+  if not exists (select 1 from pg_constraint where conrelid = 'public.training_events'::regclass and conname = 'training_events_step_range') then
+    alter table public.training_events add constraint training_events_step_range check (step is null or step between 0 and 100);
+  end if;
+end $$;
+-- 같은 신입·시도의 같은 이벤트는 한 번만 (브라우저 재전송·옛 기록 재전송 대비)
+drop index if exists public.training_events_once;
+create unique index training_events_once
+  on public.training_events (trainee_id, attempt_id, kind, coalesce(step, -1), coalesce(mistake_id, ''));
 create index if not exists training_events_trainee_idx on public.training_events (trainee_id, created_at desc);
 
 alter table public.training_trainees enable row level security;
@@ -104,6 +122,7 @@ begin
   end loop;
   return c;
 end $$;
+revoke execute on function public.training_new_code() from public, anon, authenticated;
 
 create or replace function public.training_add_trainee(p_name text, p_team_id bigint)
 returns table (trainee_id uuid, code text)
@@ -140,17 +159,22 @@ returns table (token text, trainee_id uuid, name text, team_name text)
 language plpgsql volatile security definer set search_path = public, extensions as $$
 #variable_conflict use_column
 declare t record; tok text; nm text := left(btrim(coalesce(p_name, '')), 40);
+        hdrs json := coalesce(nullif(current_setting('request.headers', true), ''), '{}')::json;
+        client_ip text;
 begin
-  -- 같은 이름 10분에 10번, 전체 1분에 60번 틀리면 잠시 막는다
-  if (select count(*) from training_enter_fails f where f.at > now() - interval '1 minute') >= 60
-     or (select count(*) from training_enter_fails f where f.name = nm and f.at > now() - interval '10 minutes') >= 10 then
+  client_ip := left(coalesce(hdrs->>'cf-connecting-ip', btrim(split_part(hdrs->>'x-forwarded-for', ',', 1)), 'unknown'), 64);
+  if client_ip = '' then client_ip := 'unknown'; end if;
+  -- 같은 IP 10분에 20번, 같은 이름 10분에 10번 틀리면 막는다. 전체 1분 600번은 비상 차단(한 곳이 모두를 잠그지 못하게 높게)
+  if (select count(*) from training_enter_fails f where f.ip = client_ip and f.at > now() - interval '10 minutes') >= 20
+     or (select count(*) from training_enter_fails f where f.name = nm and f.at > now() - interval '10 minutes') >= 10
+     or (select count(*) from training_enter_fails f where f.at > now() - interval '1 minute') >= 600 then
     raise exception 'too_many_attempts';
   end if;
   select tr.id, tr.name, tm.name as team_name into t
     from training_trainees tr join teams tm on tm.id = tr.team_id
    where tr.active and tr.name = nm and tr.code_hash = encode(digest(btrim(coalesce(p_code, '')), 'sha256'), 'hex');
   if not found then
-    insert into training_enter_fails (name) values (nm);
+    insert into training_enter_fails (name, ip) values (nm, client_ip);
     delete from training_enter_fails f where f.at < now() - interval '1 day';
     return;
   end if;
@@ -167,6 +191,7 @@ language sql stable security definer set search_path = public, extensions as $$
     from training_sessions s join training_trainees t on t.id = s.trainee_id
    where s.token_hash = encode(digest(coalesce(p_token, ''), 'sha256'), 'hex') and s.expires_at > now() and t.active
 $$;
+revoke execute on function public.training_session_trainee(text) from public, anon, authenticated;
 
 create or replace function public.training_whoami(p_token text)
 returns table (trainee_id uuid, name text, team_name text)

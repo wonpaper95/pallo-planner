@@ -3,7 +3,9 @@
 -- 로컬 개발 DB 는 public 새 테이블에 anon/authenticated 전체 권한이 기본으로 붙는다(운영은 아님). 어디서든 같게 동작하도록 먼저 걷어낸다.
 revoke all on public.training_trainees, public.training_sessions, public.training_enter_fails, public.training_events, public.training_progress from anon, authenticated;
 
-grant select, delete on public.training_trainees to authenticated;
+-- code_hash 는 열 목록에서 뺀다 (화면에 나갈 이유가 없다)
+grant select (id, team_id, name, active, created_by, created_at, last_seen_at) on public.training_trainees to authenticated;
+grant delete on public.training_trainees to authenticated;
 grant update (name, active) on public.training_trainees to authenticated;
 grant select on public.training_events, public.training_progress to authenticated;
 grant all on public.training_trainees, public.training_sessions, public.training_enter_fails, public.training_events to service_role;
@@ -15,4 +17,5 @@ revoke execute on function public.training_add_trainee(text, bigint) from public
 revoke execute on function public.training_reissue_code(uuid) from public, anon;
 grant execute on function public.training_add_trainee(text, bigint), public.training_reissue_code(uuid) to authenticated;
 grant execute on function public.training_enter(text, text), public.training_whoami(text), public.training_log_events(text, jsonb) to anon, authenticated;
+revoke execute on function public.training_my_team(), public.training_is_admin(), public.training_can_manage(bigint) from public, anon;
 grant execute on function public.training_my_team(), public.training_is_admin(), public.training_can_manage(bigint) to authenticated;
