@@ -272,6 +272,7 @@ Deno.serve(async (req)=>{
   const { data: rtDone } = await db.rpc("claim_routine_done"); // 🎉 지점 고정업무 다 끝남 → 대표
   const { data: fb } = await db.rpc("claim_new_feedback"); // 🐞 버그 신고·💡 개선 제안 → 대표
   const { data: tu } = await db.rpc("claim_timeups"); // ⏳ 해결목표 시간 끝 → 그 사람
+  const { data: qna } = await db.rpc("claim_qna_notices"); // 💬 Q&A: 새 대기 질문 → 대표, 확정 → 물어본 매니저
   let swept = 0;
   try {
     swept = await sweepPhotos();
@@ -315,6 +316,12 @@ Deno.serve(async (req)=>{
         title: `${t.kind === "bug" ? "🐞 버그 신고" : "💡 개선 제안"} · ${t.who ?? "?"}${t.team ? `(${t.team})` : ""}`,
         body: String(t.body).replace(/\s+/g, " ").slice(0, 150),
         tag: `fb-${Date.now()}-${i}`
+      })),
+    ...(qna ?? []).map((t)=>({
+        user_id: t.user_id,
+        title: t.title,
+        body: t.body,
+        tag: t.tag
       }))
   ];
   // 카톡: 배정·팀 업무를 받은 매니저 중 번호 있는 사람에게
