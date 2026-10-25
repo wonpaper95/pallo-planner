@@ -141,7 +141,26 @@ async function ask(who: Who, b: { question?: string; private?: boolean }) {
   return { item };
 }
 
-// ── extract: 카톡 캡처 → 질문·답 쌍 (Task 7) ──
-async function extract(who: Who, _b: unknown): Promise<unknown> { bossOnly(who); throw new HttpError(501, "캡처 학습은 다음 단계에서 붙여요"); }
+// ── extract: 카톡 캡처 → 질문·답 쌍. 사진은 이 요청 안에서만 쓰고 어디에도 저장하지 않는다 ──
+type Shot = { media_type?: string; data?: string };
+const IMG_TYPES = ["image/jpeg", "image/png", "image/webp"];
+async function extract(who: Who, b: { images?: Shot[] }) {
+  bossOnly(who);
+  const imgs = (b.images ?? []).filter((x) => IMG_TYPES.includes(String(x.media_type)) && typeof x.data === "string" && x.data.length > 100);
+  if (!imgs.length) throw new HttpError(400, "캡처를 1장 이상 올려 주세요");
+  if (imgs.length > 10) throw new HttpError(400, "한 번에 10장까지 돼요");
+  if (imgs.some((x) => x.data!.length > 4_500_000)) throw new HttpError(400, "사진 한 장이 너무 커요");
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [{ type: "text", text: `카톡 캡처 ${imgs.length}장 (순서대로 이어진 대화)` }];
+  imgs.forEach((x, i) => {
+    content.push({ type: "text", text: `캡처 ${i + 1}` });
+    content.push({ type: "image", source: { type: "base64", media_type: x.media_type as "image/png", data: x.data! } });
+  });
+  const { out, usage: u } = await claude(sys(EXTRACT_SYSTEM), content, EXTRACT_SCHEMA, "medium");
+  const pairs = ((out as { pairs?: { question: string; answer: string; asker_label: string; sensitive: boolean }[] }).pairs ?? [])
+    .map((p) => ({ question: maskPII(p.question).trim(), answer: maskPII(p.answer).trim(), asker_label: maskPII(p.asker_label).trim().slice(0, 40), sensitive: !!p.sensitive }))
+    .filter((p) => p.question.length >= 2 && p.answer.length >= 1);
+  await record(who, "extract", u, { shots: imgs.length, pairs: pairs.length });
+  return { pairs };
+}
 // ── suggest: 대표가 고친 답 → 말투 메모 제안 (Task 8) ──
 async function suggest(who: Who, _b: unknown): Promise<unknown> { bossOnly(who); throw new HttpError(501, "말투 제안은 다음 단계에서 붙여요"); }

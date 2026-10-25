@@ -142,8 +142,8 @@ async function renderFaq() {
 }
 
 // ── 대표 화면 (Task 5) ──
-const BOSS_TABS = [["inbox", "📥 확인할 것"], ["lib", "📚 확정 답변"]];
-const BOSS_VIEWS = { inbox: renderInbox, lib: renderLib };
+const BOSS_TABS = [["inbox", "📥 확인할 것"], ["lib", "📚 확정 답변"], ["cap", "📸 캡처로 학습"]];
+const BOSS_VIEWS = { inbox: renderInbox, lib: renderLib, cap: renderCap };
 async function renderBoss() {
   V().innerHTML = `<nav class="qatabs" style="margin-top:0">${BOSS_TABS.map(([k, l]) => `<button data-tab="${k}" class="${QA.tab === k ? "on" : ""}">${l}${k === "inbox" ? `<span class="n" id="qaInN"></span>` : ""}</button>`).join("")}</nav><div id="qaBody"><div class="mut">불러오는 중…</div></div>`;
   V().querySelectorAll(".qatabs [data-tab]").forEach((b) => (b.onclick = () => { QA.tab = b.dataset.tab; renderBoss(); }));
@@ -210,6 +210,62 @@ async function renderLib() {
     bindBoss(list, rows, "lib", renderLib);
   };
   $q("#qaFind").addEventListener("input", debounce(draw, 200)); draw();
+}
+// ── 📸 캡처로 학습: 사진은 이 기기에서 줄여서 AI 에만 보내고(저장 안 함), 뽑힌 쌍은 대표가 골라 확정 답변으로 ──
+QA.shots = []; QA.pairs = [];
+async function shrink(file) { // 긴 변 1600px JPEG (카톡 글씨가 읽히는 크기)
+  const bmp = await createImageBitmap(file), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const cv = document.createElement("canvas"); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+  cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height); bmp.close?.();
+  const url = cv.toDataURL("image/jpeg", 0.85);
+  return { url, media_type: "image/jpeg", data: url.split(",")[1] };
+}
+async function renderCap() {
+  const box = $q("#qaBody"); if (!box) return;
+  box.innerHTML = `<div class="card"><div class="mut">카톡에서 매니저 질문 → 대표님 답이 보이게 캡처해서 올려 주세요 (한 번에 10장까지). 오른쪽 노란 말풍선을 대표님으로 봐요. 사진은 저장하지 않아요.</div>
+      <div class="qarow"><input type="file" id="qaFiles" accept="image/*" multiple style="width:auto"><span class="sp"></span><button type="button" class="btn" id="qaExtract" ${QA.shots.length ? "" : "disabled"}>뽑기 (${QA.shots.length}장)</button></div>
+      <div class="qashots">${QA.shots.map((s, i) => `<img src="${s.url}" alt="캡처 ${i + 1}" title="누르면 빼요" data-i="${i}">`).join("")}</div></div>
+    <div id="qaPairs" style="margin-top:12px"></div>`;
+  $q("#qaFiles").onchange = async (e) => {
+    const files = [...e.target.files].filter((f) => /^image\//.test(f.type)).slice(0, 10 - QA.shots.length);
+    for (const f of files) { try { QA.shots.push(await shrink(f)); } catch { toast(`'${f.name}' 을 읽지 못했어요`); } }
+    renderCap();
+  };
+  box.querySelectorAll(".qashots img").forEach((im) => (im.onclick = () => { QA.shots.splice(+im.dataset.i, 1); renderCap(); }));
+  $q("#qaExtract").onclick = async () => {
+    const b = $q("#qaExtract"); b.disabled = true; b.textContent = "AI가 읽는 중… (30초쯤)";
+    const r = await call("extract", { images: QA.shots.map(({ media_type, data }) => ({ media_type, data })) });
+    if (!r) return renderCap();
+    QA.pairs = r.pairs; QA.shots = [];
+    toast(r.pairs.length ? `질문·답 ${r.pairs.length}쌍을 찾았어요. 골라서 저장해 주세요` : "질문·답을 찾지 못했어요");
+    renderCap();
+  };
+  drawPairs();
+}
+function drawPairs() {
+  const el = $q("#qaPairs"); if (!el) return;
+  el.innerHTML = QA.pairs.length ? `<div class="qarow" style="margin-bottom:8px"><span class="mut">뽑힌 ${QA.pairs.length}쌍 — 고쳐서 저장하거나 버려 주세요</span><span class="sp"></span><button type="button" class="btn small" id="qaSaveAll">전부 저장</button></div>`
+    + QA.pairs.map((p, i) => `<div class="card" data-i="${i}">
+        <div class="qameta"><span class="qbadge">📸 ${esc(p.asker_label || "카톡")}</span>${p.sensitive ? `<span class="qbadge warn">민감해 보여요</span>` : ""}</div>
+        <input type="text" data-k="question" value="${esc(p.question)}" maxlength="2000">
+        <textarea data-k="answer" style="margin-top:8px">${esc(p.answer)}</textarea>
+        <div class="qarow"><label><input type="checkbox" data-k="private" ${p.sensitive ? "checked" : ""}> 🔒 나만 보기</label>${teamSel(null)}<span class="sp"></span>
+          <button type="button" class="btn ghost small" data-act="drop">버리기</button><button type="button" class="btn small" data-act="save">저장</button></div></div>`).join("") : "";
+  const rowOf = (c) => ({ question: c.querySelector('[data-k="question"]').value.trim(), answer: c.querySelector('[data-k="answer"]').value.trim(),
+    private: c.querySelector('[data-k="private"]').checked, only_team: +c.querySelector('[data-k="only_team"]').value || null,
+    asker_label: QA.pairs[+c.dataset.i].asker_label, status: "final", source: "capture" });
+  const save = async (cards) => {
+    const rows = cards.map(rowOf).filter((x) => x.question.length >= 2 && x.answer);
+    if (!rows.length) return toast("질문과 답을 채워 주세요");
+    const { error } = await sb.from("qna_items").insert(rows); if (fail(error)) return;
+    const gone = new Set(cards.map((c) => +c.dataset.i)); QA.pairs = QA.pairs.filter((_, i) => !gone.has(i));
+    toast(`📚 확정 답변에 ${rows.length}개 넣었어요`); drawPairs();
+  };
+  el.querySelectorAll(".card[data-i]").forEach((c) => {
+    c.querySelector('[data-act="save"]').onclick = () => save([c]);
+    c.querySelector('[data-act="drop"]').onclick = () => { QA.pairs.splice(+c.dataset.i, 1); drawPairs(); };
+  });
+  $q("#qaSaveAll")?.addEventListener("click", () => save([...el.querySelectorAll(".card[data-i]")]));
 }
 // 확정 직후 (Task 8 에서 말투 제안을 붙임)
 function afterFinal(_r, _answer) {}
