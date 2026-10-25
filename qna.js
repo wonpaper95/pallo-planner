@@ -142,6 +142,75 @@ async function renderFaq() {
 }
 
 // ── 대표 화면 (Task 5) ──
-const BOSS_TABS = [["inbox", "📥 확인할 것"]];
-function renderBoss() { V().innerHTML = `<div class="card qaempty">대표 화면은 다음 단계에서 붙여요.</div>`; }
+const BOSS_TABS = [["inbox", "📥 확인할 것"], ["lib", "📚 확정 답변"]];
+const BOSS_VIEWS = { inbox: renderInbox, lib: renderLib };
+async function renderBoss() {
+  V().innerHTML = `<nav class="qatabs" style="margin-top:0">${BOSS_TABS.map(([k, l]) => `<button data-tab="${k}" class="${QA.tab === k ? "on" : ""}">${l}${k === "inbox" ? `<span class="n" id="qaInN"></span>` : ""}</button>`).join("")}</nav><div id="qaBody"><div class="mut">불러오는 중…</div></div>`;
+  V().querySelectorAll(".qatabs [data-tab]").forEach((b) => (b.onclick = () => { QA.tab = b.dataset.tab; renderBoss(); }));
+  await BOSS_VIEWS[QA.tab]();
+}
+const who = (r) => r.user_id ? `${esc(tname(QA.people.get(r.user_id)?.team_id ?? r.team_id))} ${esc(QA.people.get(r.user_id)?.name ?? "")}` : esc(r.asker_label || "카톡");
+const teamSel = (v) => `<select data-k="only_team" title="이 답이 해당하는 지점"><option value="">전 지점</option>${teams.map((t) => `<option value="${t.id}" ${t.id === v ? "selected" : ""}>${esc(t.name)}만</option>`).join("")}</select>`;
+function bossCard(r, mode) {
+  const f = r.ai_flags ?? {}, [cls, text] = BADGE[r.status] ?? ["", r.status];
+  const flags = mode === "inbox" ? [
+    f.failed && `<span class="qbadge warn">AI 실패: ${esc(String(f.reason ?? "").slice(0, 40))}</span>`,
+    !f.failed && f.grounded === false && `<span class="qbadge">근거 없음</span>`,
+    f.decision_request && `<span class="qbadge warn">허락·결정 요청</span>`,
+    f.sensitive && `<span class="qbadge warn">민감</span>`,
+    r.escalated && `<span class="qbadge waiting">🙋 직접 물어봄</span>`,
+  ].filter(Boolean).join("") : "";
+  return `<div class="card" data-id="${r.id}">
+    <div class="qameta"><span class="qbadge ${cls}">${text}</span>${flags}<span>${who(r)} · ${when(r.created_at)}</span>${r.source === "capture" ? `<span class="qbadge">📸 카톡</span>` : ""}</div>
+    ${mode === "lib" ? `<input type="text" data-k="question" value="${esc(r.question)}" maxlength="2000">` : `<div class="qaq">Q. ${esc(r.question)}</div>`}
+    ${mode === "inbox" && f.reason && !f.failed ? `<div class="mut" style="margin:4px 0">AI 판단: ${esc(f.reason)}</div>` : ""}
+    <textarea data-k="answer" style="margin-top:8px" placeholder="답을 적어 주세요">${esc(r.answer || r.ai_answer)}</textarea>
+    <div class="qarow"><label><input type="checkbox" data-k="private" ${r.private ? "checked" : ""}> 🔒 나만 보기${r.auto_private ? " (AI가 켬)" : ""}</label>${teamSel(r.only_team)}<span class="sp"></span>
+      <button type="button" class="btn ghost small" data-act="del">🗑</button><button type="button" class="btn small" data-act="ok">${mode === "lib" ? "저장" : "✅ 확정"}</button></div></div>`;
+}
+function bindBoss(box, rows, mode, reload) {
+  box.querySelectorAll(".card[data-id]").forEach((c) => {
+    const r = rows.find((x) => x.id === +c.dataset.id);
+    c.querySelector('[data-act="ok"]').onclick = async () => {
+      const answer = c.querySelector('[data-k="answer"]').value.trim();
+      if (!answer) return toast("답을 적어 주세요");
+      const patch = { status: "final", answer, private: c.querySelector('[data-k="private"]').checked, only_team: +c.querySelector('[data-k="only_team"]').value || null };
+      if (mode === "lib") { const q = c.querySelector('[data-k="question"]').value.trim(); if (q.length < 2) return toast("질문을 적어 주세요"); patch.question = q; }
+      const { error } = await sb.from("qna_items").update(patch).eq("id", r.id); if (fail(error)) return;
+      toast(mode === "lib" ? "저장했어요" : r.user_id ? "✅ 확정했어요. 매니저에게 알림이 가요" : "✅ 확정했어요");
+      if (mode === "inbox") afterFinal(r, answer);
+      reload(); QA.badge();
+    };
+    c.querySelector('[data-act="del"]').onclick = async () => {
+      if (!confirm("이 질문을 지울까요? 되돌릴 수 없어요.")) return;
+      const { error } = await sb.from("qna_items").delete().eq("id", r.id); if (fail(error)) return;
+      toast("지웠어요"); reload(); QA.badge();
+    };
+  });
+}
+async function renderInbox() {
+  const { data, error } = await sb.from("qna_items").select("*").or("status.eq.waiting,and(status.eq.ai,reviewed.eq.false)").order("created_at").limit(200);
+  if (fail(error)) return;
+  const box = $q("#qaBody"); if (!box) return;
+  $q("#qaInN") && ($q("#qaInN").textContent = data.length || "");
+  box.innerHTML = data.length ? `<div class="mut" style="margin-bottom:8px">⏳ 기다리는 질문과 🤖 AI가 바로 답한 질문(사후 확인)이에요. 고쳐서 확정하면 AI가 다음부터 이 답을 따라 해요.</div>` + data.map((r) => bossCard(r, "inbox")).join("")
+    : `<div class="card qaempty">확인할 질문이 없어요 🎉</div>`;
+  bindBoss(box, data, "inbox", renderInbox);
+}
+async function renderLib() {
+  const box = $q("#qaBody"); if (!box) return;
+  box.innerHTML = `<input type="search" id="qaFind" placeholder="확정 답변 검색"><div id="qaLibList" style="margin-top:10px"></div>`;
+  const { data, error } = await sb.from("qna_items").select("*").eq("status", "final").order("final_at", { ascending: false }).limit(1000);
+  if (fail(error)) return;
+  const draw = () => {
+    const k = $q("#qaFind").value.trim().toLowerCase();
+    const rows = (k ? data.filter((x) => (x.question + " " + x.answer).toLowerCase().includes(k)) : data).slice(0, 100);
+    const list = $q("#qaLibList");
+    list.innerHTML = rows.length ? `<div class="mut" style="margin-bottom:8px">확정 ${data.length}개 · 🔒 ${data.filter((x) => x.private).length}개 (🔒 는 AI 참고에서 빠져요)</div>` + rows.map((r) => bossCard(r, "lib")).join("") : `<div class="card qaempty">${data.length ? "찾는 내용이 없어요." : "아직 확정된 답이 없어요. 📥 에서 확정하거나 📸 캡처로 채워 주세요."}</div>`;
+    bindBoss(list, rows, "lib", renderLib);
+  };
+  $q("#qaFind").addEventListener("input", debounce(draw, 200)); draw();
+}
+// 확정 직후 (Task 8 에서 말투 제안을 붙임)
+function afterFinal(_r, _answer) {}
 })();
