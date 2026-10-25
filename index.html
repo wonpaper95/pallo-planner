@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610252225">
+<meta name="app-version" content="202610252238">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -245,7 +245,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 @media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 7개(현황은 대표만) → 폰에서 한 줄, 넘치면 .seg div 안에서만 가로 스크롤 */
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -418,6 +418,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="photo.css?v=202610250655">
 <link rel="stylesheet" href="post.css?v=202610250655">
 <link rel="stylesheet" href="marketing.css?v=202610250655">
+<link rel="stylesheet" href="links.css?v=202610250655">
 </head>
 <body>
 
@@ -447,7 +448,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="links">바로가기</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -479,6 +480,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="salesView"></section>
   <section id="blogView"></section>
   <section id="mkView"></section>
+  <section id="lkView"></section>
   <section id="postView"></section>
 </div>
 
@@ -556,9 +558,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610252225"></script>
-<script src="week.js?v=202610252225"></script>
-<script src="pick.js?v=202610252225"></script>
+<script src="config.js?v=202610252238"></script>
+<script src="week.js?v=202610252238"></script>
+<script src="pick.js?v=202610252238"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 const $ = (s) => document.querySelector(s);
@@ -638,6 +640,7 @@ async function boot() {
   if (view === "blog") window.BL?.load();
   if (view === "mk") window.MK?.load();
   if (view === "post") window.PS?.load();
+  if (view === "links") window.LK?.load();
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -1201,13 +1204,14 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
   if (v === "blog" && me && window.BL) BL.load();
   if (v === "mk" && me && window.MK) MK.load();
   if (v === "post" && me && window.PS) PS.load();
+  if (v === "links" && me && window.LK) LK.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
@@ -1728,12 +1732,13 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610252225"></script>
-<script src="photo.js?v=202610252225"></script>
-<script src="blog.js?v=202610252225"></script>
-<script src="mk-core.js?v=202610252225"></script>
-<script src="marketing.js?v=202610252225"></script>
-<script src="sns-core.js?v=202610252225"></script>
-<script src="post.js?v=202610252225"></script>
+<script src="sales.js?v=202610252238"></script>
+<script src="photo.js?v=202610252238"></script>
+<script src="blog.js?v=202610252238"></script>
+<script src="mk-core.js?v=202610252238"></script>
+<script src="marketing.js?v=202610252238"></script>
+<script src="sns-core.js?v=202610252238"></script>
+<script src="post.js?v=202610252238"></script>
+<script src="links.js?v=202610252238"></script>
 </body>
 </html>
