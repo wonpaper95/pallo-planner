@@ -152,7 +152,7 @@ qna_limits       team_id pk, daily int default 50
 
 ## 진행
 
-**2026-10-26: 1~3단계 구현 완료 (로컬 확인), 운영 배포 전.** 계획 `docs/manager-qna/plan.md`. 로컬 점검 `bash ~/.cache/pallo-planner-dev/test-qna.sh` (`AI=1` 이면 실제 AI 6회: 질문 3·캡처 1·제안 1 등).
+**2026-10-26: 1~3단계 구현 완료, 운영 배포 완료 (버전 202610260633)** — 마이그레이션 2개(정책 8·realtime·pg_trgm 1.6 확인) · `qna` 함수 · `planner-push` v17(배포 뒤 1분 실행 200) · 프런트(main 머지, Pages 반영 확인). 운영 화면에서 실제 로그인 확인은 대표가 직접. 계획 `docs/manager-qna/plan.md`. 로컬 점검 `bash ~/.cache/pallo-planner-dev/test-qna.sh` (`AI=1` 이면 실제 AI 6회: 질문 3·캡처 1·제안 1 등).
 확인한 것: 근거 있는 질문 → 🤖 바로 답(참고 번호) / 조퇴 허락 → ⏳ 대표 대기 / 급여 질문 → 🔒 자동 / 캡처에서 쌍 2개·번호 가림 / 많이 고친 답 → 메모 제안 / 다른 지점·🔒·지점 한정 안 보임 / 매니저가 답·상태 위조 못 함 / 실시간 갱신.
 
 ## 배포 (사용자 승인 뒤에만, 이 순서)
