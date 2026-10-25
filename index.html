@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610252311">
+<meta name="app-version" content="202610252328">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -244,7 +244,8 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; max-width: 100%; overflow-x: auto; }
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
 @media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 7개(현황은 대표만) → 폰에서 한 줄, 넘치면 .seg div 안에서만 가로 스크롤 */
-.seg button.dragging { opacity: .4; }
+.seg button { position: relative; user-select: none; }
+.seg button.dragging { z-index: 2; background: var(--hover); color: var(--text); box-shadow: 0 6px 16px rgba(0,0,0,.45); scale: 1.06; cursor: grabbing; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
 body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout { display: none; }
@@ -560,9 +561,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610252311"></script>
-<script src="week.js?v=202610252311"></script>
-<script src="pick.js?v=202610252311"></script>
+<script src="config.js?v=202610252328"></script>
+<script src="week.js?v=202610252328"></script>
+<script src="pick.js?v=202610252328"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -1230,7 +1231,7 @@ function setView(v) {
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
 }
-document.querySelector(".seg").onclick = (e) => e.target.dataset.v && setView(e.target.dataset.v);
+document.querySelector(".seg").onclick = (e) => !dragged && e.target.dataset.v && setView(e.target.dataset.v);
 setView(view);
 $("#weekList").onclick = (e) => {
   if (e.target.id === "py" || e.target.id === "ny") { year += e.target.id === "py" ? -1 : 1; monday = W.weeksOf(year)[0]; return loadAll(); }
@@ -1308,18 +1309,33 @@ async function savePrefs(next) {
 // 탭 순서: 탭을 끌어다 놓으면 바뀌고 계정(prefs.tabs)에 저장 → 폰·노트북 같이 적용. 터치 끌기는 안 됨(노트북에서 바꾸면 폰도 따라옴)
 const segBox = document.querySelector(".seg div");
 function applyTabOrder() { const o = prefs().tabs; if (!Array.isArray(o)) return; const bs = [...segBox.children]; for (const v of o) { const b = bs.find((x) => x.dataset.v === v); if (b) segBox.appendChild(b); } }
-let dragTab = null;
-segBox.querySelectorAll("button").forEach((b) => {
-  b.draggable = true;
-  b.addEventListener("dragstart", () => { dragTab = b; b.classList.add("dragging"); });
-  b.addEventListener("dragend", () => b.classList.remove("dragging"));
-  b.addEventListener("dragover", (e) => e.preventDefault());
-  b.addEventListener("drop", (e) => {
-    e.preventDefault(); if (!dragTab || dragTab === b) return;
-    const bs = [...segBox.children]; bs.indexOf(dragTab) < bs.indexOf(b) ? b.after(dragTab) : b.before(dragTab);
-    savePrefs({ ...prefs(), tabs: [...segBox.children].map((x) => x.dataset.v) }).then(() => toast("탭 순서를 저장했어요"));
-  });
+// 끌기: 누른 채 움직이면 버튼이 손을 따라오고, 지나친 탭은 스르륵 비켜줌(FLIP). 놓으면 제자리에 붙고 저장. 마우스·펜만(터치는 가로 스크롤과 겹쳐서 안 함)
+let dt = null, dragged = false; // dt: {b, grab, from}
+const slide = (b, dx) => { if (!dx) return; b.style.transition = "none"; b.style.transform = `translateX(${dx}px)`; requestAnimationFrame(() => { b.style.transition = "transform .18s"; b.style.transform = ""; }); };
+const placeDragged = (x) => { // 손 위치 기준으로 옮기고, 비켜난 이웃은 FLIP
+  const b = dt.b; b.style.transform = ""; const base = b.getBoundingClientRect(); const mid = x - dt.grab + base.width / 2;
+  for (let n = 0; n < 9; n++) { // 휙 끌어도 지나친 탭을 전부 비켜 줌
+    const prev = b.previousElementSibling, next = b.nextElementSibling;
+    if (prev && mid < prev.getBoundingClientRect().left + prev.offsetWidth / 2) { const l = prev.getBoundingClientRect().left; prev.before(b); slide(prev, l - prev.getBoundingClientRect().left); }
+    else if (next && mid > next.getBoundingClientRect().left + next.offsetWidth / 2) { const l = next.getBoundingClientRect().left; next.after(b); slide(next, l - next.getBoundingClientRect().left); }
+    else break;
+  }
+  b.style.transform = `translateX(${x - dt.grab - b.getBoundingClientRect().left}px)`;
+};
+segBox.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (!b || e.button || e.pointerType === "touch") return; dt = { b, grab: e.clientX - b.getBoundingClientRect().left, x0: e.clientX, from: [...segBox.children].map((x) => x.dataset.v) }; });
+segBox.addEventListener("pointermove", (e) => {
+  if (!dt) return;
+  if (!dragged) { if (Math.abs(e.clientX - dt.x0) < 5) return; dragged = true; dt.b.classList.add("dragging"); dt.b.style.transition = "none"; segBox.setPointerCapture(e.pointerId); }
+  placeDragged(e.clientX);
 });
+const dropTab = () => {
+  if (!dt) return; const { b, from } = dt; dt = null;
+  if (!dragged) return;
+  b.style.transition = "transform .15s"; b.style.transform = ""; b.classList.remove("dragging"); setTimeout(() => { dragged = false; b.style.transition = ""; }, 0); // 놓은 직후 click 은 무시
+  const to = [...segBox.children].map((x) => x.dataset.v);
+  if (to.join() !== from.join()) savePrefs({ ...prefs(), tabs: to }).then(() => toast("탭 순서를 저장했어요"));
+};
+segBox.addEventListener("pointerup", dropTab); segBox.addEventListener("pointercancel", dropTab);
 let pplCache = null; // 👀 매니저 목록(대표만, 처음 열 때 한 번)
 function openPrefs(anchor) {
   const pop = $("#pop");
@@ -1766,13 +1782,13 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610252311"></script>
-<script src="photo.js?v=202610252311"></script>
-<script src="blog.js?v=202610252311"></script>
-<script src="mk-core.js?v=202610252311"></script>
-<script src="marketing.js?v=202610252311"></script>
-<script src="sns-core.js?v=202610252311"></script>
-<script src="post.js?v=202610252311"></script>
-<script src="links.js?v=202610252311"></script>
+<script src="sales.js?v=202610252328"></script>
+<script src="photo.js?v=202610252328"></script>
+<script src="blog.js?v=202610252328"></script>
+<script src="mk-core.js?v=202610252328"></script>
+<script src="marketing.js?v=202610252328"></script>
+<script src="sns-core.js?v=202610252328"></script>
+<script src="post.js?v=202610252328"></script>
+<script src="links.js?v=202610252328"></script>
 </body>
 </html>
