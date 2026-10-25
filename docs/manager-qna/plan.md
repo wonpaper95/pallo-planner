@@ -27,7 +27,7 @@
 - 로컬 Supabase: `~/.cache/pallo-planner-dev` (`supabase status --workdir ~/.cache/pallo-planner-dev`). 지점 1 대구동성로점·2 대구일본어중국어점·3 울산점·4 구미점. 계정 `boss@pallo.test`(대표, 지점1) · `manager@pallo.test`(지점1). 비밀번호는 `dev-accounts.txt`.
 - 마이그레이션 적용(데이터 유지): `docker exec -i supabase_db_pallo-planner-dev psql -U postgres -d postgres -v ON_ERROR_STOP=1 < <파일>` + 같은 파일을 `~/.cache/pallo-planner-dev/supabase/migrations/` 에 복사.
 - 함수: `~/.cache/pallo-planner-dev/supabase/functions` 는 `~/pallo-planner/supabase/functions` 심볼릭 링크 → 작업 동안 worktree 로 돌리고(Task 3) 끝에 되돌린다(Task 9).
-- 프런트 확인: `~/pallo-planner-qna` 에서 정적 서버(`.claude/launch.json` 의 `qna-local`, `python3 -m http.server 8765`) → `http://localhost:8765/` (config.js 가 localhost 면 로컬 Supabase 사용). 로컬 DB 엔 tasks 등 옛 테이블이 없어서 다른 탭 콘솔 오류는 무시, Q&A 탭 오류만 본다.
+- 프런트 확인: 세션 폴더 `/Volumes/wonpaper308/.claude/launch.json` 의 `planner-qna`(8768, `--directory ~/pallo-planner-qna`) → `http://localhost:8768/`. 테스트 캡처는 PIL 대신 크롬 헤드리스로 `~/.cache/pallo-planner-dev/qna-cap.html` 을 찍는다 (config.js 가 localhost 면 로컬 Supabase 사용). 로컬 DB 엔 tasks 등 옛 테이블이 없어서 다른 탭 콘솔 오류는 무시, Q&A 탭 오류만 본다.
 
 ## 파일
 
@@ -116,9 +116,9 @@ export function route(out: AskOut, allowed: number[]): { status: "ai" | "waiting
 export function maskPII(s: string): string {
   return String(s ?? "")
     .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "***@***")
-    .replace(/(\+82[-\s]?)?0?1[016789][-\s.]?\d{3,4}[-\s.]?\d{4}\b/g, "010-****-****")
-    .replace(/\b0[2-6]\d?-\d{3,4}-\d{4}\b/g, "0**-****-****")
-    .replace(/\b\d[\d-]{8,}\d\b/g, (m) => (m.replace(/-/g, "").length >= 10 ? "****" : m));
+    .replace(/(?<!\d)(\+82[-\s]?)?0?1[016789][-\s.]?\d{3,4}[-\s.]?\d{4}(?!\d)/g, "010-****-****")
+    .replace(/(?<!\d)0[2-6]\d?-\d{3,4}-\d{4}(?!\d)/g, "0**-****-****")
+    .replace(/(?<!\d)\d[\d-]{8,}\d(?!\d)/g, (m) => (m.replace(/-/g, "").length >= 10 ? "****" : m));
 }
 
 // 대표가 AI 초안을 얼마나 고쳤나 (0 = 그대로, 1 = 전부 새로)

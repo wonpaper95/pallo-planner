@@ -24,12 +24,11 @@
 | 파일 | 역할 |
 |---|---|
 | `qna.js` / `qna.css` | Q&A 탭 화면 (`window.QA`). index.html 전역(sb·me·isBoss·previewTeam·previewUser·teams·esc·toast·fail)을 씀 — links.js 와 같은 방식 |
-| `qna-core.js` | 순수 함수 (`window.QACORE`, Node require 겸용): `route()` 상태 판정, `maskPII()` 전화번호·이메일 가리기, `editRatio()` 고친 정도, `pickRefs()` 참고 Q&A 고르기 규칙 |
-| `tests/qna-core.test.mjs` | `node --test 'tests/*.test.mjs'` |
-| `supabase/migrations/20261026120000_qna.sql` | 테이블 · RLS · 지킴 트리거 · `qna_search` RPC · pg_trgm 인덱스 |
+| `supabase/functions/qna/rules.ts` · `rules_test.ts` | 순수 함수: `route()` 상태 판정, `maskPII()` 전화번호·이메일·계좌 가리기, `editRatio()` 고친 정도. `deno test supabase/functions/qna/rules_test.ts` (참고 Q&A 고르기는 SQL `qna_pick_refs`) |
+| `supabase/migrations/20261026120000_qna.sql` | 테이블 5개 · RLS · 지킴 트리거 · `qna_search`(화면)·`qna_pick_refs`(AI 참고)·`claim_qna_notices`(알림) · pg_trgm · realtime |
 | `supabase/migrations/20261026130000_qna_grants.sql` | 테이블 API 권한 (운영은 새 테이블에 기본 GRANT 가 안 붙음 — sns_grants 와 같은 이유) |
 | `supabase/functions/qna/index.ts` · `prompt.ts` | AI 함수: `ask` · `extract` · `suggest` · `usage` |
-| `planner-push` (운영에만 있음, 저장소 밖) | Q&A 알림 2종 추가. 1단계 첫 작업으로 `supabase functions download planner-push` 로 받아 feedback 알림이 어떻게 걸려 있는지 보고 같은 방식으로 붙인다 |
+| `supabase/functions/planner-push/index.ts` | 운영 원본(v16, 그동안 노트북 `~/.cache/pallo-planner-dev` 에만 있었음)을 저장소로 옮기고 `claim_qna_notices()` 한 줄 추가 |
 | `~/.cache/pallo-planner-dev/test-qna.sh` | 로컬 점검 (저장소 밖). `AI=1` 이면 실제 AI 1회 |
 
 ## 화면
@@ -86,7 +85,7 @@ qna_items
   created_at, updated_at, final_at
 qna_style        (id=1 한 줄) memo text, updated_at
 qna_suggestions  id, item_id → qna_items, line text, why text, status pending|accepted|rejected, created_at
-qna_gens         id, team_id, user_id, kind ask|extract|suggest, in_tok, out_tok, usd, meta jsonb, created_at  -- 사용량·한도·캡처 기록(meta={shots,pairs})
+qna_gens         id, team_id, user_id, kind ask|extract|suggest, input_tokens, output_tokens, cost_usd, meta jsonb, created_at  -- 사용량·한도·캡처 기록(meta={shots,pairs})
 qna_limits       team_id pk, daily int default 50
 ```
 
@@ -150,6 +149,22 @@ qna_limits       team_id pk, daily int default 50
 3. **말투:** ✍️ 메모 · suggest · 제안 수락.
 
 처음엔 확정 답변이 0개라 모든 질문이 `waiting` 으로 간다. **2단계(캡처)로 기존 카톡 Q&A를 먼저 채우면** 바로 답하는 비율이 빨리 올라간다 → 1·2단계를 이어서 배포.
+
+## 진행
+
+**2026-10-26: 1~3단계 구현 완료 (로컬 확인), 운영 배포 전.** 계획 `docs/manager-qna/plan.md`. 로컬 점검 `bash ~/.cache/pallo-planner-dev/test-qna.sh` (`AI=1` 이면 실제 AI 6회: 질문 3·캡처 1·제안 1 등).
+확인한 것: 근거 있는 질문 → 🤖 바로 답(참고 번호) / 조퇴 허락 → ⏳ 대표 대기 / 급여 질문 → 🔒 자동 / 캡처에서 쌍 2개·번호 가림 / 많이 고친 답 → 메모 제안 / 다른 지점·🔒·지점 한정 안 보임 / 매니저가 답·상태 위조 못 함 / 실시간 갱신.
+
+## 배포 (사용자 승인 뒤에만, 이 순서)
+
+1. 운영 DB 에 pg_trgm 있는지: `select name, installed_version from pg_available_extensions where name = 'pg_trgm';`
+2. 마이그레이션: `supabase db query --linked --project-ref aiqrchgwrfrmscstlsmv -f supabase/migrations/20261026120000_qna.sql` → 같은 방식으로 `20261026130000_qna_grants.sql`. 확인: `select count(*) from pg_policies where policyname like 'qna_%';` → 8
+3. 함수: `supabase functions deploy qna --project-ref aiqrchgwrfrmscstlsmv --use-api` (ANTHROPIC_API_KEY 는 blog-write 와 같은 비밀값이라 따로 넣을 것 없음)
+4. 알림: `supabase functions deploy planner-push --project-ref aiqrchgwrfrmscstlsmv --use-api --no-verify-jwt` (원래 verify_jwt=false)
+5. 프런트: `version.txt` 와 index.html 의 `?v=`·`app-version` 을 `TZ=Asia/Seoul date +%Y%m%d%H%M` 로 → main 머지·푸시 (GitHub Pages)
+6. 대표가 📸 캡처로 기존 카톡 Q&A 를 먼저 채우고 ✍️ 메모에 말투 몇 줄 → 그다음 매니저에게 탭 안내.
+
+**주의 — planner-push:** 이 함수는 노트북 세션이 `~/.cache/pallo-planner-dev/supabase/functions/planner-push` 사본으로 배포해 왔다. 이제 원본은 저장소 `supabase/functions/planner-push/index.ts`. 노트북 사본으로 다시 배포하면 Q&A 알림이 사라지니, 고칠 땐 저장소 파일을 쓸 것.
 
 ## 1차에서 안 하는 것
 - 매니저 질문에 사진 첨부, 카테고리 분류, 답변 평가 통계, 카톡 대화 내보내기(.txt) 가져오기, 임베딩 검색(pg_trgm 으로 부족하면 그때).
