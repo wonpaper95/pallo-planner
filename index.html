@@ -248,7 +248,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg button.dragging { z-index: 2; background: var(--hover); color: var(--text); box-shadow: 0 6px 16px rgba(0,0,0,.45); scale: 1.06; cursor: grabbing; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.qav .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -357,7 +357,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.qav) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 #somedayView details { border-top: 1px solid var(--line); padding-top: 10px; }
@@ -437,6 +437,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="post.css?v=202610250655">
 <link rel="stylesheet" href="marketing.css?v=202610250655">
 <link rel="stylesheet" href="links.css?v=202610250655">
+<link rel="stylesheet" href="qna.css?v=202610260019">
 </head>
 <body>
 
@@ -466,7 +467,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="links">바로가기</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -500,6 +501,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="blogView"></section>
   <section id="mkView"></section>
   <section id="lkView"></section>
+  <section id="qaView"></section>
   <section id="postView"></section>
 </div>
 
@@ -671,6 +673,8 @@ async function boot() {
   if (view === "mk") window.MK?.load();
   if (view === "post") window.PS?.load();
   if (view === "links") window.LK?.load();
+  if (view === "qna") window.QA?.load();
+  window.QA?.badge(); // 💬 대표: 확인할 것 개수
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -1166,6 +1170,7 @@ function listen() {
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
+  sb.channel("qna").on("postgres_changes", { event: "*", schema: "public", table: "qna_items" }, () => window.QA?.remote()).subscribe(); // 💬 질문·확정 바로 반영
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
   sb.channel("sales").on("postgres_changes", { event: "*", schema: "public", table: "sales_plans" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
@@ -1236,7 +1241,7 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1244,6 +1249,7 @@ function setView(v) {
   if (v === "mk" && me && window.MK) MK.load();
   if (v === "post" && me && window.PS) PS.load();
   if (v === "links" && me && window.LK) LK.load();
+  if (v === "qna" && me && window.QA) QA.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
@@ -1808,5 +1814,6 @@ boot();
 <script src="post.js?v=202610260019"></script>
 <script src="someday.js?v=202610260019"></script>
 <script src="links.js?v=202610260019"></script>
+<script src="qna.js?v=202610260019"></script>
 </body>
 </html>
