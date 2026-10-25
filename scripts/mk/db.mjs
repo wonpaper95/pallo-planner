@@ -41,3 +41,19 @@ export const teamArg = (i) => { const v = arg(i, "team_id"); if (!/^[1-9]\d*$/.t
 export const dateArg = (i, name) => { const v = arg(i, name); if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(new Date(v + "T00:00:00Z")) || new Date(v + "T00:00:00Z").toISOString().slice(0, 10) !== v) { console.error(`${name} 는 YYYY-MM-DD 형식이어야 해요: ${v}`); process.exit(2); } return v; };
 // CLI 공통 마무리: 오류는 메시지만 출력(헤더·키 노출 금지)하고 종료코드 1
 export const run = async (fn) => { try { await fn(); } catch (e) { console.error(`실패: ${e?.message ?? e}`); process.exit(1); } };
+
+// 행 일부 고치기 (PATCH). query 는 PostgREST 필터 (예: `library_id=in.(a,b)`)
+export async function patch(table, query, body) {
+  const r = await fetch(`${URL_}/rest/v1/${table}?${query}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`${table} 고치기 실패 ${r.status}: ${await r.text()}`);
+}
+export async function insert(table, rows) {
+  const r = await fetch(`${URL_}/rest/v1/${table}`, { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(rows) });
+  if (!r.ok) throw new Error(`${table} 넣기 실패 ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+// Storage 올리기 (덮어쓰기). body 는 Buffer/Uint8Array
+export async function storagePut(bucket, path, body, contentType) {
+  const r = await fetch(`${URL_}/storage/v1/object/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`, { method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": contentType, "x-upsert": "true" }, body });
+  if (!r.ok) throw new Error(`storage ${bucket}/${path} 올리기 실패 ${r.status}: ${await r.text()}`);
+}

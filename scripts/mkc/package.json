@@ -1,0 +1,9 @@
+{
+  "name": "pallo-mkc-collector",
+  "private": true,
+  "type": "module",
+  "description": "경쟁사 광고 정찰 수집기 전용 의존성 (Playwright). 저장소 루트와 분리.",
+  "dependencies": {
+    "playwright": "^1.50.0"
+  }
+}

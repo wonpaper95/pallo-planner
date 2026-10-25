@@ -1,0 +1,4 @@
+node_modules/
+scripts/mkc/package-lock.json
+.DS_Store
+.claude/

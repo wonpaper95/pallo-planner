@@ -2,7 +2,7 @@
 // 숫자 계산은 mk-core.js(MKCORE), 문장(notes·persona)은 스킬이 쓴다. 이 화면은 CSV 올리기와 보여주기만.
 // index.html 의 sb·me·$·esc·toast·fail·isBoss·previewTeam·teams 를 씀 → window.MK
 (() => {
-const MK = (window.MK = { tab: "report", team: null, week: null });
+const MK = (window.MK = { tab: "report", team: null, week: null, grp: null });
 const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별"], ads_demo: ["mk_ad_demo", "team_id,period_from,period_to,ad_name,age,gender", "광고 연령·성별"], organic: ["mk_organic", "team_id,platform,post_id", "인스타·페북 게시물"] };
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
@@ -21,10 +21,11 @@ MK.load = async function () {
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
     ${admin ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ...(admin ? [["upload", "데이터 올리기"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ...(admin ? [["upload", "데이터 올리기"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
+  if (MK.tab === "compet") return renderCompet(admin);
   if (!MK.team) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
   if (MK.tab === "upload") return renderUpload();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
@@ -69,6 +70,83 @@ function personaHtml(d) {
     + `<div class="card"><b>근거 숫자</b><p class="mut">리드 → 상담 → 방문 → 등록: ${["lead", "consult", "visit", "enroll"].map((k) => n(d.funnel?.[k])).join(" → ")} (이탈 ${n(d.funnel?.lost)})</p>
        <p class="mut">등록자 나이대: ${dist(d.enrolledByAge)}</p><p class="mut">등록자 과목: ${dist(d.enrolledBySubject)}</p>
        <p class="mut">광고 리드 연령·성별: ${(d.leadsByAgeGender ?? []).slice(0, 6).map((x) => `${esc(x.age)} ${esc(x.gender)} ${pct(x.share)}`).join(" · ") || "–"}</p></div>`;
+}
+
+// ── 경쟁사 광고 정찰 (mkc_*) ──
+// 맥미니 수집기(scripts/mkc/collect.mjs)가 광고 라이브러리에서 읽은 걸 보여주고, 대표가 경쟁사 후보를 켜고 끈다. 그룹 = en(영어회화) / jpcn(일본어·중국어).
+const GRP = { en: "영어회화 (구미·대구동성로·울산)", jpcn: "일본어·중국어 (대구일중)" };
+const CSTAT = { on: "✅ 켜짐", candidate: "🟡 후보", off: "⚫ 꺼짐" };
+const days = (d, today) => (d ? MKCCORE.daysBetween(d, today) : null);
+async function renderCompet(admin) {
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  if (admin) { try { MK.grp = MK.grp ?? localStorage.getItem("mk-grp") ?? "en"; } catch { MK.grp ??= "en"; } }
+  else {
+    const name = teams.find((t) => t.id === MK.team)?.name ?? (await sb.from("teams").select("name").eq("id", MK.team).maybeSingle()).data?.name;
+    if (!name) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
+    MK.grp = MKCCORE.groupOfTeamName(name);
+  }
+  if (!GRP[MK.grp]) MK.grp = "en";
+  const grp = MK.grp;
+  const [cq, aq, rq] = await Promise.all([
+    sb.from("mkc_competitors").select("id, page_name, page_id, page_url, team_id, status, note, found_by").eq("grp", grp).order("page_name"),
+    sb.from("mkc_ads").select("library_id, page_name, page_id, competitor_id, start_date, first_seen, active, thumb_path, multi_version, n_ads, keywords").eq("grp", grp).eq("active", true),
+    sb.from("mkc_runs").select("run_date, status, counts, error").eq("grp", grp).order("id", { ascending: false }).limit(1),
+  ]);
+  if (fail(cq.error) || fail(aq.error) || fail(rq.error)) return;
+  const comps = cq.data ?? [], ads = aq.data ?? [], run = rq.data?.[0];
+  // 경쟁사별 광고 묶기 (competitor_id 또는 이름·page_id 일치) — 우리 지점 페이지는 뺀다
+  const adsOf = (c) => ads.filter((a) => a.competitor_id === c.id || a.page_name === c.page_name || (c.page_id && a.page_id === c.page_id));
+  const stat = (list) => {
+    const vs = list.map((a) => MKCCORE.verdict(a, today)), oldest = list.map((a) => a.start_date).filter(Boolean).sort()[0] ?? null;
+    const best = [...list].sort((a, b) => (a.start_date ?? "9").localeCompare(b.start_date ?? "9"))[0];
+    return { n: list.length, oldest, days: days(oldest, today), core: vs.filter((v) => v === "core").length, proven: vs.filter((v) => v === "proven").length, fresh: vs.filter((v) => v === "new").length, thumb: list.find((a) => a.thumb_path)?.thumb_path ?? best?.thumb_path ?? null, sample: best };
+  };
+  const known = new Set(comps.flatMap((c) => adsOf(c).map((a) => a.library_id)));
+  const others = new Map(); // 아직 목록에 없는 페이지 (키워드로만 본 것)
+  for (const a of ads) { if (known.has(a.library_id) || MKCCORE.isOwnPage(a.page_name) || !a.page_name) continue; (others.get(a.page_name) ?? others.set(a.page_name, []).get(a.page_name)).push(a); }
+  const otherRows = [...others.entries()].map(([page_name, list]) => ({ page_name, page_id: list[0].page_id, ...stat(list) })).filter((r) => r.n >= 2 || r.core + r.proven >= 1).sort((a, b) => b.n - a.n || (b.days ?? 0) - (a.days ?? 0)).slice(0, 15);
+  const rows = comps.map((c) => ({ ...c, ...stat(adsOf(c)) }));
+  // 썸네일 서명 주소 (비공개 버킷)
+  const paths = [...new Set([...rows, ...otherRows].map((r) => r.thumb).filter(Boolean))];
+  const signed = {};
+  if (paths.length) { const { data } = await sb.storage.from("mkc-thumbs").createSignedUrls(paths, 3600); for (const x of data ?? []) if (x.signedUrl && !x.error) signed[x.path ?? paths[data.indexOf(x)]] = x.signedUrl; }
+  const teamName = (id) => teams.find((t) => t.id === id)?.name ?? "";
+  const libUrl = (r) => r.page_url || MKCCORE.competitorUrl(r);
+  const row = (r, acts) => `<div class="cmp">${r.thumb && signed[r.thumb] ? `<img src="${esc(signed[r.thumb])}" alt="" loading="lazy">` : `<div class="cmp-no"></div>`}
+    <div class="cmp-b"><div><a href="${esc(libUrl(r))}" target="_blank" rel="noopener"><b>${esc(r.page_name)}</b></a> ${r.team_id ? `<span class="tag">${esc(teamName(r.team_id))}</span>` : `<span class="tag mut">전국·온라인</span>`}</div>
+      <div class="mut">활성 광고 ${r.n}개${r.days != null ? ` · 가장 오래 ${r.days}일째` : ""} · 🏆 ${r.core} 🟢 ${r.proven} 🆕 ${r.fresh}${r.found_by ? ` · ${esc(r.found_by)}` : ""}</div>${r.note ? `<div class="mut">📝 ${esc(r.note)}</div>` : ""}</div>
+    ${admin ? `<div class="acts">${acts}</div>` : ""}</div>`;
+  const btn = (id, st, label) => `<button class="sm" data-id="${id}" data-st="${st}">${label}</button>`;
+  const section = (st, list, empty) => `<div class="card"><b>${CSTAT[st]} ${list.length}</b>${list.length ? list.map((r) => row(r, [st !== "on" && btn(r.id, "on", "켜기"), st !== "candidate" && btn(r.id, "candidate", "후보로"), st !== "off" && btn(r.id, "off", "끄기")].filter(Boolean).join(""))).join("") : `<div class="mut">${empty}</div>`}</div>`;
+  const by = (st) => rows.filter((r) => r.status === st).sort((a, b) => b.n - a.n);
+  $m("#mkBody").innerHTML = `<div class="mkbar">${admin ? `<select id="mkGrp">${Object.entries(GRP).map(([k, v]) => `<option value="${k}" ${k === grp ? "selected" : ""}>${v}</option>`).join("")}</select>` : `<b>${GRP[grp]}</b>`}
+      <span class="mut">${run ? `마지막 수집 ${esc(run.run_date)} · ${run.status === "ok" ? "정상" : run.status === "partial" ? "일부 실패" : "실패"} · 오늘 본 광고 ${n(run.counts?.cards)}개 · 처음 본 ${n(run.counts?.new)}개 · 종료 ${n(run.counts?.ended)}개` : "아직 수집 전이에요 (맥미니가 매일 새벽에 읽어요)"}</span></div>
+    <p class="mut">메타 광고 라이브러리(공개)에서 읽은 활성 광고예요. 성과 숫자는 안 보여서 <b>집행 기간</b>으로 추정해요: 🏆 30일+ 또는 여러 버전 · 🟢 14일+ · 🆕 7일 안에 처음 봄. 이름을 누르면 라이브러리에서 원본을 볼 수 있어요.</p>
+    ${admin ? `<div class="card"><b>직접 추가</b> <span class="mut">광고 라이브러리의 페이지 링크(view_all_page_id=…)나 페이지 이름</span><div class="mkbar"><input id="mkAddUrl" placeholder="https://www.facebook.com/ads/library/?…view_all_page_id=123 또는 페이지 이름" style="flex:1;min-width:240px"><button class="btn" id="mkAdd">켜진 경쟁사로 추가</button></div></div>` : ""}
+    ${section("on", by("on"), "아직 켠 경쟁사가 없어요. 후보에서 골라 켜 주세요.")}
+    ${section("candidate", by("candidate"), "후보가 없어요. 아래 '키워드로만 본 페이지'에서 올리거나, Claude에게 \"경쟁사 후보 올려줘\"라고 하면 돼요.")}
+    <div class="card"><b>키워드로만 본 페이지</b> <span class="mut">아직 목록에 없는 광고주 (광고 2개+ 또는 14일+ 집행)</span>${otherRows.length ? otherRows.map((r) => row(r, `<button class="sm" data-add="${esc(r.page_name)}" data-pid="${esc(r.page_id ?? "")}">후보로 올리기</button>`)).join("") : `<div class="mut">없어요</div>`}</div>
+    ${section("off", by("off"), "없어요")}`;
+  $m("#mkGrp")?.addEventListener("change", (e) => { MK.grp = e.target.value; try { localStorage.setItem("mk-grp", MK.grp); } catch {} MK.load(); });
+  if (!admin) return;
+  $m("#mkBody").querySelectorAll("button[data-st]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const { error } = await sb.from("mkc_competitors").update({ status: b.dataset.st, updated_at: new Date().toISOString() }).eq("id", +b.dataset.id);
+    if (!fail(error)) MK.load();
+  }));
+  const addComp = async (page_name, page_id, status, found_by) => {
+    const { error } = await sb.from("mkc_competitors").insert({ grp, page_name, page_id, page_url: MKCCORE.pageUrl(page_id) ?? "", status, found_by });
+    if (error?.code === "23505") return toast("이미 목록에 있어요");
+    if (!fail(error)) { toast(`${page_name} 추가했어요`); MK.load(); }
+  };
+  $m("#mkBody").querySelectorAll("button[data-add]").forEach((b) => b.addEventListener("click", () => { b.disabled = true; addComp(b.dataset.add, b.dataset.pid, "candidate", "대표가 목록에서 올림"); }));
+  $m("#mkAdd")?.addEventListener("click", () => {
+    const v = $m("#mkAddUrl").value.trim(); if (!v) return;
+    const pid = v.match(/view_all_page_id=(\d+)/)?.[1] ?? v.match(/^https?:\/\/(?:www\.)?facebook\.com\/(\d+)\/?$/)?.[1] ?? "";
+    const name = pid ? (ads.find((a) => a.page_id === pid)?.page_name ?? `페이지 ${pid}`) : v;
+    if (/^https?:/.test(v) && !pid) return toast("링크에서 페이지 번호(view_all_page_id)를 못 찾았어요");
+    addComp(name, pid, "on", "대표가 직접 추가");
+  });
 }
 
 // ── CSV 올리기 (대표) ──
