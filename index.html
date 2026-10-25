@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610252238">
+<meta name="app-version" content="202610252250">
 <meta name="theme-color" content="#191919">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
@@ -113,6 +113,7 @@ dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .rthead small { color: var(--sub); margin-left: 6px; }
 .rt .carry { color: var(--orange); font-size: 12.5px; } .rt .needlink { color: var(--sub); } .rt .rtlink { flex: none; font-size: 12.5px; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
 .rtthumb { height: 30px; width: 30px; object-fit: cover; border-radius: 5px; vertical-align: middle; }
+.bphotos { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; font-size: 13px; color: var(--sub); } .bphotos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 .rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .rtrow input[type=text] { width: 100%; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
 .rtrow select { padding: 5px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
@@ -243,6 +244,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; max-width: 100%; overflow-x: auto; }
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
 @media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 7개(현황은 대표만) → 폰에서 한 줄, 넘치면 .seg div 안에서만 가로 스크롤 */
+.seg button.dragging { opacity: .4; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
 body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout { display: none; }
@@ -558,11 +560,18 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610252238"></script>
-<script src="week.js?v=202610252238"></script>
-<script src="pick.js?v=202610252238"></script>
+<script src="config.js?v=202610252250"></script>
+<script src="week.js?v=202610252250"></script>
+<script src="pick.js?v=202610252250"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+{ // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
+  const RO = { data: null, error: { message: "👀 매니저 화면 보기 중엔 보기만 돼요" } };
+  const stub = () => { const q = { then: (ok) => ok(RO) }; for (const m of ["select", "single", "maybeSingle", "eq", "in", "order", "limit"]) q[m] = () => q; return q; };
+  const from0 = sb.from.bind(sb), rpc0 = sb.rpc.bind(sb);
+  sb.from = (t) => { const q = from0(t); if (previewUser && t === "tasks") for (const m of ["insert", "update", "delete", "upsert"]) q[m] = stub; return q; };
+  sb.rpc = (f, a) => previewUser && ["set_routine_done", "timer", "set_team_task_done", "move_assigned"].includes(f) ? stub() : rpc0(f, a);
+}
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -579,7 +588,8 @@ function fail(error) { if (error) { console.error(error); toast("저장 실패: 
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager", myPhone = "", myName = "", kakaoMe = false, kakaoSender = null, isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
+let myRole = "manager", myPhone = "", myName = "", kakaoMe = false, kakaoSender = null, isBoss = false, previewTeam = null, previewUser = null, previewName = ""; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀 / previewUser: 특정 매니저 화면 그대로(보기만)
+const uid = () => previewUser ?? me.id; // 할 일·브리핑·통계는 이 사람 기준
 const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
@@ -587,17 +597,19 @@ async function loadProfile() {
   if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone, temp_pw").eq("user_id", me.id).single()); }
   if (data.temp_pw) openPwDlg(true);
   isBoss = data.role === "admin";
-  try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; } catch {}
-  myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
+  try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; previewUser = isBoss ? localStorage.getItem("planner-preview-user") || null : null; } catch {}
+  if (previewUser) { const { data: pu } = await sb.from("profiles").select("name, team_id").eq("user_id", previewUser).maybeSingle(); if (pu) { previewTeam = pu.team_id; previewName = pu.name; } else previewUser = null; }
+  myRole = previewTeam || previewUser ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
   if (isBoss) loadFeedback(); // 🐞 처리 전 개수 배지
   if (isBoss) { const k = (await sb.rpc("kakao_status")).data?.[0]; kakaoMe = !!k?.me; kakaoSender = k?.sender ? (k.receiver || "연결됨") : null; } // 💬 카톡 연결 상태
-  $("#previewBar").classList.toggle("hidden", !previewTeam);
-  if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
+  $("#previewBar").classList.toggle("hidden", !previewTeam && !previewUser);
+  if (previewUser) $("#previewBar").textContent = `👀 ${previewName}(${teams.find((x) => x.id === previewTeam)?.name ?? "지점 없음"}) 화면 그대로 보는 중 · 끄기`;
+  else if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
 }
-$("#previewBar").onclick = () => { try { localStorage.removeItem("planner-preview"); } catch {} location.reload(); };
+$("#previewBar").onclick = () => { try { localStorage.removeItem("planner-preview"); localStorage.removeItem("planner-preview-user"); } catch {} location.reload(); };
 // 처음 가입: 명단에서 내 이름 고르기 → 지점 팀까지 자동 (직접 입력 없음)
 function pickName() {
   return new Promise((done) => {
@@ -695,11 +707,11 @@ async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
   const [t, d, s, m, tt] = await Promise.all([
-    sb.from("tasks").select("*").eq("user_id", me.id).gte("day", monday).lte("day", sun).order("sort").order("id"),
-    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", me.id).eq("done", false).not("deadline", "is", null)
+    sb.from("tasks").select("*").eq("user_id", uid()).gte("day", monday).lte("day", sun).order("sort").order("id"),
+    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", uid()).eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
-    sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
-    sb.from("tasks").select("id, day, title").eq("user_id", me.id).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
+    sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser }),
+    sb.from("tasks").select("id, day, title").eq("user_id", uid()).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
     myRole === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: monday, p_to: sun }),
   ]);
   if (fail(t.error || d.error || s.error || m.error || tt.error)) return;
@@ -927,6 +939,7 @@ async function loadBoard() {
     const mem = p.data.filter((x) => x.team_id === tm.id && x.role === "manager"), ids = new Set(mem.map((x) => x.user_id));
     const done = todays.filter((it) => checks.has(it.id)), left = todays.filter((it) => !checks.has(it.id));
     const last = [...checks.values()].sort((x, y) => new Date(y.done_at) - new Date(x.done_at))[0];
+    const photos = todays.map((it) => checks.get(it.id)).filter((ck) => ck && isPhotoLink(ck.link)); // 📷 오늘 올린 인증샷
     const all = todays.length && !left.length, pct = todays.length ? Math.round((done.length / todays.length) * 100) : 0;
     const tt = k.data.filter((x) => x.team_id === tm.id), asg = a.data.filter((x) => ids.has(x.user_id));
     const who = (uid) => mem.find((m) => m.user_id === uid)?.name ?? "";
@@ -934,12 +947,13 @@ async function loadBoard() {
       <div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(mem.map((m) => m.name).join("·") || "매니저 없음")}</span><span class="pct">${all ? "🎉 " : ""}${done.length}/${todays.length}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="bsub">${last ? `마지막 체크 ${esc(last.done_name ?? "")} ${hhmm(last.done_at)}` : "아직 체크 없음"}${all ? " · 오늘 고정업무 끝" : ""}</div>
+      ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
       ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
       ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${done.length ? `<details><summary>완료한 고정업무 ${done.length}개 보기</summary><ul>${done.map((it) => { const ck = checks.get(it.id);
-        return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)} ${lkA(ck.link)}</li>`; }).join("")}</ul></details>` : ""}
+        return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)} ${lkA(ck.link, "", true)}</li>`; }).join("")}</ul></details>` : ""}
     </div>`;
   });
   const d = W.parse(day), sales = await SL.boardCards(t.data);
@@ -1094,7 +1108,7 @@ function briefPanelHtml(day) {
   return `<div class="briefText">${esc(b.data.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}<span class="at">${md(W.ymd(at))} ${pad(at.getHours())}:${pad(at.getMinutes())}에 받은 ${md(day)} 브리핑 · 날짜마다 한 번</span></div>`;
 }
 async function loadBrief() { // 보이는 주의 브리핑
-  const { data } = await sb.from("briefs").select("day, text, created_at").gte("day", monday).lte("day", W.add(monday, 6));
+  const { data } = await sb.from("briefs").select("day, text, created_at").eq("user_id", uid()).gte("day", monday).lte("day", W.add(monday, 6));
   for (const r of data ?? []) bOf(r.day).data = r;
   renderWeek();
 }
@@ -1115,7 +1129,7 @@ async function briefClick(day) {
 
 async function loadCal() {
   const d1 = `${cal.y}-${String(cal.m).padStart(2, "0")}-01`, a = W.add(d1, -7), b = W.add(d1, 43); // 월·일요일 시작 칸 둘 다 덮음
-  const { data, error } = await sb.from("tasks").select("*").eq("user_id", me.id)
+  const { data, error } = await sb.from("tasks").select("*").eq("user_id", uid())
     .or(`and(day.gte.${a},day.lte.${b}),and(deadline.gte."${W.parse(a).toISOString()}",deadline.lt."${W.parse(b).toISOString()}")`)
     .order("sort").order("id").limit(2000);
   if (fail(error)) return;
@@ -1130,7 +1144,7 @@ function softReload() {
   clearTimeout(reloadT); reloadT = setTimeout(() => loadAll(false), 300);
 }
 function listen() {
-  sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
+  sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${uid()}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
@@ -1285,13 +1299,35 @@ function openPop(anchor, t, kind) {
 const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
-function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
+function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); applyTabOrder(); }
+async function savePrefs(next) {
+  me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
+  const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
+  if (!fail(error)) me = data.user;
+}
+// 탭 순서: 탭을 끌어다 놓으면 바뀌고 계정(prefs.tabs)에 저장 → 폰·노트북 같이 적용. 터치 끌기는 안 됨(노트북에서 바꾸면 폰도 따라옴)
+const segBox = document.querySelector(".seg div");
+function applyTabOrder() { const o = prefs().tabs; if (!Array.isArray(o)) return; const bs = [...segBox.children]; for (const v of o) { const b = bs.find((x) => x.dataset.v === v); if (b) segBox.appendChild(b); } }
+let dragTab = null;
+segBox.querySelectorAll("button").forEach((b) => {
+  b.draggable = true;
+  b.addEventListener("dragstart", () => { dragTab = b; b.classList.add("dragging"); });
+  b.addEventListener("dragend", () => b.classList.remove("dragging"));
+  b.addEventListener("dragover", (e) => e.preventDefault());
+  b.addEventListener("drop", (e) => {
+    e.preventDefault(); if (!dragTab || dragTab === b) return;
+    const bs = [...segBox.children]; bs.indexOf(dragTab) < bs.indexOf(b) ? b.after(dragTab) : b.before(dragTab);
+    savePrefs({ ...prefs(), tabs: [...segBox.children].map((x) => x.dataset.v) }).then(() => toast("탭 순서를 저장했어요"));
+  });
+});
+let pplCache = null; // 👀 매니저 목록(대표만, 처음 열 때 한 번)
 function openPrefs(anchor) {
   const pop = $("#pop");
+  if (isBoss && !pplCache) sb.rpc("team_people").then(({ data }) => { pplCache = data ?? []; if (popFor?.kind === "prefs") openPrefs(anchor); });
   pop.innerHTML = `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
-    + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option>${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</select></label>`)
+    + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option><optgroup label="지점 매니저 화면(내 할 일 기준)">${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${!previewUser && previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</optgroup><optgroup label="매니저 화면 그대로 (보기만)">${(pplCache ?? []).filter((x) => x.role !== "admin").map((x) => `<option value="u:${x.user_id}" ${previewUser === x.user_id ? "selected" : ""}>${esc(x.name)} · ${esc(teams.find((t) => t.id === x.team_id)?.name ?? "지점 없음")}</option>`).join("")}</optgroup></select></label>`)
     + (!isBoss ? "" : `<div class="tg" style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">💬 카톡으로도 받기${kakaoMe
       ? `<span style="color:var(--green)">연결됨 ✓ <button id="kakaoOff" style="color:var(--sub);font-size:12px;margin-left:6px">끊기</button></span>`
       : `<button id="kakaoOn" style="color:var(--accent);font-weight:600">연결하기</button>`}</div>
@@ -1315,7 +1351,7 @@ $("#pop").addEventListener("change", async (e) => {
     myName = e.target.value.trim(); $("#me").textContent = `${myName} · ${me.email}`; toast("✏️ 이름을 바꿨어요");
     return;
   }
-  if (e.target.id === "previewSel") { try { localStorage.setItem("planner-preview", e.target.value); } catch {} return location.reload(); }
+  if (e.target.id === "previewSel") { const v = e.target.value; try { localStorage.removeItem("planner-preview"); localStorage.removeItem("planner-preview-user"); if (v.startsWith("u:")) localStorage.setItem("planner-preview-user", v.slice(2)); else if (v) localStorage.setItem("planner-preview", v); } catch {} return location.reload(); }
   if (e.target.id === "myPhone") { // 카톡 알림톡 받을 번호
     const v = e.target.value.replace(/\D/g, "");
     if (v && !/^01\d{8,9}$/.test(v)) return toast("휴대폰 번호를 확인해 주세요 (예: 01012345678)");
@@ -1325,9 +1361,7 @@ $("#pop").addEventListener("change", async (e) => {
   }
   const k = e.target.dataset.pref; if (!k) return;
   const next = { ...prefs(), [k]: e.target.checked };
-  me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
-  const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
-  if (!fail(error)) me = data.user;
+  await savePrefs(next);
 });
 const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
 $("#pop").onclick = async (e) => {
@@ -1493,7 +1527,7 @@ $("#days").addEventListener("focusout", async (e) => {
 });
 async function bumpStats() { // 주 목록 % 만 다시
   const weeks = W.weeksOf(year);
-  const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) });
+  const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser });
   if (data) renderWeeks(Object.fromEntries(data.map((x) => [x.start, x])));
 }
 $("#mustList").onclick = $("#dueList").onclick = (e) => {
@@ -1732,13 +1766,13 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610252238"></script>
-<script src="photo.js?v=202610252238"></script>
-<script src="blog.js?v=202610252238"></script>
-<script src="mk-core.js?v=202610252238"></script>
-<script src="marketing.js?v=202610252238"></script>
-<script src="sns-core.js?v=202610252238"></script>
-<script src="post.js?v=202610252238"></script>
-<script src="links.js?v=202610252238"></script>
+<script src="sales.js?v=202610252250"></script>
+<script src="photo.js?v=202610252250"></script>
+<script src="blog.js?v=202610252250"></script>
+<script src="mk-core.js?v=202610252250"></script>
+<script src="marketing.js?v=202610252250"></script>
+<script src="sns-core.js?v=202610252250"></script>
+<script src="post.js?v=202610252250"></script>
+<script src="links.js?v=202610252250"></script>
 </body>
 </html>
