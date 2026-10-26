@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610261700">
+<meta name="app-version" content="202610261427">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
 <script src="theme.js?v=202610260932"></script>
@@ -330,7 +330,7 @@ body:not(.sv) #salesView { display: none; }
 .bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
 @media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; }
-  #fbBtn .lbl, #consultBtn .lbl, #themeBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
+  #fbBtn .lbl, #consultBtn .lbl, #trainingBtn .lbl, #themeBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -436,7 +436,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="blog.css?v=202610260633">
 <link rel="stylesheet" href="photo.css?v=202610260633">
 <link rel="stylesheet" href="post.css?v=202610260633">
-<link rel="stylesheet" href="marketing.css?v=202610261700">
+<link rel="stylesheet" href="marketing.css?v=202610261427">
 <link rel="stylesheet" href="contacts.css?v=202610260633">
 <link rel="stylesheet" href="links.css?v=202610260633">
 <link rel="stylesheet" href="qna.css?v=202610260633">
@@ -466,6 +466,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="todayBtn" class="btn ghost">오늘</button>
     <button id="themeBtn" class="btn ghost" title="화면 모드">🌗<span class="lbl"> 자동</span></button>
     <a id="consultBtn" class="btn ghost" href="https://magical-buttercream-d5b901.netlify.app/" target="_blank" rel="noopener" title="상담 녹음·AI 피드백 (새 탭)" style="text-decoration:none">🎙️<span class="lbl"> 상담 AI</span></a>
+    <a id="trainingBtn" class="btn ghost" href="https://pallo-training.netlify.app/training/progress" target="_blank" rel="noopener" title="신입 전산 연습 — 진행률·입장 코드 (새 탭)" style="text-decoration:none">🎓<span class="lbl"> 전산 연습</span></a>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
@@ -1816,8 +1817,8 @@ boot();
 <script src="photo.js?v=202610260932"></script>
 <script src="blog.js?v=202610260932"></script>
 <script src="mk-core.js?v=202610260932"></script>
-<script src="mkc-core.js?v=202610261700"></script>
-<script src="marketing.js?v=202610261700"></script>
+<script src="mkc-core.js?v=202610261427"></script>
+<script src="marketing.js?v=202610261427"></script>
 <script src="sns-core.js?v=202610260932"></script>
 <script src="post.js?v=202610260932"></script>
 <script src="someday.js?v=202610260932"></script>

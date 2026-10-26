@@ -8,3 +8,4 @@
 - 10-26: 🔭 C단계 — build-daily.mjs·save-report.mjs, 스킬 pallo-competitor-ads, 예약 작업 pallo-competitor-ads-daily(05:00), 플래너 경쟁사 탭 '오늘' 화면. 운영 첫 일일 리포트 en·jpcn 저장. 로컬 매니저 화면 확인.
 - 10-26: 🔭 D단계 — build-creative.mjs(추천 입력), 점검기 checkIdeas(유사도·과장·가격, 컬컴은 카피에서만 차단), save-report creative, 플래너 '주간 추천' 화면(카피·타겟 복사). 운영 첫 추천 en 5·jpcn 4 저장. 스킬에 월요일 절차 추가.
 - 10-26: 🔖 버전 202610261700 — 🔭 경쟁사 광고 정찰 A~D 배포 (main 합치기: 리퀴드 글래스·Q&A 이후, index.html 버전 충돌 해결)
+- 10-26: 🎓 헤더 '전산 연습' 버튼(상담 AI 옆) — 연습 사이트 매니저 진행률 화면(pallo-training.netlify.app/training/progress)을 새 탭으로. 버전 202610261427. 배포.
