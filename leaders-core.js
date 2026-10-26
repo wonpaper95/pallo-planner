@@ -69,11 +69,13 @@ const LDC = {
   // 🔄 전산 리더 출석 연동: 전산 지점 코드 ↔ 플래너 지점, 이 날부터 전산 값이 우선 (그 전은 시트에서 옮긴 기록 유지)
   JEONSAN: { DAEGUDSR: "대구영어점", DAEGUJPCH: "대구일중점", ULSAN: "울산점" },
   SYNC_START: "2026-10-27",
-  // 전산 리더(이름·전화) → 플래너 리더: 전화 뒤 8자리 → 이름 정확히 → 이름 들어간 사람 한 명
-  matchJeonsan(name, phone, rows) {
+  // 전산 리더(이름·전화) → 플래너 리더: 전화 뒤 8자리 → 이름 정확히 → 이름 들어간 사람 한 명.
+  // 같은 사람이 여러 줄(여러 시간대)이면 전산 수업과 반·시간대가 맞는 줄
+  matchJeonsan(name, phone, rows, course = "") {
     const p8 = String(phone ?? "").replace(/\D/g, "").slice(-8), n = (x) => String(x).replace(/\(.*?\)|\s/g, "");
-    if (p8.length === 8) { const h = rows.filter((r) => r.phone.replace(/\D/g, "").includes(p8)); if (h.length === 1) return h[0]; }
-    const e = rows.filter((r) => n(r.name).split("/").includes(n(name))); if (e.length === 1) return e[0];
+    const pick = (h) => { if (h.length < 2) return h[0] ?? null; const { grp, slot } = LDC.courseSlot(course, h); return h.find((r) => r.grp === grp && r.slot === slot) ?? h.find((r) => r.grp === grp) ?? h[0]; };
+    if (p8.length === 8) { const h = rows.filter((r) => String(r.phone ?? "").replace(/\D/g, "").includes(p8)); if (h.length) return pick(h); }
+    const e = rows.filter((r) => n(r.name).split("/").includes(n(name))); if (e.length) return pick(e);
     return LDC.matchSub(name, rows);
   },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
@@ -83,13 +85,16 @@ const LDC = {
     const pm = s.match(/오후\s*(\d{1,2})/); if (pm) return ((+pm[1] % 12) + 12) * 60 + lang;
     return (s.includes("오전") ? 600 : s.includes("오후") ? 840 : s.includes("저녁") ? 1140 : 9999) + lang; // 대기·스터디는 맨 뒤
   },
-  // 전산 수업 이름('월수 오전', '월수 오후6', '주말 오후') → 반·시간대. 그 반에 비슷한 시간(±90분) 칸이 있으면 그걸 씀
+  // 전산 수업 이름('월수 오전', '월수 오후6', '일본어 월수 18시', '영어 화목 11:00') → 반·시간대. 그 반에 비슷한 시간(±90분)·같은 언어 칸이 있으면 그걸 씀
   courseSlot(course, rows) {
-    const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0];
-    const pm = c.match(/오후\s*(\d{1,2})/), label = pm ? `${+pm[1]}PM` : (c.match(/오전|오후|저녁/) ?? [""])[0];
+    const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0], lang = (c.match(/일본어|중국어/) ?? [""])[0];
+    const pm = c.match(/오후\s*(\d{1,2})/), hm = c.match(/(\d{1,2})\s*(?:시|:\d{2})/);
+    const label = pm ? `${+pm[1]}PM` : hm ? (+hm[1] < 12 ? `${+hm[1]}AM` : `${+hm[1] === 12 ? 12 : +hm[1] - 12}PM`) : (c.match(/오전|오후|저녁/) ?? [""])[0];
     const want = LDC.slotMin(label); if (!grp || want >= 9999) return { grp, slot: label };
-    const near = [...new Set(rows.filter((r) => r.grp === grp).map((r) => r.slot))].map((s) => [s, Math.abs(LDC.slotMin(s) - want)]).filter(([, d]) => d <= 90).sort((a, b) => a[1] - b[1])[0];
-    return { grp, slot: near ? near[0] : label };
+    let cand = [...new Set(rows.filter((r) => r.grp === grp).map((r) => r.slot))];
+    if (cand.some((x) => /일본어|중국어/.test(x))) cand = cand.filter((x) => lang ? x.includes(lang) : !/일본어|중국어/.test(x)); // 언어별 칸이면 같은 언어만
+    const near = cand.map((x) => [x, Math.abs(LDC.slotMin(x) - LDC.slotMin(label + (x.includes("중국어") ? " 중국어" : "")))]).filter(([, d]) => d <= 90).sort((a, b) => a[1] - b[1])[0];
+    return { grp, slot: near ? near[0] : (lang && cand.length ? `${lang} ${label}` : label) };
   },
 };
 if (typeof module !== "undefined") module.exports = LDC; else window.LDC = LDC;
