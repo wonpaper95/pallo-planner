@@ -59,3 +59,4 @@ body:not(.ldv) #ldView { display: none; }
 #ldView tr.rerow td { background: rgba(245, 158, 11, .14); } /* 🚨 재관리 줄은 주황 (구해야 함 분홍보다 우선) */
 #ldView .nd { display: block; margin-top: 3px; color: #e5484d; font-size: 15px; font-weight: 800; }
 #ldView td.sd { font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+#ldView td.sd .dp { display: block; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 800; }

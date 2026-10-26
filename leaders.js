@@ -85,7 +85,7 @@ LD.render = function () {
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : ses.map((d) => `<th class="${d === td ? "td" : ""}">${md(d)}(${dw(d)})</th>`).join("") + `<th>${ym(sm)}</th>`}${LD.mode === "month" ? "<th>특이사항</th><th>리더교육</th>" : ""}<th></th></tr>`;
       const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td>${esc(r.level)}</td><td>${esc(r.seat)}</td>`
-        + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}</td>`
+        + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
         + `<td>${stars(r)}</td><td>${stBox(r)}</td>`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : ses.map((d) => cell(r, d)).join("") + `<td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td>${eduBox(r)}</td>` : "")
@@ -96,7 +96,7 @@ LD.render = function () {
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
     const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고</th><th></th></tr>`;
     const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td>${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
-      + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}</td>`
+      + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
       + `<td>${stars(r)}</td><td>${stBox(r)}</td>`
       + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("")
         : `<td class="ina">${r.grp ? LDC.sessions(r.grp, from, to).map((d) => attBtn(r, d, `${md(d)}(${dw(d)})`)).join("") : `<span class="mut">–</span>`}</td><td>${flags(r, sm)}</td>`)

@@ -78,6 +78,23 @@ const LDC = {
     const e = rows.filter((r) => n(r.name).split("/").includes(n(name))); if (e.length) return pick(e);
     return LDC.matchSub(name, rows);
   },
+  // 첫 시작일 글자 → 'YYYY-MM-DD' (시트마다 형식이 다름: 2026-05-04 · 2025. 8. 6 · 26/3/4 · 20261026 · 260504). 못 읽으면 null
+  parseDay(v) {
+    const t = String(v ?? "").trim(); let m, y, mo, d;
+    if ((m = t.match(/^(\d{4})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})/))) [, y, mo, d] = m;
+    else if ((m = t.match(/^(\d{2})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})$/))) [, y, mo, d] = ["", "20" + m[1], m[2], m[3]];
+    else if ((m = t.match(/^(\d{4})(\d{2})(\d{2})$/))) [, y, mo, d] = m;
+    else if ((m = t.match(/^(\d{2})(\d{2})(\d{2})$/))) [, y, mo, d] = ["", "20" + m[1], m[2], m[3]];
+    else return null;
+    if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
+    return `${y}-${String(+mo).padStart(2, "0")}-${String(+d).padStart(2, "0")}`;
+  },
+  // 첫 시작일부터 며칠 지났나: D+30 · 오늘이면 D-day · 앞으로면 D-3
+  dPlus(start, today) {
+    const s = LDC.parseDay(start); if (!s) return "";
+    const n = Math.round((D.parse(today) - D.parse(s)) / 864e5);
+    return n > 0 ? `D+${n}` : n === 0 ? "D-day" : `D${n}`;
+  },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
   slotMin(s) {
     s = String(s ?? ""); const m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i), lang = s.includes("중국어") ? 1 : 0; // 같은 시간이면 일본어 → 중국어
