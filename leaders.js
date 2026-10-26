@@ -143,7 +143,7 @@ function editDlg(r) {
   d.querySelector("#ldX").onclick = () => d.close();
   // 시간대: 그 지점·반에서 이미 쓰는 칸 중 고르기 (처음이면 자주 쓰는 시간), 없으면 '직접 입력…'
   const fillSlots = (keep) => {
-    const used = LD.rows.filter((x) => x.grp === f.grp.value && x.slot).map((x) => x.slot);
+    const used = LD.rows.filter((x) => x.grp === f.grp.value && x.slot && (x.kind === "staff") === (f.kind.value === "staff")).map((x) => x.slot); // 리더·워킹스텝 따로
     const opts = [...new Set(used.length ? used : f.grp.value ? ["오전", "11AM", "오후", "6PM", "7PM", "8PM", "저녁"] : [])].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b)); // 그 지점이 쓰는 칸만, 없으면 기본 목록
     const cur = keep ?? f.slotSel.value;
     f.slotSel.innerHTML = `<option value="">시간 미정</option>` + opts.map((o) => `<option ${o === cur ? "selected" : ""}>${esc(o)}</option>`).join("") + `<option value="__own">직접 입력…</option>`;
@@ -151,7 +151,7 @@ function editDlg(r) {
     f.slotOwn.classList.toggle("hidden", f.slotSel.value !== "__own");
   };
   fillSlots(r?.slot ?? "");
-  f.grp.onchange = () => fillSlots();
+  f.grp.onchange = f.kind.onchange = () => fillSlots();
   f.slotSel.onchange = () => { f.slotOwn.classList.toggle("hidden", f.slotSel.value !== "__own"); if (f.slotSel.value === "__own") f.slotOwn.focus(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
