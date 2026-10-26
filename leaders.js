@@ -1,22 +1,17 @@
 // 🧑‍🏫 리더 현황 보드 탭: 지점별 리더 명단 · 라포 ⭐ · 수업마다 출석(O/X 클릭) · 🚨 재관리(한 달 3번↑ 결석) · 🏆 개근 혜택
 // 주간 / 월간 / 3달 보기. 계산은 leaders-core.js(LDC), index.html 의 sb·isBoss·previewTeam·previewUser·teams·myName·esc·toast·fail 을 씀 → window.LD
 (() => {
-const LD = (window.LD = { team: null, mode: "week", anchor: null, rows: [], att: new Map(), subs: new Map(), cover: new Map(), awards: new Map() });
+const LD = (window.LD = { team: null, mode: "month", anchor: null, rows: [], att: new Map(), subs: new Map(), cover: new Map(), awards: new Map() });
 const V = () => document.getElementById("ldView");
 const DOW = "일월화수목금토", md = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`, dw = (d) => DOW[W.parse(d).getDay()];
 const today = () => W.ymd(new Date());
 const admin = () => isBoss && !previewTeam && !previewUser;
 const ym = (m) => `${+m.slice(5, 7)}월`;
-try { LD.mode = localStorage.getItem("ld-mode") || "week"; } catch {}
+try { LD.mode = localStorage.getItem("ld-mode") === "q3" ? "q3" : "month"; } catch {} // 주간 보기는 없앰(10-26) — 월간 · 3달
 
-// 보는 기간: 주간 = 그 주 월~일, 월간 = 그달, 3달 = 기준 달 포함 지난 3달
-function range() {
-  const a = LD.anchor;
-  if (LD.mode === "week") { const m = W.monday(a); return [m, W.add(m, 6)]; }
-  if (LD.mode === "month") return [LDC.monthStart(a), LDC.monthEnd(a)];
-  return [LDC.addMonths(a, -2), LDC.monthEnd(a)];
-}
-const statMonth = () => LDC.monthStart(LD.mode === "week" ? W.add(W.monday(LD.anchor), 3) : LD.anchor); // 주간은 그 주 목요일이 속한 달
+// 보는 기간: 월간 = 그달, 3달 = 기준 달 포함 지난 3달
+const range = () => LD.mode === "month" ? [LDC.monthStart(LD.anchor), LDC.monthEnd(LD.anchor)] : [LDC.addMonths(LD.anchor, -2), LDC.monthEnd(LD.anchor)];
+const statMonth = () => LDC.monthStart(LD.anchor);
 
 LD.load = async function () {
   LD.anchor ??= today();
@@ -50,6 +45,7 @@ LD.load = async function () {
 
 const stars = (r) => `<span class="ldstars r${r.rapport ? (r.rapport <= 2 ? "low" : r.rapport === 3 ? "mid" : "high") : "none"}" title="라포 ${r.rapport ?? "-"}/5${r.rapport_by ? ` · ${esc(r.rapport_by)}` : ""}">`
   + [1, 2, 3, 4, 5].map((i) => `<button data-star="${i}">${i <= (r.rapport ?? 0) ? "★" : "☆"}</button>`).join("") + `</span>`;
+const eduBox = (r) => `<button class="edu ${r.edu_done ? "on" : ""}" data-edu title="리더교육 ${r.edu_done ? "했음" : "아직"}${r.edu ? ` · ${esc(r.edu)}` : ""} — 누르면 바뀜">${r.edu_done ? "✓" : ""}</button>`;
 const cov = (r, m) => LD.cover.get(r.id)?.get(m) ?? 0;
 const stat = (r, m) => LDC.monthStat(r.grp, m, LD.att.get(r.id), today(), cov(r, m));
 // 출석 버튼: 누르면 O → X → X+대타(이름) → 비움
@@ -74,7 +70,7 @@ LD.render = function () {
   const leaders = LD.rows.filter((r) => r.kind !== "staff"), staff = LD.rows.filter((r) => r.kind === "staff");
   const cnt = { need: LD.rows.filter((r) => r.status === "구해야 함").length, re: 0, aw: 0 };
   LD.rows.forEach((r) => { const s = stat(r, sm); if (s.recheck) cnt.re++; if (s.award || s.onTrack) cnt.aw++; });
-  const title = LD.mode === "week" ? `${md(from)} ~ ${md(to)}` : LD.mode === "month" ? `${LD.anchor.slice(0, 4)}년 ${ym(LD.anchor)}` : `${ym(months[0])} ~ ${ym(months[2])}`;
+  const title = LD.mode === "month" ? `${LD.anchor.slice(0, 4)}년 ${ym(LD.anchor)}` : `${ym(months[0])} ~ ${ym(months[2])}`;
   const blocks = [];
   for (const g of [...LDC.GRPS, ""]) { // "" = 반 없는 리더 (백업리더 등)
     const slots = [...new Set(leaders.filter((r) => r.grp === g).map((r) => r.slot))].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
@@ -82,12 +78,12 @@ LD.render = function () {
       const rs = leaders.filter((r) => r.grp === g && r.slot === s), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
-        : ses.map((d) => `<th class="${d === td ? "td" : ""}">${md(d)}(${dw(d)})</th>`).join("") + `<th>${ym(sm)}</th>`}${LD.mode === "week" ? "<th>특이사항</th><th>리더교육</th>" : ""}<th></th></tr>`;
+        : ses.map((d) => `<th class="${d === td ? "td" : ""}">${md(d)}(${dw(d)})</th>`).join("") + `<th>${ym(sm)}</th>`}${LD.mode === "month" ? "<th>특이사항</th><th>리더교육</th>" : ""}<th></th></tr>`;
       const body = rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td>${esc(r.level)}</td><td>${esc(r.seat)}</td>`
         + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}${r.start_day ? `<small class="mut">시작 ${esc(r.start_day)}</small>` : ""}</td>`
         + `<td>${stars(r)}</td><td><button class="st ${r.status === "구해야 함" ? "need" : "ok"}" data-st title="누르면 바뀜">${r.status === "구해야 함" ? "🔴 구해야 함" : "🟢 확정"}</button></td>`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : ses.map((d) => cell(r, d)).join("") + `<td>${flags(r, sm)}</td>`)
-        + (LD.mode === "week" ? `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td class="nt">${esc(r.edu)}</td>` : "")
+        + (LD.mode === "month" ? `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td>${eduBox(r)}</td>` : "")
         + `<td><button class="btn ghost lded" title="고치기">✏️</button></td></tr>`).join("");
       blocks.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
     }
@@ -104,7 +100,7 @@ LD.render = function () {
   }
   V().innerHTML = `<div class="ldbar"><h2>🧑‍🏫 리더 현황 보드</h2>
       ${admin() ? `<select id="ldTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === LD.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-      <span class="ldseg">${[["week", "주간"], ["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
+      <span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
       <span class="ldact"><button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     <div class="ldsum"><span>리더 <b>${leaders.length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span>
@@ -118,20 +114,21 @@ function dlg(html) {
   if (!d) { d = document.createElement("dialog"); d.id = "ldDlg"; document.body.appendChild(d); }
   d.innerHTML = html; d.showModal(); return d;
 }
-const F = [["level", "레벨"], ["seat", "자리"], ["name", "리더 이름"], ["start_day", "시작일"], ["phone", "전화번호"], ["note", "특이사항 (상담조교 참고)"], ["edu", "리더교육 일정 · 참석"], ["memo", "메모"]];
+const F = [["level", "레벨"], ["seat", "자리"], ["name", "리더 이름"], ["start_day", "시작일"], ["phone", "전화번호"], ["note", "특이사항 (상담조교 참고)"], ["edu", "리더교육 메모 (일정 등)"], ["memo", "메모"]];
 function editDlg(r) {
   const d = dlg(`<form method="dialog" class="ldform"><h2>${r ? "리더 고치기" : "리더 추가"}</h2>
     <label>구분<select name="kind"><option value="leader" ${r?.kind !== "staff" ? "selected" : ""}>리더</option><option value="staff" ${r?.kind === "staff" ? "selected" : ""}>워킹스텝</option></select></label>
     <label>반<select name="grp">${LDC.GRPS.map((g) => `<option ${r?.grp === g ? "selected" : ""}>${g}</option>`).join("")}<option value="" ${r && !r.grp ? "selected" : ""}>없음 (블로그스텝 등)</option></select></label>
     <label>시간대 · 업무<input name="slot" placeholder="11AM · 6PM · 오전 · 블로그스텝" value="${esc(r?.slot ?? "")}" maxlength="20"></label>
     ${F.map(([k, l]) => `<label>${l}<input name="${k}" value="${esc(r?.[k] ?? "")}" ${k === "name" ? "required" : ""}></label>`).join("")}
+    <label>리더교육<span><input type="checkbox" name="edu_done" ${r?.edu_done ? "checked" : ""}> 했음</span></label>
     <label>상태<select name="status"><option ${r?.status !== "구해야 함" ? "selected" : ""}>확정</option><option ${r?.status === "구해야 함" ? "selected" : ""}>구해야 함</option></select></label>
     <div class="row">${r ? `<button type="button" class="btn ghost" id="ldDel">🗑 지우기</button>` : ""}<span style="flex:1"></span><button type="button" class="btn ghost" value="cancel" id="ldX">취소</button><button class="btn">저장</button></div></form>`);
   const f = d.querySelector("form");
   d.querySelector("#ldX").onclick = () => d.close();
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const v = Object.fromEntries(new FormData(f)); v.name = v.name.trim(); v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
+    const v = Object.fromEntries(new FormData(f)); v.name = v.name.trim(); v.edu_done = f.edu_done.checked; v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
     const { error } = r ? await sb.from("leaders").update(v).eq("id", r.id) : await sb.from("leaders").insert({ ...v, team_id: LD.team });
     if (fail(error)) return; d.close(); toast(r ? "고쳤어요" : "추가했어요"); LD.load();
   };
@@ -166,7 +163,7 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.mode) { LD.mode = b.dataset.mode; try { localStorage.setItem("ld-mode", LD.mode); } catch {} return LD.load(); }
   if (b.dataset.nav !== undefined) {
     const n = +b.dataset.nav;
-    LD.anchor = !n ? today() : LD.mode === "week" ? W.add(LD.anchor, 7 * n) : LDC.addMonths(LD.anchor, n);
+    LD.anchor = !n ? today() : LDC.addMonths(LD.anchor, n);
     return LD.load();
   }
   if (b.id === "ldAdd") return editDlg(null);
@@ -176,6 +173,8 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.star) { const n = +b.dataset.star === r.rapport ? null : +b.dataset.star; // 같은 별 다시 누르면 지움
     const { error } = await sb.from("leaders").update({ rapport: n, rapport_by: n ? myName ?? "" : "" }).eq("id", r.id); if (fail(error)) return;
     Object.assign(r, { rapport: n, rapport_by: n ? myName ?? "" : "" }); return LD.render(); }
+  if (b.dataset.edu !== undefined) { const v = !r.edu_done; // 🎓 리더교육 했는지
+    const { error } = await sb.from("leaders").update({ edu_done: v }).eq("id", r.id); if (fail(error)) return; r.edu_done = v; return LD.render(); }
   if (b.dataset.st !== undefined) { const s = r.status === "구해야 함" ? "확정" : "구해야 함";
     const { error } = await sb.from("leaders").update({ status: s }).eq("id", r.id); if (fail(error)) return; r.status = s; return LD.render(); }
   if (b.dataset.att) { // O → X → X+대타 → 비움

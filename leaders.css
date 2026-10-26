@@ -54,3 +54,5 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .att small { display: block; font-size: 10px; font-weight: 500; line-height: 1.1; }
 #ldView td.ina { white-space: normal; } #ldView td.ina .att { height: auto; min-height: 30px; margin: 2px; padding: 2px 6px; width: auto; }
 #ldView .cv { color: #3b82f6; font-weight: 600; font-size: 12px; }
+#ldView .edu { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); color: #fff; font-weight: 800; cursor: pointer; }
+#ldView .edu.on { background: #30a46c; border-color: #30a46c; }

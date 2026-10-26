@@ -94,7 +94,8 @@ const LDC = {
     let cand = [...new Set(rows.filter((r) => r.grp === grp).map((r) => r.slot))];
     if (cand.some((x) => /일본어|중국어/.test(x))) cand = cand.filter((x) => lang ? x.includes(lang) : !/일본어|중국어/.test(x)); // 언어별 칸이면 같은 언어만
     const near = cand.map((x) => [x, Math.abs(LDC.slotMin(x) - LDC.slotMin(label + (x.includes("중국어") ? " 중국어" : "")))]).filter(([, d]) => d <= 90).sort((a, b) => a[1] - b[1])[0];
-    return { grp, slot: near ? near[0] : (lang && cand.length ? `${lang} ${label}` : label) };
+    const word = want < 720 ? "오전" : want < 1080 ? "오후" : "저녁"; // 언어별 칸은 오전·오후·저녁 이름
+    return { grp, slot: near ? near[0] : (lang && cand.length ? `${lang} ${word}` : label) };
   },
 };
 if (typeof module !== "undefined") module.exports = LDC; else window.LDC = LDC;
