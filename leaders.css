@@ -62,3 +62,9 @@ body:not(.ldv) #ldView { display: none; }
 #ldView td.sd .dp { display: block; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 800; }
 #ldView [data-f] { cursor: text; }
 #ldView .ldin { width: 100%; min-width: 80px; padding: 4px 6px; font: inherit; color: var(--text); background: var(--bg); border: 1.5px solid var(--accent); border-radius: 6px; }
+#ldView td.att2 { padding: 4px 6px; }
+#ldView .ag { display: inline-grid; grid-auto-flow: row; gap: 3px 4px; }
+#ldView .ag .att { width: 46px; height: auto; min-height: 34px; padding: 2px 2px; line-height: 1.15; }
+#ldView .ag .att small { color: var(--sub); }
+#ldView .att.tdy { outline: 2px solid #E0D120; outline-offset: 1px; }
+#ldView th .agh { display: block; font-size: 10.5px; font-weight: 500; opacity: .85; }
