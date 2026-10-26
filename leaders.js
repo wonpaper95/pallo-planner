@@ -37,10 +37,13 @@ LD.load = async function () {
   if (fail(a.error || w.error)) return;
   LD.rows = rows; LD.att = new Map(rows.map((r) => [r.id, new Map()]));
   LD.subs = new Map(rows.map((r) => [r.id, new Map()])); LD.cover = new Map();
-  a.data.forEach((x) => { LD.att.get(x.leader_id)?.set(x.day, x.state); if (!x.sub) return;
+  const byId = new Map(rows.map((r) => [r.id, r])), credit = (id, day) => { const m = LDC.monthStart(day), c = LD.cover.get(id) ?? new Map(); c.set(m, (c.get(m) ?? 0) + 1); LD.cover.set(id, c); };
+  a.data.forEach((x) => { LD.att.get(x.leader_id)?.set(x.day, x.state);
+    const me_ = byId.get(x.leader_id); // 자기 반 요일이 아닌 날 나옴(전산 출석) = 다른 시간대 대타 → 인정
+    if (x.state === "O" && me_?.grp && !LDC.DAYS[me_.grp].includes(W.parse(x.day).getDay())) credit(x.leader_id, x.day);
+    if (!x.sub) return;
     LD.subs.get(x.leader_id)?.set(x.day, x.sub);
-    const who = LDC.matchSub(x.sub, rows); if (!who) return; // 🔁 대타 해준 사람 → 그달 출석 인정 +1
-    const m = LDC.monthStart(x.day), c = LD.cover.get(who.id) ?? new Map(); c.set(m, (c.get(m) ?? 0) + 1); LD.cover.set(who.id, c); });
+    const who = LDC.matchSub(x.sub, rows); if (who) credit(who.id, x.day); }); // 🔁 대타 해준 사람 → 그달 출석 인정 +1
   LD.awards = new Map(w.data.map((x) => [`${x.leader_id}:${x.month}`, x]));
   LD.render();
 };
@@ -192,5 +195,24 @@ document.addEventListener("click", async (e) => {
     const { error } = await sb.from("leader_awards").insert(row); if (fail(error)) return; LD.awards.set(k, row); toast("🎁 혜택 기록했어요"); return LD.render();
   }
 });
+// 🔄 전산 리더 출석 → 플래너 (매일 예약 작업이 전산 탭에서 모은 걸 넘겨줌, 대표 계정에서만)
+// data = { branches: { DAEGUDSR: { r: [[이름, 전화], …], a: [[날짜, r번호, 'O'|'X'], …] }, … } }
+LD.syncJeonsan = async function (data) {
+  const report = {};
+  if (!teams.length) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
+  for (const [code, b] of Object.entries(data.branches ?? {})) {
+    if (b.error) { report[code] = "전산 오류: " + b.error; continue; }
+    const team = teams.find((t) => t.name === LDC.JEONSAN[code]); if (!team) { report[code] = "플래너 지점 없음"; continue; }
+    const { data: rows, error } = await sb.from("leaders").select("id, name, phone, grp").eq("team_id", team.id); if (error) { report[code] = error.message; continue; }
+    const hit = b.r.map(([n, p]) => LDC.matchJeonsan(n, p, rows)), up = new Map(), miss = new Set();
+    for (const [d, i, st] of b.a) { if (d < LDC.SYNC_START) continue; const l = hit[i]; if (!l) { miss.add(b.r[i][0]); continue; }
+      up.set(`${l.id}:${d}`, { leader_id: l.id, day: d, state: st, by_name: "전산", at: new Date().toISOString(), ...(st === "O" ? { sub: "" } : {}) }); }
+    const list = [...up.values()], os = list.filter((x) => x.state === "O"), xs = list.filter((x) => x.state === "X"); // X 는 sub(대타) 안 건드림 — 열이 다르면 한 번에 못 보냄
+    const errs = (await Promise.all([os, xs].filter((l) => l.length).map((l) => sb.from("leader_att").upsert(l)))).map((r) => r.error?.message).filter(Boolean);
+    report[team.name] = errs.length ? errs.join(" / ") : { 반영: list.length, 못찾은리더: [...miss] };
+  }
+  if (V() && document.body.classList.contains("ldv")) LD.load();
+  return report;
+};
 document.addEventListener("change", (e) => { if (e.target.id === "ldTeam") { LD.team = +e.target.value; try { localStorage.setItem("ld-team", LD.team); } catch {} LD.load(); } });
 })();

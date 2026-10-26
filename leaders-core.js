@@ -66,6 +66,16 @@ const LDC = {
     }
     return rows;
   },
+  // 🔄 전산 리더 출석 연동: 전산 지점 코드 ↔ 플래너 지점, 이 날부터 전산 값이 우선 (그 전은 시트에서 옮긴 기록 유지)
+  JEONSAN: { DAEGUDSR: "대구영어점", DAEGUJPCH: "대구일중점", ULSAN: "울산점" },
+  SYNC_START: "2026-10-27",
+  // 전산 리더(이름·전화) → 플래너 리더: 전화 뒤 8자리 → 이름 정확히 → 이름 들어간 사람 한 명
+  matchJeonsan(name, phone, rows) {
+    const p8 = String(phone ?? "").replace(/\D/g, "").slice(-8), n = (x) => String(x).replace(/\(.*?\)|\s/g, "");
+    if (p8.length === 8) { const h = rows.filter((r) => r.phone.replace(/\D/g, "").includes(p8)); if (h.length === 1) return h[0]; }
+    const e = rows.filter((r) => n(r.name).split("/").includes(n(name))); if (e.length === 1) return e[0];
+    return LDC.matchSub(name, rows);
+  },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
   slotMin(s) { const m = String(s).match(/(\d{1,2})(?::(\d{2}))?(AM|PM)/i); if (!m) return s === "오전" ? 540 : s === "오후" ? 840 : 9999; return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0); },
 };
