@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610262032">
+<meta name="app-version" content="202610262132">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610262032"></script>
+<script src="theme.js?v=202610262132"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -324,6 +324,9 @@ body:not(.sv) #salesView { display: none; }
 .bcard .bh { display: flex; align-items: baseline; gap: 8px; } .bcard .bh b { font-size: 18px; } .bcard .bh .mem { color: var(--sub); font-size: 13px; flex: 1; }
 .bcard .bh .pct { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; } .bcard.ok .bh .pct { color: var(--green); }
 .bcard .bar { margin: 8px 0 4px; } .bcard .bsub { color: var(--sub); font-size: 12.5px; }
+.bconsult { margin-top: 6px; font-size: 13.5px; } .bconsult.low { color: var(--red); font-weight: 600; } /* 📅 내일 상담 수 · 목표 */
+.ctgt { background: none; border: 1px dashed var(--line); border-radius: 6px; padding: 0 6px; color: inherit; cursor: pointer; font: inherit; }
+.rt .cnum { margin-left: 6px; color: var(--green, #30a46c); font-size: 13px; } .rt .cnum.low { color: var(--red); }
 .bcard h5 { margin: 12px 0 4px; font-size: 13px; color: var(--sub); font-weight: 600; }
 .bcard ul { margin: 0; padding: 0; list-style: none; } .bcard li { font-size: 13.5px; padding: 3px 0; border-top: 1px solid var(--line); display: flex; gap: 6px; align-items: baseline; }
 .bcard li:first-child { border-top: 0; } .bcard li .w { color: var(--green); white-space: nowrap; font-size: 12.5px; } .bcard li.no { color: var(--text); } .bcard li.no::before { content: "☐"; color: var(--sub); }
@@ -600,9 +603,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610262032"></script>
-<script src="week.js?v=202610262032"></script>
-<script src="pick.js?v=202610262032"></script>
+<script src="config.js?v=202610262132"></script>
+<script src="week.js?v=202610262132"></script>
+<script src="pick.js?v=202610262132"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -620,7 +623,7 @@ const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
 let tasks = [], dues = [], musts = [], openId = null, dirty = false;
-let teamTasks = [], routine = [], routineChecks = new Map();
+let teamTasks = [], routine = [], routineChecks = new Map(), consultTarget = 8; // consultTarget: 📅 내일 상담 목표(지점마다, 대표가 바꿈)
 let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
 function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600); }
@@ -784,6 +787,7 @@ async function loadRoutine() {
     myRole === "admin" || !isToday ? { data: [] } : sb.rpc("routine_carry", { p_day: day, p_team: previewTeam })]); // ↪ 전에 못 끝낸 '넘김' 일 (오늘만)
   if (fail(r.error || c.error || k.error)) return;
   routine = r.data;
+  if (myRole !== "admin" && routine.some((it) => it.need_count)) consultTarget = (await sb.rpc("consult_target", { p_team: previewTeam })).data ?? 8;
   const mine = routine.filter((it) => applies(it, day, previewTeam)), dw = W.parse(day).getDay();
   $("#rtTitle").textContent = isToday ? `오늘(${DOW[dw]}) 고정업무` : `${md(day)}(${DOW[dw]}) 고정업무`;
   if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
@@ -807,7 +811,7 @@ async function loadRoutine() {
   const row = (it, ck, from) => { const at = ck && new Date(ck.done_at);
     return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" data-day="${from ?? day}" ${ck ? "checked" : ""} ${future ? "disabled" : ""}>`
       + `${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}`
-      + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small class="needlink">📷 인증샷 올리면 완료</small>` : it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : ""}</span>`
+      + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small class="needlink">📷 인증샷 올리면 완료</small>` : it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : it.need_count && !ck ? ` <small class="needlink">📅 숫자 넣으면 완료 · 목표 ${consultTarget}명</small>` : ""}${ck?.num != null ? ` <b class="cnum ${ck.num < consultTarget ? "low" : ""}">${ck.num}명${ck.num < consultTarget ? ` · 목표 ${consultTarget}명 미달 → 대표님께 회신율·광고 연락` : " 👍"}</b>` : ""}</span>`
       + `${lkA(ck?.link, "rtlink", true)}</label>`; };
   $("#rtList").innerHTML = carried.map((x) => row(x.it, null, x.from)).join("") + mine.map((it) => row(it, routineChecks.get(it.id))).join("")
     + (mine.length && done === mine.length ? `<div class="rtdone">${isToday ? "🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요" : "🎉 이날 고정업무를 모두 끝냈어요"}</div>` : "");
@@ -863,20 +867,36 @@ async function renderRtWeek() {
 }
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
-  const it = routine.find((x) => x.id === id), on = e.target.checked; let link = null;
+  const it = routine.find((x) => x.id === id), on = e.target.checked; let link = null, num = null;
   if (on && it?.need_photo) { // 📷 인증샷을 올려야 완료 (예: 쓰레기 버리고 인증샷) — 사진 고르기(폰은 카메라/앨범) → 업로드 → 체크
     e.target.checked = false;
     const f = await pickPhoto(); if (!f) return toast("인증샷을 올려야 완료돼요");
     toast("📷 인증샷 올리는 중…");
     try { link = await uploadRoutinePhoto(sb, f, id); } catch (err) { return fail(err); }
+  } else if (on && it?.need_count) { // 📅 내일 상담 예약 수: 캘린더 보고 숫자 → 목표 미만이면 대표님께 연락 안내
+    const v = prompt(`📅 내일(다음 근무일) 상담 예약이 몇 명인가요?\n캘린더 보고 숫자만 넣어 주세요 (목표 ${consultTarget}명)`);
+    if (v === null || !/^\s*\d{1,3}\s*$/.test(v)) { e.target.checked = false; return toast(v === null ? "숫자를 넣어야 완료돼요" : "숫자만 넣어 주세요 (예: 7)"); }
+    num = +v;
   } else if (on && it?.need_link) { // 🔗 링크를 올려야 완료 (예: 네이버 블로그)
     link = (prompt("작성한 글의 링크를 붙여넣어 주세요\n(예: https://blog.naver.com/...)") || "").trim();
     if (!/^https?:\/\/\S+$/i.test(link)) { e.target.checked = false; return toast(link ? "https:// 로 시작하는 주소를 넣어 주세요" : "링크를 올려야 완료돼요"); }
   }
-  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: on, p_team: previewTeam, p_link: link });
+  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: on, p_team: previewTeam, p_link: link, p_num: num });
   if (fail(error)) e.target.checked = !on;
+  else if (num != null) consultAlert(num, consultTarget);
   loadRoutine();
 });
+// 📅 상담 수 결과 안내: 목표 이상이면 짧게, 미만이면 크게 (대표님께 회신율·광고 연락하고 퇴근)
+function consultAlert(n, target) {
+  if (n >= target) return toast(`👍 내일 상담 ${n}명 — 목표 ${target}명 달성! 보고하고 퇴근하세요`);
+  let d = document.getElementById("consultDlg");
+  if (!d) { d = document.createElement("dialog"); d.id = "consultDlg"; document.body.appendChild(d); }
+  d.innerHTML = `<div style="text-align:center;max-width:340px"><div style="font-size:40px">🔴</div><h2 style="margin:6px 0">내일 상담 ${n}명</h2>
+    <p style="margin:0 0 10px;color:var(--sub)">목표 ${target}명보다 ${target - n}명 적어요</p>
+    <div style="text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;line-height:1.7">퇴근 전에 <b>대표님께 연락</b>해 주세요<br>① 회신율 신경 쓰기<br>② 광고 더 돌리기</div>
+    <button class="btn" style="margin-top:12px;width:100%" onclick="this.closest('dialog').close()">알겠어요 — 대표님께 연락할게요</button></div>`;
+  d.showModal();
+}
 // 대표: 고정업무 편집기
 const WEEKS = [["", "매주"], ["1,3", "1·3주차"], ["2,4", "2·4주차"], ["1", "1주차"], ["2", "2주차"], ["3", "3주차"], ["4", "4주차"]];
 function renderRtEditor() {
@@ -886,7 +906,7 @@ function renderRtEditor() {
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
-    <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button><button data-tg="need_photo" class="${it.need_photo ? "on" : ""}" title="사진(인증샷)을 올려야 완료" style="width:auto;padding:0 6px">📷 인증샷</button></div>
+    <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button><button data-tg="need_photo" class="${it.need_photo ? "on" : ""}" title="사진(인증샷)을 올려야 완료" style="width:auto;padding:0 6px">📷 인증샷</button><button data-tg="need_count" class="${it.need_count ? "on" : ""}" title="숫자를 넣어야 완료 (예: 내일 상담 예약 수)" style="width:auto;padding:0 6px">🔢 숫자</button></div>
     <button data-rm title="삭제">✕</button></div>`).join("");
 }
 async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
@@ -952,7 +972,11 @@ $("#fbList").onclick = async (e) => {
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
 let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
 try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
-$("#boardView").addEventListener("click", (e) => {
+$("#boardView").addEventListener("click", async (e) => {
+  const ct = e.target.closest("[data-ctgt]"); // 📅 지점 상담 목표 바꾸기 (대표)
+  if (ct) { const v = prompt("이 지점 내일 상담 목표(명)를 넣어 주세요", ct.textContent.replace(/\D/g, "")); if (v === null) return;
+    if (!/^\s*\d{1,3}\s*$/.test(v)) return toast("숫자만 넣어 주세요");
+    const { error } = await sb.from("teams").update({ consult_target: +v }).eq("id", +ct.dataset.ctgt); if (fail(error)) return; toast(`목표 ${+v}명으로 바꿨어요`); return loadBoard(); }
   const m = e.target.dataset.bmode, n = e.target.dataset.bwk;
   if (m) { boardWeek = m === "week"; try { localStorage.setItem("board-week", boardWeek ? "1" : ""); } catch {} return loadBoard(); }
   if (n !== undefined) { boardMon = +n === 0 ? null : W.add(boardMon ?? W.monday(today()), 7 * +n); return loadBoard(); }
@@ -994,6 +1018,8 @@ async function loadBoard() {
       <div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(mem.map((m) => m.name).join("·") || "매니저 없음")}</span><span class="pct">${all ? "🎉 " : ""}${done.length}/${todays.length}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="bsub">${last ? `마지막 체크 ${esc(last.done_name ?? "")} ${hhmm(last.done_at)}` : "아직 체크 없음"}${all ? " · 오늘 고정업무 끝" : ""}</div>
+      ${todays.some((it) => it.need_count) ? (() => { const ck = todays.filter((it) => it.need_count).map((it) => checks.get(it.id)).find(Boolean), low = ck?.num != null && ck.num < tm.consult_target;
+        return `<div class="bconsult ${low ? "low" : ""}">📅 내일 상담 <b>${ck?.num ?? "–"}명</b> / 목표 <button class="ctgt" data-ctgt="${tm.id}" title="눌러서 목표 바꾸기">${tm.consult_target}명 ✏️</button>${low ? " · 미달 — 회신율·광고 연락 올 거예요" : ""}</div>`; })() : ""}
       ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
       ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
@@ -1832,19 +1858,19 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610262032"></script>
-<script src="photo.js?v=202610262032"></script>
-<script src="blog.js?v=202610262032"></script>
-<script src="mk-core.js?v=202610262032"></script>
-<script src="mkc-core.js?v=202610262032"></script>
-<script src="marketing.js?v=202610262032"></script>
-<script src="sns-core.js?v=202610262032"></script>
-<script src="post.js?v=202610262032"></script>
-<script src="someday.js?v=202610262032"></script>
-<script src="contacts.js?v=202610262032"></script>
-<script src="leaders-core.js?v=202610262032"></script>
-<script src="leaders.js?v=202610262032"></script>
-<script src="links.js?v=202610262032"></script>
-<script src="qna.js?v=202610262032"></script>
+<script src="sales.js?v=202610262132"></script>
+<script src="photo.js?v=202610262132"></script>
+<script src="blog.js?v=202610262132"></script>
+<script src="mk-core.js?v=202610262132"></script>
+<script src="mkc-core.js?v=202610262132"></script>
+<script src="marketing.js?v=202610262132"></script>
+<script src="sns-core.js?v=202610262132"></script>
+<script src="post.js?v=202610262132"></script>
+<script src="someday.js?v=202610262132"></script>
+<script src="contacts.js?v=202610262132"></script>
+<script src="leaders-core.js?v=202610262132"></script>
+<script src="leaders.js?v=202610262132"></script>
+<script src="links.js?v=202610262132"></script>
+<script src="qna.js?v=202610262132"></script>
 </body>
 </html>
