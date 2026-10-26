@@ -213,9 +213,14 @@ async function renderCreative(grp, head, wire) {
     + ideas.map(card).join("");
   wire();
   $m("#mkDay").addEventListener("change", (e) => { MK.cday = e.target.value; MK.load(); });
-  const copy = async (text, btn) => { try { await navigator.clipboard.writeText(text); toast("복사했어요"); } catch { btn.previousElementSibling; toast("복사가 안 돼요 — 길게 눌러 직접 복사해 주세요"); } };
-  $m("#mkBody").querySelectorAll("button[data-copy]").forEach((b) => b.addEventListener("click", () => copy(copyText(ideas[+b.dataset.copy]), b)));
-  $m("#mkBody").querySelectorAll("button[data-target]").forEach((b) => b.addEventListener("click", () => copy(targetText(ideas[+b.dataset.target]), b)));
+  // 클립보드 API 가 막힌 환경(앱 안 브라우저 등)은 임시 textarea + execCommand 로 한 번 더 시도
+  const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); return toast("복사했어요"); } catch {}
+    try { const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); if (ok) return toast("복사했어요"); } catch {}
+    toast("복사가 안 돼요 — 글을 길게 눌러 직접 복사해 주세요");
+  };
+  $m("#mkBody").querySelectorAll("button[data-copy]").forEach((b) => b.addEventListener("click", () => copy(copyText(ideas[+b.dataset.copy]))));
+  $m("#mkBody").querySelectorAll("button[data-target]").forEach((b) => b.addEventListener("click", () => copy(targetText(ideas[+b.dataset.target]))));
 }
 
 // ── CSV 올리기 (대표) ──
