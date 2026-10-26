@@ -756,7 +756,8 @@ async function loadAll(scrollToday) {
 }
 // ── 📌 고정업무: 대표가 정한 목록 중 오늘 요일·주차에 해당하는 것만, 순서대로 ──
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
-const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
+const applies = (it, day, team) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1))
+  && (!it.from_day || day >= it.from_day) && (!it.to_day || day <= it.to_day) && (!team || !it.team_id || it.team_id === team); }; // team: 그 지점 것만(매니저는 서버가 이미 걸러줌)
 // 체크에 붙은 🔗 링크 / 📷 인증샷 주소 → 열리는 글자(thumb 면 작은 사진)
 const lkA = (u, cls = "", thumb = false) => !u ? "" : `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener">${isPhotoLink(u) ? `${thumb ? `<img class="rtthumb" src="${esc(u)}" alt="">` : ""}📷 인증샷` : "🔗 링크"}</a>`;
 async function loadRoutine() {
@@ -767,7 +768,7 @@ async function loadRoutine() {
     myRole === "admin" || !isToday ? { data: [] } : sb.rpc("routine_carry", { p_day: day, p_team: previewTeam })]); // ↪ 전에 못 끝낸 '넘김' 일 (오늘만)
   if (fail(r.error || c.error || k.error)) return;
   routine = r.data;
-  const mine = routine.filter((it) => applies(it, day)), dw = W.parse(day).getDay();
+  const mine = routine.filter((it) => applies(it, day, previewTeam)), dw = W.parse(day).getDay();
   $("#rtTitle").textContent = isToday ? `오늘(${DOW[dw]}) 고정업무` : `${md(day)}(${DOW[dw]}) 고정업무`;
   if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
     $("#rtCount").textContent = `${mine.length}개 · 지점별 현황`;
@@ -817,11 +818,11 @@ async function routineWeekTable(mon, team) {
   const ck = await Promise.all(days.map((d) => sb.rpc("team_routine_checks_on", { p_day: d, p_team: team })));
   if (ck.some((x) => fail(x.error))) return "";
   const maps = ck.map((x) => new Map((x.data ?? []).map((c) => [c.item_id, c])));
-  const rows = routine.filter((it) => days.some((d) => applies(it, d)));
+  const rows = routine.filter((it) => days.some((d) => applies(it, d, team)));
   const hhmm = (iso) => { const t = new Date(iso); return `${pad(t.getHours())}:${pad(t.getMinutes())}`; };
   const th = `<tr><th>고정업무</th>${days.map((d) => `<th class="${d === td ? "td" : ""}">${DOW[W.parse(d).getDay()]} ${md(d)}</th>`).join("")}</tr>`;
   return rows.length ? `<div class="rtw"><table>${th}${rows.map((it) => `<tr><td class="t">${esc(it.title)}</td>${days.map((d, i) => {
-    if (!applies(it, d)) return `<td class="c x"></td>`;
+    if (!applies(it, d, team)) return `<td class="c x"></td>`;
     const c = maps[i].get(it.id);
     if (c) return `<td class="c y" title="${esc(c.done_name ?? "")} ${hhmm(c.done_at)}">✓ ${esc(c.done_name ?? "")}<br>${hhmm(c.done_at)}${c.link ? ` <a href="${esc(c.link)}" target="_blank" rel="noopener">${isPhotoLink(c.link) ? "📷" : "🔗"}</a>` : ""}</td>`;
     return d > td ? `<td class="c f">·</td>` : d < RT_START ? `<td class="c f" title="공용 고정업무 시작 전">–</td>` : d < td ? `<td class="c n">✗</td>` : `<td class="c">☐</td>`; }).join("")}</tr>`).join("")}</table></div>`
@@ -865,7 +866,7 @@ const WEEKS = [["", "매주"], ["1,3", "1·3주차"], ["2,4", "2·4주차"], ["1
 function renderRtEditor() {
   $("#rtRows").innerHTML = routine.map((it, i) => `<div class="rtrow" data-id="${it.id}">
     <div class="mv"><button data-mv="-1" ${i ? "" : "disabled"}>▲</button><button data-mv="1" ${i < routine.length - 1 ? "" : "disabled"}>▼</button></div>
-    <input type="text" class="t" value="${esc(it.title)}" data-f="title">
+    <input type="text" class="t" value="${esc(it.title)}" data-f="title">${it.team_id || it.from_day || it.to_day ? `<small class="needlink" style="white-space:nowrap">📍 ${it.team_id ? esc(teams.find((x) => x.id === it.team_id)?.name ?? "") : "전 지점"}${it.from_day || it.to_day ? ` · ${it.from_day ? md(it.from_day) : ""}~${it.to_day ? md(it.to_day) : ""}` : ""}</small>` : ""}
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -950,7 +951,7 @@ async function loadBoard() {
     sb.from("tasks").select("id, user_id, title, done").eq("assigned_by", me.id).eq("day", day).order("id"),
     sb.from("routine_items").select("*").order("sort").order("id")]);
   if (fail(t.error || p.error || k.error || a.error || r.error)) return;
-  const items = r.data, todays = items.filter((it) => applies(it, day)), name = (id) => items.find((i) => i.id === id);
+  const items = r.data, name = (id) => items.find((i) => i.id === id);
   const mode = `<span class="bmode"><button data-bmode="today" class="${boardWeek ? "" : "on"}">오늘</button><button data-bmode="week" class="${boardWeek ? "on" : ""}">이번 주</button></span>`;
   if (boardWeek) { // 지점마다 매니저 주간 기록과 같은 표
     routine = items;
@@ -966,6 +967,7 @@ async function loadBoard() {
   const hhmm = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   const cards = per.map(({ tm, checks, carry }) => {
     const mem = p.data.filter((x) => x.team_id === tm.id && x.role === "manager"), ids = new Set(mem.map((x) => x.user_id));
+    const todays = items.filter((it) => applies(it, day, tm.id)); // 그 지점 일만
     const done = todays.filter((it) => checks.has(it.id)), left = todays.filter((it) => !checks.has(it.id));
     const last = [...checks.values()].sort((x, y) => new Date(y.done_at) - new Date(x.done_at))[0];
     const photos = todays.map((it) => checks.get(it.id)).filter((ck) => ck && isPhotoLink(ck.link)); // 📷 오늘 올린 인증샷

@@ -7,7 +7,8 @@ const pad = (n) => String(n).padStart(2, "0");
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const today = () => W.ymd(new Date());
 const hm = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
+const applies = (it, day, team) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1))
+  && (!it.from_day || day >= it.from_day) && (!it.to_day || day <= it.to_day) && (!team || !it.team_id || it.team_id === team); }; // team: 그 지점 것만(매니저는 서버가 이미 걸러줌)
 const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
 const hms = (s) => { s = Math.floor(s); return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; };
 let me = null, role = "manager", day = today(), state = { tasks: [], team: [], routine: [], all: [], carried: [], checks: new Map(), status: [], dues: [] };
