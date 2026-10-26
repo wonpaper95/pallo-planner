@@ -141,10 +141,10 @@ function editDlg(r) {
     <div class="row">${r ? `<button type="button" class="btn ghost" id="ldDel">🗑 지우기</button>` : ""}<span style="flex:1"></span><button type="button" class="btn ghost" value="cancel" id="ldX">취소</button><button class="btn">저장</button></div></form>`);
   const f = d.querySelector("form");
   d.querySelector("#ldX").onclick = () => d.close();
-  // 시간대: 그 반에서 이미 쓰는 칸 + 자주 쓰는 시간 중 고르기, 없으면 '직접 입력…'
+  // 시간대: 그 지점·반에서 이미 쓰는 칸 중 고르기 (처음이면 자주 쓰는 시간), 없으면 '직접 입력…'
   const fillSlots = (keep) => {
     const used = LD.rows.filter((x) => x.grp === f.grp.value && x.slot).map((x) => x.slot);
-    const opts = [...new Set([...used, ...(f.grp.value ? ["오전", "11AM", "오후", "6PM", "7PM", "8PM", "저녁"] : [])])].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
+    const opts = [...new Set(used.length ? used : f.grp.value ? ["오전", "11AM", "오후", "6PM", "7PM", "8PM", "저녁"] : [])].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b)); // 그 지점이 쓰는 칸만, 없으면 기본 목록
     const cur = keep ?? f.slotSel.value;
     f.slotSel.innerHTML = `<option value="">시간 미정</option>` + opts.map((o) => `<option ${o === cur ? "selected" : ""}>${esc(o)}</option>`).join("") + `<option value="__own">직접 입력…</option>`;
     if (cur && !opts.includes(cur)) { f.slotSel.value = "__own"; f.slotOwn.value = cur; }
