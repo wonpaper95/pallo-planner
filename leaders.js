@@ -132,17 +132,30 @@ function editDlg(r) {
   const d = dlg(`<form method="dialog" class="ldform"><h2>${r ? "리더 고치기" : "리더 추가"}</h2>
     <label>구분<select name="kind"><option value="leader" ${r?.kind !== "staff" ? "selected" : ""}>리더</option><option value="staff" ${r?.kind === "staff" ? "selected" : ""}>워킹스텝</option></select></label>
     <label>반<select name="grp">${LDC.GRPS.map((g) => `<option ${r?.grp === g ? "selected" : ""}>${g}</option>`).join("")}<option value="" ${r && !r.grp ? "selected" : ""}>없음 (블로그스텝 등)</option></select></label>
-    <label>시간대 · 업무<input name="slot" placeholder="11AM · 6PM · 오전 · 블로그스텝" value="${esc(r?.slot ?? "")}" maxlength="20"></label>
-    ${F.map(([k, l]) => `<label>${l}<input name="${k}" value="${esc(r?.[k] ?? "")}" ${k === "name" ? "required" : ""}></label>`).join("")}
+    <label>시간대 · 업무<span class="slotpick"><select name="slotSel"></select><input name="slotOwn" placeholder="직접 입력 (예: 9PM · 블로그스텝)" maxlength="20" class="hidden"></span></label>
+    ${F.map(([k, l]) => k === "start_day" ? `<label>${l}<input type="date" name="start_day" value="${LDC.parseDay(r?.start_day) ?? ""}"></label>`
+      : `<label>${l}<input name="${k}" value="${esc(r?.[k] ?? "")}" ${k === "name" ? "required" : ""}></label>`).join("")}
     <label>리더교육<span><input type="checkbox" name="edu_done" ${r?.edu_done ? "checked" : ""}> 했음</span></label>
     <label>구해야 함 시작일<input type="date" name="need_since" value="${r?.need_since ?? ""}" title="누적일 계산 — 비우면 오늘부터"></label>
     <label>상태<select name="status"><option ${r?.status !== "구해야 함" ? "selected" : ""}>확정</option><option ${r?.status === "구해야 함" ? "selected" : ""}>구해야 함</option></select></label>
     <div class="row">${r ? `<button type="button" class="btn ghost" id="ldDel">🗑 지우기</button>` : ""}<span style="flex:1"></span><button type="button" class="btn ghost" value="cancel" id="ldX">취소</button><button class="btn">저장</button></div></form>`);
   const f = d.querySelector("form");
   d.querySelector("#ldX").onclick = () => d.close();
+  // 시간대: 그 반에서 이미 쓰는 칸 + 자주 쓰는 시간 중 고르기, 없으면 '직접 입력…'
+  const fillSlots = (keep) => {
+    const used = LD.rows.filter((x) => x.grp === f.grp.value && x.slot).map((x) => x.slot);
+    const opts = [...new Set([...used, ...(f.grp.value ? ["오전", "11AM", "오후", "6PM", "7PM", "8PM", "저녁"] : [])])].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
+    const cur = keep ?? f.slotSel.value;
+    f.slotSel.innerHTML = `<option value="">시간 미정</option>` + opts.map((o) => `<option ${o === cur ? "selected" : ""}>${esc(o)}</option>`).join("") + `<option value="__own">직접 입력…</option>`;
+    if (cur && !opts.includes(cur)) { f.slotSel.value = "__own"; f.slotOwn.value = cur; }
+    f.slotOwn.classList.toggle("hidden", f.slotSel.value !== "__own");
+  };
+  fillSlots(r?.slot ?? "");
+  f.grp.onchange = () => fillSlots();
+  f.slotSel.onchange = () => { f.slotOwn.classList.toggle("hidden", f.slotSel.value !== "__own"); if (f.slotSel.value === "__own") f.slotOwn.focus(); };
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const v = Object.fromEntries(new FormData(f)); v.name = v.name.trim(); v.edu_done = f.edu_done.checked; v.need_since ||= null; v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
+    const v = Object.fromEntries(new FormData(f)); v.slot = v.slotSel === "__own" ? v.slotOwn.trim() : v.slotSel; delete v.slotSel; delete v.slotOwn; v.name = v.name.trim(); v.edu_done = f.edu_done.checked; v.need_since ||= null; v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
     const { error } = r ? await sb.from("leaders").update(v).eq("id", r.id) : await sb.from("leaders").insert({ ...v, team_id: LD.team });
     if (fail(error)) return; d.close(); toast(r ? "고쳤어요" : "추가했어요"); LD.load();
   };
@@ -250,7 +263,7 @@ document.addEventListener("dblclick", (e) => {
   const v = V(); if (!v || !v.contains(e.target)) return;
   const c = e.target.closest("[data-f]"), tr = c?.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r || c.querySelector("input")) return;
   const f = c.dataset.f, inp = document.createElement("input");
-  inp.className = "ldin"; inp.value = r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무" }[f] ?? "";
+  inp.className = "ldin"; if (f === "start_day") inp.type = "date"; inp.value = f === "start_day" ? LDC.parseDay(r[f]) ?? "" : r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무" }[f] ?? "";
   c.replaceChildren(inp); inp.focus(); inp.select();
   let done = false;
   const save = async () => {

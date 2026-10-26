@@ -68,3 +68,4 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ag .att small { color: var(--sub); }
 #ldView .att.tdy { outline: 2px solid #E0D120; outline-offset: 1px; }
 #ldView th .agh { display: block; font-size: 10.5px; font-weight: 500; opacity: .85; }
+#ldDlg .slotpick { display: flex; gap: 6px; } #ldDlg .slotpick > * { flex: 1; min-width: 0; } #ldDlg .slotpick .hidden { display: none; }
