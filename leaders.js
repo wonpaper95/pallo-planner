@@ -214,5 +214,15 @@ LD.syncJeonsan = async function (data) {
   if (V() && document.body.classList.contains("ldv")) LD.load();
   return report;
 };
+// 예약 작업용: ① 1회용 표 받기(대표) → 전산 탭이 그 표로 전달함에 넣음 → ② 꺼내서 반영하고 지움
+LD.syncTicket = async () => { const { data, error } = await sb.rpc("leader_sync_ticket"); if (error) throw error; return data; };
+LD.syncInbox = async function (ticket) {
+  const { data, error } = await sb.from("leader_sync_inbox").select("payload").eq("ticket", ticket).maybeSingle();
+  if (error) return { error: error.message }; if (!data?.payload) return { error: "전달함이 비어 있어요 (전산 탭에서 못 넣음)" };
+  if (data.payload.error) return { error: data.payload.error };
+  const report = await LD.syncJeonsan(data.payload);
+  await sb.from("leader_sync_inbox").delete().eq("ticket", ticket);
+  return { 모은시각: data.payload.at, ...report };
+};
 document.addEventListener("change", (e) => { if (e.target.id === "ldTeam") { LD.team = +e.target.value; try { localStorage.setItem("ld-team", LD.team); } catch {} LD.load(); } });
 })();
