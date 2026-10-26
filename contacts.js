@@ -16,8 +16,8 @@ CT.render = function () {
   const row = (r) => `<div class="ctrow" data-id="${r.id}">
       <b>${esc(r.name)}</b><span class="mut">${esc(r.branch)}</span>
       ${r.phone ? `<a href="tel:${tel(r.phone)}">📞 ${esc(r.phone)}</a>` : `<span class="mut">번호 없음</span>`}
-      ${r.note ? `<small class="mut">${esc(r.note)}</small>` : ""}
-      ${admin ? `<button class="btn ghost ctedit" title="고치기">✏️</button><button class="btn ghost ctdel" title="지우기">🗑</button>` : ""}</div>`;
+      ${admin ? `<button class="btn ghost ctedit" title="고치기">✏️</button><button class="btn ghost ctdel" title="지우기">🗑</button>` : ""}
+      ${r.note ? `<small class="mut">${esc(r.note)}</small>` : ""}</div>`; // 메모는 버튼 뒤(줄 끝) — 앞에 두면 버튼이 다음 줄로 밀림
   const sec = (kind) => { const rs = CT.rows.filter((r) => r.kind === kind && hit(r)); return `<section class="ctsec"><h2>${KIND[kind]} <span class="mut">${rs.length}${kind === "branch" ? "곳" : "명"}</span></h2><div class="card">${rs.length ? rs.map(row).join("") : `<div class="mut">없어요</div>`}</div></section>`; };
   const e = CT.edit;
   V().innerHTML = `<div class="ctbar"><h2>📇 전체 연락처</h2><input id="ctQ" placeholder="이름·지점·번호 검색" value="${esc(CT.q)}"><span class="mut">매니저 번호는 대부분 지점 매장 번호예요</span></div>
