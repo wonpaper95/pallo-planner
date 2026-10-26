@@ -56,3 +56,30 @@ function placePop(pop, anchor) {
   pop.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
   pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
 }
+
+// 📷 고정업무 인증샷 (플래너·위젯·확장 공용): 사진 고르기 → 긴 쪽 1280px JPEG 로 줄여 Storage 'routine-photos' 에 올리고 공개 주소 반환
+function pickPhoto() { // 취소하면 null
+  return new Promise((res) => {
+    const inp = Object.assign(document.createElement("input"), { type: "file", accept: "image/*", hidden: true });
+    inp.onchange = () => { res(inp.files[0] || null); inp.remove(); };
+    inp.oncancel = () => { res(null); inp.remove(); };
+    document.body.appendChild(inp); inp.click();
+  });
+}
+async function shrinkImage(file, max = 1280) { // 폰 원본 3~5MB → 200KB 안팎. 못 줄이면(HEIC 등) 원본 그대로
+  try {
+    const bmp = await createImageBitmap(file), s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return (await new Promise((r) => c.toBlob(r, "image/jpeg", 0.82))) || file;
+  } catch { return file; }
+}
+async function uploadRoutinePhoto(sb, file, itemId) {
+  const blob = await shrinkImage(file), jpg = blob !== file;
+  const ext = jpg ? "jpg" : (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${W.ymd(new Date())}/${itemId}-${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from("routine-photos").upload(path, blob, { contentType: jpg ? "image/jpeg" : file.type || "image/jpeg", cacheControl: "31536000" });
+  if (error) throw error;
+  return sb.storage.from("routine-photos").getPublicUrl(path).data.publicUrl;
+}
+const isPhotoLink = (u) => /\/routine-photos\//.test(u || "");

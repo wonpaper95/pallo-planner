@@ -215,3 +215,70 @@ export const STYLE_SCHEMA = {
   required: ["name", "rules"],
   properties: { name: { type: "string" }, rules: { type: "string" } },
 } as const;
+
+// ── 📸 게시물 탭: 사진·주제 → 공통 원고 → 인스타·구글·네이버·당근 ──
+export const SNS_TONES: Record<string, string> = {
+  friendly: "친근한 존댓말 (~해요)",
+  polite: "정중한 존댓말 (~합니다)",
+};
+
+export const SNS_SYSTEM = `너는 성인 외국어 회화 학원 "팔로(Pallo)" 지점의 SNS 담당자다. 매니저가 준 사진·주제로 4개 채널 게시물을 한 번에 만든다.
+
+# 절대 규칙
+1. 사실을 지어내지 않는다. 입력에 없는 수강생, 후기, 점수, 수강료, 날짜, 시간, 정원, 할인·혜택은 쓰지 않는다. 꼭 필요한 자리면 "[확인 필요: 무엇]"으로 남긴다.
+2. 구 브랜드 "컬컴/CULCOM"은 어디에도 쓰지 않는다. 이름이 바뀌었다는 암시도 금지.
+3. 과장·법적 위험 표현 금지: 100%, 무조건, 보장, 1등, 1위, 최고, 최저가, 완벽, 다른 학원 비교·비방.
+4. 사진 속 사람의 이름·나이·직업을 추측해 단정하지 않는다. 보이는 장면만 묘사한다.
+5. 지점명·위치·운영시간·상담 방법은 입력에 있는 값만 쓴다.
+
+# 순서
+먼저 draft(공통 원고): 이 게시물이 전할 핵심 사실·장면·행동 유도를 5~8줄로 쓴다.
+그다음 draft 를 채널마다 그 채널 독자에 맞게 다시 쓴다 (복사·붙여넣기 금지, 채널마다 도입이 달라야 한다).
+
+# instagram
+- caption: 첫 줄 훅(스크롤을 멈추게, 25자 안팎) → 빈 줄 → 본문 6~12줄(한 줄 짧게, 줄 끝 이모지 0~1개) → 행동 유도 1줄(저장·공유·DM 키워드 중 하나). 해시태그는 caption 에 넣지 않는다.
+- hashtags 15~20개. "#" 없이, 띄어쓰기 없이 단어만. 순서: 넓은 지역·주제 → 핵심 타깃 → 이 게시물만의 상황·롱테일 → 브랜드 태그(맨 뒤 1~2개, 입력의 브랜드 태그에서).
+
+# google (구글 비즈니스 프로필 소식)
+- body 600~1,200자, 존댓말, 해시태그·이모지 없음. 첫 문장에 지점명과 동네·과목을 자연스럽게 넣는다. 마지막 줄에 상담 방법.
+- type: 날짜가 정해진 행사면 event, 할인·혜택이면 offer, 그 밖은 standard. 기간·혜택 내용이 입력에 없으면 standard.
+- button: 상담 방법에 전화번호가 있으면 call, 예약 링크면 book, 그 밖은 learn_more.
+
+# naver (네이버 스마트플레이스 소식)
+- title 20자 안팎, body 300~800자. 플레이스를 본 사람이 "지금 상담할 이유"(수업 안내·이번 달 일정·모집)를 바로 알게 쓴다. 해시태그 없음, 이모지 2개 이하.
+- "다른 지점 최근 네이버 소식"이 주어지면 도입·구성·마무리를 다르게 한다 (네이버는 같은 틀에 지점명만 바꾼 글을 스팸으로 본다).
+
+# daangn (당근 비즈프로필 소식)
+- title 25자 안팎, body 200~600자. 동네 이웃에게 말하듯 친근한 존댓말. 동네 이름을 앞세우고(예: 동성로, 삼산동, 옥계동) 위치는 건물·랜드마크 기준으로. 해시태그 없음, 이모지 2개 이하.
+
+# 어투
+입력의 "어투"를 instagram·naver·daangn 에 지킨다. google 은 항상 정중한 존댓말.
+
+# 겹침
+"이 지점 최근 게시물" 주제와 같은 각도로 쓰지 않는다.
+
+self_review: 무엇을 지켰는지, 어디가 [확인 필요]인지 2~3줄.`;
+
+export const SNS_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["draft", "instagram", "google", "naver", "daangn", "self_review"],
+  properties: {
+    draft: { type: "string" },
+    instagram: {
+      type: "object", additionalProperties: false, required: ["caption", "hashtags"],
+      properties: { caption: { type: "string" }, hashtags: { type: "array", items: { type: "string" } } },
+    },
+    google: {
+      type: "object", additionalProperties: false, required: ["body", "type", "button"],
+      properties: {
+        body: { type: "string" },
+        type: { type: "string", enum: ["standard", "event", "offer"] },
+        button: { type: "string", enum: ["none", "call", "book", "learn_more"] },
+      },
+    },
+    naver: { type: "object", additionalProperties: false, required: ["title", "body"], properties: { title: { type: "string" }, body: { type: "string" } } },
+    daangn: { type: "object", additionalProperties: false, required: ["title", "body"], properties: { title: { type: "string" }, body: { type: "string" } } },
+    self_review: { type: "string" },
+  },
+} as const;

@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610261630">
-<meta name="theme-color" content="#191919">
+<meta name="app-version" content="202610261700">
+<meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="theme.js?v=202610260932"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -111,7 +112,9 @@ main { padding: 20px 24px 120px; min-width: 0; }
 #rtStatus .bar { margin: 0; width: 120px; height: 6px; }
 dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .rthead small { color: var(--sub); margin-left: 6px; }
-.rt .carry { color: var(--orange); font-size: 12.5px; } .rt .needlink { color: var(--sub); } .rt .rtlink { flex: none; font-size: 12.5px; color: var(--accent); text-decoration: none; }
+.rt .carry { color: var(--orange); font-size: 12.5px; } .rt .needlink { color: var(--sub); } .rt .rtlink { flex: none; font-size: 12.5px; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.rtthumb { height: 30px; width: 30px; object-fit: cover; border-radius: 5px; vertical-align: middle; }
+.bphotos { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; font-size: 13px; color: var(--sub); } .bphotos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 .rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .rtrow input[type=text] { width: 100%; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
 .rtrow select { padding: 5px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
@@ -242,9 +245,11 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg div { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; max-width: 100%; overflow-x: auto; }
 .seg button { padding: 7px 26px; border-radius: 8px; font-weight: 600; color: var(--sub); }
 @media (max-width: 560px) { .seg button { padding: 7px 12px; white-space: nowrap; } } /* 탭 7개(현황은 대표만) → 폰에서 한 줄, 넘치면 .seg div 안에서만 가로 스크롤 */
+.seg button { position: relative; user-select: none; }
+.seg button.dragging { z-index: 2; background: var(--hover); color: var(--text); box-shadow: 0 6px 16px rgba(0,0,0,.45); scale: 1.06; cursor: grabbing; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -325,7 +330,7 @@ body:not(.sv) #salesView { display: none; }
 .bcard li.yes { color: var(--sub); } .bcard li.carry { color: var(--orange); } .bcard li a { color: var(--accent); text-decoration: none; white-space: nowrap; }
 .bcard details summary { cursor: pointer; color: var(--sub); font-size: 13px; margin-top: 10px; }
 @media (max-width: 860px) { .bgrid { grid-template-columns: 1fr; } #boardView { padding: 10px 10px 80px; }
-  #fbBtn .lbl, #consultBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
+  #fbBtn .lbl, #consultBtn .lbl, #themeBtn .lbl { display: none; } #boardView .bhead { flex-wrap: wrap; } #boardView .bhead h2 { font-size: 20px; } .bmode { margin-left: 0; } }
 body:not(.mv) #monthView { display: none; }
 body:not(.tv) #teamView { display: none; }
 .mview { max-width: 1400px; margin: 0 auto; padding: 16px 20px 80px; }
@@ -352,6 +357,21 @@ body:not(.tv) #teamView { display: none; }
   .mgrid .pill { color: #4b2fa8; } .mgrid .pill.dl { color: #c4281c; } .mgrid .pill.dl.soon { color: #a35a00; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
+#somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav) #somedayView { display: block; }
+body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
+@media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
+#somedayView details { border-top: 1px solid var(--line); padding-top: 10px; }
+#somedayView summary { cursor: pointer; font-weight: 700; font-size: 17px; list-style: none; }
+#somedayView summary small { color: var(--sub); font-weight: 400; font-size: 13px; margin-left: 4px; }
+#somedayView #sdForm { display: flex; gap: 8px; margin: 10px 0 4px; }
+#somedayView #sdForm input { flex: 1; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+#somedayView .sdrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+#somedayView .sdrow .ttl { flex: 1; min-width: 0; line-height: 1.5; }
+#somedayView .sdrow.done .ttl { color: var(--sub); text-decoration: line-through; }
+#somedayView .sdcal { position: relative; cursor: pointer; font-size: 16px; }
+#somedayView .sdcal input { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
+#somedayView .sddel { color: var(--sub); font-size: 15px; } #somedayView .sddel:hover { color: var(--red); }
 .mview.wcal { display: block; padding: 8px 0 0; margin-top: 10px; border-top: 1px solid var(--line); }
 .wcal .mh h1 { font-size: 26px; }
 .wcal .mgrid .dc { min-height: 110px; }
@@ -413,8 +433,14 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202610242009">
-<link rel="stylesheet" href="marketing.css?v=202610261630">
+<link rel="stylesheet" href="blog.css?v=202610260633">
+<link rel="stylesheet" href="photo.css?v=202610260633">
+<link rel="stylesheet" href="post.css?v=202610260633">
+<link rel="stylesheet" href="marketing.css?v=202610261700">
+<link rel="stylesheet" href="contacts.css?v=202610260633">
+<link rel="stylesheet" href="links.css?v=202610260633">
+<link rel="stylesheet" href="qna.css?v=202610260633">
+<link rel="stylesheet" href="glass.css?v=202610261000">
 </head>
 <body>
 
@@ -438,13 +464,14 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <span id="previewBar" class="hidden" style="padding:2px 10px;border-radius:99px;background:var(--orange);color:#fff;font-size:12px;font-weight:600;cursor:pointer" title="누르면 대표 화면으로">👀 매니저 화면 미리보기 중 · 끄기</span>
     <span id="me"></span>
     <button id="todayBtn" class="btn ghost">오늘</button>
+    <button id="themeBtn" class="btn ghost" title="화면 모드">🌗<span class="lbl"> 자동</span></button>
     <a id="consultBtn" class="btn ghost" href="https://magical-buttercream-d5b901.netlify.app/" target="_blank" rel="noopener" title="상담 녹음·AI 피드백 (새 탭)" style="text-decoration:none">🎙️<span class="lbl"> 상담 AI</span></a>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
     <main>
@@ -471,11 +498,16 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     </main>
   </div>
   <section class="mview" id="monthView"></section>
+  <section id="somedayView"></section>
   <section id="teamView"></section>
   <section id="boardView"></section>
   <section id="salesView"></section>
   <section id="blogView"></section>
   <section id="mkView"></section>
+  <section id="lkView"></section>
+  <section id="qaView"></section>
+  <section id="ctView"></section>
+  <section id="postView"></section>
 </div>
 
 <dialog id="fbDlg" class="wide"><h3 style="margin:0 0 4px">🐞 버그 신고 · 💡 개선 제안</h3>
@@ -552,11 +584,18 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610242009"></script>
-<script src="week.js?v=202610242009"></script>
-<script src="pick.js?v=202610242009"></script>
+<script src="config.js?v=202610260932"></script>
+<script src="week.js?v=202610260932"></script>
+<script src="pick.js?v=202610260932"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+{ // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
+  const RO = { data: null, error: { message: "👀 매니저 화면 보기 중엔 보기만 돼요" } };
+  const stub = () => { const q = { then: (ok) => ok(RO) }; for (const m of ["select", "single", "maybeSingle", "eq", "in", "order", "limit"]) q[m] = () => q; return q; };
+  const from0 = sb.from.bind(sb), rpc0 = sb.rpc.bind(sb);
+  sb.from = (t) => { const q = from0(t); if (previewUser && (t === "tasks" || t === "someday")) for (const m of ["insert", "update", "delete", "upsert"]) q[m] = stub; return q; };
+  sb.rpc = (f, a) => previewUser && ["set_routine_done", "timer", "set_team_task_done", "move_assigned"].includes(f) ? stub() : rpc0(f, a);
+}
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -573,7 +612,8 @@ function fail(error) { if (error) { console.error(error); toast("저장 실패: 
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 
 // ── 이름·역할 (대표만 업무 배정) ──
-let myRole = "manager", myPhone = "", myName = "", kakaoMe = false, kakaoSender = null, isBoss = false, previewTeam = null; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀
+let myRole = "manager", myPhone = "", myName = "", kakaoMe = false, kakaoSender = null, isBoss = false, previewTeam = null, previewUser = null, previewName = ""; // previewTeam: 대표가 '매니저 화면으로 보기' 켠 팀 / previewUser: 특정 매니저 화면 그대로(보기만)
+const uid = () => previewUser ?? me.id; // 할 일·브리핑·통계는 이 사람 기준
 const inTeam = (list) => previewTeam ? list.filter((x) => x.team_id === previewTeam) : list; // 미리보기: 그 팀 것만
 const KAKAO = false; // 카톡 알림톡(솔라피) 켜면 true → 번호 칸·팀 탭 📱 표시 (10-21: 폰 푸시로 운영 결정)
 async function loadProfile() {
@@ -581,17 +621,19 @@ async function loadProfile() {
   if (!data) { await pickName(); ({ data } = await sb.from("profiles").select("name, role, phone, temp_pw").eq("user_id", me.id).single()); }
   if (data.temp_pw) openPwDlg(true);
   isBoss = data.role === "admin";
-  try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; } catch {}
-  myRole = previewTeam ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
+  try { previewTeam = isBoss ? +localStorage.getItem("planner-preview") || null : null; previewUser = isBoss ? localStorage.getItem("planner-preview-user") || null : null; } catch {}
+  if (previewUser) { const { data: pu } = await sb.from("profiles").select("name, team_id").eq("user_id", previewUser).maybeSingle(); if (pu) { previewTeam = pu.team_id; previewName = pu.name; } else previewUser = null; }
+  myRole = previewTeam || previewUser ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
   if (isBoss) loadFeedback(); // 🐞 처리 전 개수 배지
   if (isBoss) { const k = (await sb.rpc("kakao_status")).data?.[0]; kakaoMe = !!k?.me; kakaoSender = k?.sender ? (k.receiver || "연결됨") : null; } // 💬 카톡 연결 상태
-  $("#previewBar").classList.toggle("hidden", !previewTeam);
-  if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
+  $("#previewBar").classList.toggle("hidden", !previewTeam && !previewUser);
+  if (previewUser) $("#previewBar").textContent = `👀 ${previewName}(${teams.find((x) => x.id === previewTeam)?.name ?? "지점 없음"}) 화면 그대로 보는 중 · 끄기`;
+  else if (previewTeam) $("#previewBar").textContent = `👀 ${teams.find((x) => x.id === previewTeam)?.name ?? ""} 매니저 화면 미리보기 · 끄기`;
 }
-$("#previewBar").onclick = () => { try { localStorage.removeItem("planner-preview"); } catch {} location.reload(); };
+$("#previewBar").onclick = () => { try { localStorage.removeItem("planner-preview"); localStorage.removeItem("planner-preview-user"); } catch {} location.reload(); };
 // 처음 가입: 명단에서 내 이름 고르기 → 지점 팀까지 자동 (직접 입력 없음)
 function pickName() {
   return new Promise((done) => {
@@ -629,10 +671,16 @@ async function boot() {
   applyPrefs();
   await loadProfile();
   await loadAll(true);
+  window.SD?.load(); // 🌱 언젠가 할 일
   if (view === "team") loadTeam(); // 팀 탭에서 새로고침했을 때
   if (view === "sales") window.SL?.load();
   if (view === "blog") window.BL?.load();
   if (view === "mk") window.MK?.load();
+  if (view === "post") window.PS?.load();
+  if (view === "links") window.LK?.load();
+  if (view === "qna") window.QA?.load();
+  window.QA?.badge(); // 💬 대표: 확인할 것 개수
+  if (view === "ct") window.CT?.load();
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -687,11 +735,11 @@ async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
   const [t, d, s, m, tt] = await Promise.all([
-    sb.from("tasks").select("*").eq("user_id", me.id).gte("day", monday).lte("day", sun).order("sort").order("id"),
-    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", me.id).eq("done", false).not("deadline", "is", null)
+    sb.from("tasks").select("*").eq("user_id", uid()).gte("day", monday).lte("day", sun).order("sort").order("id"),
+    sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", uid()).eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
-    sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) }),
-    sb.from("tasks").select("id, day, title").eq("user_id", me.id).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
+    sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser }),
+    sb.from("tasks").select("id, day, title").eq("user_id", uid()).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
     myRole === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: monday, p_to: sun }),
   ]);
   if (fail(t.error || d.error || s.error || m.error || tt.error)) return;
@@ -708,6 +756,8 @@ async function loadAll(scrollToday) {
 // ── 📌 고정업무: 대표가 정한 목록 중 오늘 요일·주차에 해당하는 것만, 순서대로 ──
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
+// 체크에 붙은 🔗 링크 / 📷 인증샷 주소 → 열리는 글자(thumb 면 작은 사진)
+const lkA = (u, cls = "", thumb = false) => !u ? "" : `<a class="${cls}" href="${esc(u)}" target="_blank" rel="noopener">${isPhotoLink(u) ? `${thumb ? `<img class="rtthumb" src="${esc(u)}" alt="">` : ""}📷 인증샷` : "🔗 링크"}</a>`;
 async function loadRoutine() {
   const day = today(), isToday = true, future = false;
   if (rtWk.open) renderRtWeek();
@@ -739,8 +789,8 @@ async function loadRoutine() {
   const row = (it, ck, from) => { const at = ck && new Date(ck.done_at);
     return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" data-day="${from ?? day}" ${ck ? "checked" : ""} ${future ? "disabled" : ""}>`
       + `${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}`
-      + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : ""}</span>`
-      + `${ck?.link ? `<a class="rtlink" href="${esc(ck.link)}" target="_blank" rel="noopener">🔗 링크</a>` : ""}</label>`; };
+      + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small class="needlink">📷 인증샷 올리면 완료</small>` : it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : ""}</span>`
+      + `${lkA(ck?.link, "rtlink", true)}</label>`; };
   $("#rtList").innerHTML = carried.map((x) => row(x.it, null, x.from)).join("") + mine.map((it) => row(it, routineChecks.get(it.id))).join("")
     + (mine.length && done === mine.length ? `<div class="rtdone">${isToday ? "🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요" : "🎉 이날 고정업무를 모두 끝냈어요"}</div>` : "");
   $("#rtStatus").innerHTML = "";
@@ -772,7 +822,7 @@ async function routineWeekTable(mon, team) {
   return rows.length ? `<div class="rtw"><table>${th}${rows.map((it) => `<tr><td class="t">${esc(it.title)}</td>${days.map((d, i) => {
     if (!applies(it, d)) return `<td class="c x"></td>`;
     const c = maps[i].get(it.id);
-    if (c) return `<td class="c y" title="${esc(c.done_name ?? "")} ${hhmm(c.done_at)}">✓ ${esc(c.done_name ?? "")}<br>${hhmm(c.done_at)}${c.link ? ` <a href="${esc(c.link)}" target="_blank" rel="noopener">🔗</a>` : ""}</td>`;
+    if (c) return `<td class="c y" title="${esc(c.done_name ?? "")} ${hhmm(c.done_at)}">✓ ${esc(c.done_name ?? "")}<br>${hhmm(c.done_at)}${c.link ? ` <a href="${esc(c.link)}" target="_blank" rel="noopener">${isPhotoLink(c.link) ? "📷" : "🔗"}</a>` : ""}</td>`;
     return d > td ? `<td class="c f">·</td>` : d < RT_START ? `<td class="c f" title="공용 고정업무 시작 전">–</td>` : d < td ? `<td class="c n">✗</td>` : `<td class="c">☐</td>`; }).join("")}</tr>`).join("")}</table></div>`
     : `<div style="color:var(--sub);font-size:14px">이 주에는 고정업무가 없어요</div>`;
 }
@@ -795,13 +845,18 @@ async function renderRtWeek() {
 }
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
-  let link = null;
-  if (e.target.checked && routine.find((x) => x.id === id)?.need_link) { // 🔗 링크를 올려야 완료 (예: 네이버 블로그)
+  const it = routine.find((x) => x.id === id), on = e.target.checked; let link = null;
+  if (on && it?.need_photo) { // 📷 인증샷을 올려야 완료 (예: 쓰레기 버리고 인증샷) — 사진 고르기(폰은 카메라/앨범) → 업로드 → 체크
+    e.target.checked = false;
+    const f = await pickPhoto(); if (!f) return toast("인증샷을 올려야 완료돼요");
+    toast("📷 인증샷 올리는 중…");
+    try { link = await uploadRoutinePhoto(sb, f, id); } catch (err) { return fail(err); }
+  } else if (on && it?.need_link) { // 🔗 링크를 올려야 완료 (예: 네이버 블로그)
     link = (prompt("작성한 글의 링크를 붙여넣어 주세요\n(예: https://blog.naver.com/...)") || "").trim();
     if (!/^https?:\/\/\S+$/i.test(link)) { e.target.checked = false; return toast(link ? "https:// 로 시작하는 주소를 넣어 주세요" : "링크를 올려야 완료돼요"); }
   }
-  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: e.target.checked, p_team: previewTeam, p_link: link });
-  if (fail(error)) e.target.checked = !e.target.checked;
+  const { error } = await sb.rpc("set_routine_done", { p_item: id, p_day: e.target.dataset.day || today(), p_done: on, p_team: previewTeam, p_link: link });
+  if (fail(error)) e.target.checked = !on;
   loadRoutine();
 });
 // 대표: 고정업무 편집기
@@ -813,7 +868,7 @@ function renderRtEditor() {
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
-    <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button></div>
+    <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button><button data-tg="need_photo" class="${it.need_photo ? "on" : ""}" title="사진(인증샷)을 올려야 완료" style="width:auto;padding:0 6px">📷 인증샷</button></div>
     <button data-rm title="삭제">✕</button></div>`).join("");
 }
 async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
@@ -832,7 +887,7 @@ $("#rtRows").addEventListener("click", async (e) => {
     if (!days.length) return toast("요일을 하나 이상 골라 주세요");
     return rtSave(id, { days });
   }
-  if (e.target.dataset.tg) return rtSave(id, { [e.target.dataset.tg]: !it[e.target.dataset.tg] }); // ↪ 넘김 · 🔗 링크 필수
+  if (e.target.dataset.tg) return rtSave(id, { [e.target.dataset.tg]: !it[e.target.dataset.tg] }); // ↪ 넘김 · 🔗 링크 필수 · 📷 인증샷 필수
   if (e.target.dataset.mv) { // 위·아래 이웃과 sort 교환
     const o = routine[i + +e.target.dataset.mv]; if (!o) return;
     await sb.from("routine_items").update({ sort: o.sort }).eq("id", it.id);
@@ -912,6 +967,7 @@ async function loadBoard() {
     const mem = p.data.filter((x) => x.team_id === tm.id && x.role === "manager"), ids = new Set(mem.map((x) => x.user_id));
     const done = todays.filter((it) => checks.has(it.id)), left = todays.filter((it) => !checks.has(it.id));
     const last = [...checks.values()].sort((x, y) => new Date(y.done_at) - new Date(x.done_at))[0];
+    const photos = todays.map((it) => checks.get(it.id)).filter((ck) => ck && isPhotoLink(ck.link)); // 📷 오늘 올린 인증샷
     const all = todays.length && !left.length, pct = todays.length ? Math.round((done.length / todays.length) * 100) : 0;
     const tt = k.data.filter((x) => x.team_id === tm.id), asg = a.data.filter((x) => ids.has(x.user_id));
     const who = (uid) => mem.find((m) => m.user_id === uid)?.name ?? "";
@@ -919,12 +975,13 @@ async function loadBoard() {
       <div class="bh"><b>${esc(tm.name)}</b><span class="mem">${esc(mem.map((m) => m.name).join("·") || "매니저 없음")}</span><span class="pct">${all ? "🎉 " : ""}${done.length}/${todays.length}</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="bsub">${last ? `마지막 체크 ${esc(last.done_name ?? "")} ${hhmm(last.done_at)}` : "아직 체크 없음"}${all ? " · 오늘 고정업무 끝" : ""}</div>
-      ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}</li>`).join("")}</ul>` : ""}
+      ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
+      ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
       ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${done.length ? `<details><summary>완료한 고정업무 ${done.length}개 보기</summary><ul>${done.map((it) => { const ck = checks.get(it.id);
-        return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)}${ck.link ? ` <a href="${esc(ck.link)}" target="_blank" rel="noopener">🔗 링크</a>` : ""}</li>`; }).join("")}</ul></details>` : ""}
+        return `<li class="yes"><span class="w">✓ ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}</span>${esc(it.title)} ${lkA(ck.link, "", true)}</li>`; }).join("")}</ul></details>` : ""}
     </div>`;
   });
   const d = W.parse(day), sales = await SL.boardCards(t.data);
@@ -1079,7 +1136,7 @@ function briefPanelHtml(day) {
   return `<div class="briefText">${esc(b.data.text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}<span class="at">${md(W.ymd(at))} ${pad(at.getHours())}:${pad(at.getMinutes())}에 받은 ${md(day)} 브리핑 · 날짜마다 한 번</span></div>`;
 }
 async function loadBrief() { // 보이는 주의 브리핑
-  const { data } = await sb.from("briefs").select("day, text, created_at").gte("day", monday).lte("day", W.add(monday, 6));
+  const { data } = await sb.from("briefs").select("day, text, created_at").eq("user_id", uid()).gte("day", monday).lte("day", W.add(monday, 6));
   for (const r of data ?? []) bOf(r.day).data = r;
   renderWeek();
 }
@@ -1100,7 +1157,7 @@ async function briefClick(day) {
 
 async function loadCal() {
   const d1 = `${cal.y}-${String(cal.m).padStart(2, "0")}-01`, a = W.add(d1, -7), b = W.add(d1, 43); // 월·일요일 시작 칸 둘 다 덮음
-  const { data, error } = await sb.from("tasks").select("*").eq("user_id", me.id)
+  const { data, error } = await sb.from("tasks").select("*").eq("user_id", uid())
     .or(`and(day.gte.${a},day.lte.${b}),and(deadline.gte."${W.parse(a).toISOString()}",deadline.lt."${W.parse(b).toISOString()}")`)
     .order("sort").order("id").limit(2000);
   if (fail(error)) return;
@@ -1115,10 +1172,11 @@ function softReload() {
   clearTimeout(reloadT); reloadT = setTimeout(() => loadAll(false), 300);
 }
 function listen() {
-  sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, softReload).subscribe();
+  sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${uid()}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
+  sb.channel("qna").on("postgres_changes", { event: "*", schema: "public", table: "qna_items" }, () => window.QA?.remote()).subscribe(); // 💬 질문·확정 바로 반영
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? loadTeam() : softReload(); boardSoon(); }).subscribe();
   sb.channel("sales").on("postgres_changes", { event: "*", schema: "public", table: "sales_plans" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
@@ -1189,17 +1247,21 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
   if (v === "blog" && me && window.BL) BL.load();
   if (v === "mk" && me && window.MK) MK.load();
+  if (v === "post" && me && window.PS) PS.load();
+  if (v === "links" && me && window.LK) LK.load();
+  if (v === "qna" && me && window.QA) QA.load();
+  if (v === "ct" && me && window.CT) CT.load();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   try { localStorage.setItem("planner-view", v); } catch {}
   window.scrollTo(0, 0);
 }
-document.querySelector(".seg").onclick = (e) => e.target.dataset.v && setView(e.target.dataset.v);
+document.querySelector(".seg").onclick = (e) => !dragged && e.target.dataset.v && setView(e.target.dataset.v);
 setView(view);
 $("#weekList").onclick = (e) => {
   if (e.target.id === "py" || e.target.id === "ny") { year += e.target.id === "py" ? -1 : 1; monday = W.weeksOf(year)[0]; return loadAll(); }
@@ -1268,13 +1330,50 @@ function openPop(anchor, t, kind) {
 const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
-function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); }
+function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); applyTabOrder(); }
+async function savePrefs(next) {
+  me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
+  const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
+  if (!fail(error)) me = data.user;
+}
+// 탭 순서: 탭을 끌어다 놓으면 바뀌고 계정(prefs.tabs)에 저장 → 폰·노트북 같이 적용. 터치 끌기는 안 됨(노트북에서 바꾸면 폰도 따라옴)
+const segBox = document.querySelector(".seg div");
+function applyTabOrder() { const o = prefs().tabs; if (!Array.isArray(o)) return; const bs = [...segBox.children]; for (const v of o) { const b = bs.find((x) => x.dataset.v === v); if (b) segBox.appendChild(b); } }
+// 끌기: 누른 채 움직이면 버튼이 손을 따라오고, 지나친 탭은 스르륵 비켜줌(FLIP). 놓으면 제자리에 붙고 저장. 마우스·펜만(터치는 가로 스크롤과 겹쳐서 안 함)
+let dt = null, dragged = false; // dt: {b, grab, from}
+const slide = (b, dx) => { if (!dx) return; b.style.transition = "none"; b.style.transform = `translateX(${dx}px)`; requestAnimationFrame(() => { b.style.transition = "transform .18s"; b.style.transform = ""; }); };
+const placeDragged = (x) => { // 손 위치 기준으로 옮기고, 비켜난 이웃은 FLIP
+  const b = dt.b; b.style.transform = ""; const base = b.getBoundingClientRect(); const mid = x - dt.grab + base.width / 2;
+  for (let n = 0; n < 9; n++) { // 휙 끌어도 지나친 탭을 전부 비켜 줌
+    const prev = b.previousElementSibling, next = b.nextElementSibling;
+    if (prev && mid < prev.getBoundingClientRect().left + prev.offsetWidth / 2) { const l = prev.getBoundingClientRect().left; prev.before(b); slide(prev, l - prev.getBoundingClientRect().left); }
+    else if (next && mid > next.getBoundingClientRect().left + next.offsetWidth / 2) { const l = next.getBoundingClientRect().left; next.after(b); slide(next, l - next.getBoundingClientRect().left); }
+    else break;
+  }
+  b.style.transform = `translateX(${x - dt.grab - b.getBoundingClientRect().left}px)`;
+};
+segBox.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (!b || e.button || e.pointerType === "touch") return; dt = { b, grab: e.clientX - b.getBoundingClientRect().left, x0: e.clientX, from: [...segBox.children].map((x) => x.dataset.v) }; });
+segBox.addEventListener("pointermove", (e) => {
+  if (!dt) return;
+  if (!dragged) { if (Math.abs(e.clientX - dt.x0) < 5) return; dragged = true; dt.b.classList.add("dragging"); dt.b.style.transition = "none"; segBox.setPointerCapture(e.pointerId); }
+  placeDragged(e.clientX);
+});
+const dropTab = () => {
+  if (!dt) return; const { b, from } = dt; dt = null;
+  if (!dragged) return;
+  b.style.transition = "transform .15s"; b.style.transform = ""; b.classList.remove("dragging"); setTimeout(() => { dragged = false; b.style.transition = ""; }, 0); // 놓은 직후 click 은 무시
+  const to = [...segBox.children].map((x) => x.dataset.v);
+  if (to.join() !== from.join()) savePrefs({ ...prefs(), tabs: to }).then(() => toast("탭 순서를 저장했어요"));
+};
+segBox.addEventListener("pointerup", dropTab); segBox.addEventListener("pointercancel", dropTab);
+let pplCache = null; // 👀 매니저 목록(대표만, 처음 열 때 한 번)
 function openPrefs(anchor) {
   const pop = $("#pop");
+  if (isBoss && !pplCache) sb.rpc("team_people").then(({ data }) => { pplCache = data ?? []; if (popFor?.kind === "prefs") openPrefs(anchor); });
   pop.innerHTML = `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
     `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
-    + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option>${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</select></label>`)
+    + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option><optgroup label="지점 매니저 화면(내 할 일 기준)">${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${!previewUser && previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</optgroup><optgroup label="매니저 화면 그대로 (보기만)">${(pplCache ?? []).filter((x) => x.role !== "admin").map((x) => `<option value="u:${x.user_id}" ${previewUser === x.user_id ? "selected" : ""}>${esc(x.name)} · ${esc(teams.find((t) => t.id === x.team_id)?.name ?? "지점 없음")}</option>`).join("")}</optgroup></select></label>`)
     + (!isBoss ? "" : `<div class="tg" style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">💬 카톡으로도 받기${kakaoMe
       ? `<span style="color:var(--green)">연결됨 ✓ <button id="kakaoOff" style="color:var(--sub);font-size:12px;margin-left:6px">끊기</button></span>`
       : `<button id="kakaoOn" style="color:var(--accent);font-weight:600">연결하기</button>`}</div>
@@ -1298,7 +1397,7 @@ $("#pop").addEventListener("change", async (e) => {
     myName = e.target.value.trim(); $("#me").textContent = `${myName} · ${me.email}`; toast("✏️ 이름을 바꿨어요");
     return;
   }
-  if (e.target.id === "previewSel") { try { localStorage.setItem("planner-preview", e.target.value); } catch {} return location.reload(); }
+  if (e.target.id === "previewSel") { const v = e.target.value; try { localStorage.removeItem("planner-preview"); localStorage.removeItem("planner-preview-user"); if (v.startsWith("u:")) localStorage.setItem("planner-preview-user", v.slice(2)); else if (v) localStorage.setItem("planner-preview", v); } catch {} return location.reload(); }
   if (e.target.id === "myPhone") { // 카톡 알림톡 받을 번호
     const v = e.target.value.replace(/\D/g, "");
     if (v && !/^01\d{8,9}$/.test(v)) return toast("휴대폰 번호를 확인해 주세요 (예: 01012345678)");
@@ -1308,9 +1407,7 @@ $("#pop").addEventListener("change", async (e) => {
   }
   const k = e.target.dataset.pref; if (!k) return;
   const next = { ...prefs(), [k]: e.target.checked };
-  me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
-  const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
-  if (!fail(error)) me = data.user;
+  await savePrefs(next);
 });
 const closePop = () => { $("#pop").classList.add("hidden"); popFor = null; };
 $("#pop").onclick = async (e) => {
@@ -1476,7 +1573,7 @@ $("#days").addEventListener("focusout", async (e) => {
 });
 async function bumpStats() { // 주 목록 % 만 다시
   const weeks = W.weeksOf(year);
-  const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6) });
+  const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser });
   if (data) renderWeeks(Object.fromEntries(data.map((x) => [x.start, x])));
 }
 $("#mustList").onclick = $("#dueList").onclick = (e) => {
@@ -1715,10 +1812,17 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610242009"></script>
-<script src="blog.js?v=202610242009"></script>
-<script src="mk-core.js?v=202610242130"></script>
-<script src="mkc-core.js?v=202610261630"></script>
-<script src="marketing.js?v=202610261630"></script>
+<script src="sales.js?v=202610260932"></script>
+<script src="photo.js?v=202610260932"></script>
+<script src="blog.js?v=202610260932"></script>
+<script src="mk-core.js?v=202610260932"></script>
+<script src="mkc-core.js?v=202610261700"></script>
+<script src="marketing.js?v=202610261700"></script>
+<script src="sns-core.js?v=202610260932"></script>
+<script src="post.js?v=202610260932"></script>
+<script src="someday.js?v=202610260932"></script>
+<script src="contacts.js?v=202610260932"></script>
+<script src="links.js?v=202610260932"></script>
+<script src="qna.js?v=202610260932"></script>
 </body>
 </html>

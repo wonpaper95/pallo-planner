@@ -1,0 +1,104 @@
+/* 🫧 리퀴드 글래스 테마 (10-26 시안 B) — 마지막에 불러서 index.html·탭별 css 의 색만 덮어씀.
+   다크/라이트는 html[data-theme] (theme.js 가 기기 설정 또는 🌗 버튼 선택으로 정함). 색은 전부 아래 변수 → 모드 추가는 변수만 바꾸면 됨. */
+:root {
+  --bg: #0b0a14; --panel: rgba(255,255,255,.065); --line: rgba(255,255,255,.11); --hover: rgba(255,255,255,.09);
+  --text: #fff; --sub: rgba(255,255,255,.58); --accent: #a58cf0; --yellow: #e0d120; --onyel: #1a1600;
+  --blue: #5e9bff; --red: #ff6b61; --orange: #ffad4a; --green: #45d6a0;
+  --edge: rgba(255,255,255,.14); --hi: inset 0 1px 0 rgba(255,255,255,.12); --shadow: 0 8px 30px rgba(0,0,0,.18);
+  --bar: rgba(14,12,26,.5); --glass: rgba(24,21,40,.55); --float: rgba(26,23,44,.8); --mob: rgba(11,10,20,.82);
+  --fill: rgba(255,255,255,.07); --on: rgba(255,255,255,.17); --ckb: rgba(255,255,255,.38); --rowhov: rgba(255,255,255,.04);
+  --glow1: #49308788; --glow2: #2b3fbf66; --glow3: #e0d1202a;
+  --t-red: #ff8a80; --t-ora: #ffc274; --t-blue: #a8c8ff; --t-green: #7ee8bb; --t-yel: #f1e45a; --t-pur: #d6c9ff;
+  color-scheme: dark;
+}
+:root[data-theme=light] {
+    --bg: #f3f1f9; --panel: rgba(255,255,255,.62); --line: rgba(60,50,90,.1); --hover: rgba(73,48,135,.06);
+    --text: #1d1d1f; --sub: rgba(60,60,67,.62); --accent: #493087;
+    --blue: #0a6cff; --red: #e5302a; --orange: #d97a00; --green: #12a06b;
+    --edge: rgba(255,255,255,.9); --hi: inset 0 1px 0 #fff; --shadow: 0 8px 28px rgba(73,48,135,.08), 0 1px 2px rgba(0,0,0,.04);
+    --bar: rgba(248,246,253,.62); --glass: rgba(255,255,255,.6); --float: rgba(252,251,255,.86); --mob: rgba(246,244,251,.88);
+    --fill: rgba(118,118,128,.1); --on: #fff; --ckb: rgba(60,60,67,.3); --rowhov: rgba(73,48,135,.04);
+    --glow1: #8b6fd640; --glow2: #6c8cff38; --glow3: #e0d12038;
+    --t-red: #d70015; --t-ora: #b35c00; --t-blue: #0057d9; --t-green: #0a7f55; --t-yel: #7a6c00; --t-pur: #493087;
+    color-scheme: light;
+}
+[data-theme=light] .seg div, [data-theme=light] .tcard, [data-theme=light] .card { border-color: rgba(60,50,90,.08); }
+[data-theme=light] .btn.ghost { border-color: rgba(60,50,90,.1); }
+[data-theme=light] .seg button.on { box-shadow: 0 3px 8px rgba(0,0,0,.1), 0 1px 1px rgba(0,0,0,.04); }
+/* 바탕 빛번짐: 고정 레이어 하나 (iOS 는 background-attachment: fixed 안 먹음) */
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(55% 40% at 8% 0%, var(--glow1), transparent 70%), radial-gradient(45% 38% at 100% 25%, var(--glow2), transparent 70%),
+    radial-gradient(40% 30% at 35% 100%, var(--glow3), transparent 70%), var(--bg); }
+html { background: var(--bg); } body { background: transparent; } /* body 바탕이 있으면 빛번짐 레이어를 덮음 */
+::selection { background: #8b6fd666; }
+
+/* 떠 있는 유리: 상단 바·탭·팝업·대화창 (블러는 여기만 — 카드까지 켜면 폰이 무거움) */
+header, .seg { background: var(--bar); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); border-bottom: 1px solid var(--line); }
+.seg { border-bottom: 0; }
+.seg div { background: var(--glass); border: 1px solid var(--edge); border-radius: 99px; padding: 4px; box-shadow: 0 10px 30px rgba(0,0,0,.18), var(--hi); scrollbar-width: none; }
+.seg div::-webkit-scrollbar { display: none; }
+.seg button { border-radius: 99px; font-weight: 500; }
+.seg button.on { background: var(--on); color: var(--text); font-weight: 600; box-shadow: var(--hi); }
+.seg button.dragging { background: var(--on); }
+dialog, .pop, #slDlg { background: var(--float); -webkit-backdrop-filter: blur(36px) saturate(180%); backdrop-filter: blur(36px) saturate(180%); border: 1px solid var(--edge); border-radius: 22px; box-shadow: 0 24px 60px rgba(0,0,0,.3), var(--hi); }
+dialog::backdrop { background: rgba(5,4,12,.45); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.drag-ghost { background: var(--float); border-radius: 12px; }
+#toast { background: var(--float); color: var(--text); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--edge); border-radius: 99px; box-shadow: var(--shadow); }
+@media (max-width: 860px) { aside { background: var(--mob); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); } }
+
+/* 카드: 반투명 + 윗줄 하이라이트 */
+#routinebox, #assignbox, #mustbox, #duebox, .tcard, .slcard, .slkpi, .bcard, .card, #briefText, .briefText, .rows, #somedayView details {
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 20px; box-shadow: var(--hi), var(--shadow); }
+#routinebox, #assignbox, #mustbox, #duebox { padding: 12px 16px; }
+#mustbox { border-color: color-mix(in srgb, var(--red) 40%, transparent); } #assignbox { border-color: color-mix(in srgb, var(--blue) 35%, transparent); }
+.bcard.ok { border-color: color-mix(in srgb, var(--green) 55%, transparent); }
+.rows { padding: 2px 12px; } .row:last-child { border-bottom: 0; } .row:hover { background: var(--rowhov); border-radius: 10px; }
+#somedayView details { padding: 12px 16px; }
+#routinebox summary .rtnav.wk { width: auto; } #routinebox summary button { white-space: nowrap; flex: none; }
+
+/* 버튼 */
+.btn { background: var(--yellow); color: var(--onyel); border-radius: 99px; }
+.btn.ghost { background: var(--fill); color: var(--text); border: 1px solid var(--edge); box-shadow: var(--hi); }
+.day h3 { flex-wrap: wrap; row-gap: 4px; } .briefBtn { white-space: nowrap; }
+.briefBtn { background: linear-gradient(90deg, #8b6fd6, #5b3fb0); border: 1px solid rgba(255,255,255,.2); color: #fff; }
+.mh .navs button { background: var(--fill); border: 1px solid var(--edge); }
+
+/* 둥근 체크 (할 일·고정업무·팀·언젠가) */
+.row input[type=checkbox], .rt input, .titem input, #somedayView .sdrow input[type=checkbox] {
+  appearance: none; -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--ckb); background: transparent; display: inline-grid; place-items: center; cursor: pointer; flex: none; }
+.row input[type=checkbox]:checked, .rt input:checked, .titem input:checked, #somedayView .sdrow input[type=checkbox]:checked {
+  background: var(--yellow) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%231a1600' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat;
+  border-color: var(--yellow); box-shadow: 0 0 10px #e0d12066; }
+
+/* 오늘·진행 막대 */
+.day.today h3 .pill { background: var(--yellow); color: var(--onyel); } .day.today h3 > span:first-child { color: var(--t-yel); }
+.day h3 { font-weight: 700; letter-spacing: -.01em; }
+.weekhead h1, .mh h1 { letter-spacing: -.025em; }
+.bar, .day h3 .dbar { background: var(--line); }
+.bar i, .day h3 .dbar i, .rtbar i { background: linear-gradient(90deg, #8b6fd6, var(--yellow)); }
+.wk { border-radius: 12px; } .wk.on { background: var(--hover); box-shadow: var(--hi); }
+.mgrid .dn b { background: var(--yellow); color: var(--onyel); }
+.mgrid .dc.wkend { background: var(--rowhov); }
+.mgrid .pill { color: var(--t-pur); } .mgrid .pill.dl { color: var(--t-red); } .mgrid .pill.dl.soon { color: var(--t-ora); }
+
+/* 꼬리표: 꽉 찬 색 → 반투명 유리 꼬리표 */
+.mk { border-color: var(--edge); }
+.mk.must { background: rgba(255,80,80,.18); color: var(--t-red); border-color: rgba(255,80,80,.38); }
+.mk.must.late { background: var(--red); color: #fff; }
+.mk.imp { background: rgba(255,170,60,.18); color: var(--t-ora); border-color: rgba(255,170,60,.36); }
+.mk.asg { background: rgba(94,155,255,.18); color: var(--t-blue); border-color: rgba(94,155,255,.36); }
+.mk.team { background: rgba(69,214,160,.17); color: var(--t-green); border-color: rgba(69,214,160,.34); }
+.row.hot:not(.done) { background: rgba(255,80,80,.09); box-shadow: inset 3px 0 var(--red); border-radius: 10px; } .row.hot:not(.done) textarea { color: var(--t-red); }
+.row.imp:not(.done) { background: rgba(255,170,60,.08); box-shadow: inset 3px 0 var(--orange); border-radius: 10px; } .row.imp:not(.done) textarea { color: var(--t-ora); }
+.row .star.on { color: var(--yellow); }
+.chip, .tm, .qb { border-radius: 99px; border-color: var(--edge); }
+.chip.soon { background: rgba(255,170,60,.22); color: var(--t-ora); border-color: rgba(255,170,60,.4); }
+.chip.over, .tm.over { background: var(--red); color: #fff; border-color: var(--red); }
+.tm.run { background: var(--green); color: #fff; border-color: var(--green); }
+.rt .who { background: rgba(224,209,32,.16); color: var(--t-yel); border: 1px solid rgba(224,209,32,.36); }
+.rt.red { background: rgba(255,80,80,.12); } .rt.green { background: rgba(69,214,160,.12); } .rt.yellow { background: rgba(224,209,32,.14); }
+.rt { border-radius: 10px; }
+.rtdone { background: rgba(69,214,160,.16); border: 1px solid rgba(69,214,160,.3); border-radius: 14px; }
+.quick button, .pop .grid button, .dows button, .rtnav.wk, .bmode button { border-radius: 99px; background: var(--fill); border-color: var(--edge); }
+.quick button.on, .pop .grid button.on, .dows button.on, .rtnav.wk.on, .bmode button.on { background: #8b6fd6; border-color: #8b6fd6; color: #fff; }
+#mkView .vd.cut { background: rgba(255,80,80,.18); color: var(--t-red); } #mkView .vd.watch { background: rgba(224,209,32,.18); color: var(--t-yel); }

@@ -1,0 +1,21 @@
+/* 📇 전체 연락처 탭 (contacts.js) */
+body:not(.ctv) #ctView { display: none; }
+#ctView { max-width: 860px; margin: 0 auto; padding: 16px 20px 100px; }
+#ctView .ctbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+#ctView .ctbar h2 { margin: 0; }
+#ctView input, #ctView select { padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+#ctView #ctQ { flex: 1; min-width: 160px; }
+#ctView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 14px; }
+#ctView .ctform { display: grid; grid-template-columns: auto 1.2fr 1fr 1fr 1fr auto auto; gap: 8px; padding: 12px 14px; margin-bottom: 16px; }
+@media (max-width: 700px) { #ctView .ctform { grid-template-columns: 1fr 1fr; } }
+#ctView .ctsec h2 { font-size: 17px; margin: 18px 0 8px; }
+#ctView .ctrow { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 1.2fr) auto auto auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+#ctView .ctrow:last-child { border-bottom: 0; }
+#ctView .ctrow a { color: var(--accent); text-decoration: none; white-space: nowrap; font-weight: 600; }
+#ctView .ctrow small { grid-column: 1 / -1; margin-top: -4px; }
+#ctView .ctrow .btn { padding: 4px 8px; font-size: 14px; }
+@media (max-width: 560px) {
+  #ctView .ctrow { grid-template-columns: 1fr auto auto auto; grid-template-areas: "name tel edit del" "branch branch branch branch" "note note note note"; gap: 2px 8px; }
+  #ctView .ctrow b { grid-area: name; } #ctView .ctrow .mut:nth-child(2) { grid-area: branch; font-size: 12px; }
+  #ctView .ctrow a { grid-area: tel; } #ctView .ctrow .ctedit { grid-area: edit; } #ctView .ctrow .ctdel { grid-area: del; } #ctView .ctrow small { grid-area: note; margin: 0; }
+}

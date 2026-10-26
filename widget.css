@@ -56,3 +56,39 @@ body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer [da
 .pop .clear { margin-top: 8px; width: 100%; padding: 5px 0; color: var(--red); font-size: 12.5px; }
 .it.done > input[data-rt] { display: none; } /* 끝낸 고정업무: 체크박스 자리에 이름 도장 */
 .it .who { flex: none; font-size: 11.5px; padding: 0 7px; border-radius: 99px; background: var(--green); color: #fff; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
+
+/* 🫧 리퀴드 글래스 (플래너 glass.css 와 같은 색) — 다크/라이트는 html[data-theme] (theme.js, 플래너 🌗 선택을 같이 따름) */
+:root { --bg: #0b0a14; --panel: rgba(255,255,255,.065); --line: rgba(255,255,255,.11); --text: #fff; --sub: rgba(255,255,255,.58); --accent: #a58cf0; --yellow: #e0d120; --onyel: #1a1600;
+  --blue: #5e9bff; --red: #ff6b61; --orange: #ffad4a; --green: #45d6a0; --edge: rgba(255,255,255,.14); --hi: inset 0 1px 0 rgba(255,255,255,.12);
+  --bar: rgba(14,12,26,.55); --float: rgba(26,23,44,.85); --fill: rgba(255,255,255,.07); --ckb: rgba(255,255,255,.38);
+  --glow1: #49308788; --glow2: #2b3fbf66; --glow3: #e0d1202a; --t-red: #ff8a80; --t-ora: #ffc274; --t-blue: #a8c8ff; --t-green: #7ee8bb; --t-yel: #f1e45a; color-scheme: dark; }
+:root[data-theme=light] { --bg: #f3f1f9; --panel: rgba(255,255,255,.62); --line: rgba(60,50,90,.1); --text: #1d1d1f; --sub: rgba(60,60,67,.62); --accent: #493087;
+  --blue: #0a6cff; --red: #e5302a; --orange: #d97a00; --green: #12a06b; --edge: rgba(255,255,255,.9); --hi: inset 0 1px 0 #fff;
+  --bar: rgba(248,246,253,.65); --float: rgba(252,251,255,.9); --fill: rgba(118,118,128,.1); --ckb: rgba(60,60,67,.3);
+  --glow1: #8b6fd640; --glow2: #6c8cff38; --glow3: #e0d12038; --t-red: #d70015; --t-ora: #b35c00; --t-blue: #0057d9; --t-green: #0a7f55; --t-yel: #7a6c00; color-scheme: light; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(70% 45% at 0% 0%, var(--glow1), transparent 70%), radial-gradient(60% 40% at 100% 40%, var(--glow2), transparent 70%), radial-gradient(60% 35% at 40% 100%, var(--glow3), transparent 70%), var(--bg); }
+html { background: var(--bg); } body { background: transparent; }
+header { background: var(--bar); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); }
+header a, .sum span { border-radius: 99px; border-color: var(--edge); background: var(--fill); }
+.sum .hot { background: rgba(255,80,80,.18); color: var(--t-red); border-color: rgba(255,80,80,.38); } .sum .ok { background: rgba(69,214,160,.17); color: var(--t-green); border-color: rgba(69,214,160,.34); }
+section { background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; box-shadow: var(--hi), 0 6px 20px rgba(0,0,0,.12); }
+.bar { background: var(--line); } .bar i { background: linear-gradient(90deg, #8b6fd6, var(--yellow)); }
+.it { border-radius: 8px; }
+.it input[type=checkbox] { appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid var(--ckb); background: transparent; cursor: pointer; }
+.it input[type=checkbox]:checked { background: var(--yellow) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%231a1600' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat; border-color: var(--yellow); }
+.it.hot:not(.done) .t { color: var(--t-red); } .it.imp:not(.done) .t { color: var(--t-ora); }
+.it.red { background: rgba(255,80,80,.12); } .it.green { background: rgba(69,214,160,.12); } .it.yellow { background: rgba(224,209,32,.14); }
+.tag, .qb { border-radius: 99px; border-color: var(--edge); }
+.tag.soon, .qb.soon { background: rgba(255,170,60,.22); color: var(--t-ora); border-color: rgba(255,170,60,.4); }
+.tag.over, .qb.over { background: var(--red); color: #fff; border-color: var(--red); }
+.tag.run, .qb.run { background: var(--green); color: #fff; border-color: var(--green); }
+.tag.team { background: rgba(69,214,160,.17); color: var(--t-green); border-color: rgba(69,214,160,.34); } .tag.asg { background: rgba(94,155,255,.18); color: var(--t-blue); border-color: rgba(94,155,255,.36); }
+.star.on { color: var(--yellow); }
+.it .who { background: rgba(224,209,32,.16); color: var(--t-yel); border: 1px solid rgba(224,209,32,.36); }
+.done-all { background: rgba(69,214,160,.16); border: 1px solid rgba(69,214,160,.3); border-radius: 12px; }
+#addInput { border-radius: 99px; border-color: var(--edge); background: var(--fill); padding: 6px 12px; }
+#login input { border-radius: 12px; border-color: var(--edge); background: var(--panel); }
+.lbtn, .pop .btn { background: var(--yellow); color: var(--onyel); border-radius: 99px; }
+.pop { background: var(--float); -webkit-backdrop-filter: blur(30px) saturate(180%); backdrop-filter: blur(30px) saturate(180%); border: 1px solid var(--edge); border-radius: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.3), var(--hi); }
+.pop .grid button { border-radius: 99px; background: var(--fill); border-color: var(--edge); } .pop .grid button.on { background: #8b6fd6; border-color: #8b6fd6; color: #fff; }
