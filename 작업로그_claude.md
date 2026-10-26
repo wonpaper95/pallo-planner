@@ -5,3 +5,4 @@
 - 10-26: 🔭 운영 적용 — mkc 마이그레이션 2개(테이블·버킷, 키 library_id+grp) 운영 DB에 적용, 첫 수집 en 262건·jpcn 101건(썸네일 포함). 두 그룹에 겹치는 광고가 덮어쓰이던 문제 → 키 변경.
 - 10-26: 🔭 B단계 — 후보 발굴 scripts/mkc/candidates.mjs, 플래너 마케팅 탭 '경쟁사' 페이지(켜기/후보/끄기, 직접 추가, 키워드로만 본 페이지), mkc-core 별명 page_id 처리. 로컬 대표·매니저 화면 확인. 버전 202610261630.
 - 10-26: 🔭 C단계 — build-daily.mjs·save-report.mjs, 스킬 pallo-competitor-ads, 예약 작업 pallo-competitor-ads-daily(05:00), 플래너 경쟁사 탭 '오늘' 화면. 운영 첫 일일 리포트 en·jpcn 저장. 로컬 매니저 화면 확인.
+- 10-26: 🔭 D단계 — build-creative.mjs(추천 입력), 점검기 checkIdeas(유사도·과장·가격, 컬컴은 카피에서만 차단), save-report creative, 플래너 '주간 추천' 화면(카피·타겟 복사). 운영 첫 추천 en 5·jpcn 4 저장. 스킬에 월요일 절차 추가.

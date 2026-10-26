@@ -154,3 +154,11 @@ A·B 를 먼저 끝내고 대표가 경쟁사를 고른 뒤 C·D.
 - 스킬 `~/.claude/skills/pallo-competitor-ads/SKILL.md`: 수집 en→jpcn → build → notes(summary·trend·caution) → save → 월요일엔 candidates. 예약 작업 `pallo-competitor-ads-daily` 매일 05:00(+지터) — 이 세션 권한 모드가 저장되지 않아 첫 실행은 앱의 예약 작업 화면에서 "지금 실행"으로 한 번 돌려 승인해 두는 게 좋다. 저장소는 `~/pallo-planner` 에 scripts/mkc 가 있으면 그곳, 아니면 `~/pallo-planner-marketing`.
 - 플래너: 경쟁사 탭 안 보조 탭 **오늘**(날짜 선택, 수집 경고, 오늘 한 줄·읽히는 흐름, KPI, 켜진 경쟁사 표, 처음 본/종료/오래 도는 소재 카드, 형식·CTA·랜딩 분포) / **경쟁사 목록**(B단계).
 - 10-26 운영: 첫 일일 리포트 en(활성 297·우리 19)·jpcn(활성 92·우리 9) 저장, notes 는 이 세션에서 직접 씀.
+
+## 구현 (D단계, 2026-10-26)
+
+- 추천 입력: `node scripts/mkc/build-creative.mjs <grp> [--week]` → 지난 7일 경쟁사 패턴(top 20·fresh 20·훅 유형 집계·형식/CTA/랜딩 분포) × 우리(지점별 weekly 판정·tests·persona·blog_profiles 위치/강점/키워드) × previous(지난 추천 제목). 추천 문장(ideas·notes)은 스킬이 쓴다 — 형식은 스킬 3절.
+- 점검기 `MKCCORE.checkIdeas`: 경쟁사 문구 유사도(문자 3-gram 자카드, 35% info · 60% warn), 과장·보장 표현, 가격 표기 → `data.warnings` 로 같이 저장. **컬컴은 카피·훅·제목·제작메모에 있을 때만 막는다**(why·refs 의 경쟁사 이름은 데이터).
+- 저장: `save-report.mjs <grp> <날짜> creative <json>` (월요일로 맞춤, 입력 자료 competitor/ours 는 저장 안 함).
+- 플래너: 경쟁사 탭 › **주간 추천** — 주 선택, 이번 주 한 줄, 추천 카드(왜·첫 3초·카피·타겟·제작·참고 광고 링크·우리 근거), **카피 복사 / 타겟 복사** 단추, 경고 표시. 매니저도 봄.
+- 10-26 운영: 첫 추천 en 5개(대구영어 3·울산 1·구미 1)·jpcn 4개 저장. 울산·구미는 우리 데이터 없음 명시.

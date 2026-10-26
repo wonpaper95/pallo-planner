@@ -88,12 +88,13 @@ async function renderCompet(admin) {
   if (!GRP[MK.grp]) MK.grp = "en";
   const grp = MK.grp;
   const head = `<div class="mkbar">${admin ? `<select id="mkGrp">${Object.entries(GRP).map(([k, v]) => `<option value="${k}" ${k === grp ? "selected" : ""}>${v}</option>`).join("")}</select>` : `<b>${GRP[grp]}</b>`}
-      <div class="mktabs">${[["today", "오늘"], ["list", "경쟁사 목록"]].map(([k, t]) => `<button data-c="${k}" class="${MK.ctab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
+      <div class="mktabs">${[["today", "오늘"], ["creative", "주간 추천"], ["list", "경쟁사 목록"]].map(([k, t]) => `<button data-c="${k}" class="${MK.ctab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
   const wire = () => {
     $m("#mkGrp")?.addEventListener("change", (e) => { MK.grp = e.target.value; MK.cday = null; try { localStorage.setItem("mk-grp", MK.grp); } catch {} MK.load(); });
     V().querySelectorAll(".mktabs button[data-c]").forEach((b) => b.addEventListener("click", () => { MK.ctab = b.dataset.c; MK.load(); }));
   };
   if (MK.ctab === "today") return renderToday(grp, head, wire);
+  if (MK.ctab === "creative") return renderCreative(grp, head, wire);
   const [cq, aq, rq] = await Promise.all([
     sb.from("mkc_competitors").select("id, page_name, page_id, page_url, team_id, status, note, found_by").eq("grp", grp).order("page_name"),
     sb.from("mkc_ads").select("library_id, page_name, page_id, competitor_id, start_date, first_seen, active, thumb_path, multi_version, n_ads, keywords").eq("grp", grp).eq("active", true),
@@ -183,6 +184,38 @@ async function renderToday(grp, head, wire) {
     + `<div class="card"><b>형식·CTA 분포</b><p class="mut">형식: ${(t.byMedia ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p><p class="mut">CTA: ${(t.byCta ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p><p class="mut">랜딩: ${(t.byLanding ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p></div>`;
   wire();
   $m("#mkDay").addEventListener("change", (e) => { MK.cday = e.target.value; MK.load(); });
+}
+
+// 주간 추천: 월요일 스킬이 경쟁사 패턴 × 우리 판정으로 쓴 소재 3~5개(mkc_reports kind=creative). 카피·타겟은 복사해서 광고관리자에 붙인다.
+async function renderCreative(grp, head, wire) {
+  const { data: list, error } = await sb.from("mkc_reports").select("day, data, updated_at").eq("grp", grp).eq("kind", "creative").order("day", { ascending: false }).limit(12);
+  if (fail(error)) return;
+  if (!list?.length) { $m("#mkBody").innerHTML = head + `<div class="card">아직 추천이 없어요. 매주 월요일 새벽에 경쟁사 패턴과 우리 주간 판정을 교차해서 소재 3~5개를 올려요. 급하면 Claude에게 "경쟁사 소재 추천 돌려줘"라고 하면 돼요.</div>`; wire(); return; }
+  const cur = list.find((r) => r.day === MK.cday) ?? list[0]; MK.cday = cur.day;
+  const d = cur.data ?? {}, ideas = d.ideas ?? [], warns = d.warnings ?? [];
+  const copyText = (i) => [`기본 문구:\n${i.copy?.body ?? ""}`, `제목: ${i.copy?.headline ?? ""}`, `설명: ${i.copy?.description ?? ""}`, `CTA: ${i.copy?.cta ?? ""}`].join("\n\n");
+  const targetText = (i) => Object.entries(i.target ?? {}).map(([k, v]) => `${{ objective: "목표", age: "연령", gender: "성별", location: "위치", interests: "관심사", placements: "게재위치", budget: "일 예산", audience: "오디언스", note: "메모" }[k] ?? k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("\n");
+  const card = (i, idx) => {
+    const w = warns.filter((x) => x.idea === idx);
+    return `<div class="card idea"><div class="mkbar"><h3>${idx + 1}. ${esc(i.title)}</h3>${i.team ? `<span class="tag">${esc(i.team)}</span>` : ""}${i.format ? `<span class="tag">${esc(i.format)}</span>` : ""}</div>
+      ${w.map((x) => `<div class="mut ${x.level === "warn" ? "warnline" : ""}">${x.level === "warn" ? "⚠️" : "ℹ️"} ${esc(x.msg)}${x.library_id ? ` <a href="${esc(MKCCORE.libraryUrl(x.library_id))}" target="_blank" rel="noopener">원본</a>` : ""}</div>`).join("")}
+      <p><b>왜</b> ${esc(i.why ?? "")}</p>
+      ${i.hook ? `<p><b>첫 3초</b> ${esc(i.hook)}</p>` : ""}
+      <div class="copybox"><div class="mkbar"><b>카피</b><button class="sm" data-copy="${idx}">카피 복사</button></div><pre>${esc(copyText(i))}</pre></div>
+      <div class="copybox"><div class="mkbar"><b>타겟 (광고관리자에 그대로)</b><button class="sm" data-target="${idx}">타겟 복사</button></div><pre>${esc(targetText(i))}</pre></div>
+      ${i.production ? `<p class="mut">🎬 ${esc(i.production)}</p>` : ""}
+      ${(i.refs ?? []).length ? `<p class="mut">참고한 경쟁사 광고: ${i.refs.map((r) => `<a href="${esc(MKCCORE.libraryUrl(String(r.library_id ?? r)))}" target="_blank" rel="noopener">${esc(r.page_name ?? r.library_id ?? r)}</a>`).join(" · ")}</p>` : ""}
+      ${(i.ours ?? []).length ? `<p class="mut">우리 근거: ${i.ours.map(esc).join(" · ")}</p>` : ""}</div>`;
+  };
+  $m("#mkBody").innerHTML = head + `<div class="mkbar"><select id="mkDay">${list.map((r) => `<option value="${r.day}" ${r.day === cur.day ? "selected" : ""}>${esc(r.day)} 주</option>`).join("")}</select><span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span></div>`
+    + (d.notes?.summary ? `<div class="card"><b>이번 주 한 줄</b><p>${esc(d.notes.summary)}</p>${d.notes.caution ? `<p class="mut">${esc(d.notes.caution)}</p>` : ""}</div>` : "")
+    + `<p class="mut">광고 집행은 대표님이 광고관리자에서 직접 해요. 카피는 팔로 이름으로, 경쟁사 문구는 구조만 참고했어요(베끼기 경고는 카드 위에 떠요).</p>`
+    + ideas.map(card).join("");
+  wire();
+  $m("#mkDay").addEventListener("change", (e) => { MK.cday = e.target.value; MK.load(); });
+  const copy = async (text, btn) => { try { await navigator.clipboard.writeText(text); toast("복사했어요"); } catch { btn.previousElementSibling; toast("복사가 안 돼요 — 길게 눌러 직접 복사해 주세요"); } };
+  $m("#mkBody").querySelectorAll("button[data-copy]").forEach((b) => b.addEventListener("click", () => copy(copyText(ideas[+b.dataset.copy]), b)));
+  $m("#mkBody").querySelectorAll("button[data-target]").forEach((b) => b.addEventListener("click", () => copy(targetText(ideas[+b.dataset.target]), b)));
 }
 
 // ── CSV 올리기 (대표) ──

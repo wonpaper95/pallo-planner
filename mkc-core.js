@@ -145,7 +145,35 @@ function groupByText(ads) {
   return [...m.values()].map((g) => ({ ...g, count: g.ads.length, start_date: g.ads.map((a) => a.start_date).filter(Boolean).sort()[0] ?? null }));
 }
 
+// ── 소재 추천 점검기 ──
+// 경쟁사 문구 베끼기(문자 3-gram 자카드), 구 브랜드(컬컴) 언급, 과장·보장 표현을 경고로 낸다. 막는 건 컬컴뿐(save-report).
+const grams = (s, n = 3) => { const t = normText(s); const g = new Set(); for (let i = 0; i + n <= t.length; i++) g.add(t.slice(i, i + n)); return g; };
+function similarity(a, b) {
+  const A = grams(a), B = grams(b); if (!A.size || !B.size) return 0;
+  let inter = 0; for (const g of A) if (B.has(g)) inter++;
+  return inter / (A.size + B.size - inter);
+}
+const COPY_SIMILAR = 0.35, COPY_SAME = 0.6;
+const HYPE_RE = /(100\s*%|무조건|보장|1\s*위|최고|유일|완벽|확실히|반드시)/;
+const idText = (idea) => [idea?.copy?.body, idea?.copy?.headline, idea?.copy?.description].filter(Boolean).join("\n");
+function checkIdeas(ideas, competitorAds) {
+  const out = [];
+  (ideas ?? []).forEach((idea, i) => {
+    const text = idText(idea), label = idea?.title ?? `추천 ${i + 1}`;
+    // 컬컴은 우리가 내보내는 글(카피·훅·제목·제작 메모)에서만 막는다. why·refs 의 경쟁사 이름(컬컴 송도점 등)은 데이터.
+    if (/컬컴|culcom/i.test([idea?.title, idea?.hook, idea?.production, text].join("\n"))) out.push({ idea: i, level: "block", msg: `${label}: 카피에 '컬컴/CULCOM' 이 들어 있어요 — 팔로로 바꿔 주세요` });
+    if (!text) { out.push({ idea: i, level: "warn", msg: `${label}: 카피가 비어 있어요` }); return; }
+    let best = { s: 0 };
+    for (const ad of competitorAds ?? []) { const s = similarity(text, [ad.body, ad.headline].filter(Boolean).join("\n")); if (s > best.s) best = { s, ad }; }
+    if (best.s >= COPY_SAME) out.push({ idea: i, level: "warn", msg: `${label}: ${best.ad.page_name} 광고 문구와 거의 같아요 (유사도 ${Math.round(best.s * 100)}%) — 구조만 가져오고 문장은 새로 쓰세요`, library_id: best.ad.library_id });
+    else if (best.s >= COPY_SIMILAR) out.push({ idea: i, level: "info", msg: `${label}: ${best.ad.page_name} 광고와 비슷한 표현이 있어요 (유사도 ${Math.round(best.s * 100)}%)`, library_id: best.ad.library_id });
+    const h = text.match(HYPE_RE); if (h) out.push({ idea: i, level: "warn", msg: `${label}: 과장·보장 표현 '${h[1]}' — 근거 없으면 빼세요` });
+    if (/[0-9]+\s*(만\s*원|원|₩)/.test(text)) out.push({ idea: i, level: "info", msg: `${label}: 가격이 들어 있어요 — 지점별 가격 정책 확인` });
+  });
+  return out;
+}
+
 return { GROUPS, OWN_PAGE_RE, isOwnPage, groupOfTeamName, SEARCH_SETS, COUNTRY, searchUrl, isNumericPageId, pageUrl, competitorUrl, libraryUrl, PLATFORM_PATHS, platformOfPath, CTAS, DETAIL_BUTTONS,
   parseStartDate, cleanLines, hash, normText, parseCard, unwrapLink, addDays, daysBetween, PROVEN_DAYS, CORE_DAYS, CORE_ADS, NEW_DAYS, verdict, VERDICT_LABEL,
-  ENDED_GRACE_DAYS, ENDED_GRACE_KEYWORD_DAYS, endedIds, mergeRows, groupByText };
+  ENDED_GRACE_DAYS, ENDED_GRACE_KEYWORD_DAYS, endedIds, mergeRows, groupByText, similarity, COPY_SIMILAR, COPY_SAME, checkIdeas };
 });

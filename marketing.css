@@ -38,3 +38,7 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .vd.proven { background: #d9f5df; color: #13692a; }
 #mkView .vd.new { background: #dbe9ff; color: #1b4f9c; }
 #mkView .vd.ended { background: var(--bg); color: var(--sub); }
+#mkView .idea h3 { margin: 0; font-size: 16px; }
+#mkView .copybox { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
+#mkView .copybox pre { white-space: pre-wrap; margin: 6px 0 0; font: inherit; font-size: 13.5px; }
+#mkView .warnline { color: #7a4b00; }

@@ -103,3 +103,16 @@ test("pageUrl: 숫자 ID 만, 별명이면 이름 검색", () => {
   assert.match(C.competitorUrl({ page_id: "ringleedu", page_name: "링글 1:1 화상영어" }), /q=%EB%A7%81%EA%B8%80/);
   assert.match(C.competitorUrl({ page_id: "123", page_name: "x" }), /view_all_page_id=123/);
 });
+
+test("checkIdeas: 베끼기·컬컴·과장·가격 경고", () => {
+  const comp = [{ library_id: "9", page_name: "컬컴 송도점", body: "No.1 영어회화 스터디\n👉위치: 인천대입구역 5분 거리\n- 한번이라도 영어를 배워보고 싶은 초보자\n- 그동안 배운 영어, 제대로 써먹고 싶은 사람!" }];
+  const copied = { title: "A", copy: { body: "No.1 영어회화 스터디\n👉위치: 대구 동성로역 5분 거리\n- 한번이라도 영어를 배워보고 싶은 초보자\n- 그동안 배운 영어, 제대로 써먹고 싶은 사람!" } };
+  const fresh = { title: "B", copy: { body: "퇴근 후 2시간, 외국인 친구와 진짜 대화로 영어를 쓰는 동성로 스터디. 첫 주는 무료로 들어와 보세요.", headline: "동성로 영어회화 스터디" } };
+  const r = C.checkIdeas([copied, fresh, { title: "C", copy: { body: "컬컴 대구점 100% 환급 15만원" } }], comp);
+  assert.ok(r.some((x) => x.idea === 0 && x.level === "warn" && /거의 같아요/.test(x.msg)));
+  assert.ok(!r.some((x) => x.idea === 1));
+  assert.ok(r.some((x) => x.idea === 2 && x.level === "block"));
+  assert.ok(r.some((x) => x.idea === 2 && /과장/.test(x.msg)));
+  assert.ok(r.some((x) => x.idea === 2 && /가격/.test(x.msg)));
+  assert.ok(C.similarity("안녕하세요 영어회화", "안녕하세요 영어회화") > 0.99);
+});
