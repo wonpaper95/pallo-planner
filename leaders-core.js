@@ -32,21 +32,24 @@ const LDC = {
     const rows = [], cur = { grp: "", slot: "" };
     const grpOf = (s) => (s.match(/월수|화목|토일/) ?? [s.includes("주말") ? "토일" : ""])[0];
     const slotOf = (s) => (s.match(/\d{1,2}(:\d{2})?\s*(AM|PM)/i) ?? [""])[0].replace(/\s+/g, "").toUpperCase();
+    // 시간대: 11AM 같은 시각, 없으면 남은 말('주말 오후 15팀' → 오후, '대기', '중국어 스터디')
+    const label = (s) => slotOf(s) || s.replace(/월수|화목|토일|주말|총|\d+\s*팀|[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim().slice(0, 20);
     for (const line of String(text).split(/\r?\n/)) {
       const c = line.split("\t").map((x) => x.trim());
       if (!c.some(Boolean)) continue;
-      if (grpOf(c[0]) && slotOf(c[0])) { cur.grp = grpOf(c[0]); cur.slot = slotOf(c[0]); } // 구역 제목 줄이나 '월수 11AM' 칸
+      if (c[0].includes("|")) { const h = c[0].split("|")[1] ?? ""; cur.grp = grpOf(h) || cur.grp; cur.slot = label(h); } // 구역 제목 줄 (☀️ 오전 | 월수 11AM 9팀 | …)
+      else if (grpOf(c[0])) { cur.grp = grpOf(c[0]); cur.slot = label(c[0]); } // 시간대 칸 ('월수 11AM', '주말 오전')
       if (c.length < 5 || c[3] === "리더" || c[1] === "레벨" || (!c[1] && !c[3])) continue; // 제목·머리줄·빈 줄
       if (!cur.grp) continue;
       const { name, rapport } = LDC.splitName(c[3] || "구해야됨");
       rows.push({ grp: cur.grp, slot: cur.slot, level: c[1] ?? "", seat: c[2] ?? "", name, rapport,
         status: /구해야/.test(c[4] + c[3]) ? "구해야 함" : "확정", start_day: c[5] ?? "", phone: c[6] ?? "", note: c[7] ?? "",
-        edu: [c[18], c[19]].filter(Boolean).join(" · "), memo: c[20] ?? "" });
+        edu: [c[18], c[19]].filter(Boolean).join(" · "), memo: c[20] ?? "", att: c.slice(8, 18) }); // att: 1주①~5주② 칸 그대로 (저장 땐 뺌)
     }
     return rows;
   },
-  // 시간대 정렬용 (11AM < 6PM < 8PM)
-  slotMin(s) { const m = String(s).match(/(\d{1,2})(?::(\d{2}))?(AM|PM)/i); if (!m) return 9999; return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0); },
+  // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
+  slotMin(s) { const m = String(s).match(/(\d{1,2})(?::(\d{2}))?(AM|PM)/i); if (!m) return s === "오전" ? 540 : s === "오후" ? 840 : 9999; return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0); },
 };
 if (typeof module !== "undefined") module.exports = LDC; else window.LDC = LDC;
 })();

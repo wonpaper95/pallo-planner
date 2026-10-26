@@ -126,7 +126,7 @@ function pasteDlg() {
   d.querySelector("#ldX").onclick = () => d.close();
   go.onclick = async () => {
     const base = Date.now() / 1000, by = myName ?? "";
-    const { error } = await sb.from("leaders").insert(rows.map((r, i) => ({ ...r, team_id: LD.team, sort: base + i, rapport_by: r.rapport ? by : "" })));
+    const { error } = await sb.from("leaders").insert(rows.map(({ att, ...r }, i) => ({ ...r, team_id: LD.team, sort: base + i, rapport_by: r.rapport ? by : "" })));
     if (fail(error)) return; d.close(); toast(`${rows.length}명 추가했어요`); LD.load();
   };
 }
