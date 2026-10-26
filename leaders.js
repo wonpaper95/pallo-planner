@@ -46,6 +46,11 @@ LD.load = async function () {
 const stars = (r) => `<span class="ldstars r${r.rapport ? (r.rapport <= 2 ? "low" : r.rapport === 3 ? "mid" : "high") : "none"}" title="라포 ${r.rapport ?? "-"}/5${r.rapport_by ? ` · ${esc(r.rapport_by)}` : ""}">`
   + [1, 2, 3, 4, 5].map((i) => `<button data-star="${i}">${i <= (r.rapport ?? 0) ? "★" : "☆"}</button>`).join("") + `</span>`;
 const eduBox = (r) => `<button class="edu ${r.edu_done ? "on" : ""}" data-edu title="리더교육 ${r.edu_done ? "했음" : "아직"}${r.edu ? ` · ${esc(r.edu)}` : ""} — 누르면 바뀜">${r.edu_done ? "✓" : ""}</button>`;
+// 🔴 구해야 함 + 며칠째 (구해야 함이 된 날부터, 그날 = 1일째) · 줄 색: 🚨 재관리 주황, 구해야 함 분홍
+const needDays = (r) => r.need_since ? Math.round((W.parse(today()) - W.parse(r.need_since)) / 864e5) + 1 : null;
+const stBox = (r) => r.status !== "구해야 함" ? `<button class="st ok" data-st title="누르면 바뀜">🟢 확정</button>`
+  : `<button class="st need" data-st title="누르면 바뀜">🔴 구해야 함</button>${needDays(r) ? `<b class="nd" title="${md(r.need_since)}부터">${needDays(r)}일째</b>` : ""}`;
+const rowCls = (r, m) => `${r.status === "구해야 함" ? "need" : ""} ${stat(r, m).recheck ? "rerow" : ""}`;
 const cov = (r, m) => LD.cover.get(r.id)?.get(m) ?? 0;
 const stat = (r, m) => LDC.monthStat(r.grp, m, LD.att.get(r.id), today(), cov(r, m));
 // 출석 버튼: 누르면 O → X → X+대타(이름) → 비움
@@ -77,11 +82,11 @@ LD.render = function () {
     for (const s of slots) {
       const rs = leaders.filter((r) => r.grp === g && r.slot === s), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
-      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
+      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : ses.map((d) => `<th class="${d === td ? "td" : ""}">${md(d)}(${dw(d)})</th>`).join("") + `<th>${ym(sm)}</th>`}${LD.mode === "month" ? "<th>특이사항</th><th>리더교육</th>" : ""}<th></th></tr>`;
-      const body = rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td>${esc(r.level)}</td><td>${esc(r.seat)}</td>`
-        + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}${r.start_day ? `<small class="mut">시작 ${esc(r.start_day)}</small>` : ""}</td>`
-        + `<td>${stars(r)}</td><td><button class="st ${r.status === "구해야 함" ? "need" : "ok"}" data-st title="누르면 바뀜">${r.status === "구해야 함" ? "🔴 구해야 함" : "🟢 확정"}</button></td>`
+      const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td>${esc(r.level)}</td><td>${esc(r.seat)}</td>`
+        + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}</td>`
+        + `<td>${stars(r)}</td><td>${stBox(r)}</td>`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : ses.map((d) => cell(r, d)).join("") + `<td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td>${eduBox(r)}</td>` : "")
         + `<td><button class="btn ghost lded" title="고치기">✏️</button></td></tr>`).join("");
@@ -89,10 +94,10 @@ LD.render = function () {
     }
   }
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
-    const head = `<tr><th>업무</th><th>이름</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고</th><th></th></tr>`;
-    const body = staff.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td>${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
-      + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}${r.start_day ? `<small class="mut">시작 ${esc(r.start_day)}</small>` : ""}</td>`
-      + `<td>${stars(r)}</td><td><button class="st ${r.status === "구해야 함" ? "need" : "ok"}" data-st title="누르면 바뀜">${r.status === "구해야 함" ? "🔴 구해야 함" : "🟢 확정"}</button></td>`
+    const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일</th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고</th><th></th></tr>`;
+    const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td>${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
+      + `<td class="nm"><b>${esc(r.name)}</b>${r.phone ? `<a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}">${esc(r.phone)}</a>` : ""}</td><td class="sd">${r.start_day ? esc(r.start_day) : `<span class="mut">–</span>`}</td>`
+      + `<td>${stars(r)}</td><td>${stBox(r)}</td>`
       + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("")
         : `<td class="ina">${r.grp ? LDC.sessions(r.grp, from, to).map((d) => attBtn(r, d, `${md(d)}(${dw(d)})`)).join("") : `<span class="mut">–</span>`}</td><td>${flags(r, sm)}</td>`)
       + `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td><button class="btn ghost lded" title="고치기">✏️</button></td></tr>`).join("");
@@ -114,7 +119,7 @@ function dlg(html) {
   if (!d) { d = document.createElement("dialog"); d.id = "ldDlg"; document.body.appendChild(d); }
   d.innerHTML = html; d.showModal(); return d;
 }
-const F = [["level", "레벨"], ["seat", "자리"], ["name", "리더 이름"], ["start_day", "시작일"], ["phone", "전화번호"], ["note", "특이사항 (상담조교 참고)"], ["edu", "리더교육 메모 (일정 등)"], ["memo", "메모"]];
+const F = [["level", "레벨"], ["seat", "자리"], ["name", "리더 이름"], ["start_day", "첫 시작일"], ["phone", "전화번호"], ["note", "특이사항 (상담조교 참고)"], ["edu", "리더교육 메모 (일정 등)"], ["memo", "메모"]];
 function editDlg(r) {
   const d = dlg(`<form method="dialog" class="ldform"><h2>${r ? "리더 고치기" : "리더 추가"}</h2>
     <label>구분<select name="kind"><option value="leader" ${r?.kind !== "staff" ? "selected" : ""}>리더</option><option value="staff" ${r?.kind === "staff" ? "selected" : ""}>워킹스텝</option></select></label>
@@ -122,13 +127,14 @@ function editDlg(r) {
     <label>시간대 · 업무<input name="slot" placeholder="11AM · 6PM · 오전 · 블로그스텝" value="${esc(r?.slot ?? "")}" maxlength="20"></label>
     ${F.map(([k, l]) => `<label>${l}<input name="${k}" value="${esc(r?.[k] ?? "")}" ${k === "name" ? "required" : ""}></label>`).join("")}
     <label>리더교육<span><input type="checkbox" name="edu_done" ${r?.edu_done ? "checked" : ""}> 했음</span></label>
+    <label>구해야 함 시작일<input type="date" name="need_since" value="${r?.need_since ?? ""}" title="누적일 계산 — 비우면 오늘부터"></label>
     <label>상태<select name="status"><option ${r?.status !== "구해야 함" ? "selected" : ""}>확정</option><option ${r?.status === "구해야 함" ? "selected" : ""}>구해야 함</option></select></label>
     <div class="row">${r ? `<button type="button" class="btn ghost" id="ldDel">🗑 지우기</button>` : ""}<span style="flex:1"></span><button type="button" class="btn ghost" value="cancel" id="ldX">취소</button><button class="btn">저장</button></div></form>`);
   const f = d.querySelector("form");
   d.querySelector("#ldX").onclick = () => d.close();
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const v = Object.fromEntries(new FormData(f)); v.name = v.name.trim(); v.edu_done = f.edu_done.checked; v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
+    const v = Object.fromEntries(new FormData(f)); v.name = v.name.trim(); v.edu_done = f.edu_done.checked; v.need_since ||= null; v.slot = /\d\s*(am|pm)/i.test(v.slot) ? v.slot.replace(/\s+/g, "").toUpperCase() : v.slot.trim();
     const { error } = r ? await sb.from("leaders").update(v).eq("id", r.id) : await sb.from("leaders").insert({ ...v, team_id: LD.team });
     if (fail(error)) return; d.close(); toast(r ? "고쳤어요" : "추가했어요"); LD.load();
   };
@@ -176,7 +182,7 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.edu !== undefined) { const v = !r.edu_done; // 🎓 리더교육 했는지
     const { error } = await sb.from("leaders").update({ edu_done: v }).eq("id", r.id); if (fail(error)) return; r.edu_done = v; return LD.render(); }
   if (b.dataset.st !== undefined) { const s = r.status === "구해야 함" ? "확정" : "구해야 함";
-    const { error } = await sb.from("leaders").update({ status: s }).eq("id", r.id); if (fail(error)) return; r.status = s; return LD.render(); }
+    const { data: nr, error } = await sb.from("leaders").update({ status: s }).eq("id", r.id).select("status, need_since").single(); if (fail(error)) return; Object.assign(r, nr); return LD.render(); } // need_since 는 서버가 정함
   if (b.dataset.att) { // O → X → X+대타 → 비움
     const d = b.dataset.att, m = LD.att.get(r.id), cur = m.get(d) ?? "", cs = LD.subs.get(r.id).get(d) ?? "";
     let nx = cur === "" ? "O" : cur === "O" ? "X" : "", sub = "";

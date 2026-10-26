@@ -15,7 +15,7 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 #ldView .ldblk h3 { margin: 18px 0 6px; font-size: 16px; }
 #ldView .ldneed { color: #e5484d; font-weight: 600; }
-#ldView .re { color: #e5484d; font-weight: 700; }
+#ldView .re { color: #ea8a00; font-weight: 700; }
 #ldView .on { color: #30a46c; font-weight: 600; }
 #ldView .ldtw { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
 #ldView table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
@@ -56,3 +56,6 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .cv { color: #3b82f6; font-weight: 600; font-size: 12px; }
 #ldView .edu { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); color: #fff; font-weight: 800; cursor: pointer; }
 #ldView .edu.on { background: #30a46c; border-color: #30a46c; }
+#ldView tr.rerow td { background: rgba(245, 158, 11, .14); } /* 🚨 재관리 줄은 주황 (구해야 함 분홍보다 우선) */
+#ldView .nd { display: block; margin-top: 3px; color: #e5484d; font-size: 15px; font-weight: 800; }
+#ldView td.sd { font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
