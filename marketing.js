@@ -2,7 +2,7 @@
 // 숫자 계산은 mk-core.js(MKCORE), 문장(notes·persona)은 스킬이 쓴다. 이 화면은 CSV 올리기와 보여주기만.
 // index.html 의 sb·me·$·esc·toast·fail·isBoss·previewTeam·teams 를 씀 → window.MK
 (() => {
-const MK = (window.MK = { tab: "report", team: null, week: null, grp: null });
+const MK = (window.MK = { tab: "report", team: null, week: null, grp: null, ctab: "today", cday: null });
 const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별"], ads_demo: ["mk_ad_demo", "team_id,period_from,period_to,ad_name,age,gender", "광고 연령·성별"], organic: ["mk_organic", "team_id,platform,post_id", "인스타·페북 게시물"] };
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
@@ -87,6 +87,13 @@ async function renderCompet(admin) {
   }
   if (!GRP[MK.grp]) MK.grp = "en";
   const grp = MK.grp;
+  const head = `<div class="mkbar">${admin ? `<select id="mkGrp">${Object.entries(GRP).map(([k, v]) => `<option value="${k}" ${k === grp ? "selected" : ""}>${v}</option>`).join("")}</select>` : `<b>${GRP[grp]}</b>`}
+      <div class="mktabs">${[["today", "오늘"], ["list", "경쟁사 목록"]].map(([k, t]) => `<button data-c="${k}" class="${MK.ctab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>`;
+  const wire = () => {
+    $m("#mkGrp")?.addEventListener("change", (e) => { MK.grp = e.target.value; MK.cday = null; try { localStorage.setItem("mk-grp", MK.grp); } catch {} MK.load(); });
+    V().querySelectorAll(".mktabs button[data-c]").forEach((b) => b.addEventListener("click", () => { MK.ctab = b.dataset.c; MK.load(); }));
+  };
+  if (MK.ctab === "today") return renderToday(grp, head, wire);
   const [cq, aq, rq] = await Promise.all([
     sb.from("mkc_competitors").select("id, page_name, page_id, page_url, team_id, status, note, found_by").eq("grp", grp).order("page_name"),
     sb.from("mkc_ads").select("library_id, page_name, page_id, competitor_id, start_date, first_seen, active, thumb_path, multi_version, n_ads, keywords").eq("grp", grp).eq("active", true),
@@ -119,15 +126,14 @@ async function renderCompet(admin) {
   const btn = (id, st, label) => `<button class="sm" data-id="${id}" data-st="${st}">${label}</button>`;
   const section = (st, list, empty) => `<div class="card"><b>${CSTAT[st]} ${list.length}</b>${list.length ? list.map((r) => row(r, [st !== "on" && btn(r.id, "on", "켜기"), st !== "candidate" && btn(r.id, "candidate", "후보로"), st !== "off" && btn(r.id, "off", "끄기")].filter(Boolean).join(""))).join("") : `<div class="mut">${empty}</div>`}</div>`;
   const by = (st) => rows.filter((r) => r.status === st).sort((a, b) => b.n - a.n);
-  $m("#mkBody").innerHTML = `<div class="mkbar">${admin ? `<select id="mkGrp">${Object.entries(GRP).map(([k, v]) => `<option value="${k}" ${k === grp ? "selected" : ""}>${v}</option>`).join("")}</select>` : `<b>${GRP[grp]}</b>`}
-      <span class="mut">${run ? `마지막 수집 ${esc(run.run_date)} · ${run.status === "ok" ? "정상" : run.status === "partial" ? "일부 실패" : "실패"} · 오늘 본 광고 ${n(run.counts?.cards)}개 · 처음 본 ${n(run.counts?.new)}개 · 종료 ${n(run.counts?.ended)}개` : "아직 수집 전이에요 (맥미니가 매일 새벽에 읽어요)"}</span></div>
+  $m("#mkBody").innerHTML = head + `<div class="mkbar"><span class="mut">${run ? `마지막 수집 ${esc(run.run_date)} · ${run.status === "ok" ? "정상" : run.status === "partial" ? "일부 실패" : "실패"} · 오늘 본 광고 ${n(run.counts?.cards)}개 · 처음 본 ${n(run.counts?.new)}개 · 종료 ${n(run.counts?.ended)}개` : "아직 수집 전이에요 (맥미니가 매일 새벽에 읽어요)"}</span></div>
     <p class="mut">메타 광고 라이브러리(공개)에서 읽은 활성 광고예요. 성과 숫자는 안 보여서 <b>집행 기간</b>으로 추정해요: 🏆 30일+ 또는 여러 버전 · 🟢 14일+ · 🆕 7일 안에 처음 봄. 이름을 누르면 라이브러리에서 원본을 볼 수 있어요.</p>
     ${admin ? `<div class="card"><b>직접 추가</b> <span class="mut">광고 라이브러리의 페이지 링크(view_all_page_id=…)나 페이지 이름</span><div class="mkbar"><input id="mkAddUrl" placeholder="https://www.facebook.com/ads/library/?…view_all_page_id=123 또는 페이지 이름" style="flex:1;min-width:240px"><button class="btn" id="mkAdd">켜진 경쟁사로 추가</button></div></div>` : ""}
     ${section("on", by("on"), "아직 켠 경쟁사가 없어요. 후보에서 골라 켜 주세요.")}
     ${section("candidate", by("candidate"), "후보가 없어요. 아래 '키워드로만 본 페이지'에서 올리거나, Claude에게 \"경쟁사 후보 올려줘\"라고 하면 돼요.")}
     <div class="card"><b>키워드로만 본 페이지</b> <span class="mut">아직 목록에 없는 광고주 (광고 2개+ 또는 14일+ 집행)</span>${otherRows.length ? otherRows.map((r) => row(r, `<button class="sm" data-add="${esc(r.page_name)}" data-pid="${esc(r.page_id ?? "")}">후보로 올리기</button>`)).join("") : `<div class="mut">없어요</div>`}</div>
     ${section("off", by("off"), "없어요")}`;
-  $m("#mkGrp")?.addEventListener("change", (e) => { MK.grp = e.target.value; try { localStorage.setItem("mk-grp", MK.grp); } catch {} MK.load(); });
+  wire();
   if (!admin) return;
   $m("#mkBody").querySelectorAll("button[data-st]").forEach((b) => b.addEventListener("click", async () => {
     b.disabled = true;
@@ -147,6 +153,36 @@ async function renderCompet(admin) {
     if (/^https?:/.test(v) && !pid) return toast("링크에서 페이지 번호(view_all_page_id)를 못 찾았어요");
     addComp(name, pid, "on", "대표가 직접 추가");
   });
+}
+
+// 오늘: 맥미니가 새벽에 저장한 일일 리포트(mkc_reports kind=daily). 숫자는 build-daily.mjs, 문장(notes)은 스킬이 쓴다.
+const VD = MKCCORE.VERDICT_LABEL;
+async function renderToday(grp, head, wire) {
+  const { data: list, error } = await sb.from("mkc_reports").select("day, data, updated_at").eq("grp", grp).eq("kind", "daily").order("day", { ascending: false }).limit(14);
+  if (fail(error)) return;
+  if (!list?.length) { $m("#mkBody").innerHTML = head + `<div class="card">아직 일일 리포트가 없어요. 맥미니가 매일 새벽 5시에 광고 라이브러리를 읽고 만들어요. 경쟁사 목록에서 후보를 켜 두면 그 페이지는 전부 읽어요.</div>`; wire(); return; }
+  const cur = list.find((r) => r.day === MK.cday) ?? list[0]; MK.cday = cur.day;
+  const d = cur.data ?? {}, t = d.totals ?? {}, nt = d.notes ?? {}, f = d.flags ?? {};
+  const paths = [...new Set([...(d.new ?? []), ...(d.ended ?? []), ...(d.top ?? [])].map((a) => a.thumb_path).filter(Boolean))];
+  const signed = {};
+  if (paths.length) { const { data } = await sb.storage.from("mkc-thumbs").createSignedUrls(paths, 3600); (data ?? []).forEach((x, i) => { if (x.signedUrl && !x.error) signed[x.path ?? paths[i]] = x.signedUrl; }); }
+  const adRow = (a) => `<div class="cmp">${a.thumb_path && signed[a.thumb_path] ? `<img src="${esc(signed[a.thumb_path])}" alt="" loading="lazy">` : `<div class="cmp-no"></div>`}
+    <div class="cmp-b"><div><a href="${esc(a.url)}" target="_blank" rel="noopener"><b>${esc(a.page_name)}</b></a> <span class="vd ${esc(a.verdict)}">${VD[a.verdict] ?? esc(a.verdict)}</span>${a.competitor === "on" ? `<span class="tag">켜진 경쟁사</span>` : a.competitor === "candidate" ? `<span class="tag mut">후보</span>` : ""}</div>
+      <div>${esc(a.hook || a.headline || "(문구 없음)")}</div>
+      <div class="mut">${a.days != null ? `${n(a.days)}일째` : "시작일 모름"} · ${esc(a.media_type || "?")}${a.multi_version ? " · 여러 버전" : ""}${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개` : ""}${a.cta ? ` · ${esc(a.cta)}` : ""}${a.landing_domain ? ` · ${esc(a.landing_domain)}` : ""}</div></div></div>`;
+  const section = (title, arr, empty) => `<div class="card"><b>${title} ${(arr ?? []).length}</b>${(arr ?? []).length ? arr.map(adRow).join("") : `<div class="mut">${empty}</div>`}</div>`;
+  const warns = [f.noRun && "이날 수집 기록이 없어요", f.failed && "이날 수집이 실패했어요 (라이브러리가 막혔거나 화면이 바뀜)", f.partial && "일부 검색어 수집이 실패했어요", f.firstDay && "첫 수집일이라 '처음 본 광고'가 전부예요"].filter(Boolean);
+  $m("#mkBody").innerHTML = head + `<div class="mkbar"><select id="mkDay">${list.map((r) => `<option value="${r.day}" ${r.day === cur.day ? "selected" : ""}>${esc(r.day)}</option>`).join("")}</select><span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span></div>`
+    + warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
+    + (nt.summary || nt.trend?.length ? `<div class="card">${nt.summary ? `<b>오늘 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${nt.trend?.length ? `<b>읽히는 흐름</b><ul>${nt.trend.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
+    + `<div class="card kpis"><div class="kpi"><span class="mut">활성 경쟁 광고</span><b>${n(t.active)}</b></div><div class="kpi"><span class="mut">처음 본 광고</span><b>${n(t.new)}</b></div><div class="kpi"><span class="mut">종료</span><b>${n(t.ended)}</b></div><div class="kpi"><span class="mut">켜진 경쟁사</span><b>${n(t.competitorsOn)}</b></div><div class="kpi"><span class="mut">우리 광고</span><b>${n(t.own)}</b></div></div>`
+    + ((d.competitors ?? []).length ? `<div class="card"><b>켜진 경쟁사</b><div class="tw"><table><tr><th>경쟁사</th><th>활성</th><th>오늘 신규</th><th>오늘 종료</th><th>🏆 30일+</th><th>가장 오래</th></tr>${d.competitors.map((c) => `<tr><td>${esc(c.page_name)}</td><td>${n(c.active)}</td><td>${n(c.new_today)}</td><td>${n(c.ended_today)}</td><td>${n(c.core)}</td><td>${c.oldest_days != null ? `${n(c.oldest_days)}일` : "–"}</td></tr>`).join("")}</table></div></div>` : "")
+    + section("🆕 처음 본 광고", d.new, "없어요")
+    + section("⚫ 종료된 광고", d.ended, "없어요")
+    + section("🏆 오래 도는 소재 TOP", d.top, "아직 없어요")
+    + `<div class="card"><b>형식·CTA 분포</b><p class="mut">형식: ${(t.byMedia ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p><p class="mut">CTA: ${(t.byCta ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p><p class="mut">랜딩: ${(t.byLanding ?? []).map((x) => `${esc(x.key)} ${n(x.count)}`).join(" · ") || "–"}</p></div>`;
+  wire();
+  $m("#mkDay").addEventListener("change", (e) => { MK.cday = e.target.value; MK.load(); });
 }
 
 // ── CSV 올리기 (대표) ──

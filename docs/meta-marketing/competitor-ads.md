@@ -146,3 +146,11 @@ A·B 를 먼저 끝내고 대표가 경쟁사를 고른 뒤 C·D.
 - 플래너: 마케팅 탭 › **경쟁사** (`marketing.js` renderCompet, `mkc-core.js` 를 index.html 에 추가). 대표 = 그룹 선택 + 켜기/후보로/끄기 + 링크·이름으로 직접 추가 + "키워드로만 본 페이지"에서 후보 올리기. 매니저 = 자기 지점 그룹 읽기만. 썸네일은 비공개 버킷 서명 주소(1시간).
 - 카드의 페이지 링크가 별명(ringleedu 같은)이면 `view_all_page_id` 에 못 쓴다 → `MKCCORE.competitorUrl`: 숫자 ID 면 페이지 전체, 아니면 페이지 이름 검색.
 - 로컬 확인(10-26): 대표 로그인 → 후보 30 → 켜기·후보 올리기·중복 추가 거부 동작, 매니저 로그인 → 영어 그룹 고정·단추 없음·썸네일 보임.
+
+## 구현 (C단계, 2026-10-26)
+
+- 일일 리포트 숫자: `node scripts/mkc/build-daily.mjs <grp> [--date]` → JSON(run·flags·totals·competitors(켜진 것)·new·ended·top). 목록은 한글 광고만(HSK·JLPT 검색엔 해외 광고가 섞임), 같은 페이지·같은 첫 줄은 한 소재로 묶어 n_ads 에 반영. 집계 숫자(totals)는 전체.
+- 저장: `node scripts/mkc/save-report.mjs <grp> <날짜> daily <json>` (`mkc_reports`). creative 는 월요일 날짜로 맞추고 '컬컴' 검사.
+- 스킬 `~/.claude/skills/pallo-competitor-ads/SKILL.md`: 수집 en→jpcn → build → notes(summary·trend·caution) → save → 월요일엔 candidates. 예약 작업 `pallo-competitor-ads-daily` 매일 05:00(+지터) — 이 세션 권한 모드가 저장되지 않아 첫 실행은 앱의 예약 작업 화면에서 "지금 실행"으로 한 번 돌려 승인해 두는 게 좋다. 저장소는 `~/pallo-planner` 에 scripts/mkc 가 있으면 그곳, 아니면 `~/pallo-planner-marketing`.
+- 플래너: 경쟁사 탭 안 보조 탭 **오늘**(날짜 선택, 수집 경고, 오늘 한 줄·읽히는 흐름, KPI, 켜진 경쟁사 표, 처음 본/종료/오래 도는 소재 카드, 형식·CTA·랜딩 분포) / **경쟁사 목록**(B단계).
+- 10-26 운영: 첫 일일 리포트 en(활성 297·우리 19)·jpcn(활성 92·우리 9) 저장, notes 는 이 세션에서 직접 씀.
