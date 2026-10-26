@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610262132">
+<meta name="app-version" content="202610262152">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610262132"></script>
+<script src="theme.js?v=202610262152"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -482,6 +482,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="themeBtn" class="btn ghost" title="화면 모드">🌗<span class="lbl"> 자동</span></button>
     <a id="consultBtn" class="btn ghost" href="https://magical-buttercream-d5b901.netlify.app/" target="_blank" rel="noopener" title="상담 녹음·AI 피드백 (새 탭)" style="text-decoration:none">🎙️<span class="lbl"> 상담 AI</span></a>
     <a id="trainingBtn" class="btn ghost" href="https://pallo-training.netlify.app/training/progress" target="_blank" rel="noopener" title="신입 전산 연습 — 진행률·입장 코드 (새 탭)" style="text-decoration:none">🎓<span class="lbl"> 전산 연습</span></a>
+    <button id="installBtn" class="btn ghost hidden" title="Dock·홈 화면에 진짜 앱으로 설치 (따로 창 · Dock 점 · 최소화해도 그 아이콘으로 돌아옴)">📲 앱으로 설치</button>
     <button id="pushBtn" class="btn ghost">🔔 알람 켜기</button>
     <button id="fbBtn" class="btn ghost" title="버그 신고·개선 제안">🐞<span class="lbl"> 신고·제안</span><b id="fbNew" class="hidden"></b></button>
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
@@ -603,9 +604,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610262132"></script>
-<script src="week.js?v=202610262132"></script>
-<script src="pick.js?v=202610262132"></script>
+<script src="config.js?v=202610262152"></script>
+<script src="week.js?v=202610262152"></script>
+<script src="pick.js?v=202610262152"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -1289,6 +1290,11 @@ $("#monthView").onclick = $("#weekCal").onclick = async (e) => {
   if (fail(error)) return;
   calTasks.push(data); openSheet(data); $("#sTitle").focus();
 };
+// 📲 크롬 '앱으로 설치' (설치 가능할 때만 버튼이 보임 — 이미 앱으로 열려 있으면 안 보임)
+let installEvt = null;
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("#installBtn").classList.remove("hidden"); });
+addEventListener("appinstalled", () => { installEvt = null; $("#installBtn").classList.add("hidden"); toast("📲 설치됐어요 — Dock 에서 열면 따로 창으로 떠요"); });
+$("#installBtn").onclick = async () => { if (!installEvt) return toast("크롬 주소창 오른쪽 '설치' 아이콘으로 설치할 수 있어요"); installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("#installBtn").classList.add("hidden"); };
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
@@ -1858,19 +1864,19 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610262132"></script>
-<script src="photo.js?v=202610262132"></script>
-<script src="blog.js?v=202610262132"></script>
-<script src="mk-core.js?v=202610262132"></script>
-<script src="mkc-core.js?v=202610262132"></script>
-<script src="marketing.js?v=202610262132"></script>
-<script src="sns-core.js?v=202610262132"></script>
-<script src="post.js?v=202610262132"></script>
-<script src="someday.js?v=202610262132"></script>
-<script src="contacts.js?v=202610262132"></script>
-<script src="leaders-core.js?v=202610262132"></script>
-<script src="leaders.js?v=202610262132"></script>
-<script src="links.js?v=202610262132"></script>
-<script src="qna.js?v=202610262132"></script>
+<script src="sales.js?v=202610262152"></script>
+<script src="photo.js?v=202610262152"></script>
+<script src="blog.js?v=202610262152"></script>
+<script src="mk-core.js?v=202610262152"></script>
+<script src="mkc-core.js?v=202610262152"></script>
+<script src="marketing.js?v=202610262152"></script>
+<script src="sns-core.js?v=202610262152"></script>
+<script src="post.js?v=202610262152"></script>
+<script src="someday.js?v=202610262152"></script>
+<script src="contacts.js?v=202610262152"></script>
+<script src="leaders-core.js?v=202610262152"></script>
+<script src="leaders.js?v=202610262152"></script>
+<script src="links.js?v=202610262152"></script>
+<script src="qna.js?v=202610262152"></script>
 </body>
 </html>
