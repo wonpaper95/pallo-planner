@@ -196,7 +196,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 // 🔄 전산 리더 출석 → 플래너 (매일 예약 작업이 전산 탭에서 모은 걸 넘겨줌, 대표 계정에서만)
-// data = { branches: { DAEGUDSR: { r: [[이름, 전화], …], a: [[날짜, r번호, 'O'|'X'], …] }, … } }
+// data = { branches: { DAEGUDSR: { r: [[이름, 전화], …], a: [[날짜, r번호, 'O'|'X', 전산 수업 이름], …] }, … } }
 LD.syncJeonsan = async function (data) {
   const report = {};
   if (!teams.length) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
@@ -204,12 +204,19 @@ LD.syncJeonsan = async function (data) {
     if (b.error) { report[code] = "전산 오류: " + b.error; continue; }
     const team = teams.find((t) => t.name === LDC.JEONSAN[code]); if (!team) { report[code] = "플래너 지점 없음"; continue; }
     const { data: rows, error } = await sb.from("leaders").select("id, name, phone, grp").eq("team_id", team.id); if (error) { report[code] = error.message; continue; }
-    const hit = b.r.map(([n, p]) => LDC.matchJeonsan(n, p, rows)), up = new Map(), miss = new Set();
+    const hit = b.r.map(([n, p]) => LDC.matchJeonsan(n, p, rows)), up = new Map(), miss = new Set(), added = [];
+    // 플래너에 없는 전산 리더 → 자동 추가 (전산 수업 이름으로 반·시간대 칸 찾기). 이름 없는 리더('?')는 건너뜀
+    for (const [i, [n, p]] of b.r.entries()) {
+      if (hit[i] || !n || n === "?") continue;
+      const course = b.a.find((x) => x[1] === i)?.[3] ?? "", { grp, slot } = LDC.courseSlot(course, rows);
+      const { data: nl, error: e2 } = await sb.from("leaders").insert({ team_id: team.id, kind: "leader", grp, slot, name: n, phone: p, note: `전산에서 자동 추가 (${course || "수업 모름"})` }).select("id, name, phone, grp, slot").single();
+      if (e2) { miss.add(n); continue; } hit[i] = nl; rows.push(nl); added.push(n);
+    }
     for (const [d, i, st] of b.a) { if (d < LDC.SYNC_START) continue; const l = hit[i]; if (!l) { miss.add(b.r[i][0]); continue; }
       up.set(`${l.id}:${d}`, { leader_id: l.id, day: d, state: st, by_name: "전산", at: new Date().toISOString(), ...(st === "O" ? { sub: "" } : {}) }); }
     const list = [...up.values()], os = list.filter((x) => x.state === "O"), xs = list.filter((x) => x.state === "X"); // X 는 sub(대타) 안 건드림 — 열이 다르면 한 번에 못 보냄
     const errs = (await Promise.all([os, xs].filter((l) => l.length).map((l) => sb.from("leader_att").upsert(l)))).map((r) => r.error?.message).filter(Boolean);
-    report[team.name] = errs.length ? errs.join(" / ") : { 반영: list.length, 못찾은리더: [...miss] };
+    report[team.name] = errs.length ? errs.join(" / ") : { 반영: list.length, 새로추가: added, 못찾은리더: [...miss] };
   }
   if (V() && document.body.classList.contains("ldv")) LD.load();
   return report;

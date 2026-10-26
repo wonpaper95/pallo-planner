@@ -77,7 +77,20 @@ const LDC = {
     return LDC.matchSub(name, rows);
   },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
-  slotMin(s) { const m = String(s).match(/(\d{1,2})(?::(\d{2}))?(AM|PM)/i); if (!m) return s === "오전" ? 540 : s === "오후" ? 840 : 9999; return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0); },
+  slotMin(s) {
+    s = String(s ?? ""); const m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i), lang = s.includes("중국어") ? 1 : 0; // 같은 시간이면 일본어 → 중국어
+    if (m) return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0) + lang;
+    const pm = s.match(/오후\s*(\d{1,2})/); if (pm) return ((+pm[1] % 12) + 12) * 60 + lang;
+    return (s.includes("오전") ? 600 : s.includes("오후") ? 840 : s.includes("저녁") ? 1140 : 9999) + lang; // 대기·스터디는 맨 뒤
+  },
+  // 전산 수업 이름('월수 오전', '월수 오후6', '주말 오후') → 반·시간대. 그 반에 비슷한 시간(±90분) 칸이 있으면 그걸 씀
+  courseSlot(course, rows) {
+    const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0];
+    const pm = c.match(/오후\s*(\d{1,2})/), label = pm ? `${+pm[1]}PM` : (c.match(/오전|오후|저녁/) ?? [""])[0];
+    const want = LDC.slotMin(label); if (!grp || want >= 9999) return { grp, slot: label };
+    const near = [...new Set(rows.filter((r) => r.grp === grp).map((r) => r.slot))].map((s) => [s, Math.abs(LDC.slotMin(s) - want)]).filter(([, d]) => d <= 90).sort((a, b) => a[1] - b[1])[0];
+    return { grp, slot: near ? near[0] : label };
+  },
 };
 if (typeof module !== "undefined") module.exports = LDC; else window.LDC = LDC;
 })();
