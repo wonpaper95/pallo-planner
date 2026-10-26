@@ -15,12 +15,25 @@ const LDC = {
   monthEnd(d) { const p = D.parse(LDC.monthStart(d)); p.setMonth(p.getMonth() + 1); p.setDate(0); return D.ymd(p); },
   addMonths(d, n) { const p = D.parse(LDC.monthStart(d)); p.setMonth(p.getMonth() + n); return D.ymd(p); },
   // 그달 성적. att: Map(day → 'O'|'X'). 지난 수업만 셈 (오늘은 체크했을 때만)
-  monthStat(grp, month, att, today) {
+  // cover = 그달 다른 리더 대신 와준(대타) 횟수 → 결석을 그만큼 메움 (시트 규칙: 빠지면 다른 시간대 대타 와줘야 함)
+  monthStat(grp, month, att, today, cover = 0) {
     const all = LDC.sessions(grp, LDC.monthStart(month), LDC.monthEnd(month)), past = all.filter((d) => d < today || (d === today && att.has(d))); // 오늘 수업은 체크해야 셈
     const o = past.filter((d) => att.get(d) === "O").length, x = past.filter((d) => att.get(d) === "X").length;
-    const ended = LDC.monthEnd(month) < today, perfect = past.length > 0 && o === past.length;
-    return { total: all.length, past: past.length, o, x, blank: past.length - o - x,
-      recheck: x >= LDC.ABSENT_LIMIT, award: perfect && ended, onTrack: perfect && !ended };
+    const made = Math.min(cover, x), ended = LDC.monthEnd(month) < today, perfect = past.length > 0 && o + made === past.length;
+    return { total: all.length, past: past.length, o, x, blank: past.length - o - x, cover, net: x - made,
+      recheck: x - made >= LDC.ABSENT_LIMIT, award: perfect && ended, onTrack: perfect && !ended };
+  },
+  // 시트 출석 칸 → { state, sub }. 'X / 소희'·'소희' = 빠짐 + 대타 소희
+  attOf(v) {
+    v = String(v ?? "").trim(); if (!v) return null;
+    return /^o$/i.test(v) ? { state: "O", sub: "" } : { state: "X", sub: v.replace(/^[xo]\s*\/?\s*/i, "").replace(/\s+/g, " ").trim().slice(0, 40) };
+  },
+  // 대타 이름 → 그 지점 리더 한 명 (못 찾거나 여러 명이면 null). '지우랑' → 지우, '김정화(목)' 같은 이름도
+  matchSub(sub, rows) {
+    const n = (x) => String(x).replace(/\(.*?\)|\s/g, ""), s = n(sub).replace(/(이랑|랑|님|리더)$/, "");
+    if (s.length < 2) return null;
+    const hit = rows.filter((r) => n(r.name).split("/").some((p) => p.includes(s)));
+    return hit.length === 1 ? hit[0] : null;
   },
   // 이름 끝 숫자(예: '김주란4+', '백지훈 3+')는 시트에서 쓰던 라포 → 별점으로
   splitName(raw) {
@@ -37,12 +50,17 @@ const LDC = {
     for (const line of String(text).split(/\r?\n/)) {
       const c = line.split("\t").map((x) => x.trim());
       if (!c.some(Boolean)) continue;
+      if (c[0].startsWith("시간대/업무")) { cur.staff = true; continue; } // 워킹스텝 시트 머리줄 → 아래는 스텝
+      if (cur.staff) { if (!c[0] && !c[1]) continue; const st = LDC.splitName(c[1] || "(미정)");
+        rows.push({ kind: "staff", grp: grpOf(c[0]), slot: label(c[0]), level: "", seat: "", name: st.name, rapport: st.rapport,
+          status: /구해야/.test(c[2] + c[1]) ? "구해야 함" : "확정", start_day: c[3] ?? "", phone: c[4] ?? "", note: c[5] ?? "", edu: "", memo: "", att: [] });
+        continue; }
       if (c[0].includes("|")) { const h = c[0].split("|")[1] ?? ""; cur.grp = grpOf(h) || cur.grp; cur.slot = label(h); } // 구역 제목 줄 (☀️ 오전 | 월수 11AM 9팀 | …)
       else if (grpOf(c[0])) { cur.grp = grpOf(c[0]); cur.slot = label(c[0]); } // 시간대 칸 ('월수 11AM', '주말 오전')
       if (c.length < 5 || c[3] === "리더" || c[1] === "레벨" || (!c[1] && !c[3])) continue; // 제목·머리줄·빈 줄
       if (!cur.grp) continue;
       const { name, rapport } = LDC.splitName(c[3] || "구해야됨");
-      rows.push({ grp: cur.grp, slot: cur.slot, level: c[1] ?? "", seat: c[2] ?? "", name, rapport,
+      rows.push({ kind: "leader", grp: cur.grp, slot: cur.slot, level: c[1] ?? "", seat: c[2] ?? "", name, rapport,
         status: /구해야/.test(c[4] + c[3]) ? "구해야 함" : "확정", start_day: c[5] ?? "", phone: c[6] ?? "", note: c[7] ?? "",
         edu: [c[18], c[19]].filter(Boolean).join(" · "), memo: c[20] ?? "", att: c.slice(8, 18) }); // att: 1주①~5주② 칸 그대로 (저장 땐 뺌)
     }

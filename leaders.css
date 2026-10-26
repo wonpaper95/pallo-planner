@@ -49,3 +49,8 @@ body:not(.ldv) #ldView { display: none; }
 #ldDlg .row { display: flex; gap: 8px; margin-top: 6px; }
 #ldDlg textarea { width: 100%; font: 13px monospace; }
 @media (max-width: 700px) { #ldView .ldact { margin-left: 0; } #ldDlg label { grid-template-columns: 1fr; } }
+#ldView .att.sub { width: auto; min-width: 34px; padding: 0 6px; }
+#ldView .att i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; line-height: 1.1; }
+#ldView .att small { display: block; font-size: 10px; font-weight: 500; line-height: 1.1; }
+#ldView td.ina { white-space: normal; } #ldView td.ina .att { height: auto; min-height: 30px; margin: 2px; padding: 2px 6px; width: auto; }
+#ldView .cv { color: #3b82f6; font-weight: 600; font-size: 12px; }
