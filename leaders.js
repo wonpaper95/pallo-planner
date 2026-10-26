@@ -1,13 +1,13 @@
 // 🧑‍🏫 리더 현황 보드 탭: 지점별 리더 명단 · 라포 ⭐ · 수업마다 출석(O/X 클릭) · 🚨 재관리(한 달 3번↑ 결석) · 🏆 개근 혜택
 // 주간 / 월간 / 3달 보기. 계산은 leaders-core.js(LDC), index.html 의 sb·isBoss·previewTeam·previewUser·teams·myName·esc·toast·fail 을 씀 → window.LD
 (() => {
-const LD = (window.LD = { team: null, mode: "month", anchor: null, rows: [], att: new Map(), subs: new Map(), cover: new Map(), awards: new Map() });
+const LD = (window.LD = { team: null, mode: "month", filter: "all", anchor: null, rows: [], att: new Map(), subs: new Map(), cover: new Map(), awards: new Map() });
 const V = () => document.getElementById("ldView");
 const DOW = "일월화수목금토", md = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`, dw = (d) => DOW[W.parse(d).getDay()];
 const today = () => W.ymd(new Date());
 const admin = () => isBoss && !previewTeam && !previewUser;
 const ym = (m) => `${+m.slice(5, 7)}월`;
-try { LD.mode = localStorage.getItem("ld-mode") === "q3" ? "q3" : "month"; } catch {} // 주간 보기는 없앰(10-26) — 월간 · 3달
+try { LD.mode = localStorage.getItem("ld-mode") === "q3" ? "q3" : "month"; LD.filter = localStorage.getItem("ld-filter") || "all"; } catch {} // 주간 보기는 없앰(10-26) — 월간 · 3달
 
 // 보는 기간: 월간 = 그달, 3달 = 기준 달 포함 지난 3달
 const range = () => LD.mode === "month" ? [LDC.monthStart(LD.anchor), LDC.monthEnd(LD.anchor)] : [LDC.addMonths(LD.anchor, -2), LDC.monthEnd(LD.anchor)];
@@ -72,9 +72,10 @@ function monthCell(r, m) {
 LD.render = function () {
   const [from, to] = range(), sm = statMonth(), td = today();
   const months = [LDC.addMonths(LD.anchor, -2), LDC.addMonths(LD.anchor, -1), LDC.monthStart(LD.anchor)];
-  const leaders = LD.rows.filter((r) => r.kind !== "staff"), staff = LD.rows.filter((r) => r.kind === "staff");
-  const cnt = { need: LD.rows.filter((r) => r.status === "구해야 함").length, re: 0, aw: 0 };
-  LD.rows.forEach((r) => { const s = stat(r, sm); if (s.recheck) cnt.re++; if (s.award || s.onTrack) cnt.aw++; });
+  const vis = LD.rows.filter((r) => LDC.passFilter(r, LD.filter)); // 🔎 평일 오전·오후·주말·월수·화목 필터
+  const leaders = vis.filter((r) => r.kind !== "staff"), staff = vis.filter((r) => r.kind === "staff");
+  const cnt = { need: vis.filter((r) => r.status === "구해야 함").length, re: 0, aw: 0 };
+  vis.forEach((r) => { const s = stat(r, sm); if (s.recheck) cnt.re++; if (s.award || s.onTrack) cnt.aw++; });
   const title = LD.mode === "month" ? `${LD.anchor.slice(0, 4)}년 ${ym(LD.anchor)}` : `${ym(months[0])} ~ ${ym(months[2])}`;
   const blocks = [];
   for (const g of [...LDC.GRPS, ""]) { // "" = 반 없는 리더 (백업리더 등)
@@ -106,11 +107,12 @@ LD.render = function () {
   V().innerHTML = `<div class="ldbar"><h2>🧑‍🏫 리더 현황 보드</h2>
       ${admin() ? `<select id="ldTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === LD.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
+      <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
       <span class="ldact"><button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     <div class="ldsum"><span>리더 <b>${leaders.length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span>
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록</small></div>
-    ${blocks.join("") || `<div class="card mut" style="padding:16px">아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요</div>`}`;
+    ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
 };
 
 // ── 고치기 · 붙여넣기 창 ──
@@ -166,6 +168,7 @@ function pasteDlg() {
 document.addEventListener("click", async (e) => {
   const v = V(); if (!v || !v.contains(e.target)) return;
   const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.flt) { LD.filter = b.dataset.flt; try { localStorage.setItem("ld-filter", LD.filter); } catch {} return LD.render(); }
   if (b.dataset.mode) { LD.mode = b.dataset.mode; try { localStorage.setItem("ld-mode", LD.mode); } catch {} return LD.load(); }
   if (b.dataset.nav !== undefined) {
     const n = +b.dataset.nav;

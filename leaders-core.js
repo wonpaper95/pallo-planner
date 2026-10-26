@@ -78,6 +78,13 @@ const LDC = {
     const e = rows.filter((r) => n(r.name).split("/").includes(n(name))); if (e.length) return pick(e);
     return LDC.matchSub(name, rows);
   },
+  // 보기 필터 (3지점 공통): 평일 오전 = 월수·화목 12시 전, 평일 오후 = 12시부터(저녁 포함), 주말 = 토일
+  FILTERS: [["all", "전체"], ["am", "평일 오전"], ["pm", "평일 오후"], ["we", "주말"], ["mw", "월·수"], ["tt", "화·목"]],
+  passFilter(r, f) {
+    if (!f || f === "all") return true;
+    const wd = r.grp === "월수" || r.grp === "화목", t = LDC.slotMin(r.slot);
+    return f === "am" ? wd && t < 720 : f === "pm" ? wd && t >= 720 && t < 9999 : f === "we" ? r.grp === "토일" : f === "mw" ? r.grp === "월수" : f === "tt" ? r.grp === "화목" : true;
+  },
   // 첫 시작일 글자 → 'YYYY-MM-DD' (시트마다 형식이 다름: 2026-05-04 · 2025. 8. 6 · 26/3/4 · 20261026 · 260504). 못 읽으면 null
   parseDay(v) {
     const t = String(v ?? "").trim(); let m, y, mo, d;
