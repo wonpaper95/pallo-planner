@@ -57,15 +57,15 @@ body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer [da
 .it.done > input[data-rt] { display: none; } /* 끝낸 고정업무: 체크박스 자리에 이름 도장 */
 .it .who { flex: none; font-size: 11.5px; padding: 0 7px; border-radius: 99px; background: var(--green); color: #fff; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
 
-/* 🫧 리퀴드 글래스 (플래너 glass.css 와 같은 색) — 기기 설정 따라 다크/라이트 */
+/* 🫧 리퀴드 글래스 (플래너 glass.css 와 같은 색) — 다크/라이트는 html[data-theme] (theme.js, 플래너 🌗 선택을 같이 따름) */
 :root { --bg: #0b0a14; --panel: rgba(255,255,255,.065); --line: rgba(255,255,255,.11); --text: #fff; --sub: rgba(255,255,255,.58); --accent: #a58cf0; --yellow: #e0d120; --onyel: #1a1600;
   --blue: #5e9bff; --red: #ff6b61; --orange: #ffad4a; --green: #45d6a0; --edge: rgba(255,255,255,.14); --hi: inset 0 1px 0 rgba(255,255,255,.12);
   --bar: rgba(14,12,26,.55); --float: rgba(26,23,44,.85); --fill: rgba(255,255,255,.07); --ckb: rgba(255,255,255,.38);
   --glow1: #49308788; --glow2: #2b3fbf66; --glow3: #e0d1202a; --t-red: #ff8a80; --t-ora: #ffc274; --t-blue: #a8c8ff; --t-green: #7ee8bb; --t-yel: #f1e45a; color-scheme: dark; }
-@media (prefers-color-scheme: light) { :root { --bg: #f3f1f9; --panel: rgba(255,255,255,.62); --line: rgba(60,50,90,.1); --text: #1d1d1f; --sub: rgba(60,60,67,.62); --accent: #493087;
+:root[data-theme=light] { --bg: #f3f1f9; --panel: rgba(255,255,255,.62); --line: rgba(60,50,90,.1); --text: #1d1d1f; --sub: rgba(60,60,67,.62); --accent: #493087;
   --blue: #0a6cff; --red: #e5302a; --orange: #d97a00; --green: #12a06b; --edge: rgba(255,255,255,.9); --hi: inset 0 1px 0 #fff;
   --bar: rgba(248,246,253,.65); --float: rgba(252,251,255,.9); --fill: rgba(118,118,128,.1); --ckb: rgba(60,60,67,.3);
-  --glow1: #8b6fd640; --glow2: #6c8cff38; --glow3: #e0d12038; --t-red: #d70015; --t-ora: #b35c00; --t-blue: #0057d9; --t-green: #0a7f55; --t-yel: #7a6c00; color-scheme: light; } }
+  --glow1: #8b6fd640; --glow2: #6c8cff38; --glow3: #e0d12038; --t-red: #d70015; --t-ora: #b35c00; --t-blue: #0057d9; --t-green: #0a7f55; --t-yel: #7a6c00; color-scheme: light; }
 body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(70% 45% at 0% 0%, var(--glow1), transparent 70%), radial-gradient(60% 40% at 100% 40%, var(--glow2), transparent 70%), radial-gradient(60% 35% at 40% 100%, var(--glow3), transparent 70%), var(--bg); }
 html { background: var(--bg); } body { background: transparent; }
