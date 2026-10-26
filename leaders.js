@@ -76,7 +76,7 @@ LD.render = function () {
   LD.rows.forEach((r) => { const s = stat(r, sm); if (s.recheck) cnt.re++; if (s.award || s.onTrack) cnt.aw++; });
   const title = LD.mode === "week" ? `${md(from)} ~ ${md(to)}` : LD.mode === "month" ? `${LD.anchor.slice(0, 4)}년 ${ym(LD.anchor)}` : `${ym(months[0])} ~ ${ym(months[2])}`;
   const blocks = [];
-  for (const g of LDC.GRPS) {
+  for (const g of [...LDC.GRPS, ""]) { // "" = 반 없는 리더 (백업리더 등)
     const slots = [...new Set(leaders.filter((r) => r.grp === g).map((r) => r.slot))].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
     for (const s of slots) {
       const rs = leaders.filter((r) => r.grp === g && r.slot === s), need = rs.filter((r) => r.status === "구해야 함").length;
@@ -89,7 +89,7 @@ LD.render = function () {
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : ses.map((d) => cell(r, d)).join("") + `<td>${flags(r, sm)}</td>`)
         + (LD.mode === "week" ? `<td class="nt" title="${esc(r.note)}">${esc(r.note)}</td><td class="nt">${esc(r.edu)}</td>` : "")
         + `<td><button class="btn ghost lded" title="고치기">✏️</button></td></tr>`).join("");
-      blocks.push(`<section class="ldblk"><h3>${g} ${esc(s || "시간 미정")} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
+      blocks.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
     }
   }
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
