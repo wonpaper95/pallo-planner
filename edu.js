@@ -111,7 +111,7 @@ function head(d) {
     : `<b>${esc(myName || "내 교육")}</b>`;
   return `<section class="edutop card">
     <div class="edubar">
-      <div class="eduwho">📚 매니저 교육 ${pick}</div>
+      <div class="eduwho">📚 인턴교육 ${pick}</div>
       <label class="mut edustart">시작일 <input type="date" id="eduStart" value="${start || ""}" ${d.admin ? "disabled" : ""}></label>
       ${dday === null ? "" : `<span class="mut">D+${dday} / 56일</span>`}
       <span class="grow"></span>
@@ -277,7 +277,7 @@ function report(d) {
   const name = (EDU.people || []).find((p) => p.user_id === d.mine)?.name || "";
   const wlabel = (w) => W().find((x) => x.week === w)?.label || w;
   return `<div id="eduReport">
-    <h2>매니저 교육 최종 평가서</h2>
+    <h2>인턴교육 최종 평가서</h2>
     <table><tr><th>성명</th><td>${esc(name)}</td><th>교육기간</th><td>${esc(d.meta.started_on || "")} ~ (12주)</td></tr>
       <tr><th>작성일</th><td>${today()}</td><th>평가 진행률</th><td>${rated.length} / ${ITEMS().length} 항목</td></tr></table>
     <h2>역량별 평가</h2>
