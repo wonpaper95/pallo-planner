@@ -4,7 +4,7 @@
 // 평가는 RLS 로 대표만 읽는다(합격기준 글은 모두에게 보임 — 평가받기 전에 기준을 안다).
 // index.html 의 sb·me·uid()·isBoss·previewUser·esc·toast·fail 을 씀 → window.EDU
 (() => {
-const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, data: null, split: false });
+const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, data: null });
 const V = () => document.getElementById("eduView");
 const W = () => globalThis.EDU_WEEKS || [];
 const ITEMS = () => globalThis.EDU_ITEMS || [];
@@ -24,7 +24,6 @@ const who = () => (EDU.canPick() ? EDU.target : uid());
 EDU.canPick = () => isBoss && !previewUser;
 
 EDU.load = async function () {
-  try { EDU.split = !!localStorage.getItem("edu-split"); } catch {}
   const mine = who();
   if (EDU.canPick() && !mine) {
     const { data: ppl, error } = await sb.rpc("edu_people");
@@ -80,7 +79,6 @@ function head(d) {
       <label class="mut edustart">시작일 <input type="date" id="eduStart" value="${start || ""}" ${d.admin ? "disabled" : ""}></label>
       ${dday === null ? "" : `<span class="mut">D+${dday} / 56일</span>`}
       <span class="grow"></span>
-      ${d.admin ? `<button class="btn ghost ${EDU.split ? "on" : ""}" id="eduSplitBtn" title="항목을 펼치면 매니저 화면과 대표 칸을 나란히 보여 줘요">👀 매니저 화면 같이 보기${EDU.split ? " 끄기" : ""}</button>` : ""}
       ${d.admin ? `<button class="btn ghost" id="eduRepBtn">🧾 평가서</button>` : ""}
     </div>
     <div class="edubarline"><div style="width:${Math.round((done / all) * 100)}%"></div></div>
@@ -158,13 +156,11 @@ function itemRow(i, d) {
 }
 
 function detail(i, d) {
-  // 대표가 "매니저한테는 이게 어떻게 보이지?"를 확인하려고 앱 전체를 미리보기로 바꾸지 않아도 되게,
-  // 같이 보기를 켜면 한 항목 안에서 매니저 화면(왼쪽)과 대표 전용 칸(오른쪽)을 나란히 보여 준다.
-  const side = d.admin && EDU.split;
-  const mgr = mgrPane(i, d, side);
+  // 대표 화면은 늘 2단 — 왼쪽은 매니저가 보는 그대로, 오른쪽은 대표만 보는 칸.
+  // 앱 전체를 미리보기로 바꾸지 않아도 "매니저한테 이게 어떻게 보이지?"가 항상 같이 보인다.
+  const mgr = mgrPane(i, d, d.admin);
   if (!d.admin) return `<div class="edudetail">${mgr}</div>`;
   const boss = bossPane(i, d);
-  if (!side) return `<div class="edudetail">${mgr}${boss}</div>`;
   return `<div class="edudetail edusplit">
     <div class="edupane mgr"><div class="edupanetag">🧑‍💼 매니저가 보는 화면</div>${mgr}</div>
     <div class="edupane boss"><div class="edupanetag">👑 대표만 보는 칸</div>${boss}</div>
@@ -194,7 +190,6 @@ function mgrPane(i, d, side) {
 function bossPane(i, d) {
   const ev = d.evals[i.id] || {};
   return `<div class="eduadmin">
-      ${EDU.split ? "" : `<div class="mut">대표 전용</div>`}
       ${i.leaderQ?.length ? `<div><b>확인 질문</b><ul>${i.leaderQ.map((q) => `<li>${esc(q)}</li>`).join("")}</ul></div>` : ""}
       <div class="eduev"><b>평가</b> ${LEVELS.map(([v, lb]) => `<label><input type="radio" name="ev-${i.id}" data-ev="${i.id}" value="${v}" ${String(ev.level) === v ? "checked" : ""}> ${lb}</label>`).join("")}</div>
       <textarea data-evc="${i.id}" rows="2" placeholder="관찰한 사실을 적어요 (예: 3차 연습에서 스크립트 4개 구간 누락)">${esc(ev.comment || "")}</textarea>
@@ -332,11 +327,6 @@ function bind(d) {
   }));
 
   // 평가서
-  V0.querySelector("#eduSplitBtn")?.addEventListener("click", () => {
-    EDU.split = !EDU.split;
-    try { localStorage.setItem("edu-split", EDU.split ? "1" : ""); } catch {}
-    EDU.load();
-  });
   V0.querySelector("#eduRepBtn")?.addEventListener("click", async () => {
     const { data } = await sb.from("edu_final").select("note").eq("user_id", d.mine).maybeSingle();
     V0.querySelector("#eduFinal").value = data?.note || "";

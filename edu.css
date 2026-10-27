@@ -92,8 +92,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
   #eduReport { margin: 0; border-radius: 0; }
 }
 
-/* 👀 매니저 화면 같이 보기 — 항목 상세를 두 칸으로 */
-#eduView .btn.on { border-color: var(--accent); color: var(--accent); }
+/* 대표 화면: 항목 상세를 늘 두 칸으로 (왼쪽 매니저 화면 · 오른쪽 대표 전용) */
 #eduView .edusplit { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 @media (max-width: 1100px) { #eduView .edusplit { grid-template-columns: 1fr; } }
 #eduView .edupane { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
