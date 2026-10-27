@@ -9,3 +9,10 @@
 - 10-26: 🔭 D단계 — build-creative.mjs(추천 입력), 점검기 checkIdeas(유사도·과장·가격, 컬컴은 카피에서만 차단), save-report creative, 플래너 '주간 추천' 화면(카피·타겟 복사). 운영 첫 추천 en 5·jpcn 4 저장. 스킬에 월요일 절차 추가.
 - 10-26: 🔖 버전 202610261700 — 🔭 경쟁사 광고 정찰 A~D 배포 (main 합치기: 리퀴드 글래스·Q&A 이후, index.html 버전 충돌 해결)
 - 10-26: 🎓 헤더 '전산 연습' 버튼(상담 AI 옆) — 연습 사이트 매니저 진행률 화면(pallo-training.netlify.app/training/progress)을 새 탭으로. 버전 202610261427. 배포.
+
+## 2026-10-27 조교 링크 (운영 반영)
+- 0045_assistant_links 운영 DB 적용: role 'assistant', 허용 표(leaders·leader_att·leader_awards·blog_%·sns_posts·sns_jobs·feedback·profiles(자기 줄)·teams) 밖 RLS 표 전부 restrictive no_assistant. my_team() 은 조교에게 null.
+- edge function planner-jo 운영 배포 (JWT 확인 OFF — 함수가 직접 확인: login=링크 해시, rotate=대표만).
+- 사이트 80c59cb: 현황 카드 "🔗 조교 링크", ?jo= 로그인, 조교는 리더 현황·블로그·게시물만.
+- 운영 검증: 울산점 링크 생성 → 로그인 200, 조교·울산점, 리더 66명, 다른 지점 0, 할 일·고정업무·연락처·매출·교육 등 0, app_settings 거부. 가짜 링크 401, 비로그인 rotate 401.
+- 새 표 만들 때: RLS 켜면 no_assistant 정책도 같이 (tools/test_assistant.sql 이 빠진 표 잡음).
