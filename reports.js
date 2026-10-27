@@ -1,9 +1,9 @@
 // 📝 리포트 탭: 데일리 리포트(정식 매니저 교육, 10/27부터 한 달) · 주간 성장 리포트(매주, 미팅 전).
 // 매니저는 양식대로 적고(0.7초 뒤 자동 저장) [제출] → 대표에게 푸시+카톡. 대표는 날짜(주)별로 지점·사람마다 모아 봄(읽기만).
-// 쓰는 사람 = report_people(이름, 대표가 정함) — 다른 매니저는 탭이 안 보임. 쓰는 날: 데일리 = 수·일, 주간 성장 = 일 (일요일은 2개).
+// 쓰는 사람 = report_people(이름, 대표가 정함) — 다른 매니저는 탭이 안 보임. 쓰는 날: 데일리 = 수·일(사람별로 daily_days·daily_until 이면 그 요일), 주간 성장 = 일 (일요일은 2개).
 // index.html 의 sb·me·uid·isBoss·previewTeam·previewUser·previewName·myName·esc·toast·fail·today·DOW·inTeam 을 씀 → window.RP
 (() => {
-const RP = (window.RP = { kind: "daily", day: null, row: null, open: new Set(), names: new Set(), ok: false, todo: {} });
+const RP = (window.RP = { kind: "daily", day: null, row: null, open: new Set(), names: new Map(), ok: false, todo: {} });
 const DAILY_DAYS = [3, 0], WEEKLY_DAY = 0; // 수·일 / 일 (getDay: 0 = 일)
 const V = () => document.getElementById("rpView");
 const CONSULT = ["Premium", "Pro Max", "Pro", "Plus", "미등록"];
@@ -39,22 +39,31 @@ const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDat
 const hm = (t) => { const d = new Date(t); return `${md(W.ymd(d))} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const dow = (s) => W.parse(s).getDay(), dd = (s) => `${md(s)}(${DOW[dow(s)]})`;
 const dayLabel = () => RP.kind === "daily" ? dd(RP.day) : `${md(RP.day)} ~ ${md(W.add(RP.day, 6))} 주 · ${dd(W.add(RP.day, 6))} 작성`;
-// 데일리는 쓰는 날(수·일)끼리만 오감: n = -1 이전 · 1 다음
-const stepDaily = (s, n) => { do s = W.add(s, n); while (!DAILY_DAYS.includes(dow(s))); return s; };
-const thisDay = () => RP.kind === "daily" ? (DAILY_DAYS.includes(dow(today())) ? today() : stepDaily(today(), -1)) : W.monday(today());
-const bossMode = () => isBoss && !previewUser;
+const bossMode = () => isBoss && !previewUser, meName = () => previewUser ? previewName : myName;
+// 사람별 데일리 요일: report_people.daily_days 를 daily_until 까지, 아니면 수·일
+const daysOf = (name, s) => { const p = RP.names.get(name); return p?.daily_days && (!p.daily_until || s <= p.daily_until) ? p.daily_days : DAILY_DAYS; };
+const ruleText = (name, s) => {
+  const d = daysOf(name, s); if (d === DAILY_DAYS) return "수·일";
+  const off = [1, 2, 3, 4, 5, 6, 0].filter((x) => !d.includes(x)), until = RP.names.get(name).daily_until;
+  return (off.length ? `매일(${off.map((x) => DOW[x]).join("·")} 제외)` : "매일") + (until ? ` ~${md(until)}` : "");
+};
+// s 날 데일리 쓰나: 매니저 = 나, 대표 = 대상 중 누구라도
+const writes = (s) => (bossMode() ? [...RP.names.keys()] : [meName()]).some((n) => daysOf(n, s).includes(dow(s)));
+// 데일리는 쓰는 날끼리만 오감: n = -1 이전 · 1 다음
+const stepDaily = (s, n) => { for (let i = 0; i < 14; i++) if (writes((s = W.add(s, n)))) break; return s; };
+const thisDay = () => RP.kind === "daily" ? (writes(today()) ? today() : stepDaily(today(), -1)) : W.monday(today());
 
 // 부팅 때 한 번: 대상자만 탭 보이기 + 오늘 쓸 것 배지
 RP.init = async function () {
-  const { data } = await sb.from("report_people").select("name");
-  RP.names = new Set((data ?? []).map((x) => x.name));
-  RP.ok = bossMode() || RP.names.has(previewUser ? previewName : myName);
+  const { data } = await sb.from("report_people").select("name, daily_days, daily_until");
+  RP.names = new Map((data ?? []).map((x) => [x.name, x]));
+  RP.ok = bossMode() || RP.names.has(meName());
   document.querySelector('.seg [data-v="rp"]')?.classList.toggle("hidden", !RP.ok);
   if (RP.ok && !bossMode()) await RP.badge();
 };
 // 오늘 써야 하는 것: 수 = 데일리, 일 = 데일리 + 주간 성장. RP.todo = { daily: 제출했나, weekly: 제출했나 } (오늘 쓸 것만)
 RP.badge = async function () {
-  const t = today(), d = dow(t), need = { ...(DAILY_DAYS.includes(d) ? { daily: t } : {}), ...(d === WEEKLY_DAY ? { weekly: W.monday(t) } : {}) };
+  const t = today(), d = dow(t), need = { ...(writes(t) ? { daily: t } : {}), ...(d === WEEKLY_DAY ? { weekly: W.monday(t) } : {}) };
   RP.todo = {};
   if (Object.keys(need).length) {
     const { data } = await sb.from("reports").select("kind, day, submitted_at").eq("user_id", uid()).in("day", [...new Set(Object.values(need))]);
@@ -67,10 +76,11 @@ RP.badge = async function () {
 function todayCard() {
   const t = today(), d = dow(t), chip = (k, label) => `<button class="rpchip ${RP.todo[k] ? "ok" : ""}" data-k2="${k}">${RP.todo[k] ? "✅" : "⬜"} ${label}</button>`;
   let now;
-  if (d === WEEKLY_DAY) now = `<b>오늘(일)은 리포트 2개를 써요</b> ${chip("daily", "① 데일리 리포트")} ${chip("weekly", "② 주간 성장 리포트")}`;
-  else if (DAILY_DAYS.includes(d)) now = `<b>오늘(${DOW[d]})은 데일리 리포트 쓰는 날이에요</b> ${chip("daily", "데일리 리포트")}`;
+  if (d === WEEKLY_DAY && writes(t)) now = `<b>오늘(일)은 리포트 2개를 써요</b> ${chip("daily", "① 데일리 리포트")} ${chip("weekly", "② 주간 성장 리포트")}`;
+  else if (d === WEEKLY_DAY) now = `<b>오늘(일)은 주간 성장 리포트 쓰는 날이에요</b> ${chip("weekly", "주간 성장 리포트")}`;
+  else if (writes(t)) now = `<b>오늘(${DOW[d]})은 데일리 리포트 쓰는 날이에요</b> ${chip("daily", "데일리 리포트")}`;
   else { const n = stepDaily(t, 1); now = `오늘은 쓰는 날이 아니에요 · 다음은 <b>${dd(n)}</b> ${dow(n) === WEEKLY_DAY ? "데일리 + 주간 성장 2개" : "데일리"}`; }
-  return `<div class="card rptoday"><div>📅 <b>쓰는 날</b> — 데일리: <b>수·일</b> · 주간 성장: <b>일요일</b> <span class="mut">(일요일은 2개 다 써요)</span></div><div class="rpnow">${now}</div></div>`;
+  return `<div class="card rptoday"><div>📅 <b>쓰는 날</b> — 데일리: <b>${ruleText(meName(), t)}</b> · 주간 성장: <b>일요일</b> <span class="mut">(일요일은 2개 다 써요)</span></div><div class="rpnow">${now}</div></div>`;
 }
 // 상담 결과 숫자 → 'Premium 2명 / Pro 1명 / 미등록 1명'
 const consultLine = (c = {}) => CONSULT.filter((k) => Number(c[k]) > 0).map((k) => `${k} ${c[k]}명`).join(" / ");
@@ -180,12 +190,14 @@ RP.loadBoss = async function () {
   const [t, p, r] = await Promise.all([sb.from("teams").select("id, name, sort").order("sort"), sb.rpc("team_people"),
     sb.from("reports").select("*").eq("kind", RP.kind).eq("day", RP.day)]);
   if (fail(t.error || p.error || r.error)) return;
+  const due = (n) => RP.kind === "weekly" || daysOf(n, RP.day).includes(dow(RP.day)); // 이 날 쓸 사람인가
   const mgrs = inTeam(p.data).filter((x) => x.role === "manager" && x.team_id && RP.names.has(x.name)), by = new Map(r.data.map((x) => [x.user_id, x]));
-  const noAcct = previewTeam ? [] : [...RP.names].filter((n) => !p.data.some((x) => x.name === n)); // 대상인데 아직 플래너 가입 전
-  const done = mgrs.filter((m) => by.get(m.user_id)?.submitted_at).length;
+  const noAcct = previewTeam ? [] : [...RP.names.keys()].filter((n) => due(n) && !p.data.some((x) => x.name === n)); // 대상인데 아직 플래너 가입 전
+  const done = mgrs.filter((m) => due(m.name) && by.get(m.user_id)?.submitted_at).length, total = mgrs.filter((m) => due(m.name)).length + noAcct.length;
+  const special = [...RP.names.keys()].filter((n) => daysOf(n, RP.day) !== DAILY_DAYS).map((n) => `${n} ${ruleText(n, RP.day)}`);
   const card = (m) => {
     const x = by.get(m.user_id), b = x?.body ?? {}, open = RP.open.has(m.user_id);
-    const st = !x ? `<span class="rpst none">미작성</span>` : x.submitted_at ? `<span class="rpst ok">✅ 제출 ${hm(x.submitted_at)}</span>` : `<span class="rpst draft">✍️ 작성 중</span>`;
+    const st = !x ? `<span class="rpst none">${due(m.name) ? "미작성" : "쓰는 날 아님"}</span>` : x.submitted_at ? `<span class="rpst ok">✅ 제출 ${hm(x.submitted_at)}</span>` : `<span class="rpst draft">✍️ 작성 중</span>`;
     const sum = !x ? "" : RP.kind === "daily" ? consultLine(b.consult) || "상담 없음" : b.mood ?? "";
     return `<div class="rpp ${open ? "open" : ""}" data-u="${m.user_id}"><button class="rph" ${x ? "" : "disabled"}><b>${esc(m.name)}</b>${st}<span class="mut">${esc(sum)}</span>${x ? `<span class="rpar">${open ? "▲" : "▼"}</span>` : ""}</button>
       ${open && x ? `<div class="rpread">${F().fields.map(([k, l]) => `<div><b>${l}</b><p>${esc((b[k] ?? "").trim() || "-")}</p></div>`).join("")}
@@ -193,10 +205,10 @@ RP.loadBoss = async function () {
           : `<div><b>6. 현재 나의 컨디션</b><p>${esc(b.mood ?? "-")}<br>${esc((b.mood_why ?? "").trim())}</p></div>`}
         <button class="btn ghost rpcp">📋 복사</button></div>` : ""}</div>`;
   };
-  const offDay = RP.kind === "daily" && !DAILY_DAYS.includes(dow(RP.day));
-  V().innerHTML = head(`<span class="mut">제출 ${done}/${mgrs.length + noAcct.length}명 · 대상 ${[...RP.names].join("·")} · 데일리 수·일, 주간 성장 일</span>`) + (offDay ? `<div class="card mut">이 날은 쓰는 날이 아니에요</div>` : "") + t.data.map((tm) => {
+  const offDay = RP.kind === "daily" && !writes(RP.day);
+  V().innerHTML = head(`<span class="mut">제출 ${done}/${total}명 · 대상 ${[...RP.names.keys()].join("·")} · 데일리 수·일${special.length ? ` (${special.join(", ")})` : ""}, 주간 성장 일</span>`) + (offDay ? `<div class="card mut">이 날은 쓰는 날이 아니에요</div>` : "") + t.data.map((tm) => {
     const ms = mgrs.filter((m) => m.team_id === tm.id); if (!ms.length) return "";
-    return `<section class="rpsec"><h3>${esc(tm.name)} <span class="mut">${ms.filter((m) => by.get(m.user_id)?.submitted_at).length}/${ms.length}</span></h3><div class="card">${ms.map(card).join("")}</div></section>`;
+    return `<section class="rpsec"><h3>${esc(tm.name)} <span class="mut">${ms.filter((m) => due(m.name) && by.get(m.user_id)?.submitted_at).length}/${ms.filter((m) => due(m.name)).length}</span></h3><div class="card">${ms.map(card).join("")}</div></section>`;
   }).join("") + (noAcct.length ? `<section class="rpsec"><h3>가입 전</h3><div class="card">${noAcct.map((n) => `<div class="rpp"><div class="rph"><b>${esc(n)}</b><span class="rpst none">플래너 가입 전</span></div></div>`).join("")}</div></section>` : "")
     || `<div class="card mut">대상 매니저가 없어요</div>`;
   wireHead();
