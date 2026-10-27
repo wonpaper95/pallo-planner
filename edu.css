@@ -123,3 +123,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 #eduView .eduimplist input { width: 100%; }
 #eduView .edumission .edugrid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 #eduView .edutools { margin-top: 14px; }
+
+/* 주차 제출물 — 주차 자료 아래, 항목 목록 위 */
+#eduView .eduweeksubs { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+#eduView .eduweeksubs .edusubf { margin-top: 8px; }

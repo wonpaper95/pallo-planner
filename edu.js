@@ -9,6 +9,7 @@ const V = () => document.getElementById("eduView");
 const W = () => globalThis.EDU_WEEKS || [];
 const ITEMS = () => globalThis.EDU_ITEMS || [];
 const byWeek = (w) => ITEMS().filter((i) => i.week === w);
+const weekKey = (w) => `week-${w}`;   // 주차 제출물은 edu_submits 에 이 id 로 들어간다
 const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
 const BOOKS = [["book1", "어떻게 원하는 것을 얻는가", "INTRO~2주차"], ["book2", "일의 격", "3주차"], ["book3", "데일 카네기 인간관계론", "5~7주차"]];
@@ -141,8 +142,22 @@ function weekCard(w, d, role) {
       ${refs.length ? refs.map((r) => refRow(r, canEdit)).join("") : `<span class="mut">아직 없어요.</span>`}
       ${canEdit ? `<form class="edureff" data-week="${w.week}"><input name="title" placeholder="자료 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">추가</button></form>` : ""}
     </div>
+    ${weekSubs(w, d, role)}
     <div class="eduitems">${items.map((i) => itemRow(i, d, role)).join("")}</div>
   </section>`;
+}
+
+// 주차 단위 제출 칸 — 그 주 보고서처럼 항목 하나에 딸리지 않는 산출물을 여기에 올린다.
+// 저장은 항목 제출물과 같은 표(edu_submits)에 item_id = "week-<주차>" 로 들어간다.
+function weekSubs(w, d, role) {
+  const key = weekKey(w.week);
+  const subs = d.subs.filter((s) => s.item_id === key);
+  return `<div class="edusubs eduweeksubs">
+    <b>📤 주차 제출물</b> <span class="mut">${esc(w.report)}</span>
+    ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
+    ${!d.admin ? `<form class="edusubf" data-id="${key}"><input name="title" placeholder="제출물 이름 (예: 주간보고 #1)" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
+      : role === "mgr" ? `<form class="edusubf demo"><input placeholder="제출물 이름 (예: 주간보고 #1)" disabled><input placeholder="링크 (https://…)" disabled><span class="btn ghost" aria-disabled="true">📁 파일</span><span class="btn" aria-disabled="true">올리기</span></form><div class="mut">매니저는 여기에 그 주 보고서를 올려요 (대표 화면에서는 안 눌려요)</div>` : ""}
+  </div>`;
 }
 
 function refRow(r, canEdit) {
