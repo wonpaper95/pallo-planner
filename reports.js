@@ -57,7 +57,7 @@ const thisDay = () => RP.kind === "daily" ? (writes(today()) ? today() : stepDai
 RP.init = async function () {
   const { data } = await sb.from("report_people").select("name, daily_days, daily_until");
   RP.names = new Map((data ?? []).map((x) => [x.name, x]));
-  RP.ok = bossMode() || RP.names.has(meName());
+  RP.ok = bossMode() || RP.names.has(meName()); RP.ready = true;
   document.querySelector('.seg [data-v="rp"]')?.classList.toggle("hidden", !RP.ok);
   if (RP.ok && !bossMode()) await RP.badge();
 };
@@ -95,6 +95,7 @@ RP.text = function (kind, body, who) {
 };
 
 RP.load = async function () {
+  if (!RP.ready) await RP.init();
   RP.day ??= thisDay();
   if (bossMode()) return RP.loadBoss();
   if (!RP.ok) { V().innerHTML = `<div class="card mut">${esc(previewName || "이 계정")}은(는) 리포트 대상이 아니에요.</div>`; return; }
