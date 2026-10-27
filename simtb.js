@@ -1,4 +1,4 @@
-// 🧠 다음날 시뮬레이션 — 타임박스 플래너 (지점 공용, 하루 하나): 우선순위 3 · 브레인 덤프 · 시간표 5시~12시(:00/:30)
+// 🧠 다음날 시뮬레이션 — 타임박스 플래너 (지점 공용, 하루 하나): 우선순위 3 · 브레인 덤프 · 시간표 5시~12시(한 시간 한 칸, 키 "HH:00")
 // 적는 칸마다 실시간으로 나눔(비공개 채널 simnote:<지점>), 0.7초 뒤 저장. 같은 칸을 내가 적는 중이면 남의 글은 그 칸에만 안 덮음.
 // data-tb = 지점 id (공용·실시간) 또는 "me" (🧠 시뮬레이터 탭 — 대표 개인, my_notes, 나만 봄). data-day 없으면 오늘
 // index.html 의 sb·simChannel·today·md·pad·esc·fail·myName·W 를 씀 → window.TB
@@ -7,6 +7,8 @@ const TB = (window.TB = {});
 const HOURS = Array.from({ length: 20 }, (_, i) => i + 5); // 5 … 24(밤 12시)
 const key = (h, m) => `${String(h).padStart(2, "0")}:${m}`;
 const h12 = (h) => (h % 12 === 0 ? 12 : h % 12);
+// 예전 :30 칸에 적은 건 그 시간 칸에 이어 붙여 보여 줌 (다음 저장 때 한 칸으로 합쳐짐)
+const hourText = (t, h) => [t[key(h, "00")], t[key(h, "30")]].filter((x) => x?.trim()).join("\n");
 
 TB.html = (st, tid, day = "") => {
   const p = st?.plan?.p ?? [], t = st?.plan?.t ?? {};
@@ -16,8 +18,8 @@ TB.html = (st, tid, day = "") => {
       <div class="tbDH">브레인 덤프 — 옮겨 적기</div>
       <textarea class="tbDump" data-k="body" placeholder="떠오르는 걸 다 적고, 시간표로 옮겨 적어요">${esc(st?.body ?? "")}</textarea>
     </div>
-    <div class="tbR"><table><tr><th>시간</th><th>:00</th><th>:30</th></tr>${HOURS.map((h) => `<tr class="${h >= 12 && h < 24 ? "pm" : ""}"><td class="h">${h12(h)}</td>`
-      + ["00", "30"].map((m) => `<td><textarea class="tbc" rows="1" data-k="t${key(h, m)}">${esc(t[key(h, m)] ?? "")}</textarea></td>`).join("") + `</tr>`).join("")}</table></div>
+    <div class="tbR"><table><tr><th>시간</th><th>할 일</th></tr>${HOURS.map((h) => `<tr class="${h >= 12 && h < 24 ? "pm" : ""}"><td class="h">${h12(h)}</td>`
+      + `<td><textarea class="tbc" rows="1" data-k="t${key(h, "00")}">${esc(hourText(t, h))}</textarea></td></tr>`).join("")}</table></div>
   </div>`;
 };
 // 칸들 → 저장할 모양
@@ -30,7 +32,7 @@ TB.read = (root) => {
 TB.apply = (root, st) => {
   const want = { body: st.body ?? "" };
   (st.plan?.p ?? []).forEach((x, i) => (want[`p${i}`] = x ?? ""));
-  root.querySelectorAll('[data-k^="t"]').forEach((el) => (want[el.dataset.k] = st.plan?.t?.[el.dataset.k.slice(1)] ?? ""));
+  root.querySelectorAll('[data-k^="t"]').forEach((el) => (want[el.dataset.k] = hourText(st.plan?.t ?? {}, +el.dataset.k.slice(1, 3))));
   if (!st.plan) Object.keys(want).forEach((k) => k !== "body" && delete want[k]); // 예전 화면은 글(body)만 보냄
   for (const [k, v] of Object.entries(want)) { const el = root.querySelector(`[data-k="${k}"]`); if (el && el !== document.activeElement && el.value !== v) { el.value = v; if (el.matches(".tbc")) fit(el); } }
   TB.grow(root);
