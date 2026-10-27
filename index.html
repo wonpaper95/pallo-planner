@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610270951">
+<meta name="app-version" content="202610270953">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
 <script src="theme.js?v=202610270946"></script>
@@ -332,6 +332,12 @@ body:not(.smv) #mySimView { display: none; } /* 🧠 시뮬레이터 탭 (대표
 #mySimView .mysimbar h2 { margin: 0; } #mySimView .mysimbar h2 small, #mySimWho { color: var(--sub); font-weight: 400; font-size: 13px; }
 #mySimView .mysimnav { display: inline-flex; align-items: center; gap: 6px; }
 #mySimView .mysimnav button { padding: 4px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); cursor: pointer; }
+#mySimView .mytodo { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; margin-bottom: 12px; }
+#mySimView .mytodo h3 { margin: 0 0 6px; font-size: 15px; } #mySimView .mytodo h3 small { color: var(--sub); font-weight: 400; }
+#mySimView .mytodo ul { list-style: none; margin: 0; padding: 0; columns: 2 320px; column-gap: 24px; }
+#mySimView .mytodo li { break-inside: avoid; display: flex; gap: 8px; align-items: baseline; padding: 4px 0; font-size: 14px; border-bottom: 1px solid var(--line); }
+#mySimView .mytodo li.done span.t { color: var(--sub); text-decoration: line-through; }
+#mySimView .mytodo li .m { color: var(--sub); font-size: 12px; white-space: nowrap; }
 #mySimView .mysimcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px 16px 16px; }
 #simTeamSel { margin-left: 6px; padding: 2px 6px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
 .bsim { margin-top: 8px; } .bsim summary { cursor: pointer; font-weight: 600; font-size: 13.5px; } .bsim small { color: var(--sub); font-weight: 400; }
@@ -828,6 +834,7 @@ function simChannel(tid, onText, key = "tb") {
 let simP = null; // 대표: 고른 지점 · 매니저·미리보기: 우리 지점(null = 서버가 앎)
 async function loadSim() {
   const box = $("#simbox"), admin = myRole === "admin";
+  if (admin) return box.classList.add("hidden"); // 대표: 지점 시뮬레이션은 현황 탭 카드에서 봄 (주간엔 안 보임, 10-27)
   if (admin) { // 대표: 지점 고르기 (마지막 고른 지점 기억)
     const on = teams.filter((t) => t.sim_note); if (!on.length) return box.classList.add("hidden");
     let saved = null; try { saved = +localStorage.getItem("sim-team") || null; } catch {}
@@ -1949,7 +1956,7 @@ boot();
 <script src="post.js?v=202610270946"></script>
 <script src="someday.js?v=202610270946"></script>
 <script src="contacts.js?v=202610270946"></script>
-<script src="simtb.js?v=202610270951"></script>
+<script src="simtb.js?v=202610270953"></script>
 <script src="leaders-core.js?v=202610270946"></script>
 <script src="leaders.js?v=202610270946"></script>
 <script src="links.js?v=202610270946"></script>

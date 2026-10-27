@@ -76,13 +76,23 @@ TB.loadMine = async (day) => {
   const v = document.getElementById("mySimView"); if (!v) return;
   TB.myDay = day ?? TB.myDay ?? today();
   const d = TB.myDay, DOWS = "일월화수목금토", wd = DOWS[W.parse(d).getDay()];
-  const { data, error } = await sb.from("my_notes").select("body, plan, updated_at").eq("day", d).maybeSingle(); if (fail(error)) return;
+  const [{ data, error }, tk] = await Promise.all([sb.from("my_notes").select("body, plan, updated_at").eq("day", d).maybeSingle(),
+    sb.from("tasks").select("id, title, done, start_time, estimate_min, important, sort").eq("user_id", me.id).eq("day", d).neq("title", "")]); // 📋 그날 주간 할 일
+  if (fail(error || tk.error)) return;
+  const todos = (tk.data ?? []).sort(W.daySort);
   v.innerHTML = `<div class="mysimbar"><h2>🧠 시뮬레이터 <small>내 타임박스 · 나만 봐요</small></h2>
       <span class="mysimnav"><button data-myd="-1">‹</button><b>${md(d)}(${wd})${d === today() ? " · 오늘" : ""}</b><button data-myd="1">›</button>${d !== today() ? `<button data-myd="0">오늘</button>` : ""}</span>
       <small id="mySimWho">${data?.updated_at ? `${md(d)} · ${pad(new Date(data.updated_at).getHours())}:${pad(new Date(data.updated_at).getMinutes())} 저장` : "아직 없음"}</small></div>
+    <div class="mytodo"><h3>📋 ${md(d)} 할 일 <small>주간 탭과 같은 목록 · ${todos.filter((x) => x.done).length}/${todos.length} · 체크하면 주간에도 반영</small></h3>
+      ${todos.length ? `<ul>${todos.map((x) => `<li class="${x.done ? "done" : ""}"><input type="checkbox" data-mytodo="${x.id}" ${x.done ? "checked" : ""}><span class="t">${x.important ? "★ " : ""}${esc(x.title)}</span>${x.start_time ? `<span class="m">🕐 ${x.start_time.slice(0, 5)}</span>` : ""}${x.estimate_min ? `<span class="m">⏳ ${x.estimate_min}분</span>` : ""}</li>`).join("")}</ul>` : `<div class="mut" style="color:var(--sub);font-size:14px">이날 할 일이 없어요</div>`}</div>
     <div class="mysimcard">${TB.html({ body: data?.body, plan: data?.plan }, "me", d)}</div>`;
   TB.grow(v.querySelector(".tb"));
 };
+document.addEventListener("change", async (e) => { // 📋 할 일 체크 → 주간과 같은 tasks
+  const c = e.target.closest?.("#mySimView [data-mytodo]"); if (!c) return;
+  const { error } = await sb.from("tasks").update({ done: c.checked }).eq("id", +c.dataset.mytodo); if (fail(error)) { c.checked = !c.checked; return; }
+  TB.loadMine(); window.loadAll?.();
+});
 document.addEventListener("click", (e) => {
   const b = e.target.closest?.("#mySimView [data-myd]"); if (!b) return;
   const n = +b.dataset.myd; TB.loadMine(n ? W.add(TB.myDay, n) : today());
