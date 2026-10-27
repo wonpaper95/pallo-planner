@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610272252">
+<meta name="app-version" content="202610272312">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610272252"></script>
+<script src="theme.js?v=202610272312"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -373,6 +373,13 @@ body:not(.smv) #mySimView { display: none; } /* 🧠 시뮬레이터 탭 (대표
 .tb tr.pm td:not(.h) { background: rgba(224, 209, 32, .16); }
 .tb td .tbc { display: block; min-height: 32px; padding: 7px 8px; line-height: 1.35; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; } /* 길면 아래로 늘어남 */
 .tb td { vertical-align: top; }
+#simRecDlg { width: min(1180px, 96vw); } #simRecDlg .srTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+#simRecDlg .srBody { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; max-height: 76vh; }
+#simRecDlg .srList { overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+#simRecDlg .srList button { text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); cursor: pointer; font: inherit; }
+#simRecDlg .srList button.on { border-color: var(--accent); background: rgba(73, 48, 135, .14); } #simRecDlg .srList small { font-size: 12px; }
+#simRecDlg .srView { overflow: auto; } #simRecDlg .srHead { margin-bottom: 4px; }
+@media (max-width: 700px) { #simRecDlg .srBody { grid-template-columns: 1fr; max-height: none; } #simRecDlg .srList { flex-direction: row; overflow-x: auto; } #simRecDlg .srList button { min-width: 130px; } }
 .tb .tbw { position: relative; } /* ✍️ 줄마다 글자색: 글은 투명 textarea 뒤 .tbbk 에 그림 */
 .tb .tbw > textarea { position: relative; z-index: 1; color: transparent; caret-color: var(--text); }
 .tb .tbw > textarea::placeholder { color: var(--sub); } .tb .tbw > textarea::selection { color: var(--text); background: rgba(73, 48, 135, .35); }
@@ -561,7 +568,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
       <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
           <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
         <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
-      <details id="simbox" class="hidden" open><summary>🧠 다음날 시뮬레이션 <small class="tbsub">타임박스</small> <select id="simTeamSel" class="hidden" onclick="event.stopPropagation()"></select> <button id="simDay" class="rtnav" type="button" title="눌러서 오늘 / 내일 바꿔 보기"></button> <small id="simWho"></small></summary>
+      <details id="simbox" class="hidden" open><summary>🧠 다음날 시뮬레이션 <small class="tbsub">타임박스</small> <select id="simTeamSel" class="hidden" onclick="event.stopPropagation()"></select> <button id="simDay" class="rtnav" type="button" title="눌러서 오늘 / 내일 바꿔 보기"></button> <button id="simRec" class="rtnav" type="button" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button> <small id="simWho"></small></summary>
         <div id="simTB"></div></details>
       <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
         <textarea id="asgText" rows="2" placeholder="예) 김예원 매니저님 금요일 6시까지 환불 리스트 정리해 주세요"></textarea>
@@ -667,9 +674,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610272252"></script>
-<script src="week.js?v=202610272252"></script>
-<script src="pick.js?v=202610272252"></script>
+<script src="config.js?v=202610272312"></script>
+<script src="week.js?v=202610272312"></script>
+<script src="pick.js?v=202610272312"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -901,6 +908,7 @@ async function loadSim() {
   simChannel(tid, (p) => TB.remote(tid, p));
   $("#simWho").textContent = n.at ? `${n.who ?? ""} ${pad(new Date(n.at).getHours())}:${pad(new Date(n.at).getMinutes())} 저장` : "아직 없음";
 }
+$("#simRec").onclick = (e) => { e.preventDefault(); TB.history(simP ?? null); }; // 📜 지난 날들
 $("#simDay").onclick = (e) => { e.preventDefault(); simOff = simOff ? 0 : 1; loadSim(); }; // summary 안 버튼: 접히지 않게
 $("#simTeamSel").onchange = (e) => { simP = +e.target.value; try { localStorage.setItem("sim-team", simP); } catch {} $("#simTB").innerHTML = ""; loadSim(); };
 async function loadRoutine() {
@@ -1098,6 +1106,7 @@ $("#fbList").onclick = async (e) => {
 let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
 try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
 $("#boardView").addEventListener("click", async (e) => {
+  const sr = e.target.closest("[data-simrec]"); if (sr) { e.preventDefault(); return TB.history(+sr.dataset.simrec, sr.dataset.simrecname); } // 📜 지점 시뮬레이션 기록
   const jb = e.target.closest("[data-jo]"); // 🧑‍🎓 조교 링크 새로 만들기 (예전 링크는 바로 막힘)
   if (jb) return joLinkDlg(+jb.dataset.jo, jb.dataset.joname);
   const ct = e.target.closest("[data-ctgt]"); // 📅 지점 상담 목표 바꾸기 (대표)
@@ -1152,7 +1161,7 @@ async function loadBoard() {
       ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
       ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
       ${tm.sim_note ? (() => { const nt = notes.get(tm.id), has = nt && (nt.body || Object.keys(nt.plan?.t ?? {}).length || (nt.plan?.p ?? []).some(Boolean));
-        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"}</summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id)}</details>`; })() : ""}
+        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"} <button type="button" class="rtnav" data-simrec="${tm.id}" data-simrecname="${esc(tm.name)}" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button></summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id)}</details>`; })() : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
       ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
@@ -2025,24 +2034,24 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610272252"></script>
-<script src="photo.js?v=202610272252"></script>
-<script src="blog.js?v=202610272252"></script>
-<script src="mk-core.js?v=202610272252"></script>
-<script src="mkc-core.js?v=202610272252"></script>
-<script src="marketing.js?v=202610272252"></script>
-<script src="sns-core.js?v=202610272252"></script>
-<script src="post.js?v=202610272252"></script>
-<script src="someday.js?v=202610272252"></script>
-<script src="contacts.js?v=202610272252"></script>
-<script src="refs.js?v=202610272252"></script>
-<script src="simtb.js?v=202610272252"></script>
-<script src="leaders-core.js?v=202610272252"></script>
-<script src="leaders.js?v=202610272252"></script>
-<script src="links.js?v=202610272252"></script>
-<script src="edu-data.js?v=202610272252"></script>
-<script src="edu.js?v=202610272252"></script>
-<script src="reports.js?v=202610272252"></script>
-<script src="qna.js?v=202610272252"></script>
+<script src="sales.js?v=202610272312"></script>
+<script src="photo.js?v=202610272312"></script>
+<script src="blog.js?v=202610272312"></script>
+<script src="mk-core.js?v=202610272312"></script>
+<script src="mkc-core.js?v=202610272312"></script>
+<script src="marketing.js?v=202610272312"></script>
+<script src="sns-core.js?v=202610272312"></script>
+<script src="post.js?v=202610272312"></script>
+<script src="someday.js?v=202610272312"></script>
+<script src="contacts.js?v=202610272312"></script>
+<script src="refs.js?v=202610272312"></script>
+<script src="simtb.js?v=202610272312"></script>
+<script src="leaders-core.js?v=202610272312"></script>
+<script src="leaders.js?v=202610272312"></script>
+<script src="links.js?v=202610272312"></script>
+<script src="edu-data.js?v=202610272312"></script>
+<script src="edu.js?v=202610272312"></script>
+<script src="reports.js?v=202610272312"></script>
+<script src="qna.js?v=202610272312"></script>
 </body>
 </html>

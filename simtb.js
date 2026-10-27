@@ -90,6 +90,7 @@ document.addEventListener("input", (e) => {
   if (el.matches(".tbDump, .tbc")) fit(el);
   if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? relines(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 바꾼 줄만 내 색
   if (who) who.textContent = "적는 중…";
+  root._dirty = true; // 저장 전엔 서버 글로 안 덮음 (TB.sync)
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
     const st = TB.read(root);
@@ -99,7 +100,7 @@ document.addEventListener("input", (e) => {
   clearTimeout(tm.save); tm.save = setTimeout(async () => {
     const st = TB.read(root);
     const { error } = mine ? await sb.from("my_notes").upsert({ day, body: st.body, plan: st.plan, updated_at: new Date().toISOString() })
-      : await sb.rpc("team_note_set", { p_day: day, p_body: st.body, p_team: tid, p_plan: st.plan }); if (fail(error)) return;
+      : await sb.rpc("team_note_set", { p_day: day, p_body: st.body, p_team: tid, p_plan: st.plan }); root._dirty = false; if (fail(error)) return;
     const n = new Date(); if (who) who.textContent = `${md(day)} · ${pad(n.getHours())}:${pad(n.getMinutes())} 저장됨`;
   }, 700);
 });
@@ -114,7 +115,7 @@ TB.loadMine = async (day) => {
   if (fail(error || tk.error)) return;
   const todos = (tk.data ?? []).sort(W.daySort);
   v.innerHTML = `<div class="mysimbar"><h2>🧠 시뮬레이터 <small>내 타임박스 · 나만 봐요</small></h2>
-      <span class="mysimnav"><button data-myd="-1">‹</button><b>${md(d)}(${wd})${d === today() ? " · 오늘" : ""}</b><button data-myd="1">›</button>${d !== today() ? `<button data-myd="0">오늘</button>` : ""}</span>
+      <span class="mysimnav"><button data-myd="-1">‹</button><b>${md(d)}(${wd})${d === today() ? " · 오늘" : ""}</b><button data-myd="1">›</button>${d !== today() ? `<button data-myd="0">오늘</button>` : ""}<button data-myrec>📜 기록</button></span>
       <small id="mySimWho">${data?.updated_at ? `${md(d)} · ${pad(new Date(data.updated_at).getHours())}:${pad(new Date(data.updated_at).getMinutes())} 저장` : "아직 없음"}</small></div>
     <div class="mytodo"><h3>📋 ${md(d)} 할 일 <small>주간 탭과 같은 목록 · ${todos.filter((x) => x.done).length}/${todos.length} · 체크하면 주간에도 반영</small></h3>
       ${todos.length ? `<ul>${todos.map((x) => `<li class="${x.done ? "done" : ""}"><input type="checkbox" data-mytodo="${x.id}" ${x.done ? "checked" : ""}><span class="t">${x.important ? "★ " : ""}${esc(x.title)}</span>${x.start_time ? `<span class="m">🕐 ${x.start_time.slice(0, 5)}</span>` : ""}${x.estimate_min ? `<span class="m">⏳ ${x.estimate_min}분</span>` : ""}</li>`).join("")}</ul>` : `<div class="mut" style="color:var(--sub);font-size:14px">이날 할 일이 없어요</div>`}</div>
@@ -127,10 +128,49 @@ document.addEventListener("change", async (e) => { // 📋 할 일 체크 → �
   TB.loadMine(); window.loadAll?.();
 });
 document.addEventListener("click", (e) => {
+  if (e.target.closest?.("#mySimView [data-myrec]")) return TB.history("me", "내 타임박스");
   const b = e.target.closest?.("#mySimView [data-myd]"); if (!b) return;
   const n = +b.dataset.myd; TB.loadMine(n ? W.add(TB.myDay, n) : today());
 });
 document.addEventListener("scroll", (e) => { const el = e.target; if (el?.matches?.(".tbw > textarea")) el.previousElementSibling.scrollTop = el.scrollTop; }, true); // 칸을 줄여 스크롤해도 색 글자가 같이 움직임
+// 🔁 실시간 보조: 오래 켜 둔 화면·잠자기 뒤에 실시간 연결이 끊겨도 10초마다(+화면 돌아올 때) 서버 글을 다시 받아 맞춤.
+// 적는 중인 칸은 안 덮음(TB.apply). 끊긴 실시간 채널은 다시 연결
+let polling = false;
+TB.sync = async () => {
+  if (polling || document.hidden || typeof sb === "undefined") return; polling = true;
+  try {
+    for (const [topic, ent] of simChs ?? []) if (["closed", "errored"].includes(ent.ch.state)) { sb.removeChannel(ent.ch); simChs.delete(topic); ent.cbs.forEach((c, k) => simChannel(+topic.split(":")[1], c, k)); }
+    for (const root of document.querySelectorAll(".tb[data-tb]")) {
+      const tid = +root.dataset.tb; if (!tid || !root.offsetParent || root._dirty) continue; // 지점 타임박스 중 보이는 것만 (개인·기록 제외)
+      const day = root.dataset.day || today(), { data } = await sb.rpc("team_note_get", { p_day: day, p_team: tid }), n = data?.[0];
+      if (!n?.at || n.at === root._at) continue; root._at = n.at;
+      TB.apply(root, { body: n.body ?? "", plan: n.plan ?? {} });
+    }
+  } finally { polling = false; }
+};
+setInterval(TB.sync, 10000);
+document.addEventListener("visibilitychange", () => !document.hidden && TB.sync());
+window.addEventListener("focus", () => TB.sync());
+// 📜 기록: 지난 날 타임박스 목록 → 눌러서 그날 그대로 보기 (읽기만, 쓴 사람 색 그대로). tid = 지점 id 또는 "me"(대표 개인)
+const DOWS = "일월화수목금토";
+const filled = (r) => (r.body ?? "").trim() || (r.plan?.p ?? []).some((x) => x?.trim()) || Object.values(r.plan?.t ?? {}).some((x) => x?.trim());
+TB.history = async (tid, title = "") => {
+  const { data, error } = tid === "me" ? await sb.from("my_notes").select("day, body, plan, at:updated_at").order("day", { ascending: false }).limit(90)
+    : await sb.rpc("team_note_days", { p_team: tid }); if (fail(error)) return;
+  const rows = (data ?? []).filter(filled);
+  let d = document.getElementById("simRecDlg"); if (!d) { d = document.createElement("dialog"); d.id = "simRecDlg"; d.className = "wide"; document.body.appendChild(d); }
+  const names = (r) => [...new Set(Object.values(r.plan?.w ?? {}).flat())].filter((n) => n && n !== "대표");
+  const show = (i) => {
+    const r = rows[i], v = d.querySelector(".srView"); d.querySelectorAll(".srList button").forEach((b) => b.classList.toggle("on", +b.dataset.sr === i));
+    v.innerHTML = `<div class="srHead"><b>${md(r.day)}(${DOWS[W.parse(r.day).getDay()]})</b> <small class="mut">${r.who ? `${esc(r.who)} · ` : ""}${r.at ? `${md(r.at.slice(0, 10))} ${pad(new Date(r.at).getHours())}:${pad(new Date(r.at).getMinutes())} 마지막 저장` : ""}</small></div>${TB.html({ body: r.body, plan: r.plan }, "rec", r.day)}`;
+    v.querySelectorAll("[data-k]").forEach((el) => (el.readOnly = true)); TB.grow(v.querySelector(".tb"));
+  };
+  d.innerHTML = `<div class="srTop"><h3 style="margin:0">📜 시뮬레이션 기록${title ? ` · ${esc(title)}` : ""}</h3><button class="btn ghost" data-srx>닫기</button></div>
+    ${rows.length ? `<div class="srBody"><div class="srList">${rows.map((r, i) => `<button data-sr="${i}"><b>${md(r.day)}(${DOWS[W.parse(r.day).getDay()]})</b><small>${names(r).map((n) => `<span style="color:${TB.color(n)}">●${esc(n)}</span>`).join(" ") || esc(r.who ?? "")}</small><small class="mut">${esc((r.plan?.p ?? []).find((x) => x?.trim()) ?? (r.body ?? "").split("\n")[0]).slice(0, 40)}</small></button>`).join("")}</div><div class="srView"></div></div>`
+      : `<p class="mut">아직 기록이 없어요. 타임박스에 적으면 날짜별로 여기 쌓여요.</p>`}`;
+  d.onclick = (e) => { if (e.target.closest("[data-srx]")) return d.close(); const b = e.target.closest("[data-sr]"); if (b) show(+b.dataset.sr); };
+  d.showModal(); if (rows.length) show(0);
+};
 // 칸에서 Enter = 아래 칸으로 (시간표 빨리 채우기), Shift+Enter = 칸 안에서 줄바꿈
 document.addEventListener("keydown", (e) => {
   const el = e.target.closest?.(".tb input[data-k], .tb .tbc"); if (!el || e.key !== "Enter" || e.shiftKey || e.isComposing) return; // Shift+Enter = 칸 안 줄바꿈
