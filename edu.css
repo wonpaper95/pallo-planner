@@ -134,3 +134,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 #eduView .eduimpbox > summary::before { content: "▸ "; }
 #eduView .eduimpbox[open] > summary::before { content: "▾ "; }
 #eduView .eduimpbox[open] > summary { color: var(--text); }
+
+/* 업무 툴 세팅 — 16줄이라 좁은 칸에서는 두 줄로 흘린다 */
+#eduView .edutools .edutoolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 14px; margin-top: 4px; }
+#eduView .edutools .eduline { margin: 2px 0; }

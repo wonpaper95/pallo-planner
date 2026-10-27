@@ -14,7 +14,16 @@ const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
 const BOOKS = [["book1", "어떻게 원하는 것을 얻는가", "INTRO~2주차"], ["book2", "일의 격", "3주차"], ["book3", "데일 카네기 인간관계론", "5~7주차"]];
 const IMPROVE_N = 30;   // 지점 개선안 칸 수 (직접 적는 목록)
-const TOOLS = [["planner", "팔로플래너 세팅"], ["ai", "Claude"], ["discord", "Discord"], ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["icloud", "iCloud 공유"], ["gmail", "Gmail 라벨"]];
+// 업무 툴 세팅 체크리스트 — 입사 순서대로 (계정 → 내 컴퓨터 → 업무 도구 → 대외 채널)
+// 키는 저장된 체크가 날아가지 않게 그대로 둔다.
+const TOOLS = [
+  ["erp", "전산 세팅 (이메일 초대)"], ["macbook", "맥북 계정 세팅"], ["planner", "팔로플래너 세팅"],
+  ["ai", "Claude"], ["discord", "Discord"], ["gmail", "Gmail 라벨"], ["icloud", "iCloud 공유파일"],
+  ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["keyrepl", "키보드 대치 세팅"],
+  ["bookmark", "북마크 최적화 세팅"], ["insta", "인스타그램 계정 세팅"],
+  ["splace", "네이버 스마트플레이스 세팅"], ["nblog", "네이버 블로그 세팅"],
+  ["meta", "META 광고 관리자 세팅"], ["alba", "알바몬·알바천국 세팅"],
+];
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 const normUrl = (u) => (/^https?:\/\//i.test(u) ? u : "https://" + u);
 // Storage 키는 ASCII 만 받는다(한글 파일명이면 거절) → 안전한 이름으로 바꿔 올리고, 보이는 이름은 사용자가 적은 제목을 쓴다
@@ -123,7 +132,7 @@ function mission(d, role) {
         const b = (m.books || {})[k] || {};
         return `<div class="eduline"><span>${esc(t)} <span class="mut">${when}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
       }).join("")}
-      <div class="edutools"><b>업무 툴 세팅</b>${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div>
+      <div class="edutools"><b>업무 툴 세팅</b><div class="edutoolgrid">${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div></div>
     </div>
   </section>`;
 }
