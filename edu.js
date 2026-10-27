@@ -135,7 +135,8 @@ function weekCard(w, d) {
 }
 
 function refRow(r, d) {
-  const href = r.url || (globalThis.CONFIG && `${CONFIG.url}/storage/v1/object/public/edu-materials/${r.path}`);
+  // 공개 주소는 손으로 만들지 말고 SDK 가 주는 것을 쓴다(직접 조립하면 404)
+  const href = r.url || sb.storage.from("edu-materials").getPublicUrl(r.path).data.publicUrl;
   return `<div class="eduref" data-id="${r.id}"><a href="${esc(href)}" target="_blank" rel="noopener">${r.path ? "📄" : "🔗"} ${esc(r.title)}</a>${d.admin ? `<button class="btn ghost edurefdel" title="지우기">🗑</button>` : ""}</div>`;
 }
 
