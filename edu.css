@@ -142,3 +142,9 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 /* 파일을 골랐으면 버튼에 파일 이름이 보이게 — 고른 줄 모르고 추가를 누르던 문제 */
 #eduView .eduup.picked { border-color: var(--green); color: var(--green); }
 #eduView .eduupname { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#eduView .eduitemdel { padding: 2px 6px; font-size: 12px; }
+#eduView .eduitemadm { border-top: 1px dashed var(--line); margin-top: 6px; padding-top: 8px; display: grid; gap: 6px; }
+#eduView .eduitemf { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#eduView .eduitemf input[name=title], #eduView .eduitemf input[name=goal] { flex: 1 1 200px; }
+#eduView .eduitemf input[name=cat] { width: 130px; }
+#eduView .eduunhide { font-size: 12px; padding: 2px 8px; }

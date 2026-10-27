@@ -7,7 +7,11 @@
 const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, impOpen: false, data: null });
 const V = () => document.getElementById("eduView");
 const W = () => globalThis.EDU_WEEKS || [];
-const ITEMS = () => globalThis.EDU_ITEMS || [];
+// 기본 항목(edu-data.js) + 대표가 추가한 항목(edu_items.item) − 숨긴 항목(edu_items.hidden)
+const ITEMS = () => {
+  const ed = EDU.edits || [], hide = new Set(ed.filter((e) => e.hidden).map((e) => e.id));
+  return [...(globalThis.EDU_ITEMS || []), ...ed.filter((e) => e.item).map((e) => ({ ...e.item, id: e.id, week: e.week }))].filter((i) => !hide.has(i.id));
+};
 const byWeek = (w) => ITEMS().filter((i) => i.week === w);
 const weekKey = (w) => `week-${w}`;   // 주차 제출물은 edu_submits 에 이 id 로 들어간다
 const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
@@ -56,15 +60,17 @@ EDU.load = async function () {
   if (EDU.canPick() && !EDU.people) { const { data: ppl } = await sb.rpc("edu_people"); EDU.people = ppl || []; }
 
   const admin = EDU.canPick();
-  const [prog, meta, refs, subs, evals, fbs] = await Promise.all([
+  const [prog, meta, refs, subs, evals, fbs, edits] = await Promise.all([
     sb.from("edu_progress").select("item_id, status").eq("user_id", mine),
     sb.from("edu_meta").select("*").eq("user_id", mine).maybeSingle(),
     sb.from("edu_refs").select("*").order("created_at"),
     sb.from("edu_submits").select("*").eq("user_id", mine).order("created_at"),
     admin ? sb.from("edu_eval").select("*").eq("user_id", mine) : Promise.resolve({ data: [] }),
     admin ? sb.from("edu_feedback").select("*").eq("user_id", mine).order("day") : Promise.resolve({ data: [] }),
+    sb.from("edu_items").select("*").order("created_at"),
   ]);
-  if (fail(prog.error) || fail(refs.error)) return;
+  if (fail(prog.error) || fail(refs.error) || fail(edits.error)) return;
+  EDU.edits = edits.data || [];
 
   const d = (EDU.data = {
     admin, mine,
@@ -77,7 +83,7 @@ EDU.load = async function () {
   });
 
   // 지워진 항목에 평가가 남아 있으면 알려 준다(내용 파일에서 항목을 뺀 경우).
-  const known = new Set(ITEMS().map((i) => i.id));
+  const known = new Set([...(globalThis.EDU_ITEMS || []).map((i) => i.id), ...EDU.edits.map((e) => e.id)]);   // 숨긴 항목은 빠진 게 아님
   d.orphans = Object.keys(d.evals).filter((id) => !known.has(id));
 
   // 대표 화면은 좌우 2단 — 왼쪽은 매니저가 보는 화면 그대로(눌러 볼 수만 있고 입력은 잠김),
@@ -164,7 +170,26 @@ function weekCard(w, d, role) {
     </div>
     ${weekSubs(w, d, role)}
     <div class="eduitems">${items.map((i) => itemRow(i, d, role)).join("")}</div>
+    ${canEdit ? itemAdmin(w) : ""}
   </section>`;
+}
+
+// 대표: 그 주 항목 추가 + 숨긴 항목 되살리기
+function itemAdmin(w) {
+  const hidden = EDU.edits.filter((e) => e.hidden && e.week === w.week);
+  const title = (e) => e.item?.title || (globalThis.EDU_ITEMS || []).find((i) => i.id === e.id)?.title || e.id;
+  const cats = [...new Set(ITEMS().map((i) => i.cat).filter(Boolean))];
+  return `<div class="eduitemadm">
+    ${hidden.length ? `<div class="mut">숨긴 항목: ${hidden.map((e) => `<button class="btn ghost eduunhide" data-id="${esc(e.id)}" title="되살리기">↺ ${esc(title(e))}</button>`).join(" ")}</div>` : ""}
+    <form class="eduitemf" data-week="${w.week}">
+      <input name="title" placeholder="새 항목 이름" maxlength="200" required>
+      <input name="cat" placeholder="분류 (예: 마인드)" maxlength="20" list="eduCats${w.week}"><datalist id="eduCats${w.week}">${cats.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
+      <label class="mut"><input type="checkbox" name="required"> 필수</label>
+      <label class="mut"><input type="checkbox" name="report"> 보고</label>
+      <input name="goal" placeholder="목표 (선택)" maxlength="300">
+      <button class="btn">＋ 항목 추가</button>
+    </form>
+  </div>`;
 }
 
 // 주차 단위 제출 칸 — 그 주 보고서처럼 항목 하나에 딸리지 않는 산출물을 여기에 올린다.
@@ -196,6 +221,7 @@ function itemRow(i, d, role) {
       ${i.required ? `<span class="tag">필수</span>` : ""}${i.report ? `<span class="tag rep">보고</span>` : ""}
       <span class="tag">${esc(i.cat)}</span>
       ${role === "boss" && ev ? `<span class="tag lv${ev.level}">${LEVELS[ev.level][1]}</span>` : ""}
+      ${role === "boss" ? `<button class="btn ghost eduitemdel" title="이 항목 숨기기">🗑</button>` : ""}
     </div>
     ${open ? detail(i, d, role) : ""}
   </div>`;
@@ -209,13 +235,14 @@ function detail(i, d, role) {
 // 양쪽이 똑같이 보는 부분. side 가 켜져 있으면 제출 폼을 '매니저에겐 이렇게 보인다'는 설명용으로 잠가서 보여 준다.
 function mgrPane(i, d, side) {
   const subs = d.subs.filter((s) => s.item_id === i.id);
-  let h = `<div><b>목표</b><br>${esc(i.goal)}</div>
-    <div><b>진행법</b><ol>${i.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
-    <div><b>산출물</b><br>${esc(i.output)}</div>
-    <div class="educrit"><b>합격기준</b>
+  // 대표가 추가한 항목은 이름·목표만 있을 수 있어서 빈 칸은 건너뛴다
+  let h = (i.goal ? `<div><b>목표</b><br>${esc(i.goal)}</div>` : "")
+    + (i.steps?.length ? `<div><b>진행법</b><ol>${i.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>` : "")
+    + (i.output ? `<div><b>산출물</b><br>${esc(i.output)}</div>` : "")
+    + (i.criteria ? `<div class="educrit"><b>합격기준</b>
       <div><span class="tag lv0">미달</span> ${esc(i.criteria.fail)}</div>
       <div><span class="tag lv1">기본</span> ${esc(i.criteria.base)}</div>
-      <div><span class="tag lv2">우수</span> ${esc(i.criteria.good)}</div></div>`;
+      <div><span class="tag lv2">우수</span> ${esc(i.criteria.good)}</div></div>` : "");
   if (i.refs?.length) h += `<div><b>참고자료</b><br>${i.refs.map((r) => { const u = r.url || r, lb = r.label || String(u).split("/").pop(); return /^https?:/i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(lb)}</a>` : `<span class="mut">${esc(lb)} <small>(위 📎 주차 자료 칸에서 열어요)</small></span>`; }).join("<br>")}</div>`;
   h += `<div class="edusubs"><b>📤 제출물</b>
     ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
@@ -263,10 +290,10 @@ function report(d) {
       <tr><td>역량 점수에 포함되지 않음</td><td>${un.got} / ${un.max}</td><td>${pct(un)}</td><td>${un.n} / ${un.all}</td></tr></table>
     <h2>주차별 이수 현황</h2>
     <table><tr><th>주차</th><th>완료</th><th>이수율</th></tr>
-      ${W().map((w) => { const it = byWeek(w.week), dn = it.filter((i) => d.status[i.id] === "done").length; return `<tr><td>${esc(w.label)} ${esc(w.theme)}</td><td>${dn} / ${it.length}</td><td>${Math.round((dn / it.length) * 100)}%</td></tr>`; }).join("")}</table>
+      ${W().map((w) => { const it = byWeek(w.week), dn = it.filter((i) => d.status[i.id] === "done").length; return `<tr><td>${esc(w.label)} ${esc(w.theme)}</td><td>${dn} / ${it.length}</td><td>${it.length ? Math.round((dn / it.length) * 100) : 0}%</td></tr>`; }).join("")}</table>
     <h2>미달 항목</h2>
     ${fails.length ? `<table><tr><th>주차</th><th>항목</th><th>미달 기준</th><th>평가 내용</th><th>평가일</th></tr>
-      ${fails.map((i) => { const e = d.evals[i.id]; return `<tr><td>${esc(wlabel(i.week))}</td><td>${esc(i.title)}</td><td>${esc(i.criteria.fail)}</td><td>${esc(e.comment || "")}</td><td>${esc(e.rated_on)}</td></tr>`; }).join("")}</table>`
+      ${fails.map((i) => { const e = d.evals[i.id]; return `<tr><td>${esc(wlabel(i.week))}</td><td>${esc(i.title)}</td><td>${esc(i.criteria?.fail || "")}</td><td>${esc(e.comment || "")}</td><td>${esc(e.rated_on)}</td></tr>`; }).join("")}</table>`
       : `<p>미달로 평가된 항목이 없습니다.</p>`}
     <h2>피드백 제공 이력</h2>
     ${d.fbs.length ? `<table><tr><th>일자</th><th>주차</th><th>방식</th><th>내용</th></tr>
@@ -309,6 +336,27 @@ function bind(d) {
     const { error } = next === "todo"
       ? await sb.from("edu_progress").delete().eq("user_id", d.mine).eq("item_id", id)
       : await sb.from("edu_progress").upsert({ user_id: d.mine, item_id: id, status: next, updated_at: new Date().toISOString() });
+    if (!fail(error)) EDU.load();
+  }));
+
+  // 항목 추가·숨기기 (대표) — 숨겨도 진행·평가 기록은 남고, ↺ 로 되살린다
+  V0.querySelectorAll(".eduitemf").forEach((f) => (f.onsubmit = async (e) => {
+    e.preventDefault();
+    const title = f.title.value.trim(), required = f.required.checked, report = f.report.checked;
+    if (!title) return toast("항목 이름을 적어 주세요");
+    const item = { title, cat: f.cat.value.trim() || "기타", required, report, weight: report ? 3 : required ? 2 : 1, goal: f.goal.value.trim() };
+    const { error } = await sb.from("edu_items").insert({ id: "c-" + Date.now().toString(36), week: +f.dataset.week, item });
+    if (fail(error)) return; toast("항목을 추가했어요"); EDU.load();
+  }));
+  V0.querySelectorAll(".eduitemdel").forEach((b) => (b.onclick = async () => {
+    const id = b.closest(".eduitem").dataset.id, i = ITEMS().find((x) => x.id === id);
+    if (!confirm(`'${i.title}' 항목을 숨길까요?\n진행·평가 기록은 남아 있고, 주차 맨 아래 '숨긴 항목'에서 되살릴 수 있어요.`)) return;
+    const { error } = await sb.from("edu_items").upsert({ id, week: i.week, hidden: true });
+    if (!fail(error)) { if (EDU.openItem === id) EDU.openItem = null; EDU.load(); }
+  }));
+  V0.querySelectorAll(".eduunhide").forEach((b) => (b.onclick = async () => {
+    const e = EDU.edits.find((x) => x.id === b.dataset.id);
+    const { error } = await sb.from("edu_items").upsert({ id: e.id, week: e.week, hidden: false });
     if (!fail(error)) EDU.load();
   }));
 
