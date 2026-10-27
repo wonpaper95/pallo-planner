@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610270946">
+<meta name="app-version" content="202610270951">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
 <script src="theme.js?v=202610270946"></script>
@@ -354,8 +354,9 @@ body:not(.smv) #mySimView { display: none; } /* 🧠 시뮬레이터 탭 (대표
 .tb td.h { text-align: center; color: var(--sub); font-size: 12.5px; }
 .tb td:not(.h) { background: rgba(224, 209, 32, .10); border-left: 1px solid var(--line); }
 .tb tr.pm td:not(.h) { background: rgba(224, 209, 32, .16); }
-.tb td input { height: 32px; padding: 0 8px; }
-.tb td input:focus, .tb .tbPri input:focus { background: rgba(73, 48, 135, .12); }
+.tb td .tbc { display: block; min-height: 32px; padding: 7px 8px; line-height: 1.35; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; } /* 길면 아래로 늘어남 */
+.tb td { vertical-align: top; }
+.tb td .tbc:focus, .tb .tbPri input:focus { background: rgba(73, 48, 135, .12); }
 .ctgt { background: none; border: 1px dashed var(--line); border-radius: 6px; padding: 0 6px; color: inherit; cursor: pointer; font: inherit; }
 .rt .cnum { margin-left: 6px; color: var(--green, #30a46c); font-size: 13px; } .rt .cnum.low { color: var(--red); }
 .bcard h5 { margin: 12px 0 4px; font-size: 13px; color: var(--sub); font-weight: 600; }
@@ -1948,7 +1949,7 @@ boot();
 <script src="post.js?v=202610270946"></script>
 <script src="someday.js?v=202610270946"></script>
 <script src="contacts.js?v=202610270946"></script>
-<script src="simtb.js?v=202610270946"></script>
+<script src="simtb.js?v=202610270951"></script>
 <script src="leaders-core.js?v=202610270946"></script>
 <script src="leaders.js?v=202610270946"></script>
 <script src="links.js?v=202610270946"></script>

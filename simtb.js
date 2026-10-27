@@ -17,7 +17,7 @@ TB.html = (st, tid, day = "") => {
       <textarea class="tbDump" data-k="body" placeholder="떠오르는 걸 다 적고, 시간표로 옮겨 적어요">${esc(st?.body ?? "")}</textarea>
     </div>
     <div class="tbR"><table><tr><th>시간</th><th>:00</th><th>:30</th></tr>${HOURS.map((h) => `<tr class="${h >= 12 && h < 24 ? "pm" : ""}"><td class="h">${h12(h)}</td>`
-      + ["00", "30"].map((m) => `<td><input data-k="t${key(h, m)}" value="${esc(t[key(h, m)] ?? "")}"></td>`).join("") + `</tr>`).join("")}</table></div>
+      + ["00", "30"].map((m) => `<td><textarea class="tbc" rows="1" data-k="t${key(h, m)}">${esc(t[key(h, m)] ?? "")}</textarea></td>`).join("") + `</tr>`).join("")}</table></div>
   </div>`;
 };
 // 칸들 → 저장할 모양
@@ -32,10 +32,12 @@ TB.apply = (root, st) => {
   (st.plan?.p ?? []).forEach((x, i) => (want[`p${i}`] = x ?? ""));
   root.querySelectorAll('[data-k^="t"]').forEach((el) => (want[el.dataset.k] = st.plan?.t?.[el.dataset.k.slice(1)] ?? ""));
   if (!st.plan) Object.keys(want).forEach((k) => k !== "body" && delete want[k]); // 예전 화면은 글(body)만 보냄
-  for (const [k, v] of Object.entries(want)) { const el = root.querySelector(`[data-k="${k}"]`); if (el && el !== document.activeElement && el.value !== v) el.value = v; }
+  for (const [k, v] of Object.entries(want)) { const el = root.querySelector(`[data-k="${k}"]`); if (el && el !== document.activeElement && el.value !== v) { el.value = v; if (el.matches(".tbc")) fit(el); } }
   TB.grow(root);
 };
-TB.grow = (root) => { const d = root.querySelector(".tbDump"); if (d) { d.style.height = "auto"; d.style.height = Math.max(160, d.scrollHeight + 2) + "px"; } };
+// 글이 길면 칸이 아래로 늘어나서 다 보임 (브레인 덤프·시간표 칸)
+const fit = (el) => { el.style.height = "auto"; el.style.height = (el.classList.contains("tbDump") ? Math.max(160, el.scrollHeight + 2) : el.scrollHeight) + "px"; };
+TB.grow = (root) => root?.querySelectorAll(".tbDump, .tbc").forEach(fit);
 // 남이 적은 것 → 그 지점 타임박스 전부(메인 칸·현황 카드)
 TB.remote = (tid, p) => {
   if (p.day !== today()) return;
@@ -53,7 +55,7 @@ document.addEventListener("input", (e) => {
   const el = e.target.closest?.(".tb [data-k]"); if (!el) return;
   const root = el.closest(".tb"), mine = root.dataset.tb === "me", tid = mine ? "me" : +root.dataset.tb, day = root.dataset.day || today();
   const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small");
-  if (el.classList.contains("tbDump")) TB.grow(root);
+  if (el.matches(".tbDump, .tbc")) fit(el);
   if (who) who.textContent = "적는 중…";
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
@@ -85,12 +87,12 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest?.("#mySimView [data-myd]"); if (!b) return;
   const n = +b.dataset.myd; TB.loadMine(n ? W.add(TB.myDay, n) : today());
 });
-// 칸에서 Enter = 아래 칸으로 (시간표 빨리 채우기)
+// 칸에서 Enter = 아래 칸으로 (시간표 빨리 채우기), Shift+Enter = 칸 안에서 줄바꿈
 document.addEventListener("keydown", (e) => {
-  const el = e.target.closest?.(".tb input[data-k]"); if (!el || e.key !== "Enter" || e.isComposing) return;
-  e.preventDefault(); const all = [...el.closest(".tb").querySelectorAll("input[data-k]")], i = all.indexOf(el);
+  const el = e.target.closest?.(".tb input[data-k], .tb .tbc"); if (!el || e.key !== "Enter" || e.shiftKey || e.isComposing) return; // Shift+Enter = 칸 안 줄바꿈
+  e.preventDefault(); const all = [...el.closest(".tb").querySelectorAll("input[data-k], .tbc")], i = all.indexOf(el);
   const col = el.closest("td"), tr = el.closest("tr"); // 시간표: 같은 열 아래 줄
-  const next = col && tr?.nextElementSibling ? tr.nextElementSibling.children[col.cellIndex]?.querySelector("input") : all[i + 1];
+  const next = col && tr?.nextElementSibling ? tr.nextElementSibling.children[col.cellIndex]?.querySelector(".tbc") : all[i + 1];
   next?.focus();
 });
 })();
