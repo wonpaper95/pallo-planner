@@ -1,8 +1,10 @@
 // 📝 리포트 탭: 데일리 리포트(정식 매니저 교육, 10/27부터 한 달) · 주간 성장 리포트(매주, 미팅 전).
 // 매니저는 양식대로 적고(0.7초 뒤 자동 저장) [제출] → 대표에게 푸시+카톡. 대표는 날짜(주)별로 지점·사람마다 모아 봄(읽기만).
-// index.html 의 sb·me·uid·isBoss·previewTeam·previewUser·esc·toast·fail·today·DOW·inTeam 을 씀 → window.RP
+// 쓰는 사람 = report_people(이름, 대표가 정함) — 다른 매니저는 탭이 안 보임. 쓰는 날: 데일리 = 수·일, 주간 성장 = 일 (일요일은 2개).
+// index.html 의 sb·me·uid·isBoss·previewTeam·previewUser·previewName·myName·esc·toast·fail·today·DOW·inTeam 을 씀 → window.RP
 (() => {
-const RP = (window.RP = { kind: "daily", day: null, row: null, open: new Set() });
+const RP = (window.RP = { kind: "daily", day: null, row: null, open: new Set(), names: new Set(), ok: false, todo: {} });
+const DAILY_DAYS = [3, 0], WEEKLY_DAY = 0; // 수·일 / 일 (getDay: 0 = 일)
 const V = () => document.getElementById("rpView");
 const CONSULT = ["Premium", "Pro Max", "Pro", "Plus", "미등록"];
 const MOODS = ["😄 매우 좋음", "🙂 괜찮음", "😐 보통", "😵 지침", "😢 많이 힘듦"];
@@ -35,8 +37,41 @@ const FORMS = {
 const F = () => FORMS[RP.kind];
 const md = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}`; };
 const hm = (t) => { const d = new Date(t); return `${md(W.ymd(d))} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
-const dayLabel = () => RP.kind === "daily" ? `${md(RP.day)}(${DOW[W.parse(RP.day).getDay()]})` : `${md(RP.day)} ~ ${md(W.add(RP.day, 6))} 주`;
-const thisDay = () => RP.kind === "daily" ? today() : W.monday(today());
+const dow = (s) => W.parse(s).getDay(), dd = (s) => `${md(s)}(${DOW[dow(s)]})`;
+const dayLabel = () => RP.kind === "daily" ? dd(RP.day) : `${md(RP.day)} ~ ${md(W.add(RP.day, 6))} 주 · ${dd(W.add(RP.day, 6))} 작성`;
+// 데일리는 쓰는 날(수·일)끼리만 오감: n = -1 이전 · 1 다음
+const stepDaily = (s, n) => { do s = W.add(s, n); while (!DAILY_DAYS.includes(dow(s))); return s; };
+const thisDay = () => RP.kind === "daily" ? (DAILY_DAYS.includes(dow(today())) ? today() : stepDaily(today(), -1)) : W.monday(today());
+const bossMode = () => isBoss && !previewUser;
+
+// 부팅 때 한 번: 대상자만 탭 보이기 + 오늘 쓸 것 배지
+RP.init = async function () {
+  const { data } = await sb.from("report_people").select("name");
+  RP.names = new Set((data ?? []).map((x) => x.name));
+  RP.ok = bossMode() || RP.names.has(previewUser ? previewName : myName);
+  document.querySelector('.seg [data-v="rp"]')?.classList.toggle("hidden", !RP.ok);
+  if (RP.ok && !bossMode()) await RP.badge();
+};
+// 오늘 써야 하는 것: 수 = 데일리, 일 = 데일리 + 주간 성장. RP.todo = { daily: 제출했나, weekly: 제출했나 } (오늘 쓸 것만)
+RP.badge = async function () {
+  const t = today(), d = dow(t), need = { ...(DAILY_DAYS.includes(d) ? { daily: t } : {}), ...(d === WEEKLY_DAY ? { weekly: W.monday(t) } : {}) };
+  RP.todo = {};
+  if (Object.keys(need).length) {
+    const { data } = await sb.from("reports").select("kind, day, submitted_at").eq("user_id", uid()).in("day", [...new Set(Object.values(need))]);
+    for (const k in need) RP.todo[k] = !!(data ?? []).find((x) => x.kind === k && x.day === need[k] && x.submitted_at);
+  }
+  const left = Object.values(RP.todo).filter((x) => !x).length, b = document.getElementById("rpBadge");
+  if (b) { b.textContent = left; b.classList.toggle("hidden", !left); }
+};
+// 📅 매니저 맨 위 안내: 쓰는 날 + 오늘 할 것
+function todayCard() {
+  const t = today(), d = dow(t), chip = (k, label) => `<button class="rpchip ${RP.todo[k] ? "ok" : ""}" data-k2="${k}">${RP.todo[k] ? "✅" : "⬜"} ${label}</button>`;
+  let now;
+  if (d === WEEKLY_DAY) now = `<b>오늘(일)은 리포트 2개를 써요</b> ${chip("daily", "① 데일리 리포트")} ${chip("weekly", "② 주간 성장 리포트")}`;
+  else if (DAILY_DAYS.includes(d)) now = `<b>오늘(${DOW[d]})은 데일리 리포트 쓰는 날이에요</b> ${chip("daily", "데일리 리포트")}`;
+  else { const n = stepDaily(t, 1); now = `오늘은 쓰는 날이 아니에요 · 다음은 <b>${dd(n)}</b> ${dow(n) === WEEKLY_DAY ? "데일리 + 주간 성장 2개" : "데일리"}`; }
+  return `<div class="card rptoday"><div>📅 <b>쓰는 날</b> — 데일리: <b>수·일</b> · 주간 성장: <b>일요일</b> <span class="mut">(일요일은 2개 다 써요)</span></div><div class="rpnow">${now}</div></div>`;
+}
 // 상담 결과 숫자 → 'Premium 2명 / Pro 1명 / 미등록 1명'
 const consultLine = (c = {}) => CONSULT.filter((k) => Number(c[k]) > 0).map((k) => `${k} ${c[k]}명`).join(" / ");
 // 📋 복사용 글 (카톡·문서에 붙여넣기)
@@ -51,7 +86,9 @@ RP.text = function (kind, body, who) {
 
 RP.load = async function () {
   RP.day ??= thisDay();
-  if (isBoss && !previewUser) return RP.loadBoss();
+  if (bossMode()) return RP.loadBoss();
+  if (!RP.ok) { V().innerHTML = `<div class="card mut">${esc(previewName || "이 계정")}은(는) 리포트 대상이 아니에요.</div>`; return; }
+  await RP.badge();
   const { data, error } = await sb.from("reports").select("*").eq("user_id", uid()).eq("kind", RP.kind).eq("day", RP.day).maybeSingle();
   if (fail(error)) return;
   RP.row = data ?? { body: {} };
@@ -68,8 +105,9 @@ function wireHead() {
   }));
   V().querySelectorAll("[data-go]").forEach((b) => (b.onclick = async () => {
     await RP.flush(); const n = +b.dataset.go;
-    RP.day = n ? W.add(RP.day, n * (RP.kind === "daily" ? 1 : 7)) : thisDay(); RP.open.clear(); RP.load();
+    RP.day = !n ? thisDay() : RP.kind === "daily" ? stepDaily(RP.day, n) : W.add(RP.day, n * 7); RP.open.clear(); RP.load();
   }));
+  V().querySelectorAll("[data-k2]").forEach((b) => (b.onclick = async () => { await RP.flush(); RP.kind = b.dataset.k2; RP.day = thisDay(); RP.load(); }));
 }
 
 // ── 매니저: 내 리포트 쓰기 (대표가 '매니저 화면 그대로' 보는 중이면 보기만) ──
@@ -86,7 +124,7 @@ RP.renderMine = function () {
     : `<div class="rpq"><b>6. 현재 나의 컨디션</b><small>하나 고르고 이유를 적어 주세요.</small>
         <div class="rpmood">${MOODS.map((m) => `<button type="button" data-m="${m}" class="${b.mood === m ? "on" : ""}" ${ro ? "disabled" : ""}>${m}</button>`).join("")}</div>
         <textarea data-f="mood_why" rows="2" maxlength="2000" ${ro ? "readonly" : ""} placeholder="${ro ? "" : "이유"}">${esc(b.mood_why ?? "")}</textarea></div>`;
-  V().innerHTML = head() + `<div class="card rpnote">${esc(f.note).replace(/\n/g, "<br>")}</div>
+  V().innerHTML = head() + todayCard() + `<div class="card rpnote">${esc(f.note).replace(/\n/g, "<br>")}</div>
     <div class="card rpform-card">${f.fields.map((x) => area(...x)).join("")}${last}</div>
     <div class="rpfoot"><span id="rpState" class="mut"></span>
       <button class="btn ghost" id="rpCopy">📋 복사</button>${ro ? "" : `<button class="btn" id="rpSubmit">${RP.row.submitted_at ? "✅ 제출함" : "📤 제출하기"}</button>`}</div>`;
@@ -130,7 +168,11 @@ RP.submit = async function () {
   if (empty.length === f.fields.length) return toast("내용을 적고 제출해 주세요");
   if (empty.length && !confirm(`${empty.join(", ")} 칸이 비어 있어요. 그래도 제출할까요?`)) return;
   clearTimeout(saveT);
-  if (await RP.save({ submitted_at: new Date().toISOString() })) { toast("제출했어요 — 대표님께 알림이 가요"); RP.renderMine(); }
+  if (!(await RP.save({ submitted_at: new Date().toISOString() }))) return;
+  await RP.badge();
+  const other = RP.kind === "daily" ? "weekly" : "daily", isToday = RP.day === (RP.kind === "daily" ? today() : W.monday(today()));
+  toast(isToday && RP.todo[other] === false ? `제출했어요 — 오늘은 ${other === "weekly" ? "② 주간 성장" : "① 데일리"} 리포트도 써 주세요` : "제출했어요 — 대표님께 알림이 가요");
+  RP.renderMine();
 };
 
 // ── 대표: 그날(그 주) 매니저 리포트 모아 보기 ──
@@ -138,7 +180,8 @@ RP.loadBoss = async function () {
   const [t, p, r] = await Promise.all([sb.from("teams").select("id, name, sort").order("sort"), sb.rpc("team_people"),
     sb.from("reports").select("*").eq("kind", RP.kind).eq("day", RP.day)]);
   if (fail(t.error || p.error || r.error)) return;
-  const mgrs = inTeam(p.data).filter((x) => x.role === "manager" && x.team_id), by = new Map(r.data.map((x) => [x.user_id, x]));
+  const mgrs = inTeam(p.data).filter((x) => x.role === "manager" && x.team_id && RP.names.has(x.name)), by = new Map(r.data.map((x) => [x.user_id, x]));
+  const noAcct = previewTeam ? [] : [...RP.names].filter((n) => !p.data.some((x) => x.name === n)); // 대상인데 아직 플래너 가입 전
   const done = mgrs.filter((m) => by.get(m.user_id)?.submitted_at).length;
   const card = (m) => {
     const x = by.get(m.user_id), b = x?.body ?? {}, open = RP.open.has(m.user_id);
@@ -150,10 +193,12 @@ RP.loadBoss = async function () {
           : `<div><b>6. 현재 나의 컨디션</b><p>${esc(b.mood ?? "-")}<br>${esc((b.mood_why ?? "").trim())}</p></div>`}
         <button class="btn ghost rpcp">📋 복사</button></div>` : ""}</div>`;
   };
-  V().innerHTML = head(`<span class="mut">제출 ${done}/${mgrs.length}명</span>`) + t.data.map((tm) => {
+  const offDay = RP.kind === "daily" && !DAILY_DAYS.includes(dow(RP.day));
+  V().innerHTML = head(`<span class="mut">제출 ${done}/${mgrs.length + noAcct.length}명 · 대상 ${[...RP.names].join("·")} · 데일리 수·일, 주간 성장 일</span>`) + (offDay ? `<div class="card mut">이 날은 쓰는 날이 아니에요</div>` : "") + t.data.map((tm) => {
     const ms = mgrs.filter((m) => m.team_id === tm.id); if (!ms.length) return "";
     return `<section class="rpsec"><h3>${esc(tm.name)} <span class="mut">${ms.filter((m) => by.get(m.user_id)?.submitted_at).length}/${ms.length}</span></h3><div class="card">${ms.map(card).join("")}</div></section>`;
-  }).join("") || `<div class="card mut">매니저가 없어요</div>`;
+  }).join("") + (noAcct.length ? `<section class="rpsec"><h3>가입 전</h3><div class="card">${noAcct.map((n) => `<div class="rpp"><div class="rph"><b>${esc(n)}</b><span class="rpst none">플래너 가입 전</span></div></div>`).join("")}</div></section>` : "")
+    || `<div class="card mut">대상 매니저가 없어요</div>`;
   wireHead();
   V().querySelectorAll(".rph").forEach((h) => (h.onclick = () => { const u = h.closest(".rpp").dataset.u; RP.open.has(u) ? RP.open.delete(u) : RP.open.add(u); RP.loadBoss(); }));
   V().querySelectorAll(".rpcp").forEach((c) => (c.onclick = () => {

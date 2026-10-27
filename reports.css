@@ -24,7 +24,7 @@ body:not(.rpv) #rpView { display: none; }
 #rpView .rpmood { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 #rpView .rpmood button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: inherit; cursor: pointer; font: inherit; }
 #rpView .rpmood button.on { border-color: var(--accent); background: var(--accent); color: #fff; }
-#rpView .rpfoot { position: sticky; bottom: 12px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+#rpView .rpfoot { position: sticky; bottom: 12px; z-index: 5; -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 #rpView .rpfoot #rpState { margin-right: auto; font-size: 13px; }
 #rpView .rpsec h3 { font-size: 16px; margin: 16px 0 8px; }
 #rpView .rpsec .card { padding: 4px 14px; }
@@ -42,3 +42,7 @@ body:not(.rpv) #rpView { display: none; }
 #rpView .rpread p { margin: 3px 0 0; white-space: pre-wrap; line-height: 1.6; }
 #rpView .rpread .btn { margin-top: 12px; }
 @media (max-width: 560px) { #rpView { padding: 12px 12px 100px; } #rpView .rph { flex-wrap: wrap; } #rpView .rph .mut { flex-basis: 100%; } }
+#rpView .rptoday { border-color: var(--accent); line-height: 1.7; }
+#rpView .rpnow { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+#rpView .rpchip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
+#rpView .rpchip.ok { border-color: rgba(52, 199, 89, .5); }

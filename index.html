@@ -530,7 +530,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="ld">리더 현황</button><button data-v="edu">교육</button><button data-v="rp">리포트</button><button data-v="sim" class="adminonly">시뮬레이터</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="ld">리더 현황</button><button data-v="edu">교육</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim" class="adminonly">시뮬레이터</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
@@ -771,7 +771,8 @@ async function boot() {
   if (view === "ld") window.LD?.load(); // 리더 현황 탭에서 새로고침했을 때
   if (view === "sim") window.TB?.loadMine(); // 🧠 시뮬레이터 탭
   if (view === "edu") window.EDU?.load(); // 📚 교육 탭에서 새로고침했을 때
-  if (view === "rp") window.RP?.load(); // 📝 리포트 탭
+  await window.RP?.init(); // 📝 리포트: 대상자만 탭 + 오늘 쓸 것 배지
+  if (view === "rp") RP.ok ? RP.load() : setView("week");
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
