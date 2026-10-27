@@ -57,15 +57,14 @@ TB.read = (root) => {
   return { body: v("body"), plan: { p: [0, 1, 2].map((i) => v(`p${i}`)), t, w: Object.fromEntries(Object.entries(wOf(root)).filter(([k, a]) => v(k).trim() && (!Array.isArray(a) || a.some(Boolean)))) } }; // 빈 칸은 이름 안 남김
 };
 // 받은 걸 칸에 — 지금 내가 적는 칸만 빼고
-TB.apply = (root, st) => {
-  const want = { body: st.body ?? "" };
-  (st.plan?.p ?? []).forEach((x, i) => (want[`p${i}`] = x ?? ""));
-  root.querySelectorAll('[data-k^="t"]').forEach((el) => (want[el.dataset.k] = hourText(st.plan?.t ?? {}, +el.dataset.k.slice(1, 3))));
-  if (!st.plan) Object.keys(want).forEach((k) => k !== "body" && delete want[k]); // 예전 화면은 글(body)만 보냄
-  if (st.plan?.w) { const w = wOf(root), mine = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null; root._w = { ...st.plan.w, ...(mine && w[mine] ? { [mine]: w[mine] } : {}) }; paint(root); }
-  for (const [k, v] of Object.entries(want)) { const el = root.querySelector(`[data-k="${k}"]`); if (el && el !== document.activeElement && el.value !== v) { el.value = v; if (el.matches(".tbc")) fit(el); } }
-  paint(root);
-  TB.grow(root);
+TB.apply = (root, st) => { // 서버 글 통째(10초 다시 받기·예전 화면): 여러 줄 칸은 줄 합치기, 한 줄 칸은 적는 중 아니면 덮음
+  const plan = st.plan, w = wOf(root), act = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null;
+  mergeIn(root, "body", st.body ?? "", plan?.w?.body);
+  if (plan) {
+    (plan.p ?? []).forEach((x, i) => { const k = `p${i}`, el = root.querySelector(`[data-k="${k}"]`); if (!el || k === act) return; el.value = x ?? ""; plan.w?.[k] ? (w[k] = plan.w[k]) : delete w[k]; });
+    root.querySelectorAll('[data-k^="t"]').forEach((el) => { const k = el.dataset.k; mergeIn(root, k, hourText(plan.t ?? {}, +k.slice(1, 3)), plan.w?.[k]); });
+  }
+  paint(root); TB.grow(root);
 };
 // 글이 길면 칸이 아래로 늘어나서 다 보임 (브레인 덤프·시간표 칸)
 const fit = (el) => { el.style.height = "auto"; el.style.height = (el.classList.contains("tbDump") ? Math.max(160, el.scrollHeight + 2) : el.scrollHeight) + "px"; };
@@ -83,14 +82,39 @@ const patchOf = (root, keys) => {
   }
   return out;
 };
-// 받은 바뀐 칸만 내 화면에 (내가 적는 칸은 그대로)
+// ── 여러 줄 칸(브레인 덤프·시간표) 줄 합치기 (sim-merge.js): 여러 명이 같은 칸에 써도 서로 줄을 안 지움
+// root._base[칸] = 서버에 있다고 아는 글(내가 바꾼 줄 찾는 기준), root._sent[칸] = 마지막으로 실시간 전송한 내 글
+const isMulti = (k) => k === "body" || k[0] === "t";
+const baseOf = (root, k) => (root._base ??= {})[k] ?? root.querySelector(`[data-k="${k}"]`)?.defaultValue ?? "";
+const L = (text, who) => { const lines = (text ?? "").split("\n"); return { lines, who: linesW(who, lines.length) }; };
+const setText = (el, val) => { // 적는 중이면 커서를 같은 줄에 둠
+  if (el.value === val) return;
+  if (el !== document.activeElement) el.value = val;
+  else {
+    const before = el.value.slice(0, el.selectionStart).split("\n"), line = before.length - 1, col = before.at(-1).length, cur = el.value.split("\n")[line];
+    el.value = val; const nl = val.split("\n"); let i = nl.indexOf(cur); if (i < 0) i = Math.min(line, nl.length - 1);
+    const off = nl.slice(0, i).reduce((a, x) => a + x.length + 1, 0) + Math.min(col, nl[i].length); el.setSelectionRange(off, off);
+  }
+  if (el.matches(".tbc, .tbDump")) fit(el);
+};
+// 남의 글을 내 칸에. from 있으면(실시간) 보낸 사람이 from→text 로 바꾼 줄만 내 칸·내 기준에 적용, 없으면(서버 글) 내가 바꾼 줄을 서버 글 위에
+const mergeIn = (root, k, text, who, from) => {
+  const el = root.querySelector(`[data-k="${k}"]`); if (!el) return;
+  const w = wOf(root), base = baseOf(root, k), mineChanged = el.value !== base;
+  let out;
+  if (from != null) { out = SIMMERGE.merge3(L(from), L(text, who), L(el.value, w[k])); root._base[k] = mineChanged ? SIMMERGE.merge3(L(from), L(text), L(base)).lines.join("\n") : out.lines.join("\n"); }
+  else { out = mineChanged ? SIMMERGE.merge3(L(base), L(el.value, w[k]), L(text, who)) : L(text, who); root._base[k] = text ?? ""; }
+  setText(el, out.lines.join("\n")); w[k] = out.who;
+};
+// 받은 바뀐 칸만 내 화면에 — 한 줄 칸(우선순위)은 내가 적는 중이면 그대로, 여러 줄 칸은 줄 합치기
 TB.applyPatch = (root, pt) => {
-  const set = (k, val) => { const el = root.querySelector(`[data-k="${k}"]`); if (!el || el === document.activeElement || el.value === val) return; el.value = val; if (el.matches(".tbc, .tbDump")) fit(el); };
-  if ("body" in pt) set("body", pt.body ?? "");
-  for (const [i, val] of Object.entries(pt.p ?? {})) set(`p${i}`, val ?? "");
-  for (const [k, val] of Object.entries(pt.t ?? {})) if (k.endsWith(":00")) set(`t${k}`, val ?? "");
-  const w = wOf(root), act = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null;
-  for (const [k, val] of Object.entries(pt.w ?? {})) if (k !== act) { if (val == null) delete w[k]; else w[k] = val; }
+  const act = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null, w = wOf(root), mb = pt.mb ?? {};
+  if ("body" in pt) mergeIn(root, "body", pt.body ?? "", pt.w?.body, mb.body);
+  for (const [k, val] of Object.entries(pt.t ?? {})) if (k.endsWith(":00")) mergeIn(root, `t${k}`, val ?? "", pt.w?.[`t${k}`], mb[`t${k}`]);
+  for (const [i, val] of Object.entries(pt.p ?? {})) {
+    const k = `p${i}`, el = root.querySelector(`[data-k="${k}"]`); if (!el || k === act) continue;
+    el.value = val ?? ""; if (pt.w && k in pt.w) pt.w[k] == null ? delete w[k] : (w[k] = pt.w[k]);
+  }
   paint(root);
 };
 TB.remote = (tid, p) => {
@@ -119,14 +143,26 @@ document.addEventListener("input", (e) => {
   if (!mine) { (root._chg ??= new Set()).add(el.dataset.k); (root._send ??= new Set()).add(el.dataset.k); } // 💾 바뀐 칸만 저장·전송
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
-    const st = TB.read(root), patch = patchOf(root, root._send); root._send = new Set();
+    const st = TB.read(root), patch = patchOf(root, root._send), sent = (root._sent ??= {});
+    for (const k of root._send) if (isMulti(k)) { (patch.mb ??= {})[k] = sent[k] ?? baseOf(root, k); sent[k] = root.querySelector(`[data-k="${k}"]`).value; } // 받는 쪽은 직전→지금 바뀐 줄만 적용
+    root._send = new Set();
     document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((r) => r !== root && (r.dataset.day || today()) === day && TB.applyPatch(r, patch));
     simChannel(tid, (p) => TB.remote(tid, p), "tb").send({ type: "broadcast", event: "text", payload: { day, patch, state: st, body: st.body, who: myName } }); // state·body = 예전 화면용
   }, 150);
   clearTimeout(tm.save); tm.save = setTimeout(async () => {
     const st = TB.read(root), keys = root._chg ?? new Set(); root._chg = new Set();
-    const { error } = mine ? await sb.from("my_notes").upsert({ day, body: st.body, plan: st.plan, updated_at: new Date().toISOString() })
-      : await sb.rpc("team_note_patch", { p_day: day, p_patch: patchOf(root, keys), p_team: tid }); // 💾 바뀐 칸만 → 남이 다른 칸에 쓴 글은 안 지워짐
+    let error;
+    if (mine) ({ error } = await sb.from("my_notes").upsert({ day, body: st.body, plan: st.plan, updated_at: new Date().toISOString() }));
+    else {
+      const mk = [...keys].filter(isMulti);
+      if (mk.length) { // 여러 줄 칸: 서버 최신 글 위에 내가 바꾼 줄만 얹음 → 같은 칸에 남이 쓴 줄도 안 지워짐
+        const r = await sb.rpc("team_note_get", { p_day: day, p_team: tid }), n = r.data?.[0]; error = r.error;
+        if (n) mk.forEach((k) => mergeIn(root, k, k === "body" ? n.body ?? "" : hourText(n.plan?.t ?? {}, +k.slice(1, 3)), n.plan?.w?.[k]));
+      }
+      const pt = patchOf(root, keys); // 💾 바뀐 칸만 → 남이 다른 칸에 쓴 글은 안 지워짐
+      if (!error) ({ error } = await sb.rpc("team_note_patch", { p_day: day, p_patch: pt, p_team: tid }));
+      if (!error) mk.forEach((k) => (root._base[k] = k === "body" ? pt.body : pt.t?.[k.slice(1)] ?? ""));
+    }
     if (error) keys.forEach((k) => root._chg.add(k)); else if (!root._chg.size) root._dirty = false; if (fail(error)) return;
     const n = new Date(); if (who) who.textContent = `${md(day)} · ${pad(n.getHours())}:${pad(n.getMinutes())} 저장됨`;
   }, 700);
