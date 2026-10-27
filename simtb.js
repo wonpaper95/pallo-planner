@@ -8,39 +8,53 @@ const HOURS = Array.from({ length: 20 }, (_, i) => i + 5); // 5 … 24(밤 12시
 const key = (h, m) => `${String(h).padStart(2, "0")}:${m}`;
 const h12 = (h) => (h % 12 === 0 ? 12 : h % 12);
 // 예전 :30 칸에 적은 건 그 시간 칸에 이어 붙여 보여 줌 (다음 저장 때 한 칸으로 합쳐짐)
-// ✍️ 누가 적은 칸인지 글자색으로 (plan.w = { 칸: 마지막에 적은 사람 }). 대표는 기본색
+// ✍️ 누가 적었는지 글자색으로 — 여러 줄 칸(브레인 덤프·시간표)은 줄마다, 우선순위 칸은 칸마다. 대표는 기본색
+// plan.w = { 칸: ["줄1 쓴 사람", "줄2 쓴 사람", …] | "쓴 사람" }. 글은 투명 textarea 뒤 .tbbk 에 색 입혀 그림
 const COLORS = { 민주: "#e64980", 올리비아: "#339af0", 준석: "#37b24d", 마야: "#e64980", 박혁: "#845ef7", 원빈: "#1098ad", 해민: "#f03e3e", 채림: "#74b816", 은서: "#cc5de8", 세연: "#4263eb", 헤이즐: "#b08968" }; // 마야 = 민주 (같은 사람, 핑크)
 const EXTRA = ["#d6336c", "#0ca678", "#e67700", "#7950f2", "#1971c2", "#a61e4d"]; // 새 매니저: 이름으로 고정 배정
 TB.color = (n) => !n || n === "대표" ? "" : COLORS[n] ?? EXTRA[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length];
 const wOf = (root) => (root._w ??= JSON.parse(root.dataset.w || "{}"));
+const linesW = (a, n) => Array.from({ length: n }, (_, i) => (Array.isArray(a) ? a[i] ?? "" : a ?? "")); // 예전(칸 통째 이름)도 줄마다로
+const bk = (v, a) => v.split("\n").map((l, i) => { const c = TB.color(linesW(a, i + 1)[i]); return `<span${c ? ` style="color:${c}"` : ""}>${esc(l)}</span>`; }).join("\n") + "\n";
+// 바뀐 줄만 내 이름: 그대로 남은 줄은 원래 쓴 사람 유지
+const relines = (prev, next, a, me) => {
+  const old = prev.split("\n"), aa = linesW(a, old.length), pool = new Map();
+  old.forEach((l, i) => { if (!pool.has(l)) pool.set(l, []); pool.get(l).push(aa[i]); });
+  return next.split("\n").map((l) => (!l.trim() ? "" : pool.get(l)?.length ? pool.get(l).shift() : me));
+};
 const paint = (root) => {
-  const w = wOf(root);
-  root.querySelectorAll("[data-k]").forEach((el) => { const n = w[el.dataset.k]; el.style.color = TB.color(n); el.title = n ? `✍️ ${n}` : ""; });
-  const who = [...new Set(Object.entries(w).filter(([k]) => root.querySelector(`[data-k="${k}"]`)?.value.trim()).map(([, n]) => n))].filter((n) => n && n !== "대표"), leg = root.querySelector(".tbLeg");
-  if (leg) leg.innerHTML = who.map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("");
+  const w = wOf(root), names = [];
+  root.querySelectorAll("[data-k]").forEach((el) => {
+    const a = w[el.dataset.k];
+    if (el.tagName === "TEXTAREA") { const b = el.previousElementSibling; if (b?.classList.contains("tbbk")) b.innerHTML = bk(el.value, a); el.value.split("\n").forEach((l, i) => l.trim() && names.push(linesW(a, i + 1)[i])); }
+    else { el.style.color = TB.color(a); if (el.value.trim()) names.push(a); }
+  });
+  const leg = root.querySelector(".tbLeg");
+  if (leg) leg.innerHTML = [...new Set(names)].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("");
 };
 TB.paint = paint;
 const hourText = (t, h) => [t[key(h, "00")], t[key(h, "30")]].filter((x) => x?.trim()).join("\n");
 
 TB.html = (st, tid, day = "") => {
   const p = st?.plan?.p ?? [], t = st?.plan?.t ?? {};
-  const w = st?.plan?.w ?? {}, sty = (k) => (TB.color(w[k]) ? ` style="color:${TB.color(w[k])}" title="✍️ ${esc(w[k])}"` : "");
+  const w = st?.plan?.w ?? {}, sty = (k) => (TB.color(w[k]) && !Array.isArray(w[k]) ? ` style="color:${TB.color(w[k])}"` : "");
+  const ta = (cls, k, v, extra = "") => `<div class="tbw ${cls === "tbc" ? "wc" : "wd"}"><div class="tbbk" aria-hidden="true">${bk(v, w[k])}</div><textarea class="${cls}" data-k="${k}"${extra}>${esc(v)}</textarea></div>`;
   return `<div class="tb" data-tb="${tid}" ${day ? `data-day="${day}"` : ""} data-w="${esc(JSON.stringify(w))}">
     <div class="tbL">
-      <div class="tbLeg">${[...new Set(Object.values(w))].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("")}</div>
+      <div class="tbLeg">${[...new Set(Object.values(w).flat())].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("")}</div>
       <div class="tbPri"><div class="tbH">우선순위 3가지</div>${[0, 1, 2].map((i) => `<label><b>${i + 1}.</b><input data-k="p${i}"${sty(`p${i}`)} value="${esc(p[i] ?? "")}" placeholder="가장 중요한 일"></label>`).join("")}</div>
       <div class="tbDH">브레인 덤프 — 옮겨 적기</div>
-      <textarea class="tbDump" data-k="body"${sty("body")} placeholder="떠오르는 걸 다 적고, 시간표로 옮겨 적어요">${esc(st?.body ?? "")}</textarea>
+      ${ta("tbDump", "body", st?.body ?? "", ` placeholder="떠오르는 걸 다 적고, 시간표로 옮겨 적어요"`)}
     </div>
     <div class="tbR"><table><tr><th>시간</th><th>할 일</th></tr>${HOURS.map((h) => `<tr class="${h >= 12 && h < 24 ? "pm" : ""}"><td class="h">${h12(h)}</td>`
-      + `<td><textarea class="tbc" rows="1" data-k="t${key(h, "00")}"${sty(`t${key(h, "00")}`)}>${esc(hourText(t, h))}</textarea></td></tr>`).join("")}</table></div>
+      + `<td>${ta("tbc", `t${key(h, "00")}`, hourText(t, h), ` rows="1"`)}</td></tr>`).join("")}</table></div>
   </div>`;
 };
 // 칸들 → 저장할 모양
 TB.read = (root) => {
   const v = (k) => root.querySelector(`[data-k="${k}"]`)?.value ?? "", t = {};
   root.querySelectorAll('[data-k^="t"]').forEach((el) => { if (el.value.trim()) t[el.dataset.k.slice(1)] = el.value; });
-  return { body: v("body"), plan: { p: [0, 1, 2].map((i) => v(`p${i}`)), t, w: Object.fromEntries(Object.entries(wOf(root)).filter(([k]) => v(k).trim())) } }; // 빈 칸은 이름 안 남김
+  return { body: v("body"), plan: { p: [0, 1, 2].map((i) => v(`p${i}`)), t, w: Object.fromEntries(Object.entries(wOf(root)).filter(([k, a]) => v(k).trim() && (!Array.isArray(a) || a.some(Boolean)))) } }; // 빈 칸은 이름 안 남김
 };
 // 받은 걸 칸에 — 지금 내가 적는 칸만 빼고
 TB.apply = (root, st) => {
@@ -50,6 +64,7 @@ TB.apply = (root, st) => {
   if (!st.plan) Object.keys(want).forEach((k) => k !== "body" && delete want[k]); // 예전 화면은 글(body)만 보냄
   if (st.plan?.w) { const w = wOf(root), mine = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null; root._w = { ...st.plan.w, ...(mine && w[mine] ? { [mine]: w[mine] } : {}) }; paint(root); }
   for (const [k, v] of Object.entries(want)) { const el = root.querySelector(`[data-k="${k}"]`); if (el && el !== document.activeElement && el.value !== v) { el.value = v; if (el.matches(".tbc")) fit(el); } }
+  paint(root);
   TB.grow(root);
 };
 // 글이 길면 칸이 아래로 늘어나서 다 보임 (브레인 덤프·시간표 칸)
@@ -73,7 +88,7 @@ document.addEventListener("input", (e) => {
   const root = el.closest(".tb"), mine = root.dataset.tb === "me", tid = mine ? "me" : +root.dataset.tb, day = root.dataset.day || today();
   const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small:last-of-type");
   if (el.matches(".tbDump, .tbc")) fit(el);
-  if (!mine) { wOf(root)[el.dataset.k] = myName; paint(root); } // ✍️ 이 칸은 내 색
+  if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? relines(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 바꾼 줄만 내 색
   if (who) who.textContent = "적는 중…";
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
