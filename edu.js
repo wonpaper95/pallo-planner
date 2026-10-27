@@ -4,7 +4,7 @@
 // 평가는 RLS 로 대표만 읽는다(합격기준 글은 모두에게 보임 — 평가받기 전에 기준을 안다).
 // index.html 의 sb·me·uid()·isBoss·previewUser·esc·toast·fail 을 씀 → window.EDU
 (() => {
-const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, data: null });
+const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, impOpen: false, data: null });
 const V = () => document.getElementById("eduView");
 const W = () => globalThis.EDU_WEEKS || [];
 const ITEMS = () => globalThis.EDU_ITEMS || [];
@@ -113,9 +113,11 @@ function mission(d, role) {
       <div class="eduimp">
         <b>지점 개선안 ${IMPROVE_N}개</b>
         <div class="edubarline sm"><div style="width:${Math.round((done / IMPROVE_N) * 100)}%"></div></div>
-        <span class="mut">${done} / ${IMPROVE_N} 적음 — 떠오를 때마다 한 줄씩 채운다</span>
-        <ol class="eduimplist">${Array.from({ length: IMPROVE_N }, (_, k) =>
-          `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
+        <details class="eduimpbox"${EDU.impOpen ? " open" : ""}>
+          <summary>${done} / ${IMPROVE_N} 적음 — 떠오를 때마다 한 줄씩 채운다</summary>
+          <ol class="eduimplist">${Array.from({ length: IMPROVE_N }, (_, k) =>
+            `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
+        </details>
       </div>
       <div><b>필독서 3권</b>${BOOKS.map(([k, t, when]) => {
         const b = (m.books || {})[k] || {};
@@ -270,6 +272,7 @@ function bind(d) {
 
   V0.querySelector("#eduWho")?.addEventListener("change", (e) => { EDU.target = e.target.value; try { localStorage.setItem("edu-target", EDU.target); } catch {} EDU.openItem = null; EDU.load(); });
   V0.querySelector("#eduStart")?.addEventListener("change", (e) => save({ started_on: e.target.value || null }));
+  V0.querySelectorAll(".eduimpbox").forEach((x) => (x.ontoggle = () => { EDU.impOpen = x.open; }));
   V0.querySelectorAll("[data-imp]").forEach((inp) => (inp.onchange = () => {
     const list = Array.isArray(d.meta.improve_list) ? [...d.meta.improve_list] : [];
     while (list.length < IMPROVE_N) list.push("");

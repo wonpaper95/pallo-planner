@@ -127,3 +127,10 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 /* 주차 제출물 — 주차 자료 아래, 항목 목록 위 */
 #eduView .eduweeksubs { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
 #eduView .eduweeksubs .edusubf { margin-top: 8px; }
+
+/* 지점 개선안 — 접었다 펼친다 (칸을 많이 먹어서 기본은 접힘) */
+#eduView .eduimpbox > summary { cursor: pointer; color: var(--sub); font-size: 13px; padding: 2px 0; list-style: none; }
+#eduView .eduimpbox > summary::-webkit-details-marker { display: none; }
+#eduView .eduimpbox > summary::before { content: "▸ "; }
+#eduView .eduimpbox[open] > summary::before { content: "▾ "; }
+#eduView .eduimpbox[open] > summary { color: var(--text); }
