@@ -61,7 +61,18 @@ EDU.load = async function () {
   const known = new Set(ITEMS().map((i) => i.id));
   d.orphans = Object.keys(d.evals).filter((id) => !known.has(id));
 
-  V().innerHTML = head(d) + (d.orphans.length ? orphanBar(d) : "") + mission(d) + W().map((w) => weekCard(w, d)).join("") + report(d);
+  // 대표 화면은 좌우 2단 — 왼쪽은 매니저가 보는 화면 그대로(눌러 볼 수만 있고 입력은 잠김),
+  // 오른쪽은 대표 화면(평가·자료 관리). 주차·항목을 어느 쪽에서 눌러도 양쪽이 같이 열린다.
+  V().classList.toggle("wide", d.admin);
+  const body = (role) => mission(d, role) + W().map((w) => weekCard(w, d, role)).join("");
+  V().innerHTML = head(d) + (d.orphans.length ? orphanBar(d) : "")
+    + (d.admin
+      ? `<div class="edusplit">
+          <div class="educol mgr"><div class="edupanetag">🧑‍💼 매니저가 보는 화면</div>${body("mgr")}</div>
+          <div class="educol boss"><div class="edupanetag">👑 대표 화면</div>${body("boss")}</div>
+        </div>`
+      : body("mgr"))
+    + report(d);
   bind(d);
 };
 
@@ -91,15 +102,16 @@ function orphanBar(d) {
 }
 
 // ── 장기 미션 ──
-function mission(d) {
-  const m = d.meta, ro = !d.admin ? "" : "disabled";
+function mission(d, role) {
+  const m = d.meta, ro = role === "boss" || d.admin ? "disabled" : "";
+  const id = (n) => (role === "mgr" ? "" : ` id="${n}"`);
   const n = m.improvements || 0;
   return `<section class="card edumission">
     <h3>장기 미션</h3>
     <div class="edugrid">
       <div>
         <b>지점 개선안 50개</b>
-        <div class="eduline"><input type="number" id="eduImp" min="0" max="50" value="${n}" ${ro}> / 50</div>
+        <div class="eduline"><input type="number"${id("eduImp")} min="0" max="50" value="${n}" ${ro}> / 50</div>
         <div class="edubarline sm"><div style="width:${Math.min(100, n * 2)}%"></div></div>
         <span class="mut">10개마다 한 칸 — 지금 ${Math.floor(n / 10)}/5</span>
       </div>
@@ -116,10 +128,11 @@ function mission(d) {
 }
 
 // ── 주차 카드 ──
-function weekCard(w, d) {
+function weekCard(w, d, role) {
   const items = byWeek(w.week), done = items.filter((i) => d.status[i.id] === "done").length;
   const open = EDU.openWeek === w.week;
   const refs = d.refs.filter((r) => r.week === w.week);
+  const canEdit = d.admin && role === "boss";
   if (!open) return `<section class="card eduweek" data-week="${w.week}"><div class="eduwk"><button class="eduwkbtn">▸ <b>${esc(w.label)}</b> <span class="mut">${esc(w.theme)}</span></button><span class="mut">${done}/${items.length}</span></div></section>`;
   return `<section class="card eduweek open" data-week="${w.week}">
     <div class="eduwk"><button class="eduwkbtn">▾ <b>${esc(w.label)}</b> <span class="mut">${esc(w.theme)}</span></button><span class="mut">${done}/${items.length}</span></div>
@@ -127,20 +140,20 @@ function weekCard(w, d) {
     <div class="mut edureport">📋 보고: ${esc(w.report)}</div>
     <div class="edurefs">
       <b>📎 주차 자료</b>
-      ${refs.length ? refs.map((r) => refRow(r, d)).join("") : `<span class="mut">아직 없어요.</span>`}
-      ${d.admin ? `<form class="edureff" data-week="${w.week}"><input name="title" placeholder="자료 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">추가</button></form>` : ""}
+      ${refs.length ? refs.map((r) => refRow(r, canEdit)).join("") : `<span class="mut">아직 없어요.</span>`}
+      ${canEdit ? `<form class="edureff" data-week="${w.week}"><input name="title" placeholder="자료 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">추가</button></form>` : ""}
     </div>
-    <div class="eduitems">${items.map((i) => itemRow(i, d)).join("")}</div>
+    <div class="eduitems">${items.map((i) => itemRow(i, d, role)).join("")}</div>
   </section>`;
 }
 
-function refRow(r, d) {
+function refRow(r, canEdit) {
   // 공개 주소는 손으로 만들지 말고 SDK 가 주는 것을 쓴다(직접 조립하면 404)
   const href = r.url || sb.storage.from("edu-materials").getPublicUrl(r.path).data.publicUrl;
-  return `<div class="eduref" data-id="${r.id}"><a href="${esc(href)}" target="_blank" rel="noopener">${r.path ? "📄" : "🔗"} ${esc(r.title)}</a>${d.admin ? `<button class="btn ghost edurefdel" title="지우기">🗑</button>` : ""}</div>`;
+  return `<div class="eduref" data-id="${r.id}"><a href="${esc(href)}" target="_blank" rel="noopener">${r.path ? "📄" : "🔗"} ${esc(r.title)}</a>${canEdit ? `<button class="btn ghost edurefdel" title="지우기">🗑</button>` : ""}</div>`;
 }
 
-function itemRow(i, d) {
+function itemRow(i, d, role) {
   const st = d.status[i.id] || "todo", open = EDU.openItem === i.id, ev = d.evals[i.id];
   const mark = st === "done" ? "✓" : st === "doing" ? "·" : "";
   return `<div class="eduitem ${st} ${i.report ? "rep" : ""}" data-id="${i.id}">
@@ -149,22 +162,15 @@ function itemRow(i, d) {
       <button class="edutitle">${esc(i.title)}</button>
       ${i.required ? `<span class="tag">필수</span>` : ""}${i.report ? `<span class="tag rep">보고</span>` : ""}
       <span class="tag">${esc(i.cat)}</span>
-      ${d.admin && ev ? `<span class="tag lv${ev.level}">${LEVELS[ev.level][1]}</span>` : ""}
+      ${role === "boss" && ev ? `<span class="tag lv${ev.level}">${LEVELS[ev.level][1]}</span>` : ""}
     </div>
-    ${open ? detail(i, d) : ""}
+    ${open ? detail(i, d, role) : ""}
   </div>`;
 }
 
-function detail(i, d) {
-  // 대표 화면은 늘 2단 — 왼쪽은 매니저가 보는 그대로, 오른쪽은 대표만 보는 칸.
-  // 앱 전체를 미리보기로 바꾸지 않아도 "매니저한테 이게 어떻게 보이지?"가 항상 같이 보인다.
-  const mgr = mgrPane(i, d, d.admin);
-  if (!d.admin) return `<div class="edudetail">${mgr}</div>`;
-  const boss = bossPane(i, d);
-  return `<div class="edudetail edusplit">
-    <div class="edupane mgr"><div class="edupanetag">🧑‍💼 매니저가 보는 화면</div>${mgr}</div>
-    <div class="edupane boss"><div class="edupanetag">👑 대표만 보는 칸</div>${boss}</div>
-  </div>`;
+function detail(i, d, role) {
+  if (role === "boss") return `<div class="edudetail">${bossPane(i, d)}</div>`;
+  return `<div class="edudetail">${mgrPane(i, d, d.admin)}</div>`;
 }
 
 // 양쪽이 똑같이 보는 부분. side 가 켜져 있으면 제출 폼을 '매니저에겐 이렇게 보인다'는 설명용으로 잠가서 보여 준다.
