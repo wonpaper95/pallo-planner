@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610272316">
+<meta name="app-version" content="202610272323">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610272316"></script>
+<script src="theme.js?v=202610272323"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -674,9 +674,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610272316"></script>
-<script src="week.js?v=202610272316"></script>
-<script src="pick.js?v=202610272316"></script>
+<script src="config.js?v=202610272323"></script>
+<script src="week.js?v=202610272323"></script>
+<script src="pick.js?v=202610272323"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -885,7 +885,8 @@ function simChannel(tid, onText, key = "tb") {
   simChs.set(topic, ent); return ent.ch;
 }
 let simP = null; // 대표: 고른 지점 · 매니저·미리보기: 우리 지점(null = 서버가 앎)
-let simOff = 0; // 0 = 오늘 · 1 = 내일 (날짜 버튼으로 바꿈)
+let simOff = 0, simPicked = false; // 0 = 오늘 · 1 = 내일 (날짜 버튼으로 바꿈). 안 골랐으면 내일 적은 게 있으면 내일 — 현황 카드와 같은 규칙
+const simFilled = (n) => n && ((n.body ?? "").trim() || (n.plan?.p ?? []).some((x) => x?.trim()) || Object.values(n.plan?.t ?? {}).some((x) => x?.trim()));
 async function loadSim() {
   const box = $("#simbox"), admin = myRole === "admin";
   if (admin) return box.classList.add("hidden"); // 대표: 지점 시뮬레이션은 현황 탭 카드에서 봄 (주간엔 안 보임, 10-27)
@@ -896,6 +897,7 @@ async function loadSim() {
     $("#simTeamSel").innerHTML = on.map((t) => `<option value="${t.id}" ${t.id === simP ? "selected" : ""}>${esc(t.name)}</option>`).join("");
   } else simP = previewTeam;
   $("#simTeamSel").classList.toggle("hidden", !admin);
+  if (!simPicked) simOff = simFilled((await sb.rpc("team_note_get", { p_day: W.add(today(), 1), p_team: simP })).data?.[0]) ? 1 : 0;
   const day = W.add(today(), simOff);
   $("#simDay").textContent = `📅 ${md(day)}(${simOff ? "내일" : "오늘"})`;
   const { data, error } = await sb.rpc("team_note_get", { p_day: day, p_team: simP }); const n = data?.[0];
@@ -909,7 +911,13 @@ async function loadSim() {
   $("#simWho").textContent = n.at ? `${n.who ?? ""} ${pad(new Date(n.at).getHours())}:${pad(new Date(n.at).getMinutes())} 저장` : "아직 없음";
 }
 $("#simRec").onclick = (e) => { e.preventDefault(); TB.history(simP ?? null); }; // 📜 지난 날들
-$("#simDay").onclick = (e) => { e.preventDefault(); simOff = simOff ? 0 : 1; loadSim(); }; // summary 안 버튼: 접히지 않게
+$("#simDay").onclick = (e) => { e.preventDefault(); simOff = simOff ? 0 : 1; simPicked = true; loadSim(); };
+// 🧠 남이 다른 날(오늘↔내일) 칸에 적기 시작하면 그 날로 따라감 (내가 적는 중이면 안 바꿈)
+window.simOnOtherDay = (tid, day, root) => {
+  const off = day === today() ? 0 : 1;
+  if (root.closest("#simTB")) { if (simOff !== off) { simOff = off; simPicked = true; loadSim(); } }
+  else if (root.closest("#boardView") && boardSimDay[tid] !== off) { boardSimDay[tid] = off; loadBoard(); }
+}; // summary 안 버튼: 접히지 않게
 $("#simTeamSel").onchange = (e) => { simP = +e.target.value; try { localStorage.setItem("sim-team", simP); } catch {} $("#simTB").innerHTML = ""; loadSim(); };
 async function loadRoutine() {
   loadSim();
@@ -2041,24 +2049,24 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610272316"></script>
-<script src="photo.js?v=202610272316"></script>
-<script src="blog.js?v=202610272316"></script>
-<script src="mk-core.js?v=202610272316"></script>
-<script src="mkc-core.js?v=202610272316"></script>
-<script src="marketing.js?v=202610272316"></script>
-<script src="sns-core.js?v=202610272316"></script>
-<script src="post.js?v=202610272316"></script>
-<script src="someday.js?v=202610272316"></script>
-<script src="contacts.js?v=202610272316"></script>
-<script src="refs.js?v=202610272316"></script>
-<script src="simtb.js?v=202610272316"></script>
-<script src="leaders-core.js?v=202610272316"></script>
-<script src="leaders.js?v=202610272316"></script>
-<script src="links.js?v=202610272316"></script>
-<script src="edu-data.js?v=202610272316"></script>
-<script src="edu.js?v=202610272316"></script>
-<script src="reports.js?v=202610272316"></script>
-<script src="qna.js?v=202610272316"></script>
+<script src="sales.js?v=202610272323"></script>
+<script src="photo.js?v=202610272323"></script>
+<script src="blog.js?v=202610272323"></script>
+<script src="mk-core.js?v=202610272323"></script>
+<script src="mkc-core.js?v=202610272323"></script>
+<script src="marketing.js?v=202610272323"></script>
+<script src="sns-core.js?v=202610272323"></script>
+<script src="post.js?v=202610272323"></script>
+<script src="someday.js?v=202610272323"></script>
+<script src="contacts.js?v=202610272323"></script>
+<script src="refs.js?v=202610272323"></script>
+<script src="simtb.js?v=202610272323"></script>
+<script src="leaders-core.js?v=202610272323"></script>
+<script src="leaders.js?v=202610272323"></script>
+<script src="links.js?v=202610272323"></script>
+<script src="edu-data.js?v=202610272323"></script>
+<script src="edu.js?v=202610272323"></script>
+<script src="reports.js?v=202610272323"></script>
+<script src="qna.js?v=202610272323"></script>
 </body>
 </html>

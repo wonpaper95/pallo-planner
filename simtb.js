@@ -74,7 +74,10 @@ TB.grow = (root) => root?.querySelectorAll(".tbDump, .tbc").forEach(fit);
 TB.remote = (tid, p) => {
   const st = p.state ?? { body: p.body };
   document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((root) => {
-    if ((root.dataset.day || today()) !== p.day) return; // 같은 날짜 칸에만 (오늘·내일 따로)
+    if ((root.dataset.day || today()) !== p.day) { // 다른 날(오늘↔내일) 칸에 적는 중: 내가 안 적고 있으면 그 날로 바꿔 보여 줌
+      if (p.day && !root._dirty && !root.contains(document.activeElement) && [today(), W.add(today(), 1)].includes(p.day)) window.simOnOtherDay?.(tid, p.day, root);
+      return;
+    }
     TB.apply(root, st);
     const who = root.closest("details")?.querySelector("summary small:last-of-type"); if (!who) return;
     who.textContent = `✍️ ${p.who} 적는 중…`; clearTimeout(who._t);
