@@ -41,7 +41,7 @@ async function upload(files) {
   if (!files.length) return; const add = [];
   for (const f of files) {
     if (f.size > 52428800) { toast(`${f.name}: 50MB 넘어요`); continue; }
-    const path = `${me.id}/${cur.id}/${Date.now()}-${f.name.replace(/[^\w.\-가-힣]/g, "_")}`;
+    const ext = (f.name.match(/\.[A-Za-z0-9]{1,8}$/) ?? [""])[0], path = `${me.id}/${cur.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`; // 보관함 주소는 영문만 됨 → 원래 이름은 name 에
     toast(`올리는 중… ${f.name}`);
     const { error } = await sb.storage.from("task-files").upload(path, f, { contentType: f.type || undefined }); if (fail(error)) continue;
     add.push({ k: "file", name: f.name, path, at: new Date().toISOString() });
