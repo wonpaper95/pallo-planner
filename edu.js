@@ -4,7 +4,7 @@
 // 평가는 RLS 로 대표만 읽는다(합격기준 글은 모두에게 보임 — 평가받기 전에 기준을 안다).
 // index.html 의 sb·me·uid()·isBoss·previewUser·esc·toast·fail 을 씀 → window.EDU
 (() => {
-const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, data: null });
+const EDU = (window.EDU = { target: null, openWeek: null, openItem: null, data: null, split: false });
 const V = () => document.getElementById("eduView");
 const W = () => globalThis.EDU_WEEKS || [];
 const ITEMS = () => globalThis.EDU_ITEMS || [];
@@ -24,6 +24,7 @@ const who = () => (EDU.canPick() ? EDU.target : uid());
 EDU.canPick = () => isBoss && !previewUser;
 
 EDU.load = async function () {
+  try { EDU.split = !!localStorage.getItem("edu-split"); } catch {}
   const mine = who();
   if (EDU.canPick() && !mine) {
     const { data: ppl, error } = await sb.rpc("edu_people");
@@ -79,6 +80,7 @@ function head(d) {
       <label class="mut edustart">시작일 <input type="date" id="eduStart" value="${start || ""}" ${d.admin ? "disabled" : ""}></label>
       ${dday === null ? "" : `<span class="mut">D+${dday} / 56일</span>`}
       <span class="grow"></span>
+      ${d.admin ? `<button class="btn ghost ${EDU.split ? "on" : ""}" id="eduSplitBtn" title="항목을 펼치면 매니저 화면과 대표 칸을 나란히 보여 줘요">👀 매니저 화면 같이 보기${EDU.split ? " 끄기" : ""}</button>` : ""}
       ${d.admin ? `<button class="btn ghost" id="eduRepBtn">🧾 평가서</button>` : ""}
     </div>
     <div class="edubarline"><div style="width:${Math.round((done / all) * 100)}%"></div></div>
@@ -156,9 +158,23 @@ function itemRow(i, d) {
 }
 
 function detail(i, d) {
+  // 대표가 "매니저한테는 이게 어떻게 보이지?"를 확인하려고 앱 전체를 미리보기로 바꾸지 않아도 되게,
+  // 같이 보기를 켜면 한 항목 안에서 매니저 화면(왼쪽)과 대표 전용 칸(오른쪽)을 나란히 보여 준다.
+  const side = d.admin && EDU.split;
+  const mgr = mgrPane(i, d, side);
+  if (!d.admin) return `<div class="edudetail">${mgr}</div>`;
+  const boss = bossPane(i, d);
+  if (!side) return `<div class="edudetail">${mgr}${boss}</div>`;
+  return `<div class="edudetail edusplit">
+    <div class="edupane mgr"><div class="edupanetag">🧑‍💼 매니저가 보는 화면</div>${mgr}</div>
+    <div class="edupane boss"><div class="edupanetag">👑 대표만 보는 칸</div>${boss}</div>
+  </div>`;
+}
+
+// 양쪽이 똑같이 보는 부분. side 가 켜져 있으면 제출 폼을 '매니저에겐 이렇게 보인다'는 설명용으로 잠가서 보여 준다.
+function mgrPane(i, d, side) {
   const subs = d.subs.filter((s) => s.item_id === i.id);
-  let h = `<div class="edudetail">
-    <div><b>목표</b><br>${esc(i.goal)}</div>
+  let h = `<div><b>목표</b><br>${esc(i.goal)}</div>
     <div><b>진행법</b><ol>${i.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>
     <div><b>산출물</b><br>${esc(i.output)}</div>
     <div class="educrit"><b>합격기준</b>
@@ -168,20 +184,24 @@ function detail(i, d) {
   if (i.refs?.length) h += `<div><b>참고자료</b><br>${i.refs.map((r) => { const u = r.url || r, lb = r.label || String(u).split("/").pop(); return /^https?:/i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(lb)}</a>` : `<span class="mut">${esc(lb)} <small>(교육 폴더 파일 — 주차 자료로 올려 주세요)</small></span>`; }).join("<br>")}</div>`;
   h += `<div class="edusubs"><b>📤 제출물</b>
     ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
-    ${d.admin ? "" : `<form class="edusubf" data-id="${i.id}"><input name="title" placeholder="제출물 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`}
+    ${!d.admin ? `<form class="edusubf" data-id="${i.id}"><input name="title" placeholder="제출물 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
+      : side ? `<form class="edusubf demo"><input placeholder="제출물 이름" disabled><input placeholder="링크 (https://…)" disabled><span class="btn ghost" aria-disabled="true">📁 파일</span><span class="btn" aria-disabled="true">올리기</span></form><div class="mut">매니저는 여기에 산출물을 올려요 (대표 화면에서는 안 눌려요)</div>` : ""}
   </div>`;
-  if (d.admin) {
-    const ev = d.evals[i.id] || {};
-    h += `<div class="eduadmin">
-      <div class="mut">대표 전용</div>
+  return h;
+}
+
+// 대표만 보는 부분 — 확인 질문과 평가.
+function bossPane(i, d) {
+  const ev = d.evals[i.id] || {};
+  return `<div class="eduadmin">
+      ${EDU.split ? "" : `<div class="mut">대표 전용</div>`}
       ${i.leaderQ?.length ? `<div><b>확인 질문</b><ul>${i.leaderQ.map((q) => `<li>${esc(q)}</li>`).join("")}</ul></div>` : ""}
       <div class="eduev"><b>평가</b> ${LEVELS.map(([v, lb]) => `<label><input type="radio" name="ev-${i.id}" data-ev="${i.id}" value="${v}" ${String(ev.level) === v ? "checked" : ""}> ${lb}</label>`).join("")}</div>
       <textarea data-evc="${i.id}" rows="2" placeholder="관찰한 사실을 적어요 (예: 3차 연습에서 스크립트 4개 구간 누락)">${esc(ev.comment || "")}</textarea>
       <div class="mut">${ev.rated_on ? `평가일 ${ev.rated_on}${ev.updated_on && ev.updated_on !== ev.rated_on ? ` (최종 수정 ${ev.updated_on})` : ""}` : "아직 평가 전"}</div>
     </div>`;
-  }
-  return h + `</div>`;
 }
+
 
 // ── 평가서 ──
 function report(d) {
@@ -312,6 +332,11 @@ function bind(d) {
   }));
 
   // 평가서
+  V0.querySelector("#eduSplitBtn")?.addEventListener("click", () => {
+    EDU.split = !EDU.split;
+    try { localStorage.setItem("edu-split", EDU.split ? "1" : ""); } catch {}
+    EDU.load();
+  });
   V0.querySelector("#eduRepBtn")?.addEventListener("click", async () => {
     const { data } = await sb.from("edu_final").select("note").eq("user_id", d.mine).maybeSingle();
     V0.querySelector("#eduFinal").value = data?.note || "";

@@ -91,3 +91,16 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
   body.edurep #eduView { max-width: none; padding: 0; }
   #eduReport { margin: 0; border-radius: 0; }
 }
+
+/* 👀 매니저 화면 같이 보기 — 항목 상세를 두 칸으로 */
+#eduView .btn.on { border-color: var(--accent); color: var(--accent); }
+#eduView .edusplit { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+@media (max-width: 1100px) { #eduView .edusplit { grid-template-columns: 1fr; } }
+#eduView .edupane { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+#eduView .edupane.mgr { background: color-mix(in srgb, var(--bg) 70%, transparent); }
+#eduView .edupane.boss { border-color: var(--orange); }
+#eduView .edupanetag { font-size: 12px; font-weight: 600; color: var(--sub); }
+#eduView .edupane.boss .edupanetag { color: var(--orange); }
+#eduView .edupane .eduadmin { border-top: 0; padding-top: 0; }
+#eduView .edusubf.demo { opacity: .55; pointer-events: none; }
+#eduView .edusubf.demo .btn { display: inline-flex; align-items: center; justify-content: center; }
