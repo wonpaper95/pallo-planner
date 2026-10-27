@@ -138,3 +138,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 /* 업무 툴 세팅 — 16줄이라 좁은 칸에서는 두 줄로 흘린다 */
 #eduView .edutools .edutoolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 14px; margin-top: 4px; }
 #eduView .edutools .eduline { margin: 2px 0; }
+
+/* 파일을 골랐으면 버튼에 파일 이름이 보이게 — 고른 줄 모르고 추가를 누르던 문제 */
+#eduView .eduup.picked { border-color: var(--green); color: var(--green); }
+#eduView .eduupname { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

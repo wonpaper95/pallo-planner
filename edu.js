@@ -160,7 +160,7 @@ function weekCard(w, d, role) {
     <div class="edurefs">
       <b>📎 주차 자료</b>
       ${refs.length ? refs.map((r) => refRow(r, canEdit)).join("") : `<span class="mut">아직 없어요.</span>`}
-      ${canEdit ? `<form class="edureff" data-week="${w.week}"><input name="title" placeholder="자료 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">추가</button></form>` : ""}
+      ${canEdit ? `<form class="edureff" data-week="${w.week}"><input name="title" placeholder="자료 이름" maxlength="120"><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 <span class="eduupname">파일</span><input type="file" hidden name="file"></label><button class="btn">추가</button></form>` : ""}
     </div>
     ${weekSubs(w, d, role)}
     <div class="eduitems">${items.map((i) => itemRow(i, d, role)).join("")}</div>
@@ -175,7 +175,7 @@ function weekSubs(w, d, role) {
   return `<div class="edusubs eduweeksubs">
     <b>📤 주차 제출물</b> <span class="mut">${esc(w.report)}</span>
     ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
-    ${!d.admin ? `<form class="edusubf" data-id="${key}"><input name="title" placeholder="제출물 이름 (예: 주간보고 #1)" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
+    ${!d.admin ? `<form class="edusubf" data-id="${key}"><input name="title" placeholder="제출물 이름 (예: 주간보고 #1)" maxlength="120"><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 <span class="eduupname">파일</span><input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
       : role === "mgr" ? `<form class="edusubf demo"><input placeholder="제출물 이름 (예: 주간보고 #1)" disabled><input placeholder="링크 (https://…)" disabled><span class="btn ghost" aria-disabled="true">📁 파일</span><span class="btn" aria-disabled="true">올리기</span></form><div class="mut">매니저는 여기에 그 주 보고서를 올려요 (대표 화면에서는 안 눌려요)</div>` : ""}
   </div>`;
 }
@@ -219,7 +219,7 @@ function mgrPane(i, d, side) {
   if (i.refs?.length) h += `<div><b>참고자료</b><br>${i.refs.map((r) => { const u = r.url || r, lb = r.label || String(u).split("/").pop(); return /^https?:/i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(lb)}</a>` : `<span class="mut">${esc(lb)} <small>(위 📎 주차 자료 칸에서 열어요)</small></span>`; }).join("<br>")}</div>`;
   h += `<div class="edusubs"><b>📤 제출물</b>
     ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
-    ${!d.admin ? `<form class="edusubf" data-id="${i.id}"><input name="title" placeholder="제출물 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
+    ${!d.admin ? `<form class="edusubf" data-id="${i.id}"><input name="title" placeholder="제출물 이름" maxlength="120"><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 <span class="eduupname">파일</span><input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
       : side ? `<form class="edusubf demo"><input placeholder="제출물 이름" disabled><input placeholder="링크 (https://…)" disabled><span class="btn ghost" aria-disabled="true">📁 파일</span><span class="btn" aria-disabled="true">올리기</span></form><div class="mut">매니저는 여기에 산출물을 올려요 (대표 화면에서는 안 눌려요)</div>` : ""}
   </div>`;
   return h;
@@ -327,11 +327,19 @@ function bind(d) {
     if (fail(error)) return; toast("평가 내용을 저장했어요");
   }));
 
+  V0.querySelectorAll(".eduup input[type=file]").forEach((inp) => (inp.onchange = () => {
+    const tag = inp.closest(".eduup").querySelector(".eduupname"), f0 = inp.files[0];
+    tag.textContent = f0 ? (f0.name.length > 22 ? f0.name.slice(0, 20) + "…" : f0.name) : "파일";
+    inp.closest(".eduup").classList.toggle("picked", !!f0);
+  }));
+
   // 주차 자료 (대표)
   V0.querySelectorAll(".edureff").forEach((f) => (f.onsubmit = async (e) => {
     e.preventDefault();
-    const week = +f.dataset.week, title = f.title.value.trim(), url = f.url.value.trim(), file = f.file.files[0];
+    const week = +f.dataset.week, url = f.url.value.trim(), file = f.file.files[0];
+    const title = f.title.value.trim() || (file ? file.name.replace(/\.[^.]*$/, "") : "");
     if (!url && !file) return toast("링크를 넣거나 파일을 고르세요");
+    if (!title) return toast("자료 이름을 적어 주세요");
     let path = null;
     if (file) { path = `${week}/${safeKey(file.name)}`; const { error } = await sb.storage.from("edu-materials").upload(path, file); if (fail(error)) return; }
     const { error } = await sb.from("edu_refs").insert({ week, title, url: url ? normUrl(url) : null, path });
@@ -348,8 +356,10 @@ function bind(d) {
   // 제출물 (신입)
   V0.querySelectorAll(".edusubf").forEach((f) => (f.onsubmit = async (e) => {
     e.preventDefault();
-    const item_id = f.dataset.id, title = f.title.value.trim(), url = f.url.value.trim(), file = f.file.files[0];
+    const item_id = f.dataset.id, url = f.url.value.trim(), file = f.file.files[0];
+    const title = f.title.value.trim() || (file ? file.name.replace(/\.[^.]*$/, "") : "");
     if (!url && !file) return toast("링크를 넣거나 파일을 고르세요");
+    if (!title) return toast("제출물 이름을 적어 주세요");
     let path = null;
     if (file) { path = `${me.id}/${safeKey(file.name)}`; const { error } = await sb.storage.from("edu-submits").upload(path, file); if (fail(error)) return; }
     const { error } = await sb.from("edu_submits").insert({ item_id, title, url: url ? normUrl(url) : null, path });
