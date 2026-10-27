@@ -12,7 +12,16 @@ const byWeek = (w) => ITEMS().filter((i) => i.week === w);
 const weekKey = (w) => `week-${w}`;   // 주차 제출물은 edu_submits 에 이 id 로 들어간다
 const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
-const BOOKS = [["book1", "어떻게 원하는 것을 얻는가", "INTRO~2주차"], ["book2", "일의 격", "3주차"], ["book3", "데일 카네기 인간관계론", "5~7주차"]];
+// 필독서 — 키는 저장된 체크가 날아가지 않게 그대로 둔다. 읽는 시기는 안 박고, 왜 읽는지만 적는다.
+const BOOKS = [
+  ["emotion", "감정의 발견", "상담할 때"],
+  ["giant", "거인의 리더십", "조교·리더 관리할 때"],
+  ["teamlead", "팀장 리더십 수업", "조교·리더 관리할 때"],
+  ["fourhour", "나는 4시간만 일한다", "업무 효율과 시간 관리에"],
+  ["book1", "어떻게 원하는 것을 얻는가", "상담할 때"],
+  ["book2", "일의 격", "일하는 마인드셋에"],
+  ["book3", "데일 카네기 인간관계론", "지점 사람들 대할 때"],
+];
 const IMPROVE_N = 30;   // 지점 개선안 칸 수 (직접 적는 목록)
 // 업무 툴 세팅 체크리스트 — 입사 순서대로 (계정 → 내 컴퓨터 → 업무 도구 → 대외 채널)
 // 키는 저장된 체크가 날아가지 않게 그대로 둔다.
@@ -128,9 +137,9 @@ function mission(d, role) {
             `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
         </details>
       </div>
-      <div><b>필독서 3권</b>${BOOKS.map(([k, t, when]) => {
+      <div><b>필독서 ${BOOKS.length}권</b>${BOOKS.map(([k, t, why]) => {
         const b = (m.books || {})[k] || {};
-        return `<div class="eduline"><span>${esc(t)} <span class="mut">${when}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
+        return `<div class="eduline"><span>${esc(t)} <span class="mut">${why}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
       }).join("")}
       <div class="edutools"><b>업무 툴 세팅</b><div class="edutoolgrid">${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div></div>
     </div>
