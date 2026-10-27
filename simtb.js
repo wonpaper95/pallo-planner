@@ -42,13 +42,13 @@ const fit = (el) => { el.style.height = "auto"; el.style.height = (el.classList.
 TB.grow = (root) => root?.querySelectorAll(".tbDump, .tbc").forEach(fit);
 // 남이 적은 것 → 그 지점 타임박스 전부(메인 칸·현황 카드)
 TB.remote = (tid, p) => {
-  if (p.day !== today()) return;
   const st = p.state ?? { body: p.body };
   document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((root) => {
+    if ((root.dataset.day || today()) !== p.day) return; // 같은 날짜 칸에만 (오늘·내일 따로)
     TB.apply(root, st);
-    const who = root.closest("details")?.querySelector("summary small"); if (!who) return;
+    const who = root.closest("details")?.querySelector("summary small:last-of-type"); if (!who) return;
     who.textContent = `✍️ ${p.who} 적는 중…`; clearTimeout(who._t);
-    who._t = setTimeout(() => { const n = new Date(); who.textContent = `${md(today())} · ${p.who} ${pad(n.getHours())}:${pad(n.getMinutes())} 저장`; }, 2500);
+    who._t = setTimeout(() => { const n = new Date(); who.textContent = `${md(p.day)} · ${p.who} ${pad(n.getHours())}:${pad(n.getMinutes())} 저장`; }, 2500);
   });
 };
 // 내가 적으면: 0.15초 모아 실시간 전송 · 0.7초 뒤 저장 (다른 열린 타임박스에도 바로 반영)
@@ -56,19 +56,19 @@ const timers = new Map();
 document.addEventListener("input", (e) => {
   const el = e.target.closest?.(".tb [data-k]"); if (!el) return;
   const root = el.closest(".tb"), mine = root.dataset.tb === "me", tid = mine ? "me" : +root.dataset.tb, day = root.dataset.day || today();
-  const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small");
+  const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small:last-of-type");
   if (el.matches(".tbDump, .tbc")) fit(el);
   if (who) who.textContent = "적는 중…";
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
     const st = TB.read(root);
-    document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((r) => r !== root && TB.apply(r, st));
-    simChannel(tid, (p) => TB.remote(tid, p), "tb").send({ type: "broadcast", event: "text", payload: { day: today(), state: st, body: st.body, who: myName } });
+    document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((r) => r !== root && (r.dataset.day || today()) === day && TB.apply(r, st));
+    simChannel(tid, (p) => TB.remote(tid, p), "tb").send({ type: "broadcast", event: "text", payload: { day, state: st, body: st.body, who: myName } });
   }, 150);
   clearTimeout(tm.save); tm.save = setTimeout(async () => {
     const st = TB.read(root);
     const { error } = mine ? await sb.from("my_notes").upsert({ day, body: st.body, plan: st.plan, updated_at: new Date().toISOString() })
-      : await sb.rpc("team_note_set", { p_day: today(), p_body: st.body, p_team: tid, p_plan: st.plan }); if (fail(error)) return;
+      : await sb.rpc("team_note_set", { p_day: day, p_body: st.body, p_team: tid, p_plan: st.plan }); if (fail(error)) return;
     const n = new Date(); if (who) who.textContent = `${md(day)} · ${pad(n.getHours())}:${pad(n.getMinutes())} 저장됨`;
   }, 700);
 });
