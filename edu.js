@@ -13,7 +13,7 @@ const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
 const BOOKS = [["book1", "어떻게 원하는 것을 얻는가", "INTRO~2주차"], ["book2", "일의 격", "3주차"], ["book3", "데일 카네기 인간관계론", "5~7주차"]];
 const KPIS = [["revenue", "매출"], ["callback", "회신율"], ["consult", "상담율"], ["payment", "결제율"]];
-const TOOLS = [["notion", "Notion"], ["ai", "Claude/Gemini"], ["clovanote", "Clovanote"], ["discord", "Discord"], ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["icloud", "iCloud 공유"], ["gmail", "Gmail 라벨"]];
+const TOOLS = [["planner", "팔로플래너 세팅"], ["ai", "Claude"], ["discord", "Discord"], ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["icloud", "iCloud 공유"], ["gmail", "Gmail 라벨"]];
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 const normUrl = (u) => (/^https?:\/\//i.test(u) ? u : "https://" + u);
 // Storage 키는 ASCII 만 받는다(한글 파일명이면 거절) → 안전한 이름으로 바꿔 올리고, 보이는 이름은 사용자가 적은 제목을 쓴다
@@ -103,7 +103,7 @@ function orphanBar(d) {
 
 // ── 장기 미션 ──
 function mission(d, role) {
-  const m = d.meta, ro = role === "boss" || d.admin ? "disabled" : "";
+  const m = d.meta, ro = role === "mgr" && d.admin ? "disabled" : "";   // 왼쪽 미리보기 칸만 잠근다
   const id = (n) => (role === "mgr" ? "" : ` id="${n}"`);
   const n = m.improvements || 0;
   return `<section class="card edumission">
