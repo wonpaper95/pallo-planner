@@ -52,7 +52,8 @@ body:not(.eduv) #eduView { display: none; }
 #eduView .edust.doing { border-color: var(--blue); color: var(--blue); }
 #eduView .edust.done { border-color: var(--green); color: var(--green); }
 #eduView .tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
-#eduView .tag.rep { border-color: var(--orange); color: var(--orange); }
+#eduView .tag.req { border-color: var(--red); color: var(--red); }
+#eduView .tag.rep { border-color: #E0D120; color: #E0D120; }
 #eduView .tag.lv0 { border-color: var(--red); color: var(--red); }
 #eduView .tag.lv1 { border-color: var(--blue); color: var(--blue); }
 #eduView .tag.lv2 { border-color: var(--green); color: var(--green); }

@@ -178,12 +178,10 @@ function weekCard(w, d, role) {
 function itemAdmin(w) {
   const hidden = EDU.edits.filter((e) => e.hidden && e.week === w.week);
   const title = (e) => e.item?.title || (globalThis.EDU_ITEMS || []).find((i) => i.id === e.id)?.title || e.id;
-  const cats = [...new Set(ITEMS().map((i) => i.cat).filter(Boolean))];
   return `<div class="eduitemadm">
     ${hidden.length ? `<div class="mut">숨긴 항목: ${hidden.map((e) => `<button class="btn ghost eduunhide" data-id="${esc(e.id)}" title="되살리기">↺ ${esc(title(e))}</button>`).join(" ")}</div>` : ""}
     <form class="eduitemf" data-week="${w.week}">
       <input name="title" placeholder="새 항목 이름" maxlength="200" required>
-      <input name="cat" placeholder="분류 (예: 마인드)" maxlength="20" list="eduCats${w.week}"><datalist id="eduCats${w.week}">${cats.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>
       <label class="mut"><input type="checkbox" name="required"> 필수</label>
       <label class="mut"><input type="checkbox" name="report"> 보고</label>
       <input name="goal" placeholder="목표 (선택)" maxlength="300">
@@ -218,8 +216,7 @@ function itemRow(i, d, role) {
     <div class="eduhead">
       <button class="edust ${st}" title="미착수 → 하는 중 → 끝">${mark}</button>
       <button class="edutitle">${esc(i.title)}</button>
-      ${i.required ? `<span class="tag">필수</span>` : ""}${i.report ? `<span class="tag rep">보고</span>` : ""}
-      <span class="tag">${esc(i.cat)}</span>
+      ${i.required ? `<span class="tag req">필수</span>` : ""}${i.report ? `<span class="tag rep">보고</span>` : ""}
       ${role === "boss" && ev ? `<span class="tag lv${ev.level}">${LEVELS[ev.level][1]}</span>` : ""}
       ${role === "boss" ? `<button class="btn ghost eduitemdel" title="이 항목 숨기기">🗑</button>` : ""}
     </div>
@@ -344,7 +341,7 @@ function bind(d) {
     e.preventDefault();
     const title = f.title.value.trim(), required = f.required.checked, report = f.report.checked;
     if (!title) return toast("항목 이름을 적어 주세요");
-    const item = { title, cat: f.cat.value.trim() || "기타", required, report, weight: report ? 3 : required ? 2 : 1, goal: f.goal.value.trim() };
+    const item = { title, cat: "기타", required, report, weight: report ? 3 : required ? 2 : 1, goal: f.goal.value.trim() };
     const { error } = await sb.from("edu_items").insert({ id: "c-" + Date.now().toString(36), week: +f.dataset.week, item });
     if (fail(error)) return; toast("항목을 추가했어요"); EDU.load();
   }));
