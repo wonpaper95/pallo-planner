@@ -71,6 +71,28 @@ TB.apply = (root, st) => {
 const fit = (el) => { el.style.height = "auto"; el.style.height = (el.classList.contains("tbDump") ? Math.max(160, el.scrollHeight + 2) : el.scrollHeight) + "px"; };
 TB.grow = (root) => root?.querySelectorAll(".tbDump, .tbc").forEach(fit);
 // 남이 적은 것 → 그 지점 타임박스 전부(메인 칸·현황 카드)
+// 바뀐 칸 → 저장·전송 모양 { body, p: {i}, t: {"HH:00"}, w: {칸} }. 예전 :30 칸은 그 시간 칸에 합쳐졌으니 지움
+const patchOf = (root, keys) => {
+  const out = {}, w = wOf(root), v = (k) => root.querySelector(`[data-k="${k}"]`)?.value ?? "";
+  for (const k of keys ?? []) {
+    if (k === "body") out.body = v(k);
+    else if (/^p[0-2]$/.test(k)) (out.p ??= {})[k[1]] = v(k);
+    else if (k[0] === "t") { (out.t ??= {})[k.slice(1)] = v(k).trim() ? v(k) : null; out.t[`${k.slice(1, 3)}:30`] = null; }
+    else continue;
+    (out.w ??= {})[k] = v(k).trim() && w[k] && (!Array.isArray(w[k]) || w[k].some(Boolean)) ? w[k] : null;
+  }
+  return out;
+};
+// 받은 바뀐 칸만 내 화면에 (내가 적는 칸은 그대로)
+TB.applyPatch = (root, pt) => {
+  const set = (k, val) => { const el = root.querySelector(`[data-k="${k}"]`); if (!el || el === document.activeElement || el.value === val) return; el.value = val; if (el.matches(".tbc, .tbDump")) fit(el); };
+  if ("body" in pt) set("body", pt.body ?? "");
+  for (const [i, val] of Object.entries(pt.p ?? {})) set(`p${i}`, val ?? "");
+  for (const [k, val] of Object.entries(pt.t ?? {})) if (k.endsWith(":00")) set(`t${k}`, val ?? "");
+  const w = wOf(root), act = document.activeElement?.closest?.(".tb") === root ? document.activeElement.dataset.k : null;
+  for (const [k, val] of Object.entries(pt.w ?? {})) if (k !== act) { if (val == null) delete w[k]; else w[k] = val; }
+  paint(root);
+};
 TB.remote = (tid, p) => {
   const st = p.state ?? { body: p.body };
   document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((root) => {
@@ -78,7 +100,7 @@ TB.remote = (tid, p) => {
       if (p.day && !root._dirty && !root.contains(document.activeElement) && [today(), W.add(today(), 1)].includes(p.day)) window.simOnOtherDay?.(tid, p.day, root);
       return;
     }
-    TB.apply(root, st);
+    p.patch ? TB.applyPatch(root, p.patch) : TB.apply(root, st);
     const who = root.closest("details")?.querySelector("summary small:last-of-type"); if (!who) return;
     who.textContent = `✍️ ${p.who} 적는 중…`; clearTimeout(who._t);
     who._t = setTimeout(() => { const n = new Date(); who.textContent = `${md(p.day)} · ${p.who} ${pad(n.getHours())}:${pad(n.getMinutes())} 저장`; }, 2500);
@@ -94,16 +116,18 @@ document.addEventListener("input", (e) => {
   if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? relines(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 바꾼 줄만 내 색
   if (who) who.textContent = "적는 중…";
   root._dirty = true; // 저장 전엔 서버 글로 안 덮음 (TB.sync)
+  if (!mine) { (root._chg ??= new Set()).add(el.dataset.k); (root._send ??= new Set()).add(el.dataset.k); } // 💾 바뀐 칸만 저장·전송
   const tm = timers.get(tid) ?? {}; timers.set(tid, tm);
   if (!mine) clearTimeout(tm.send); if (!mine) tm.send = setTimeout(() => {
-    const st = TB.read(root);
-    document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((r) => r !== root && (r.dataset.day || today()) === day && TB.apply(r, st));
-    simChannel(tid, (p) => TB.remote(tid, p), "tb").send({ type: "broadcast", event: "text", payload: { day, state: st, body: st.body, who: myName } });
+    const st = TB.read(root), patch = patchOf(root, root._send); root._send = new Set();
+    document.querySelectorAll(`.tb[data-tb="${tid}"]`).forEach((r) => r !== root && (r.dataset.day || today()) === day && TB.applyPatch(r, patch));
+    simChannel(tid, (p) => TB.remote(tid, p), "tb").send({ type: "broadcast", event: "text", payload: { day, patch, state: st, body: st.body, who: myName } }); // state·body = 예전 화면용
   }, 150);
   clearTimeout(tm.save); tm.save = setTimeout(async () => {
-    const st = TB.read(root);
+    const st = TB.read(root), keys = root._chg ?? new Set(); root._chg = new Set();
     const { error } = mine ? await sb.from("my_notes").upsert({ day, body: st.body, plan: st.plan, updated_at: new Date().toISOString() })
-      : await sb.rpc("team_note_set", { p_day: day, p_body: st.body, p_team: tid, p_plan: st.plan }); root._dirty = false; if (fail(error)) return;
+      : await sb.rpc("team_note_patch", { p_day: day, p_patch: patchOf(root, keys), p_team: tid }); // 💾 바뀐 칸만 → 남이 다른 칸에 쓴 글은 안 지워짐
+    if (error) keys.forEach((k) => root._chg.add(k)); else if (!root._chg.size) root._dirty = false; if (fail(error)) return;
     const n = new Date(); if (who) who.textContent = `${md(day)} · ${pad(n.getHours())}:${pad(n.getMinutes())} 저장됨`;
   }, 700);
 });
