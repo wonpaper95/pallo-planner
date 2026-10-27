@@ -1,0 +1,93 @@
+/* 📚 매니저 교육 탭 (edu.js) */
+body:not(.eduv) #eduView { display: none; }
+#eduView { max-width: 900px; margin: 0 auto; padding: 16px 20px 100px; }
+#eduView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+#eduView .card + .card { margin-top: 12px; }
+#eduView .grow { flex: 1; }
+#eduView .mut { color: var(--sub); font-size: 13px; }
+#eduView input, #eduView select, #eduView textarea { padding: 6px 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; min-width: 0; }
+
+/* 위 칸 */
+#eduView .edubar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+#eduView .eduwho { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+#eduView .edustart { display: flex; align-items: center; gap: 6px; }
+#eduView .edubarline { height: 8px; background: var(--hover); border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
+#eduView .edubarline.sm { height: 6px; margin: 4px 0; }
+#eduView .edubarline > div { height: 100%; background: var(--accent); transition: width .3s; }
+#eduView .eduwarn { border-color: var(--red); color: var(--red); }
+
+/* 장기 미션 */
+#eduView .edumission h3 { margin: 0 0 10px; font-size: 15px; }
+#eduView .edugrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+#eduView .eduline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; font-size: 13px; }
+#eduView .eduline input[type=number] { width: 70px; }
+#eduView .edukpi { width: 100%; border-collapse: collapse; font-size: 12px; }
+#eduView .edukpi td { padding: 2px; }
+#eduView .edukpi td:first-child { white-space: nowrap; padding-right: 6px; }
+#eduView .edukpi tr td:first-child { width: 1%; }
+#eduView .edukpi input { width: 100%; }
+
+/* 주차 */
+#eduView .eduwk { display: flex; align-items: center; gap: 10px; }
+#eduView .eduwkbtn { flex: 1; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 2px 0; }
+#eduView .eduwkbtn b { font-size: 15px; }
+#eduView .eduweek.open { border-color: var(--accent); }
+#eduView .edugoals { margin: 10px 0 6px; padding-left: 20px; color: var(--sub); font-size: 13px; }
+#eduView .edureport { margin-bottom: 10px; }
+#eduView .edurefs { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+#eduView .eduref { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+#eduView .eduref a { color: var(--blue); text-decoration: none; }
+#eduView .eduref a:hover { text-decoration: underline; }
+#eduView .edureff, #eduView .edusubf { display: grid; grid-template-columns: 1fr 1.4fr auto auto; gap: 6px; margin-top: 8px; }
+@media (max-width: 640px) { #eduView .edureff, #eduView .edusubf { grid-template-columns: 1fr; } }
+#eduView .eduup { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* 항목 */
+#eduView .eduitem { border-top: 1px solid var(--line); padding: 6px 0; }
+#eduView .eduhead { display: flex; align-items: center; gap: 8px; }
+#eduView .edutitle { flex: 1; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 4px 0; }
+#eduView .eduitem.done .edutitle { color: var(--sub); text-decoration: line-through; }
+#eduView .eduitem.rep .eduhead { font-weight: 600; }
+#eduView .edust { width: 22px; height: 22px; flex: none; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--sub); cursor: pointer; }
+#eduView .edust.doing { border-color: var(--blue); color: var(--blue); }
+#eduView .edust.done { border-color: var(--green); color: var(--green); }
+#eduView .tag { font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+#eduView .tag.rep { border-color: var(--orange); color: var(--orange); }
+#eduView .tag.lv0 { border-color: var(--red); color: var(--red); }
+#eduView .tag.lv1 { border-color: var(--blue); color: var(--blue); }
+#eduView .tag.lv2 { border-color: var(--green); color: var(--green); }
+
+/* 상세 */
+#eduView .edudetail { display: grid; gap: 10px; padding: 10px 0 12px 30px; font-size: 14px; }
+#eduView .edudetail ol, #eduView .edudetail ul { margin: 4px 0; padding-left: 20px; }
+#eduView .educrit > div { margin-top: 3px; }
+#eduView .edusubs { border-top: 1px dashed var(--line); padding-top: 10px; }
+#eduView .edusub { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+#eduView .edusub a { color: var(--blue); text-decoration: none; cursor: pointer; }
+#eduView .eduadmin { border-top: 1px dashed var(--orange); padding-top: 10px; display: grid; gap: 8px; }
+#eduView .eduadmin > .mut:first-child { color: var(--orange); }
+#eduView .eduev label { margin-right: 12px; }
+#eduView .eduadmin textarea { width: 100%; }
+
+/* 평가서 — 평소엔 숨기고, 열면 인쇄용 흰 종이 */
+#eduReport { display: none; background: #fff; color: #111; padding: 28px; border-radius: 10px; margin-top: 16px; }
+body.edurep #eduReport { display: block; }
+body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
+#eduReport h2 { font-size: 17px; border-bottom: 2px solid #111; padding-bottom: 6px; margin: 18px 0 8px; }
+#eduReport table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
+#eduReport th, #eduReport td { border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
+#eduReport th { background: #f0f0f0; }
+#eduReport .red { color: #c00; }
+#eduReport textarea, #eduReport input, #eduReport select { background: #fff; color: #111; border: 1px solid #bbb; border-radius: 6px; padding: 6px; font: inherit; }
+#eduReport #eduFinal { width: 100%; }
+#eduReport .edufb { border: 1px dashed #bbb; border-radius: 8px; padding: 10px; margin: 8px 0 16px; }
+#eduReport .edufb form { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+#eduReport .edufb input[name=note] { flex: 1; min-width: 180px; }
+#eduReport .edusign { margin-top: 36px; display: flex; gap: 40px; }
+#eduReport .edusign div { flex: 1; border-top: 1px solid #111; padding-top: 6px; font-size: 12px; }
+
+@media print {
+  body.edurep header, body.edurep .seg, body.edurep .no-print, body.edurep #toast { display: none !important; }
+  body.edurep #eduView { max-width: none; padding: 0; }
+  #eduReport { margin: 0; border-radius: 0; }
+}

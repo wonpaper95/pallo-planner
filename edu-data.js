@@ -424,7 +424,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w0-boss",
   "week": 0,
-  "title": "[보스전] INTRO 보고 — 대표 면담",
+  "title": "INTRO 보고 — 대표 면담",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -721,7 +721,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w1-boss",
   "week": 1,
-  "title": "[보스전] 주간보고 #1 제출",
+  "title": "주간보고 #1 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -1035,7 +1035,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w2-boss",
   "week": 2,
-  "title": "[보스전] 주간보고 #2 제출",
+  "title": "주간보고 #2 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -1348,7 +1348,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w3-boss",
   "week": 3,
-  "title": "[보스전] 주간보고 #3 제출",
+  "title": "주간보고 #3 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -1678,7 +1678,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w4-boss",
   "week": 4,
-  "title": "[보스전] 월말보고 #1 + 주간보고 #4 제출",
+  "title": "월말보고 #1 + 주간보고 #4 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -1952,7 +1952,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w5-boss",
   "week": 5,
-  "title": "[보스전] 주간보고 #5 + 중간 점검 보고 제출",
+  "title": "주간보고 #5 + 중간 점검 보고 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -2174,7 +2174,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w6-boss",
   "week": 6,
-  "title": "[보스전] 주간보고 #6 제출",
+  "title": "주간보고 #6 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -2394,7 +2394,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w7-boss",
   "week": 7,
-  "title": "[보스전] 주간보고 #7 제출",
+  "title": "주간보고 #7 제출",
   "cat": "복기",
   "axis": "own",
   "required": true,
@@ -2696,7 +2696,7 @@ globalThis.EDU_ITEMS = [
  {
   "id": "w8-boss",
   "week": 8,
-  "title": "[보스전] 월말보고 #2 + 최종 종합평가 + 대표 면담",
+  "title": "월말보고 #2 + 최종 종합평가 + 대표 면담",
   "cat": "복기",
   "axis": "own",
   "required": true,
