@@ -1,4 +1,4 @@
-// 📚 매니저 교육 탭: 신입 매니저 8주(INTRO~8주차) 교육 진행·평가.
+// 📚 매니저 교육 탭: 신입 매니저 12주(INTRO~12주차) 교육 진행·평가.
 // 내용은 edu-data.js(EDU_WEEKS·EDU_ITEMS), 사람마다 달라지는 것은 DB(edu_*).
 // 신입 = 자기 진행 체크 + 산출물 제출. 대표 = 사람 고르기 + 등급·코멘트 + 피드백 기록 + 평가서.
 // 평가는 RLS 로 대표만 읽는다(합격기준 글은 모두에게 보임 — 평가받기 전에 기준을 안다).
@@ -278,7 +278,7 @@ function report(d) {
   const wlabel = (w) => W().find((x) => x.week === w)?.label || w;
   return `<div id="eduReport">
     <h2>매니저 교육 최종 평가서</h2>
-    <table><tr><th>성명</th><td>${esc(name)}</td><th>교육기간</th><td>${esc(d.meta.started_on || "")} ~ (8주)</td></tr>
+    <table><tr><th>성명</th><td>${esc(name)}</td><th>교육기간</th><td>${esc(d.meta.started_on || "")} ~ (12주)</td></tr>
       <tr><th>작성일</th><td>${today()}</td><th>평가 진행률</th><td>${rated.length} / ${ITEMS().length} 항목</td></tr></table>
     <h2>역량별 평가</h2>
     <table><tr><th>역량</th><th>점수</th><th>백분율</th><th>평가/전체</th></tr>
