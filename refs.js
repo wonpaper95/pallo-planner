@@ -21,14 +21,15 @@ const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } 
 const render = () => {
   const t = cur, rs = list(t), d = dlg();
   d.innerHTML = `<h3 style="margin:0 0 2px">📎 참고 자료</h3><p class="mut" style="margin:0 0 10px;font-size:13px">${esc(t.title || "할 일")}</p>
+    <label class="btn refup">📤 파일 올리기<input type="file" id="refFile" multiple hidden></label>
+    <small class="mut" style="display:block;margin:4px 0 10px">눌러서 고르거나 이 창에 끌어다 놓기 · 50MB까지 · 나만 볼 수 있어요</small>
     <div class="reflist">${rs.length ? rs.map((r, i) => `<div class="refrow"><span>${r.k === "file" ? "📄" : "🔗"}</span>
         <button class="reflink" data-ropen="${i}" title="열기">${esc(r.name)}</button><small class="mut">${r.k === "file" ? "파일" : esc(host(r.url))}</small>
         <button class="btn ghost" data-rdel="${i}" title="지우기">🗑</button></div>`).join("")
       : `<div class="mut" style="padding:10px 0;font-size:14px">아직 없어요 — 링크를 붙여 넣거나 파일을 올려 두면 작업할 때 바로 열 수 있어요</div>`}</div>
     <div class="refadd"><input id="refUrl" placeholder="링크 붙여넣기 (https://…)"><input id="refName" placeholder="이름 (비우면 주소)">
       <button class="btn" data-radd>추가</button></div>
-    <div class="refadd"><label class="btn ghost" style="cursor:pointer">📤 파일 올리기<input type="file" id="refFile" multiple hidden></label>
-      <small class="mut">여기로 끌어다 놓아도 돼요 · 50MB까지 · 나만 볼 수 있어요</small><span style="flex:1"></span><button class="btn ghost" data-rx>닫기</button></div>`;
+    <div class="refadd"><span style="flex:1"></span><button class="btn ghost" data-rx>닫기</button></div>`;
 };
 const put = async (refs) => { if (!(await save(cur.id, { refs }))) return false; cur = tasks.find((t) => t.id === cur.id) ?? { ...cur, refs }; render(); renderWeek(); return true; };
 async function addLink() {
