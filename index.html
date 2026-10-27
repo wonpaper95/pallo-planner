@@ -249,7 +249,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg button.dragging { z-index: 2; background: var(--hover); color: var(--text); box-shadow: 0 6px 16px rgba(0,0,0,.45); scale: 1.06; cursor: grabbing; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -399,7 +399,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 /* 🌱 언젠가 할 일 자리: PC(넓은 화면) = 주간·월간 오른쪽 칸(스크롤해도 따라옴), 폰 = 맨 위 */
@@ -492,6 +492,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="contacts.css?v=202610260633">
 <link rel="stylesheet" href="leaders.css?v=202610262245">
 <link rel="stylesheet" href="links.css?v=202610260633">
+<link rel="stylesheet" href="reports.css?v=202610271232">
 <link rel="stylesheet" href="edu.css?v=202610271300">
 <link rel="stylesheet" href="qna.css?v=202610260633">
 <link rel="stylesheet" href="glass.css?v=202610262200">
@@ -527,7 +528,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="ld">리더 현황</button><button data-v="edu">교육</button><button data-v="sim" class="adminonly">시뮬레이터</button><button data-v="board" class="adminonly">현황</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="ld">리더 현황</button><button data-v="edu">교육</button><button data-v="rp">리포트</button><button data-v="sim" class="adminonly">시뮬레이터</button><button data-v="board" class="adminonly">현황</button></div></nav>
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
@@ -566,6 +567,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="mkView"></section>
   <section id="lkView"></section>
   <section id="eduView"></section>
+  <section id="rpView"></section>
   <section id="qaView"></section>
   <section id="ctView"></section>
   <section id="ldView"></section>
@@ -656,7 +658,7 @@ const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
   const RO = { data: null, error: { message: "👀 매니저 화면 보기 중엔 보기만 돼요" } };
   const stub = () => { const q = { then: (ok) => ok(RO) }; for (const m of ["select", "single", "maybeSingle", "eq", "in", "order", "limit"]) q[m] = () => q; return q; };
   const from0 = sb.from.bind(sb), rpc0 = sb.rpc.bind(sb);
-  sb.from = (t) => { const q = from0(t); if (previewUser && (t === "tasks" || t === "someday")) for (const m of ["insert", "update", "delete", "upsert"]) q[m] = stub; return q; };
+  sb.from = (t) => { const q = from0(t); if (previewUser && (t === "tasks" || t === "someday" || t === "reports")) for (const m of ["insert", "update", "delete", "upsert"]) q[m] = stub; return q; };
   sb.rpc = (f, a) => previewUser && ["set_routine_done", "timer", "set_team_task_done", "move_assigned"].includes(f) ? stub() : rpc0(f, a);
 }
 const $ = (s) => document.querySelector(s);
@@ -747,6 +749,7 @@ async function boot() {
   if (view === "ld") window.LD?.load(); // 리더 현황 탭에서 새로고침했을 때
   if (view === "sim") window.TB?.loadMine(); // 🧠 시뮬레이터 탭
   if (view === "edu") window.EDU?.load(); // 📚 교육 탭에서 새로고침했을 때
+  if (view === "rp") window.RP?.load(); // 📝 리포트 탭
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
@@ -1382,7 +1385,7 @@ $("#installBtn").onclick = async () => { if (!installEvt) return toast("크롬 �
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
 function setView(v) {
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1394,6 +1397,7 @@ function setView(v) {
   if (v === "ct" && me && window.CT) CT.load();
   if (v === "ld" && me && window.LD) LD.load();
   if (v === "edu" && me && window.EDU) EDU.load();
+  if (v === "rp" && me && window.RP) RP.load();
   if (v === "sim" && me && window.TB) TB.loadMine();
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   if (v !== "edu") document.body.classList.remove("edurep");
@@ -1967,6 +1971,7 @@ boot();
 <script src="links.js?v=202610271232"></script>
 <script src="edu-data.js?v=202610271232"></script>
 <script src="edu.js?v=202610271232"></script>
+<script src="reports.js?v=202610271232"></script>
 <script src="qna.js?v=202610271232"></script>
 </body>
 </html>
