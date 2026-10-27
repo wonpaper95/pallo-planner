@@ -148,3 +148,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 #eduView .eduitemf input[name=title], #eduView .eduitemf input[name=goal] { flex: 1 1 200px; }
 #eduView .eduitemf input[name=cat] { width: 130px; }
 #eduView .eduunhide { font-size: 12px; padding: 2px 8px; }
+/* 필독서 줄: 체크 3개는 줄바꿈 없이 오른쪽에 붙이고, 길면 책 이름 쪽이 접힌다 */
+#eduView .eduline.book { flex-wrap: nowrap; }
+#eduView .eduline.book > span { flex: 1; min-width: 0; }
+#eduView .eduline.book label { flex: none; white-space: nowrap; }

@@ -145,7 +145,7 @@ function mission(d, role) {
       </div>
       <div><b>필독서 ${BOOKS.length}권</b>${BOOKS.map(([k, t, why]) => {
         const b = (m.books || {})[k] || {};
-        return `<div class="eduline"><span>${esc(t)} <span class="mut">${why}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
+        return `<div class="eduline book"><span>${esc(t)} <span class="mut">${why}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
       }).join("")}
       <div class="edutools"><b>업무 툴 세팅</b><div class="edutoolgrid">${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div></div>
     </div>
