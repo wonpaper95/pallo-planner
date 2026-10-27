@@ -21,7 +21,7 @@ LD.load = async function () {
     const has = new Set(((await sb.from("leaders").select("team_id").limit(2000)).data ?? []).map((x) => x.team_id));
     LD.team = teams.find((t) => t.id === saved)?.id ?? teams.find((t) => has.has(t.id))?.id ?? teams[0]?.id ?? null;
   }
-  if (!admin()) LD.team = previewTeam ?? (await sb.rpc("my_team")).data ?? null; // 매니저·미리보기: 우리 지점
+  if (!admin()) LD.team = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data ?? null; // 매니저·미리보기: 우리 지점 · 조교: 링크 지점
   if (!LD.team) { V().innerHTML = `<div class="ldbar"><h2>🧑‍🏫 리더 현황 보드</h2></div><div class="card mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const [from, to] = range(), aFrom = [from, LDC.addMonths(statMonth(), -2)].sort()[0], aTo = [to, LDC.monthEnd(statMonth())].sort().at(-1);
   const { data: rows, error } = await sb.from("leaders").select("*").eq("team_id", LD.team).order("sort").order("id");
