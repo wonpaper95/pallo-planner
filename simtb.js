@@ -130,6 +130,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest?.("#mySimView [data-myd]"); if (!b) return;
   const n = +b.dataset.myd; TB.loadMine(n ? W.add(TB.myDay, n) : today());
 });
+document.addEventListener("scroll", (e) => { const el = e.target; if (el?.matches?.(".tbw > textarea")) el.previousElementSibling.scrollTop = el.scrollTop; }, true); // 칸을 줄여 스크롤해도 색 글자가 같이 움직임
 // 칸에서 Enter = 아래 칸으로 (시간표 빨리 채우기), Shift+Enter = 칸 안에서 줄바꿈
 document.addEventListener("keydown", (e) => {
   const el = e.target.closest?.(".tb input[data-k], .tb .tbc"); if (!el || e.key !== "Enter" || e.shiftKey || e.isComposing) return; // Shift+Enter = 칸 안 줄바꿈
