@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610272312">
+<meta name="app-version" content="202610272316">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610272312"></script>
+<script src="theme.js?v=202610272316"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -674,9 +674,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610272312"></script>
-<script src="week.js?v=202610272312"></script>
-<script src="pick.js?v=202610272312"></script>
+<script src="config.js?v=202610272316"></script>
+<script src="week.js?v=202610272316"></script>
+<script src="pick.js?v=202610272316"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -1104,8 +1104,10 @@ $("#fbList").onclick = async (e) => {
 
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
 let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
+const boardSimDay = {}; // 🧠 현황 카드 시뮬레이션: 지점별 0 오늘 · 1 내일 (안 고르면 내일 적은 게 있으면 내일)
 try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
 $("#boardView").addEventListener("click", async (e) => {
+  const sbd = e.target.closest("[data-simbday]"); if (sbd) { e.preventDefault(); const id = +sbd.dataset.simbday; boardSimDay[id] = sbd.textContent.includes("내일") ? 0 : 1; return loadBoard(); } // 🧠 오늘/내일
   const sr = e.target.closest("[data-simrec]"); if (sr) { e.preventDefault(); return TB.history(+sr.dataset.simrec, sr.dataset.simrecname); } // 📜 지점 시뮬레이션 기록
   const jb = e.target.closest("[data-jo]"); // 🧑‍🎓 조교 링크 새로 만들기 (예전 링크는 바로 막힘)
   if (jb) return joLinkDlg(+jb.dataset.jo, jb.dataset.joname);
@@ -1127,7 +1129,12 @@ async function loadBoard() {
     sb.from("tasks").select("id, user_id, title, done").eq("assigned_by", me.id).eq("day", day).order("id"),
     sb.from("routine_items").select("*").order("sort").order("id")]);
   if (fail(t.error || p.error || k.error || a.error || r.error)) return;
-  const notes = new Map(((await sb.from("team_notes").select("team_id, body, plan, updated_at").eq("day", day)).data ?? []).map((x) => [x.team_id, x])); // 🧠 시뮬레이션 메모
+  const nday = W.add(day, 1), nrows = (await sb.from("team_notes").select("team_id, day, body, plan, updated_at").in("day", [day, nday])).data ?? [];
+  const noteOk = (x) => x && (x.body || Object.values(x.plan?.t ?? {}).some((v) => v?.trim()) || (x.plan?.p ?? []).some(Boolean));
+  const notes = new Map(t.data.map((tm) => { // 🧠 시뮬레이션: 고른 날(오늘/내일) — 안 골랐으면 내일 적은 게 있으면 내일
+    const td = nrows.find((x) => x.team_id === tm.id && x.day === day), tm2 = nrows.find((x) => x.team_id === tm.id && x.day === nday);
+    const pick = boardSimDay[tm.id] ?? (noteOk(tm2) ? 1 : 0); return [tm.id, { ...(pick ? tm2 : td), sday: pick ? nday : day, soff: pick }];
+  }));
   const items = r.data, name = (id) => items.find((i) => i.id === id);
   const mode = `<span class="bmode"><button data-bmode="today" class="${boardWeek ? "" : "on"}">오늘</button><button data-bmode="week" class="${boardWeek ? "on" : ""}">이번 주</button></span>`;
   if (boardWeek) { // 지점마다 매니저 주간 기록과 같은 표
@@ -1160,8 +1167,8 @@ async function loadBoard() {
         return `<div class="bconsult ${low ? "low" : ""}">📅 내일 상담 <b>${ck?.num ?? "–"}명</b> / 목표 <button class="ctgt" data-ctgt="${tm.id}" title="눌러서 목표 바꾸기">${tm.consult_target}명 ✏️</button>${low ? " · 미달 — 회신율·광고 연락 올 거예요" : ""}</div>`; })() : ""}
       ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
       ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
-      ${tm.sim_note ? (() => { const nt = notes.get(tm.id), has = nt && (nt.body || Object.keys(nt.plan?.t ?? {}).length || (nt.plan?.p ?? []).some(Boolean));
-        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"} <button type="button" class="rtnav" data-simrec="${tm.id}" data-simrecname="${esc(tm.name)}" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button></summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id)}</details>`; })() : ""}
+      ${tm.sim_note ? (() => { const nt = notes.get(tm.id), has = noteOk(nt);
+        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 <button type="button" class="rtnav" data-simbday="${tm.id}" title="눌러서 오늘 / 내일 바꿔 보기">📅 ${md(nt.sday)}(${nt.soff ? "내일" : "오늘"})</button> ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"} <button type="button" class="rtnav" data-simrec="${tm.id}" data-simrecname="${esc(tm.name)}" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button></summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id, nt.sday)}</details>`; })() : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
       ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
@@ -2034,24 +2041,24 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610272312"></script>
-<script src="photo.js?v=202610272312"></script>
-<script src="blog.js?v=202610272312"></script>
-<script src="mk-core.js?v=202610272312"></script>
-<script src="mkc-core.js?v=202610272312"></script>
-<script src="marketing.js?v=202610272312"></script>
-<script src="sns-core.js?v=202610272312"></script>
-<script src="post.js?v=202610272312"></script>
-<script src="someday.js?v=202610272312"></script>
-<script src="contacts.js?v=202610272312"></script>
-<script src="refs.js?v=202610272312"></script>
-<script src="simtb.js?v=202610272312"></script>
-<script src="leaders-core.js?v=202610272312"></script>
-<script src="leaders.js?v=202610272312"></script>
-<script src="links.js?v=202610272312"></script>
-<script src="edu-data.js?v=202610272312"></script>
-<script src="edu.js?v=202610272312"></script>
-<script src="reports.js?v=202610272312"></script>
-<script src="qna.js?v=202610272312"></script>
+<script src="sales.js?v=202610272316"></script>
+<script src="photo.js?v=202610272316"></script>
+<script src="blog.js?v=202610272316"></script>
+<script src="mk-core.js?v=202610272316"></script>
+<script src="mkc-core.js?v=202610272316"></script>
+<script src="marketing.js?v=202610272316"></script>
+<script src="sns-core.js?v=202610272316"></script>
+<script src="post.js?v=202610272316"></script>
+<script src="someday.js?v=202610272316"></script>
+<script src="contacts.js?v=202610272316"></script>
+<script src="refs.js?v=202610272316"></script>
+<script src="simtb.js?v=202610272316"></script>
+<script src="leaders-core.js?v=202610272316"></script>
+<script src="leaders.js?v=202610272316"></script>
+<script src="links.js?v=202610272316"></script>
+<script src="edu-data.js?v=202610272316"></script>
+<script src="edu.js?v=202610272316"></script>
+<script src="reports.js?v=202610272316"></script>
+<script src="qna.js?v=202610272316"></script>
 </body>
 </html>
