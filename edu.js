@@ -12,7 +12,7 @@ const byWeek = (w) => ITEMS().filter((i) => i.week === w);
 const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
 const BOOKS = [["book1", "어떻게 원하는 것을 얻는가", "INTRO~2주차"], ["book2", "일의 격", "3주차"], ["book3", "데일 카네기 인간관계론", "5~7주차"]];
-const KPIS = [["revenue", "매출"], ["callback", "회신율"], ["consult", "상담율"], ["payment", "결제율"]];
+const IMPROVE_N = 30;   // 지점 개선안 칸 수 (직접 적는 목록)
 const TOOLS = [["planner", "팔로플래너 세팅"], ["ai", "Claude"], ["discord", "Discord"], ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["icloud", "iCloud 공유"], ["gmail", "Gmail 라벨"]];
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 const normUrl = (u) => (/^https?:\/\//i.test(u) ? u : "https://" + u);
@@ -103,26 +103,24 @@ function orphanBar(d) {
 
 // ── 장기 미션 ──
 function mission(d, role) {
-  const m = d.meta, ro = role === "mgr" && d.admin ? "disabled" : "";   // 왼쪽 미리보기 칸만 잠근다
-  const id = (n) => (role === "mgr" ? "" : ` id="${n}"`);
-  const n = m.improvements || 0;
+  const m = d.meta;
+  const list = Array.isArray(m.improve_list) ? m.improve_list : [];
+  const done = list.filter((x) => (x || "").trim()).length;
   return `<section class="card edumission">
     <h3>장기 미션</h3>
     <div class="edugrid">
-      <div>
-        <b>지점 개선안 50개</b>
-        <div class="eduline"><input type="number"${id("eduImp")} min="0" max="50" value="${n}" ${ro}> / 50</div>
-        <div class="edubarline sm"><div style="width:${Math.min(100, n * 2)}%"></div></div>
-        <span class="mut">10개마다 한 칸 — 지금 ${Math.floor(n / 10)}/5</span>
+      <div class="eduimp">
+        <b>지점 개선안 ${IMPROVE_N}개</b>
+        <div class="edubarline sm"><div style="width:${Math.round((done / IMPROVE_N) * 100)}%"></div></div>
+        <span class="mut">${done} / ${IMPROVE_N} 적음 — 떠오를 때마다 한 줄씩 채운다</span>
+        <ol class="eduimplist">${Array.from({ length: IMPROVE_N }, (_, k) =>
+          `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
       </div>
       <div><b>필독서 3권</b>${BOOKS.map(([k, t, when]) => {
         const b = (m.books || {})[k] || {};
-        return `<div class="eduline"><span>${esc(t)} <span class="mut">${when}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((s) => { const [f, lb] = s.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""} ${ro}> ${lb}</label>`; }).join("")}</div>`;
-      }).join("")}</div>
-      <div><b>KPI</b><table class="edukpi"><tr><td></td><td class="mut">목표</td><td class="mut">기준선</td><td class="mut">현재</td></tr>
-        ${KPIS.map(([k, name]) => { const v = (m.kpi || {})[k] || {}; return `<tr><td>${name}</td>${["target", "base", "current"].map((f) => `<td><input data-kpi="${k}" data-f="${f}" value="${esc(v[f] || "")}" ${ro}></td>`).join("")}</tr>`; }).join("")}
-      </table><span class="mut">4주차에 기준선을 재고, 8주차에 그 대비 증감으로 본다</span></div>
-      <div><b>업무 툴 세팅</b>${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""} ${ro}> ${esc(name)}</label>`).join("")}</div>
+        return `<div class="eduline"><span>${esc(t)} <span class="mut">${when}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
+      }).join("")}
+      <div class="edutools"><b>업무 툴 세팅</b>${TOOLS.map(([k, name]) => `<label class="eduline mut"><input type="checkbox" data-tool="${k}" ${(m.tools || {})[k] ? "checked" : ""}> ${esc(name)}</label>`).join("")}</div></div>
     </div>
   </section>`;
 }
@@ -257,9 +255,13 @@ function bind(d) {
 
   V0.querySelector("#eduWho")?.addEventListener("change", (e) => { EDU.target = e.target.value; try { localStorage.setItem("edu-target", EDU.target); } catch {} EDU.openItem = null; EDU.load(); });
   V0.querySelector("#eduStart")?.addEventListener("change", (e) => save({ started_on: e.target.value || null }));
-  V0.querySelector("#eduImp")?.addEventListener("change", (e) => save({ improvements: Math.max(0, Math.min(50, +e.target.value || 0)) }));
+  V0.querySelectorAll("[data-imp]").forEach((inp) => (inp.onchange = () => {
+    const list = Array.isArray(d.meta.improve_list) ? [...d.meta.improve_list] : [];
+    while (list.length < IMPROVE_N) list.push("");
+    list[+inp.dataset.imp] = inp.value.trim();
+    save({ improve_list: list });
+  }));
   V0.querySelectorAll("[data-book]").forEach((c) => (c.onchange = () => { const b = { ...(d.meta.books || {}) }; b[c.dataset.book] = { ...(b[c.dataset.book] || {}), [c.dataset.f]: c.checked }; save({ books: b }); }));
-  V0.querySelectorAll("[data-kpi]").forEach((inp) => (inp.onchange = () => { const k = { ...(d.meta.kpi || {}) }; k[inp.dataset.kpi] = { ...(k[inp.dataset.kpi] || {}), [inp.dataset.f]: inp.value }; save({ kpi: k }); }));
   V0.querySelectorAll("[data-tool]").forEach((c) => (c.onchange = () => save({ tools: { ...(d.meta.tools || {}), [c.dataset.tool]: c.checked } })));
 
   V0.querySelectorAll(".eduwkbtn").forEach((b) => (b.onclick = () => { const w = +b.closest(".eduweek").dataset.week; EDU.openWeek = EDU.openWeek === w ? null : w; EDU.load(); }));
@@ -267,7 +269,6 @@ function bind(d) {
 
   const NEXT = { todo: "doing", doing: "done", done: "todo" };
   V0.querySelectorAll(".edust").forEach((b) => (b.onclick = async () => {
-    if (d.admin) return toast("진행 체크는 교육받는 매니저가 해요");
     const id = b.closest(".eduitem").dataset.id, next = NEXT[d.status[id] || "todo"];
     const { error } = next === "todo"
       ? await sb.from("edu_progress").delete().eq("user_id", d.mine).eq("item_id", id)

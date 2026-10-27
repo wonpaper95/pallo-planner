@@ -111,8 +111,15 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
 #eduView .educol.boss .edupanetag { color: #fff; background: var(--orange); }
 
 /* 매니저 칸은 보기 전용 — 입력은 잠겨 있고 주차·항목만 눌러 볼 수 있다 */
-#eduView .educol.mgr input:disabled, #eduView .educol.mgr .edusubf.demo { opacity: .55; }
-#eduView .educol.mgr .edupanetag::after { content: " · 보기 전용"; font-weight: 400; opacity: .85; }
+#eduView .educol.mgr .edusubf.demo { opacity: .55; }
 #eduView .edusubf.demo { opacity: .55; pointer-events: none; }
 #eduView .edusubf.demo .btn { display: inline-flex; align-items: center; justify-content: center; }
 #eduView .educol .edudetail { padding-left: 20px; }
+
+/* 지점 개선안 — 30칸에 직접 적는 목록 */
+#eduView .eduimp { grid-column: 1 / -1; }
+#eduView .eduimplist { margin: 8px 0 0; padding-left: 26px; display: grid; gap: 4px; }
+#eduView .eduimplist li { list-style: decimal; }
+#eduView .eduimplist input { width: 100%; }
+#eduView .edumission .edugrid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+#eduView .edutools { margin-top: 14px; }
