@@ -181,7 +181,7 @@ function mgrPane(i, d, side) {
       <div><span class="tag lv0">미달</span> ${esc(i.criteria.fail)}</div>
       <div><span class="tag lv1">기본</span> ${esc(i.criteria.base)}</div>
       <div><span class="tag lv2">우수</span> ${esc(i.criteria.good)}</div></div>`;
-  if (i.refs?.length) h += `<div><b>참고자료</b><br>${i.refs.map((r) => { const u = r.url || r, lb = r.label || String(u).split("/").pop(); return /^https?:/i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(lb)}</a>` : `<span class="mut">${esc(lb)} <small>(교육 폴더 파일 — 주차 자료로 올려 주세요)</small></span>`; }).join("<br>")}</div>`;
+  if (i.refs?.length) h += `<div><b>참고자료</b><br>${i.refs.map((r) => { const u = r.url || r, lb = r.label || String(u).split("/").pop(); return /^https?:/i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(lb)}</a>` : `<span class="mut">${esc(lb)} <small>(위 📎 주차 자료 칸에서 열어요)</small></span>`; }).join("<br>")}</div>`;
   h += `<div class="edusubs"><b>📤 제출물</b>
     ${subs.length ? subs.map((s) => `<div class="edusub" data-id="${s.id}" data-path="${esc(s.path || "")}"><a href="${s.url ? esc(s.url) : "#"}" ${s.url ? 'target="_blank" rel="noopener"' : 'class="edusubfile"'}>${s.path ? "📄" : "🔗"} ${esc(s.title)}</a><button class="btn ghost edusubdel" title="지우기">🗑</button></div>`).join("") : `<span class="mut">아직 없어요.</span>`}
     ${!d.admin ? `<form class="edusubf" data-id="${i.id}"><input name="title" placeholder="제출물 이름" maxlength="120" required><input name="url" placeholder="링크 (https://…) — 파일만 올릴 땐 비워 두세요"><label class="btn ghost eduup">📁 파일<input type="file" hidden name="file"></label><button class="btn">올리기</button></form>`
