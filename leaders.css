@@ -142,3 +142,5 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .promo.on { background: rgba(224, 209, 32, .25); border-color: #c9b800; font-weight: 700; }
 #ldView .ldfind input { width: 150px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line, #ddd); background: var(--card, #fff); color: inherit; font: inherit; }
 #ldView .endb.del { margin-left: 4px; padding: 4px 7px; }
+#ldView .rpwho { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); white-space: nowrap; }
+#ldView .rpwho .me { color: var(--accent); font-weight: 700; }

@@ -27,11 +27,13 @@ LD.load = async function () {
   const { data: rows, error } = await sb.from("leaders").select("*").eq("team_id", LD.team).order("sort").order("id");
   if (fail(error)) return;
   const ids = rows.map((r) => r.id);
-  const [a, w, mo, ce] = ids.length ? await Promise.all([sb.from("leader_att").select("leader_id, day, state, sub").in("leader_id", ids).gte("day", aFrom).lte("day", aTo),
+  const [a, w, mo, ce, rp] = ids.length ? await Promise.all([sb.from("leader_att").select("leader_id, day, state, sub").in("leader_id", ids).gte("day", aFrom).lte("day", aTo),
     sb.from("leader_awards").select("*").in("leader_id", ids),
     sb.from("leader_months").select("*").in("leader_id", ids).gte("month", LDC.addMonths(aFrom, -1)).lte("month", aTo),
-    sb.from("leader_certs").select("*").in("leader_id", ids)]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]; // 지난달 라포도 (흐리게 보여 주려고)
-  if (fail(a.error || w.error || mo.error || ce.error)) return;
+    sb.from("leader_certs").select("*").in("leader_id", ids),
+    sb.from("leader_rapports").select("*").in("leader_id", ids).gte("month", LDC.addMonths(aFrom, -1)).lte("month", aTo).order("name")]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }]; // 지난달 라포도 (흐리게 보여 주려고)
+  if (fail(a.error || w.error || mo.error || ce.error || rp.error)) return;
+  LD.raps = new Map(); rp.data.forEach((x) => { const k = `${x.leader_id}:${x.month}`; LD.raps.set(k, [...(LD.raps.get(k) ?? []), x]); });
   LD.certs = new Map(ce.data.map((x) => [`${x.leader_id}:${x.grade}`, x]));
   LD.mon = new Map(mo.data.map((x) => [`${x.leader_id}:${x.month}`, x]));
   LD.rows = rows; LD.att = new Map(rows.map((r) => [r.id, new Map()]));
@@ -50,9 +52,14 @@ LD.load = async function () {
 
 // ⭐ 라포는 달마다 새로 매김 (그달 기록). 아직이면 지난달 별점을 흐리게 보여 줌
 const mon = (r, m) => LD.mon.get(`${r.id}:${m}`);
-const stars = (r, m) => { const c = mon(r, m), p = mon(r, LDC.addMonths(m, -1)), v = c?.rapport ?? null, g = v ? null : p?.rapport ?? null;
-  return `<span class="ldstars r${v ? (v <= 2 ? "low" : v === 3 ? "mid" : "high") : "none"} ${g ? "ghost" : ""}" title="${ym(m)} 라포 ${v ?? "아직"}/5${c?.rapport_by ? ` · ${esc(c.rapport_by)}` : ""}${g ? ` · 지난달 ★${g} — 이번 달도 매겨 주세요` : ""}">`
-  + [1, 2, 3, 4, 5].map((i) => `<button data-star="${i}">${i <= (v ?? g ?? 0) ? "★" : "☆"}</button>`).join("") + `</span>`; };
+// 매니저마다 따로 매김(leader_rapports): 별 = 내 별점 (조교는 평균만 보기) · 밑에 '채림 ★4 · 해민 ★3' · 예전 한 개짜리(시트)는 그 이름으로
+const raps = (r, m) => LD.raps?.get(`${r.id}:${m}`) ?? [];
+const myRap = (r, m) => raps(r, m).find((x) => x.user_id === me?.id)?.rapport ?? null;
+const stars = (r, m) => { const c = mon(r, m), all = raps(r, m), mine = myRole !== "assistant", pm = LDC.addMonths(m, -1);
+  const v = mine ? myRap(r, m) : c?.rapport ?? null, g = v ? null : mine ? myRap(r, pm) : mon(r, pm)?.rapport ?? null;
+  const who = all.length ? all.map((x) => `<span class="${x.user_id === me?.id ? "me" : ""}">${esc(x.name || "?")} ★${x.rapport}</span>`).join(" · ") : c?.rapport ? `${esc(c.rapport_by || "예전")} ★${c.rapport}` : "";
+  return `<span class="ldstars r${v ? (v <= 2 ? "low" : v === 3 ? "mid" : "high") : "none"} ${g ? "ghost" : ""}" title="${ym(m)} ${mine ? "내 라포" : "라포 평균"} ${v ?? "아직"}/5${g ? ` · 지난달 ★${g} — 이번 달도 매겨 주세요` : ""}">`
+  + [1, 2, 3, 4, 5].map((i) => `<button data-star="${i}">${i <= (v ?? g ?? 0) ? "★" : "☆"}</button>`).join("") + `</span>${who ? `<small class="rpwho">${who}</small>` : ""}`; };
 const nightBox = (r, m) => { const on = !!mon(r, m)?.night; return `<button class="night ${on ? "on" : ""}" data-night title="${ym(m)} 리더나잇 ${on ? "왔음" : "안 옴"} — 누르면 바뀜">${on ? "🌙" : ""}</button>`; };
 // 👋 그만둠 버튼 (줄마다 보임) → 날짜·이유 창. 그만둔 줄은 ↩️ 취소 · 빈자리 줄은 없음
 const endBtn = (r) => `<td class="endc">${r.end_day ? `<button class="endb back" data-endback title="${md(r.end_day)} 그만둠 취소 — 다시 활동">↩️ 취소</button>` : r.name === VACANT ? "" : `<button class="endb" data-end title="그만둔 날·이유 기록 (지우지 않고 남겨요)">👋 그만둠</button>`}<button class="endb del" data-del title="줄 지우기 — 잘못 넣은 줄만">🗑</button></td>`;
@@ -148,7 +155,7 @@ function subTable(sm) {
       + `<td><button class="promo ${r.promote ? "on" : ""}" data-promote title="메인 리더 승격 후보 — 누르면 바뀜">${r.promote ? "⭐ 후보" : "☆"}</button> <button class="slotedit" data-ldedit title="메인으로 올리기 = 구분을 리더로, 반·시간대 고르기">⬆️</button></td>`
       + `${certCell(r)}${endBtn(r)}<td class="nt ed1" data-f="note" title="누르면 메모 적기">${r.note ? esc(r.note) : `<span class="addh">+ 적기</span>`}</td></tr>`; }).join("");
   return `<section class="ldblk ldsubblk"><h3>🔁 서브리더 <span class="mut">대기·대타 풀 ${rs.filter((r) => !r.end_day).length}명 · 대타는 출석 칸 '대타'에 이름을 적으면 자동으로 세요</span> <button class="btn ghost small" id="ldAddSub">+ 서브리더 추가</button></h3>
-    ${rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>가능 요일·시간 <small class="agh">✏️ 눌러서 적기</small></th><th>첫 시작일</th><th>라포</th><th>${ym(sm)} 대타</th><th>승격 후보</th><th>📜 자격증</th><th>그만둠</th><th>메모</th></tr>${body}</table></div>` : `<div class="card mut" style="padding:12px">아직 서브리더가 없어요 — <b>+ 서브리더 추가</b></div>`}</section>`;
+    ${rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>가능 요일·시간 <small class="agh">✏️ 눌러서 적기</small></th><th>첫 시작일</th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>${ym(sm)} 대타</th><th>승격 후보</th><th>📜 자격증</th><th>그만둠</th><th>메모</th></tr>${body}</table></div>` : `<div class="card mut" style="padding:12px">아직 서브리더가 없어요 — <b>+ 서브리더 추가</b></div>`}</section>`;
 }
 
 LD.render = function () {
@@ -169,7 +176,7 @@ LD.render = function () {
     for (const s of slots) {
       const rs = leaders.filter((r) => r.grp === g && r.slot === s), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
-      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
+      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th>리더교육</th><th>🌙 리더나잇</th><th>📜 자격증</th>` : ""}</tr>`;
       const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="level">${esc(r.level)}</td><td data-f="seat">${esc(r.seat)}</td>`
         + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
@@ -181,7 +188,7 @@ LD.render = function () {
   }
   if (LD.mode === "month") blocks.push(subTable(sm));
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
-    const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
+    const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
     const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="slot">${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
       + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
       + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
@@ -201,7 +208,7 @@ LD.render = function () {
     ${certTable()}
     ${mixHtml()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.cert ? `<span class="on" title="근속 6개월 2급 · 1년 1급 — 아직 발급 안 함">📜 자격증 발급 <b>${cnt.cert}</b></span>` : ""}${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
-      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
+      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
 };
 
@@ -430,10 +437,12 @@ document.addEventListener("click", async (e) => {
     t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); return setTimeout(() => t.classList.remove("flash"), 1600); }
   const tr = b.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   const sm = statMonth();
-  if (b.dataset.star) { const n = +b.dataset.star === mon(r, sm)?.rapport ? null : +b.dataset.star; // 그달 라포 · 같은 별 다시 누르면 지움
-    const row = { leader_id: r.id, month: sm, rapport: n, rapport_by: n ? myName ?? "" : "", at: new Date().toISOString() };
-    const { data: nr, error } = await sb.from("leader_months").upsert(row).select().single(); if (fail(error)) return;
-    LD.mon.set(`${r.id}:${sm}`, nr); if (sm >= LDC.monthStart(today())) Object.assign(r, { rapport: n, rapport_by: row.rapport_by }); return LD.render(); }
+  if (b.dataset.star) { if (myRole === "assistant") return toast("라포는 매니저가 매겨요"); // 그달 내 라포 · 같은 별 다시 누르면 지움 → 평균은 서버가 leader_months 에
+    const n = +b.dataset.star === myRap(r, sm) ? null : +b.dataset.star, key = { leader_id: r.id, month: sm, user_id: me.id };
+    const { error } = n ? await sb.from("leader_rapports").upsert({ ...key, name: myName ?? "", rapport: n, at: new Date().toISOString() }) : await sb.from("leader_rapports").delete().match(key); if (fail(error)) return;
+    const [rp, mo] = await Promise.all([sb.from("leader_rapports").select("*").match({ leader_id: r.id, month: sm }).order("name"), sb.from("leader_months").select("*").match({ leader_id: r.id, month: sm }).maybeSingle()]);
+    LD.raps.set(`${r.id}:${sm}`, rp.data ?? []); if (mo.data) LD.mon.set(`${r.id}:${sm}`, mo.data);
+    if (sm >= LDC.monthStart(today())) Object.assign(r, { rapport: mo.data?.rapport ?? null, rapport_by: mo.data?.rapport_by ?? "" }); return LD.render(); }
   if (b.dataset.night !== undefined) { const v = !mon(r, sm)?.night; // 🌙 그달 리더나잇 왔는지
     const { data: nr, error } = await sb.from("leader_months").upsert({ leader_id: r.id, month: sm, night: v, at: new Date().toISOString() }).select().single(); if (fail(error)) return;
     LD.mon.set(`${r.id}:${sm}`, nr); return LD.render(); }
