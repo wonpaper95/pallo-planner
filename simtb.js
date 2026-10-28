@@ -1,6 +1,6 @@
 // 🧠 다음날 시뮬레이션 — 타임박스 플래너 (지점 공용, 하루 하나): 우선순위 3 · 브레인 덤프 · 시간표 5시~12시(한 시간 한 칸, 키 "HH:00")
 // 적는 칸마다 실시간으로 나눔(비공개 채널 simnote:<지점>), 0.7초 뒤 저장. 같은 칸을 내가 적는 중이면 남의 글은 그 칸에만 안 덮음.
-// data-tb = 지점 id (공용·실시간) 또는 "me" (🧠 시뮬레이터 탭 — 대표 개인, my_notes, 나만 봄). data-day 없으면 오늘
+// data-tb = 지점 id (공용·실시간) 또는 "me" (🧠 시뮬레이터 탭 — 대표·매니저 각자 개인, my_notes, 나만 봄). data-day 없으면 오늘
 // index.html 의 sb·simChannel·today·md·pad·esc·fail·myName·W 를 씀 → window.TB
 (() => {
 const TB = (window.TB = {});
@@ -167,7 +167,7 @@ document.addEventListener("input", (e) => {
     const n = new Date(); if (who) who.textContent = `${md(day)} · ${pad(n.getHours())}:${pad(n.getMinutes())} 저장됨`;
   }, 700);
 });
-// 🧠 시뮬레이터 탭 (대표 개인): 날짜 ‹ 오늘 › · 하루 하나
+// 🧠 시뮬레이터 탭 (각자 개인): 날짜 ‹ 오늘 › · 하루 하나
 TB.myDay = null;
 TB.loadMine = async (day) => {
   const v = document.getElementById("mySimView"); if (!v) return;
