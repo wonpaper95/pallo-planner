@@ -16,7 +16,7 @@ body:not(.blv) #blogView { display: none; }
 #blogView .btn.small { padding: 5px 9px; font-size: 13px; }
 
 .blgrid { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
-.blform { position: sticky; top: 112px; max-height: calc(100vh - 124px); overflow: auto; }
+.blform { position: sticky; top: 60px; max-height: calc(100vh - 72px); overflow: auto; }
 .blseg { display: flex; gap: 4px; } .blseg button { flex: 1; }
 
 /* 사진 올리기 */
