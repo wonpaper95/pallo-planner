@@ -1,12 +1,14 @@
 // 📎 할 일 자료: 할 일 줄의 📎 → 참고 링크·파일 모아 두고 작업할 때 바로 열기 (tasks.refs, 파일은 비공개 task-files/<내 id>/<할 일 id>/)
 // index.html 의 sb·me·tasks·save·renderWeek·esc·toast·fail 을 씀 → window.REF
+// 다른 곳(🌱 언젠가 할 일)은 REF.open(행, { save(refs) → 새 행|false, folder }) 로 같은 창을 씀
 // ponytail: 할 일을 지워도 올린 파일은 보관함에 남음 — 용량이 문제 되면 지울 때 같이 지우기
 (() => {
 const REF = (window.REF = {});
 const list = (t) => (Array.isArray(t.refs) ? t.refs : []);
 REF.btn = (t) => { const n = list(t).length; return `<button class="rf ${n ? "on" : ""}" data-act="ref" title="참고 링크·파일">📎${n ? ` ${n}` : ""}</button>`; };
 
-let cur = null;
+let cur = null, ad = null; // ad = 저장 방법 (기본: 주간 할 일 tasks)
+const TASKS = { save: async (refs) => (await save(cur.id, { refs })) ? tasks.find((t) => t.id === cur.id) ?? { ...cur, refs } : false, after: () => renderWeek(), folder: () => cur.id };
 const dlg = () => {
   let d = document.getElementById("refDlg"); if (d) return d;
   d = document.createElement("dialog"); d.id = "refDlg"; d.className = "wide"; document.body.appendChild(d);
@@ -31,7 +33,7 @@ const render = () => {
       <button class="btn" data-radd>추가</button></div>
     <div class="refadd"><span style="flex:1"></span><button class="btn ghost" data-rx>닫기</button></div>`;
 };
-const put = async (refs) => { if (!(await save(cur.id, { refs }))) return false; cur = tasks.find((t) => t.id === cur.id) ?? { ...cur, refs }; render(); renderWeek(); return true; };
+const put = async (refs) => { const row = await ad.save(refs); if (!row) return false; cur = row; render(); ad.after?.(); return true; };
 async function addLink() {
   let u = document.getElementById("refUrl").value.trim(); if (!u) return toast("링크를 붙여 넣어 주세요");
   if (!/^https?:\/\//i.test(u)) u = "https://" + u;
@@ -42,7 +44,7 @@ async function upload(files) {
   if (!files.length) return; const add = [];
   for (const f of files) {
     if (f.size > 52428800) { toast(`${f.name}: 50MB 넘어요`); continue; }
-    const ext = (f.name.match(/\.[A-Za-z0-9]{1,8}$/) ?? [""])[0], path = `${me.id}/${cur.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`; // 보관함 주소는 영문만 됨 → 원래 이름은 name 에
+    const ext = (f.name.match(/\.[A-Za-z0-9]{1,8}$/) ?? [""])[0], path = `${me.id}/${ad.folder()}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`; // 보관함 주소는 영문만 됨 → 원래 이름은 name 에
     toast(`올리는 중… ${f.name}`);
     const { error } = await sb.storage.from("task-files").upload(path, f, { contentType: f.type || undefined }); if (fail(error)) continue;
     add.push({ k: "file", name: f.name, path, at: new Date().toISOString() });
@@ -66,5 +68,5 @@ async function onClick(e) {
     await put(rs.filter((_, j) => j !== i));
   }
 }
-REF.open = (t) => { cur = t; render(); dlg().showModal(); setTimeout(() => document.getElementById("refUrl")?.focus(), 50); };
+REF.open = (t, how = TASKS) => { cur = t; ad = how; render(); dlg().showModal(); setTimeout(() => document.getElementById("refUrl")?.focus(), 50); };
 })();
