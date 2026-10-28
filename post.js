@@ -63,7 +63,7 @@ PS.load = async function () {
   PS.teamName = (teams.find((t) => t.id === PS.team) ?? (await sb.from("teams").select("name").eq("id", PS.team).single()).data)?.name ?? "";
   $p("#psTeamName").textContent = boss ? "" : PS.teamName;
   if (prev !== undefined && prev !== PS.team) reset();
-  if (prev !== PS.team || !PS.links) PS.links = (await sb.from("blog_profiles").select("data").eq("team_id", PS.team).maybeSingle()).data?.data?.links ?? {};
+  if (PS.linksTeam !== PS.team || !PS.links) { PS.links = (await sb.from("blog_profiles").select("data").eq("team_id", PS.team).maybeSingle()).data?.data?.links ?? {}; PS.linksTeam = PS.team; } // 지점 바꾸면 그 지점 바로가기 (지점 고르기가 PS.team 을 먼저 바꿔서 prev 로는 못 앎)
   renderLinks();
   call("usage").then((r) => r && setQuota(r.quota));
   renderTab();
