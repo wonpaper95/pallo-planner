@@ -19,7 +19,7 @@
     for (const x of lines) {
       const li = typeof x === "string" && x.startsWith("• ");
       if (li && !ul) { h += "<ul>"; ul = true; } else if (!li && ul) { h += "</ul>"; ul = false; }
-      if (x.table) h += `<div class="jgtw"><table>${x.table.map((r, i) => `<tr>${r.map((c) => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table></div>`;
+      if (x.table) h += `<div class="jgtw"><table>${x.table.map((r, i) => `<tr${x.hi?.includes(i) ? ' class="hi"' : ""}>${r.map((c) => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table></div>`;
       else if (li) h += `<li>${esc(x.slice(2))}</li>`;
       else h += `<p${x.startsWith("❗") ? ' class="jgwarn"' : ""}>${esc(x)}</p>`;
     }
