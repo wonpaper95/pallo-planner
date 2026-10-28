@@ -31,7 +31,9 @@ async function call(action, body = {}) {
   return data;
 }
 function setQuota(q) { const el = $p("#psQuota"); if (el && q) el.textContent = `오늘 남은 생성 ${Math.max(0, q.limit - q.used)}/${q.limit}회 (블로그와 합산)`; }
-function reset() { PS.photos = []; PS.post = null; PS.jobs = []; PS.topic = ""; PS.tone = "friendly"; PS.ch = "instagram"; PS.sel = allKeys(); }
+// 열어 둔 게시물 기억: 다른 사이트에 올리고 돌아왔을 때 화면이 새로 열려도(폰이 메모리 정리·새 버전) 그 게시물을 다시 띄움
+const remember = (id) => { try { id ? localStorage.setItem("ps-open", JSON.stringify({ id, team: PS.team, at: Date.now() })) : localStorage.removeItem("ps-open"); } catch {} };
+function reset() { remember(null); PS.photos = []; PS.post = null; PS.jobs = []; PS.topic = ""; PS.tone = "friendly"; PS.ch = "instagram"; PS.sel = allKeys(); }
 
 // ── 화면 뼈대 (한 번만) ──
 function shell() {
@@ -66,8 +68,13 @@ PS.load = async function () {
   if (PS.linksTeam !== PS.team || !PS.links) { PS.links = (await sb.from("blog_profiles").select("data").eq("team_id", PS.team).maybeSingle()).data?.data?.links ?? {}; PS.linksTeam = PS.team; } // 지점 바꾸면 그 지점 바로가기 (지점 고르기가 PS.team 을 먼저 바꿔서 prev 로는 못 앎)
   renderLinks();
   call("usage").then((r) => r && setQuota(r.quota));
+  if (!PS.post && PS.tab !== "list") { // 화면이 새로 열렸으면 하루 안에 열어 둔 게시물을 다시
+    let m = null; try { m = JSON.parse(localStorage.getItem("ps-open") || "null"); } catch {}
+    if (m?.id && m.team === PS.team && Date.now() - m.at < 864e5) return openPost(m.id);
+  }
   renderTab();
 };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && PS.post) save(); }); // 다른 앱·사이트로 갈 때 바로 저장
 function renderTab() {
   V().querySelectorAll("[data-pt]").forEach((b) => b.classList.toggle("on", b.dataset.pt === PS.tab));
   if (PS.tab === "list") renderList(); else renderMake();
@@ -250,7 +257,7 @@ async function save() {
     }
     else {
       const { data, error } = await sb.from("sns_posts").insert({ team_id: team, ...row }).select("id").single();
-      if (!fail(error)) { ok = true; X.id = data.id; if (PS.post === X) { await syncJobs(team); renderOut(); } }
+      if (!fail(error)) { ok = true; X.id = data.id; if (PS.post === X) remember(X.id); if (PS.post === X) { await syncJobs(team); renderOut(); } }
     }
     if (ok) { // 고쳐서 다시 올렸거나 뺀 사진의 예전 파일은 바로 지운다
       const keep = new Set(photos.map((x) => x.path)), old = (X.savedPaths ?? []).filter((x) => !keep.has(x));
@@ -354,7 +361,7 @@ async function openPost(id) {
   PS.post = { id: data.id, savedPaths: PS.photos.map((x) => x.path), topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
   PS.topic = data.topic; PS.tone = data.tone; PS.ch = "instagram";
   await loadJobs(); PS.sel = new Set(PS.jobs.map((j) => j.channel));
-  PS.tab = "make"; renderTab();
+  PS.tab = "make"; remember(data.id); renderTab();
 }
 async function deletePost(id) {
   if (!confirm("이 게시물을 지울까요? 올려 둔 사진 파일도 같이 지워요. 되돌릴 수 없어요.")) return;

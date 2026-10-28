@@ -122,6 +122,10 @@ BL.load = async function () {
   }
   BL.styles = (await sb.from("blog_styles").select("id, name, team_id").order("created_at")).data ?? [];
   call("usage").then((r) => r && setQuota(r.quota));
+  if (!BL.post) { // 화면이 새로 열렸으면 하루 안에 열어 둔 글을 다시
+    let m = null; try { m = JSON.parse(localStorage.getItem("bl-open") || "null"); } catch {}
+    if (m?.id && m.team === BL.team && Date.now() - m.at < 864e5) { const { data } = await sb.from("blog_posts").select("id, post").eq("id", m.id).maybeSingle(); if (data?.post) { BL.post = data.post; BL.postId = data.id; BL.tab = "new"; } else remember(null); }
+  }
   renderTab();
 };
 // ── 내 기본값 (blog_prefs, 사람마다 1줄): 새 글 옵션을 지점 기본값 위에 덮어씀. 지점에 없는 과목은 건너뜀 ──
@@ -404,11 +408,14 @@ const similarSoon = debounce(async () => {
 const edited = debounce(() => { check(); similarSoon(); }, 400);
 
 // ── 저장·보관함 ──
+// 열어 둔 글 기억: 다른 사이트에 올리고 돌아왔을 때 화면이 새로 열려도 그 글을 다시 띄움
+const remember = (id) => { try { id ? localStorage.setItem("bl-open", JSON.stringify({ id, team: BL.team, at: Date.now() })) : localStorage.removeItem("bl-open"); } catch {} };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && BL.post) savePost(true); }); // 다른 앱·사이트로 갈 때 바로 저장
 async function savePost(silent) {
   const X = BL.post; if (!X) return;
   const row = { team_id: BL.team, title: X.titles[X.sel] ?? "", keyword: X.main_keyword ?? "", body: bodyText(), post: X, updated_at: new Date().toISOString() };
   if (BL.postId) { const { error } = await sb.from("blog_posts").update(row).eq("id", BL.postId); if (!fail(error) && !silent) toast("저장했어요"); }
-  else { const { data, error } = await sb.from("blog_posts").insert(row).select("id").single(); if (!fail(error)) { BL.postId = data.id; if (!silent) toast("보관함에 저장했어요"); } }
+  else { const { data, error } = await sb.from("blog_posts").insert(row).select("id").single(); if (!fail(error)) { BL.postId = data.id; remember(data.id); if (!silent) toast("보관함에 저장했어요"); } }
 }
 async function renderList() {
   $b("#blBody").innerHTML = `<div class="mut">불러오는 중…</div>`;
@@ -547,7 +554,7 @@ function wire() {
     if (d.open) {
       const { data, error } = await sb.from("blog_posts").select("id, post").eq("id", +d.open).single();
       if (fail(error)) return;
-      BL.post = data.post; BL.postId = data.id; BL.sim = null; BL.tab = "new"; return renderTab();
+      BL.post = data.post; BL.postId = data.id; BL.sim = null; BL.tab = "new"; remember(data.id); return renderTab();
     }
     if (d.pub) {
       const url = prompt("발행한 네이버 글 주소를 붙여 주세요 (없으면 비워 두세요)", ""); if (url === null) return;
