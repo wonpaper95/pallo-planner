@@ -58,6 +58,8 @@ body:not(.jcv) #jcView { display: none; }
 #jcView td.gray { background: var(--fill); }
 #jcView .jcgrid .jctask { position: sticky; left: 0; z-index: 1; background: var(--bg); min-width: 230px; max-width: 230px; padding: 8px 10px; text-align: left; font-size: 13px; line-height: 1.4; }
 #jcView th.jctask { z-index: 2; }
+#jcView tr.jcsec td { background: color-mix(in srgb, var(--accent) 10%, var(--bg)); padding: 6px 10px; font-size: 12.5px; } /* ■ 구간 제목 줄 */
+#jcView tr.jcsec .jcrow { position: sticky; left: 10px; width: max-content; max-width: 90vw; flex-wrap: nowrap; }
 @media (max-width: 680px) { #jcView .jcgrid .jctask { min-width: 130px; max-width: 130px; } #jcView { padding: 12px 12px 100px; } }
 #jcView td.jccell { padding: 4px; text-align: center; vertical-align: middle; }
 #jcView .jccb { width: 100%; min-height: 36px; border: 1px dashed transparent; border-radius: 8px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 3px; padding: 4px; font: inherit; }

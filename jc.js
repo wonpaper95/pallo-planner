@@ -94,7 +94,7 @@ function shell() {
     <div id="jcNames" class="jcnames"></div>
     <form class="jcform" data-f="name"><input name="name" maxlength="20" placeholder="조교 이름 입력"><button class="btn">이름 추가</button></form></details></section>
   <section class="jcpanel"><div class="jcgbar"><h3>체크리스트</h3><button type="button" class="btn ghost" data-act="today">오늘로 이동</button></div>
-    <form class="jcform" data-f="task"><input name="body" maxlength="120" placeholder="할일 추가"><button class="btn">추가</button></form>
+    <form class="jcform" data-f="task"><input name="body" maxlength="120" placeholder="할일 추가 (■ 로 시작하면 구간 제목 줄)"><button class="btn">추가</button></form>
     <div id="jcGrid"></div></section>`;
 }
 
@@ -141,7 +141,8 @@ function renderGrid(toToday) {
     return `<td class="jccell ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}"><button class="jccb" data-act="cell" data-task="${t.id}" data-day="${d.k}">${ns.slice(0, 2).map(chip).join("")}${ns.length > 2 ? `<span class="jcmore">+${ns.length - 2}</span>` : ""}${ns.length ? "" : `<span class="jcplus">+</span>`}</button></td>`;
   };
   box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}" ${d.h ? `title="${esc(d.h)}"` : ""}>${d.label}</th>`).join("")}</tr></thead>
-    <tbody>${tasks.map((t) => `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><span class="jcgrow">${esc(t.body)}</span><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
+    <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><b>${esc(t.body.slice(1).trim())}</b><button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
+      : `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><span class="jcgrow">${esc(t.body)}</span><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
   const sc = box.querySelector(".jcscrollx");
   if (toToday || keep === null) setTimeout(() => scrollToday(V().querySelector(".jcscrollx"), false)); else sc.scrollLeft = keep; // 그 사이 다시 그렸으면 새 표 기준
 }
