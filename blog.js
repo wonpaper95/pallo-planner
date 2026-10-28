@@ -243,11 +243,11 @@ function renderChips() {
 // ── 사진: 읽기·편집은 photo.js(PHOTO) ──
 async function addFiles(files) { BL.photos.push(...await PHOTO.fromFiles(files)); renderThumbs(); presetWhy(); }
 async function faceAll() {
-  if (!BL.photos.some((p) => !p.faced)) return toast("모든 사진을 이미 확인했어요");
+  if (!BL.photos.length) return toast("사진을 먼저 올려 주세요");
   const btn = $b("#blFaceAll"); if (btn) { btn.disabled = true; btn.textContent = "🙂 얼굴 찾는 중…"; }
-  try {
-    const n = await PHOTO.faceAll(BL.photos);
-    toast(n ? `얼굴 ${n}개를 모자이크했어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "찾은 얼굴이 없어요. 작은 얼굴은 [편집]에서 확인해 주세요");
+  try { // 버튼은 매번 모든 사진을 다시 봄 (놓친 얼굴만 더하고, 이미 칠한 곳은 그대로)
+    const n = await PHOTO.faceAll(BL.photos, true, (i, all) => btn && (btn.textContent = `🙂 얼굴 찾는 중… ${i}/${all}`));
+    toast(n ? `얼굴 ${n}개를 모자이크했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
   } catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요. [편집]에서 직접 칠해 주세요"); }
   renderThumbs(); if (BL.post) renderOut();
 }
