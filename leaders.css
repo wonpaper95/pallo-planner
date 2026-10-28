@@ -119,3 +119,12 @@ body:not(.ldv) #ldView { display: none; }
 #ldDlg .aitext { max-height: 62vh; overflow: auto; white-space: pre-wrap; line-height: 1.65; font-size: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
 #ldDlg .aitext p { margin: 0; white-space: normal; }
 #ldDlg .ldai select { flex: 0 0 auto; width: auto; } #ldDlg .ldai .row .mut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 🔀 팀 믹싱 메모: 투명 글 뒤 .tbbk 에 줄마다 쓴 사람 색 (시뮬레이터와 같은 방식) */
+#ldView .ldmix { margin-bottom: 14px; }
+#ldView .ldmix h3 { margin: 4px 0 6px; font-size: 16px; color: var(--accent); } #ldView .ldmix h3 .mut { font-size: 12.5px; font-weight: 500; } #ldView .ldmix h3 small { font-size: 12px; color: var(--sub); font-weight: 500; margin-left: 6px; }
+#ldView .mixleg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; font-weight: 700; margin-bottom: 6px; } #ldView .mixleg:empty { display: none; }
+#ldView .mixw { position: relative; background: var(--panel); border-radius: 12px; }
+#ldView .mixw textarea, #ldView .mixw .tbbk { font-family: inherit; font-size: 14px; line-height: 1.6; padding: 10px 12px; border: 3px solid #E0D120; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: normal; }
+#ldView .mixw textarea { position: relative; z-index: 1; display: block; width: 100%; min-height: 140px; field-sizing: content; resize: vertical; background: transparent; color: transparent; caret-color: var(--text); }
+#ldView .mixw textarea::placeholder { color: var(--sub); } #ldView .mixw textarea::selection { color: var(--text); background: rgba(73, 48, 135, .35); }
+#ldView .mixw .tbbk { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; color: var(--text); border-color: transparent; margin: 0; }

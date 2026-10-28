@@ -12,7 +12,7 @@ const h12 = (h) => (h % 12 === 0 ? 12 : h % 12);
 // plan.w = { 칸: ["줄1 쓴 사람", "줄2 쓴 사람", …] | "쓴 사람" }. 글은 투명 textarea 뒤 .tbbk 에 색 입혀 그림
 const COLORS = { 민주: "#e64980", 올리비아: "#339af0", 준석: "#37b24d", 마야: "#e64980", 박혁: "#845ef7", 원빈: "#1098ad", 해민: "#f03e3e", 채림: "#74b816", 은서: "#cc5de8", 세연: "#4263eb", 헤이즐: "#b08968" }; // 마야 = 민주 (같은 사람, 핑크)
 const EXTRA = ["#d6336c", "#0ca678", "#e67700", "#7950f2", "#1971c2", "#a61e4d"]; // 새 매니저: 이름으로 고정 배정
-TB.color = (n) => !n || n === "대표" ? "" : COLORS[n] ?? EXTRA[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length];
+TB.color = (n) => !n || n === "대표" ? "" : n.startsWith("조교") ? "#f76707" : COLORS[n] ?? EXTRA[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length];
 const wOf = (root) => (root._w ??= JSON.parse(root.dataset.w || "{}"));
 const linesW = (a, n) => Array.from({ length: n }, (_, i) => (Array.isArray(a) ? a[i] ?? "" : a ?? "")); // 예전(칸 통째 이름)도 줄마다로
 const bk = (v, a) => v.split("\n").map((l, i) => { const c = TB.color(linesW(a, i + 1)[i]); return `<span${c ? ` style="color:${c}"` : ""}>${esc(l)}</span>`; }).join("\n") + "\n";
@@ -32,7 +32,7 @@ const paint = (root) => {
   const leg = root.querySelector(".tbLeg");
   if (leg) leg.innerHTML = [...new Set(names)].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("");
 };
-TB.paint = paint;
+TB.paint = paint; TB.bk = bk; TB.relines = relines; // 🔀 리더 현황 팀 믹싱 메모도 같은 글자색 방식
 const hourText = (t, h) => [t[key(h, "00")], t[key(h, "30")]].filter((x) => x?.trim()).join("\n");
 
 TB.html = (st, tid, day = "") => {

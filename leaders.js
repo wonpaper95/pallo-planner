@@ -42,6 +42,7 @@ LD.load = async function () {
     LD.subs.get(x.leader_id)?.set(x.day, x.sub);
     const who = LDC.matchSub(x.sub, rows); if (who) credit(who.id, x.day); }); // 🔁 대타 해준 사람 → 그달 출석 인정 +1
   LD.awards = new Map(w.data.map((x) => [`${x.leader_id}:${x.month}`, x]));
+  await mixLoad();
   LD.render();
 };
 
@@ -153,6 +154,7 @@ LD.render = function () {
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
       <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(sm)} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
+    ${mixHtml()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
@@ -226,6 +228,75 @@ function endDlg(r) {
   };
 }
 const VACANT = "(구하는 중)"; // 빈 자리 줄 이름 → 확정 누르면 새 리더 이름 물어봄
+// 🔀 팀 믹싱 메모 (지점·달마다 하나): 매니저·조교·대표가 같이 적음 — 시뮬레이터처럼 줄마다 쓴 사람 글자색(TB.color), 적는 중 글자는 비공개 채널 ldmix:<지점> 으로 실시간
+// 0.15초 모아 전송(직전→지금 바뀐 줄만 받는 쪽에 적용) · 0.7초 뒤 저장(서버 최신 글 위에 내가 바꾼 줄만 얹음, SIMMERGE) · 12초마다 서버 글 다시 받아 맞춤(끊김 대비)
+const ML = (t, who) => { const lines = String(t ?? "").split("\n"); return { lines, who: lines.map((_, i) => (Array.isArray(who) ? who[i] ?? "" : "")) }; };
+async function mixLoad() {
+  const month = statMonth(), m = LD.mix;
+  if (m?.dirty && m.team === LD.team && m.month === month) return; // 적은 게 저장 전이면 그대로
+  const { data } = await sb.from("leader_mix").select("body, who, by_name, updated_at").eq("team_id", LD.team).eq("month", month).maybeSingle();
+  LD.mix = { team: LD.team, month, body: data?.body ?? "", who: data?.who ?? [], base: data?.body ?? "", sent: null, at: data?.updated_at ?? null, by: data?.by_name ?? "" };
+  mixListen();
+}
+function mixHtml() {
+  const m = LD.mix; if (!m) return "";
+  const at = m.at && new Date(m.at);
+  return `<section class="ldmix"><h3>🔀 팀 믹싱 <span class="mut">${ym(m.month)} · 매니저·조교 같이 적어요 · 글자색 = 쓴 사람 · 실시간</span> <small id="mixWho">${at ? `${md(W.ymd(at))} ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")} ${esc(m.by)} 저장` : "아직 없음"}</small></h3>
+    <div class="mixleg"></div><div class="mixw"><div class="tbbk" aria-hidden="true">${TB.bk(m.body, m.who)}</div><textarea id="ldMix" spellcheck="false" placeholder="팀 믹싱 계획을 같이 적어요 — 예: 월수 11AM 3팀 ↔ 화목 8PM 2팀 리더 교체 / 신규 리더 OO님 → 패턴1 반 …">${esc(m.body)}</textarea></div></section>`;
+}
+function mixPaint() {
+  const m = LD.mix, v = V(), bk = v?.querySelector(".ldmix .tbbk"), leg = v?.querySelector(".ldmix .mixleg"); if (!bk) return;
+  bk.innerHTML = TB.bk(m.body, m.who); bk.scrollTop = v.querySelector("#ldMix").scrollTop;
+  const names = [...new Set(m.body.split("\n").map((l, i) => (l.trim() ? m.who[i] : "")))].filter((n) => n && n !== "대표");
+  leg.innerHTML = names.map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("");
+}
+const mixWho = (t) => { const el = document.getElementById("mixWho"); if (el) el.textContent = t; };
+function mixSet(out) { // 받은 글을 칸에 — 적는 중이면 커서를 같은 줄에 둠
+  const m = LD.mix, val = out.lines.join("\n"), el = document.getElementById("ldMix");
+  m.body = val; m.who = out.who;
+  if (el && el.value !== val) {
+    if (el !== document.activeElement) el.value = val;
+    else { const before = el.value.slice(0, el.selectionStart).split("\n"), line = before.length - 1, col = before.at(-1).length, cur = el.value.split("\n")[line];
+      el.value = val; const nl = val.split("\n"); let i = nl.indexOf(cur); if (i < 0) i = Math.min(line, nl.length - 1);
+      const off = nl.slice(0, i).reduce((a, x) => a + x.length + 1, 0) + Math.min(col, nl[i].length); el.setSelectionRange(off, off); }
+  }
+  mixPaint();
+}
+let mixChan = null, mixTopic = "";
+function mixListen() {
+  const t = `ldmix:${LD.team}`; if (mixTopic === t) return;
+  if (mixChan) sb.removeChannel(mixChan); mixTopic = t;
+  mixChan = sb.channel(t, { config: { private: true, broadcast: { self: false } } }).on("broadcast", { event: "mix" }, ({ payload: p }) => {
+    const m = LD.mix; if (!m || p.month !== m.month || `ldmix:${m.team}` !== mixTopic) return;
+    m.base = SIMMERGE.merge3(ML(p.from), ML(p.text), ML(m.base)).lines.join("\n");
+    mixSet(SIMMERGE.merge3(ML(p.from), ML(p.text, p.who), ML(m.body, m.who)));
+    mixWho(`✍️ ${p.by} 적는 중…`); clearTimeout(mixWho.t); mixWho.t = setTimeout(() => { const n = new Date(); mixWho(`${p.by} ${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")} 저장`); }, 2500);
+  }).subscribe();
+}
+async function mixSave() {
+  const m = LD.mix, { team, month } = m;
+  const { data: sv, error: e1 } = await sb.from("leader_mix").select("body, who").eq("team_id", team).eq("month", month).maybeSingle(); if (fail(e1)) return;
+  if (sv && sv.body !== m.base) mixSet(SIMMERGE.merge3(ML(m.base), ML(m.body, m.who), ML(sv.body, sv.who))); // 그 사이 남이 저장한 줄도 살림
+  const body = m.body, row = { team_id: team, month, body, who: m.who, by_name: myName ?? "", updated_at: new Date().toISOString() };
+  const { error } = await sb.from("leader_mix").upsert(row); if (fail(error)) return;
+  m.base = body; m.at = row.updated_at; m.by = row.by_name; if (m.body === body) m.dirty = false;
+  const n = new Date(); mixWho(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")} 저장됨`);
+}
+document.addEventListener("input", (e) => {
+  if (e.target.id !== "ldMix" || !LD.mix) return;
+  const m = LD.mix, el = e.target;
+  m.who = TB.relines(m.body, el.value, m.who, myName ?? ""); m.body = el.value; m.dirty = true; mixPaint(); mixWho("적는 중…");
+  clearTimeout(m.tSend); m.tSend = setTimeout(() => { mixChan?.send({ type: "broadcast", event: "mix", payload: { month: m.month, from: m.sent ?? m.base, text: m.body, who: m.who, by: myName ?? "" } }); m.sent = m.body; }, 150);
+  clearTimeout(m.tSave); m.tSave = setTimeout(mixSave, 700);
+});
+document.addEventListener("scroll", (e) => { if (e.target?.id === "ldMix") e.target.previousElementSibling.scrollTop = e.target.scrollTop; }, true);
+setInterval(async () => { // 🔁 실시간이 끊겨도 맞춤: 보드가 보이고, 안 적고 있을 때만
+  const m = LD.mix; if (!m || m.dirty || !document.body.classList.contains("ldv") || document.hidden || document.activeElement?.id === "ldMix") return;
+  const { data } = await sb.from("leader_mix").select("body, who, by_name, updated_at").eq("team_id", m.team).eq("month", m.month).maybeSingle();
+  if (!data || data.body === m.body || LD.mix !== m || m.dirty) return;
+  Object.assign(m, { base: data.body, at: data.updated_at, by: data.by_name }); mixSet(ML(data.body, data.who));
+}, 12000);
+
 // 🤖 AI 전략: 서버 함수 planner-leader-ai (Claude) 가 지점 리더 데이터를 읽고 그달 전략을 씀 · 지점·달마다 1개 저장, 다시 만들면 덮어씀
 async function aiDlg(month = statMonth()) {
   const cur = LDC.monthStart(today()), tname = teams.find((t) => t.id === LD.team)?.name ?? (await sb.from("teams").select("name").eq("id", LD.team).maybeSingle()).data?.name ?? "우리 지점";
