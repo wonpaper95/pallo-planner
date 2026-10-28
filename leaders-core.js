@@ -96,6 +96,14 @@ const LDC = {
     if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
     return `${y}-${String(+mo).padStart(2, "0")}-${String(+d).padStart(2, "0")}`;
   },
+  // 📊 기록용 고르기 칸 (DB check 와 같게)
+  END_REASONS: ["취업·이직", "이사", "학업·시험", "건강", "개인 사정", "불만·갈등", "연락 두절", "기타"],
+  SOURCES: ["회원 전환", "지인 추천", "알바몬", "인스타", "당근", "기타"],
+  // 그 기간(from~to)에 활동한 리더인가: 시작일이 기간 끝 전 · 그만둔 날이 기간 시작 뒤 (시작일 모르면 있는 걸로)
+  activeIn(r, from, to) {
+    const s = LDC.parseDay(r.start_day);
+    return (!s || s <= to) && (!r.end_day || r.end_day >= from);
+  },
   // 첫 시작일부터 며칠 지났나: D+30 · 오늘이면 D-day · 앞으로면 D-3
   dPlus(start, today) {
     const s = LDC.parseDay(start); if (!s) return "";
