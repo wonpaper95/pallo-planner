@@ -311,18 +311,17 @@ function renderOut() {
     <div class="blchips">${(X.thumbnail_texts ?? []).map((t) => `<button type="button" class="blchip" data-copy="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="mut" style="margin-top:10px">메인 <b>${esc(X.main_keyword)}</b> · 서브 ${esc((X.sub_keywords ?? []).join(", "))} · ${esc(presetName(X.opts?.preset))}</div>
     ${spare.length ? `<div class="mut" style="margin-top:10px">안 쓴 사진 — 본문으로 끌어다 놓으세요</div><div class="bltray">${spare.map((p) => `<div class="blthumb" draggable="true" data-spare="${p.id}"><img src="${p.url}" alt=""></div>`).join("")}</div>` : ""}
-    <div class="mut" style="margin-top:10px">💡 네이버에 사진 넣기: <b>📋 본문 복사</b>로 글을 붙인 뒤, '📷 사진 01' 줄을 지우고 그 자리에서 <b>📋 사진 01 복사</b> → 붙여넣기(⌘V / Ctrl+V). 사진 01이 대표사진(썸네일)이 돼요 — 바꾸려면 원하는 사진의 <b>⭐ 대표사진으로</b></div>
+    <div class="mut" style="margin-top:10px">💡 네이버에 올리기: <b>📋 본문 복사</b> → 네이버에 붙여넣기 → <b>📋 다음 사진 복사</b>를 누를 때마다 01·02·03… 차례로 복사돼요. '📷 사진 01' 줄을 지우고 그 자리에 붙여넣기(⌘V / Ctrl+V), 다음 사진도 같은 방법. 사진 01이 대표사진(썸네일) — 바꾸려면 원하는 사진의 <b>⭐ 대표사진으로</b></div>
     <div class="blpaper" id="blPaper">${X.blocks.map((b, i) => blockHtml(b, i, b.type === "photo" ? ++n : n)).join("")}</div>
     <div class="bltags" id="blTags" contenteditable="true">${esc((X.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" "))}</div>
     <details style="margin-top:10px"><summary class="mut">🔁 AI 자체 검수 메모</summary><div class="mut" style="white-space:pre-wrap;margin-top:6px">${esc(X.self_review)}</div></details>
     <h3 style="margin:16px 0 4px">🚦 발행 전 점검</h3><div class="blcheck" id="blCheck"></div>
     <div class="blacts">
-      <button type="button" class="btn" id="blCopy">📋 본문 복사</button><button type="button" class="btn ghost" id="blCopyTitle">제목 복사</button>
+      <button type="button" class="btn" id="blCopy">📋 본문 복사</button><button type="button" class="btn" id="blNextPhoto">${nextLabel()}</button><button type="button" class="btn ghost" id="blCopyTitle">제목 복사</button>
       <button type="button" class="btn ghost" id="blPhotos">🖼 사진 번호대로 받기</button><button type="button" class="btn ghost" id="blTagsCopy"># 해시태그 복사</button>
-      <button type="button" class="btn ghost" id="blCopyAll" title="사진까지 한 번에 붙여넣기 (스마트에디터에서 안 될 수 있어요)">🧪 사진까지 통째 복사</button>
       <button type="button" class="btn ghost" id="blConv">🔁 인스타·당근·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
     </div></div>`;
-  check(); similarSoon(); publishUsed();
+  check(); similarSoon();
 }
 const pasteAsText = (ev) => { if (!ev.target.closest("[contenteditable]")) return; ev.preventDefault(); document.execCommand("insertText", false, ev.clipboardData.getData("text/plain")); };
 
@@ -333,30 +332,17 @@ function plainText() {
   return BL.post.blocks.map((b) => b.type === "photo" ? `📷 사진 ${pad(++n)}${b.caption ? ` — ${b.caption}` : ""}` : b.type === "divider" ? "────────" : b.type === "map" ? `📍 [지도: ${P().display || BL.teamName}]` : b.text).join("\n\n") + "\n\n" + tagsText();
 }
 const tagsText = () => (BL.post.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
-// 네이버 스마트에디터는 data:/blob: 이미지를 거부하고(“허용되지 않는 형식”) https 주소 이미지는 가져가서 다시 올린다.
-// → 모자이크 반영된 사진을 임시 공개 보관함(blog-temp, 무작위 이름, 2일 뒤 삭제)에 올려 그 주소로 붙여넣기·끌어놓기
-async function publish(p) {
-  if (p.pub && p.pubOf === p.url) return p.pub;
-  const path = `${BL.team}/${crypto.randomUUID()}.jpg`;
-  const { error } = await sb.storage.from("blog-temp").upload(path, p.blob, { contentType: "image/jpeg" });
-  if (error) throw error;
-  p.pub = sb.storage.from("blog-temp").getPublicUrl(path).data.publicUrl; p.pubOf = p.url;
-  return p.pub;
-}
-const publishUsed = debounce(async () => {
-  for (const pid of used()) { const p = photoOf(pid); if (p) try { await publish(p); } catch (e) { console.warn("사진 임시 올리기 실패", e); } }
-}, 600);
-async function richHtml(embed) {
+// 네이버 스마트에디터: 붙여넣은 HTML 속 사진은 data: 면 빠지고, https 주소면 외부 주소 사진으로만 남아 대표·업로드가 안 됨 (10-28 실측)
+// → 글은 '📷 사진 NN' 자리표시로, 사진은 한 장씩 이미지 클립보드(copyImg)로. 예전 임시 공개 보관함(blog-temp) 업로드는 그만둠
+async function richHtml() {
   const lines = (t) => String(t).split("\n").map((l) => `<p>${l.trim() ? esc(l) : "<br>"}</p>`).join("");
-  const urls = new Map();
-  if (embed) for (const pid of used()) { const p = photoOf(pid); if (p) urls.set(p.id, await publish(p)); }
   let n = 0; const out = [];
   for (const b of BL.post.blocks) {
     if (b.type === "text") out.push(lines(b.text));
     else if (b.type === "quote") out.push(`<blockquote><p><b>${esc(b.text)}</b></p></blockquote>`);
     else if (b.type === "divider") out.push("<hr>");
     else if (b.type === "map") out.push(`<p>📍 [지도: ${esc(P().display || BL.teamName)}]</p>`);
-    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${urls.get(p.id)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
+    else out.push(`<p>📷 사진 ${pad(++n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`);
     out.push("<p><br></p>");
   }
   out.push(`<p>${esc(tagsText())}</p>`);
@@ -373,6 +359,13 @@ async function copyImg(p) {
   });
   try { await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]); return true; }
   catch (e) { console.warn("사진 복사 실패", e); toast("이 브라우저에선 사진 복사가 안 돼요. 🖼 사진 번호대로 받기로 받아서 올려 주세요"); return false; }
+}
+// [📋 다음 사진 복사] 차례: 시안의 사진 자리 번호(빈 자리 건너뜀) 순서. BL.next = 다음에 복사할 칸
+const shots = () => { let n = 0; return (BL.post?.blocks ?? []).flatMap((b) => b.type !== "photo" ? [] : (n++, photoOf(b.pid) ? [{ no: pad(n), p: photoOf(b.pid) }] : [])); };
+function nextLabel() {
+  const L = shots(); if (BL.nextOf !== BL.post) { BL.nextOf = BL.post; BL.next = 0; } // 다른 글을 열면 01부터
+  if (!L.length) return "📋 다음 사진 복사";
+  return BL.next >= L.length ? `✅ 사진 ${L.length}장 다 복사 · 다시 01부터` : `📋 다음 사진 복사 (${L[BL.next].no} · ${BL.next + 1}/${L.length})`;
 }
 async function photosOut() {
   const list = []; let n = 0;
@@ -554,13 +547,12 @@ function wire() {
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
     if (d.pcopy) { const no = t.textContent.match(/\d+/)?.[0]; if (await copyImg(photoOf(X.blocks[+d.pcopy].pid))) toast(`사진 ${no} 복사! 네이버 글쓰기 '📷 사진 ${no}' 자리에 붙여넣으세요(⌘V / Ctrl+V)`); return; }
     if (d.cover) { const B = X.blocks, i = +d.cover, f = B.findIndex((b) => b.type === "photo"); [B[f], B[i]] = [B[i], B[f]]; renderOut(); toast("이 사진이 사진 01(대표사진)이 됐어요"); return; }
-    if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 붙여넣은 뒤 '📷 사진 01' 자리마다 시안의 [📋 사진 복사] → 붙여넣기 하세요"); return; }
-    if (t.id === "blCopyAll") {
-      t.textContent = "🧪 사진 올리는 중…"; let failed = false;
-      const html = richHtml(true); html.catch(() => { failed = true; });
-      const ok = await copy(plainText(), html); t.textContent = "🧪 사진까지 통째 복사";
-      if (ok) toast(failed ? "사진을 올리지 못해 글자만 복사했어요. 인터넷 연결을 확인하고 다시 눌러 주세요" : "사진까지 복사했어요. 네이버 글쓰기에 붙여넣으면 사진은 네이버가 가져가 올려요");
-      return;
+    if (t.id === "blCopy") { BL.next = 0; $b("#blNextPhoto").textContent = nextLabel(); if (await copy(plainText(), richHtml())) toast("본문 복사! 네이버에 붙여넣은 뒤 [📋 다음 사진 복사] → '📷 사진 01' 자리에 붙여넣기를 사진마다 반복하세요"); return; }
+    if (t.id === "blNextPhoto") {
+      const L = shots(); if (!L.length) return toast("시안에 들어간 사진이 없어요");
+      const { no, p } = L[BL.next % L.length];
+      if (await copyImg(p)) { BL.next = BL.next % L.length + 1; toast(`사진 ${no} 복사! '📷 사진 ${no}' 줄을 지우고 그 자리에 붙여넣으세요(⌘V / Ctrl+V)${no === "01" ? " — 대표사진" : ""}`); }
+      t.textContent = nextLabel(); return;
     }
     if (t.id === "blCopyTitle") { if (await copy(X.titles[X.sel])) toast("제목 복사했어요"); return; }
     if (t.id === "blTagsCopy") { if (await copy(tagsText())) toast("해시태그 복사했어요"); return; }
@@ -612,12 +604,8 @@ function wire() {
     const th = ev.target.closest?.("[data-thumb]"), sp = ev.target.closest?.("[data-spare]"), bk = ev.target.closest?.(".blk.photo");
     drag = th ? { kind: "thumb", i: +th.dataset.thumb } : sp ? { kind: "spare", pid: +sp.dataset.spare } : bk ? { kind: "blk", i: +bk.dataset.i } : null;
     if (!drag) return;
-    // 네이버 글쓰기로 끌 때: 크롬 기본값은 blob: 주소라 네이버가 거부 → 미리 올려 둔 https 주소로 바꿔 실음 (다른 사이트 사진 끌어오기와 같은 방식)
     // 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
     ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("application/x-pallo", "1");
-    const p = photoOf(drag.kind === "spare" ? drag.pid : drag.kind === "blk" ? BL.post?.blocks[drag.i]?.pid : 0);
-    if (p?.pub && p.pubOf === p.url) { ev.dataTransfer.setData("text/uri-list", p.pub); ev.dataTransfer.setData("text/html", `<img src="${p.pub}" alt="">`); }
-    else if (p) { publish(p).catch(() => {}); toast("사진을 준비하는 중이에요. 2~3초 뒤 다시 끌어 주세요"); }
     (th || sp || bk).classList.add("dragging");
   });
   v.addEventListener("dragend", () => { drag = null; v.querySelectorAll(".dragging, .dropbefore, .dropon").forEach((x) => x.classList.remove("dragging", "dropbefore", "dropon")); });
