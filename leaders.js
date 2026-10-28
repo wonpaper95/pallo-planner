@@ -84,6 +84,21 @@ function monthCell(r, m) {
   return `<td class="m">${st.o + st.x + st.cover ? `<span class="ldo">O ${st.o}</span> <span class="ldx">X ${st.x}</span>${st.blank ? ` <span class="mut">미체크 ${st.blank}</span>` : ""}` : `<span class="mut">–</span>`}${extra ? ` ${extra}` : ""}<br>${flags(r, m)}</td>`;
 }
 
+// 🔴 맨 위 구해야 함 현황표: 지금 비어 있는 자리 전부 (보기 필터·달과 상관없이), 오래 비어 있는 순 · 팀 특이사항은 바로 적음
+function needTable() {
+  const td = today(), rs = LD.rows.filter((r) => r.status === "구해야 함" && (!r.end_day || r.end_day >= td))
+    .sort((a, b) => (needDays(b) ?? 0) - (needDays(a) ?? 0) || LDC.GRPS.indexOf(a.grp) - LDC.GRPS.indexOf(b.grp) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot));
+  if (!rs.length) return `<div class="ldneedtb ok">🎉 지금 리더 빈자리 없어요</div>`;
+  const body = rs.map((r) => { const n = needDays(r);
+    return `<tr><td><b class="nd ${n >= 14 ? "long" : ""}">${n ? `${n}일째` : "–"}</b>${r.need_since ? `<small>${md(r.need_since)}부터</small>` : ""}</td>`
+      + `<td><button class="goto" data-goto="${r.id}" title="보드에서 이 줄 보기">${esc([r.grp, r.slot].filter(Boolean).join(" ") || "반 없음")}</button></td>`
+      + `<td>${esc([r.level, r.seat].filter(Boolean).join(" · ")) || `<span class="mut">–</span>`}</td>`
+      + `<td>${r.name === VACANT ? `<span class="mut">빈자리</span>` : esc(r.name)}${r.note ? `<small>${esc(r.note)}</small>` : ""}</td>`
+      + `<td class="nn"><textarea data-nn="${r.id}" rows="1" maxlength="500" placeholder="이 팀 특이사항 — 구하는 이유 · 팀 분위기 · 원하는 리더 · 진행 상황">${esc(r.need_note ?? "")}</textarea></td></tr>`; }).join("");
+  return `<section class="ldneedtb"><h3>🔴 리더 구해야 함 현황 <span class="mut">${rs.length}자리 · 오래 비어 있는 순 · 2주 넘으면 빨강</span></h3>
+    <div class="ldtw"><table><tr><th>비어 있은 지</th><th>반 · 시간대</th><th>레벨 · 자리</th><th>원래 리더 · 메모</th><th>팀 특이사항</th></tr>${body}</table></div></section>`;
+}
+
 LD.render = function () {
   const [from, to] = range(), sm = statMonth(), td = today();
   const months = [LDC.addMonths(LD.anchor, -2), LDC.addMonths(LD.anchor, -1), LDC.monthStart(LD.anchor)];
@@ -128,6 +143,7 @@ LD.render = function () {
       <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
       <span class="ldact"><button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
+    ${needTable()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>글자 칸 더블클릭 → 고치고 Enter</b> · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 그만두면 줄 오른쪽 클릭 → 👋 그만둠 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
@@ -234,6 +250,9 @@ document.addEventListener("click", async (e) => {
   }
   if (b.id === "ldAdd") return editDlg(null);
   if (b.id === "ldPaste") return pasteDlg();
+  if (b.dataset.goto) { // 현황표 → 보드의 그 줄 (지금 보기 필터·달에 없으면 알려 줌)
+    const t = v.querySelector(`.ldblk tr[data-id="${b.dataset.goto}"]`); if (!t) return toast("지금 보기(필터·달)에는 없는 줄이에요 — 전체 · 오늘로 바꿔 보세요");
+    t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); return setTimeout(() => t.classList.remove("flash"), 1600); }
   const tr = b.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   const sm = statMonth();
   if (b.dataset.star) { const n = +b.dataset.star === mon(r, sm)?.rapport ? null : +b.dataset.star; // 그달 라포 · 같은 별 다시 누르면 지움
@@ -323,6 +342,11 @@ document.addEventListener("contextmenu", (e) => {
   const v = V(); if (!v || !v.contains(e.target) || e.target.closest("input")) return;
   const tr = e.target.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   e.preventDefault(); editDlg(r);
+});
+document.addEventListener("change", async (e) => {
+  const id = e.target.dataset?.nn; if (!id) return; // 🔴 현황표 팀 특이사항 (칸에서 나가면 저장)
+  const r = LD.rows.find((x) => x.id == id), val = e.target.value.trim();
+  const { error } = await sb.from("leaders").update({ need_note: val }).eq("id", id); if (fail(error)) return; if (r) r.need_note = val; toast("팀 특이사항 저장했어요");
 });
 document.addEventListener("change", (e) => { if (e.target.id === "ldTeam") { LD.team = +e.target.value; try { localStorage.setItem("ld-team", LD.team); } catch {} LD.load(); } });
 })();

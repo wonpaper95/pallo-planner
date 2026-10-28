@@ -75,3 +75,13 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .night { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
 #ldView .night.on { background: rgba(73, 48, 135, .15); border-color: #493087; }
 #ldView .mrp { color: #f59e0b; font-weight: 700; font-size: 12px; }
+#ldView .ldneedtb { margin-bottom: 14px; } /* 🔴 맨 위 구해야 함 현황표 */
+#ldView .ldneedtb h3 { margin: 4px 0 6px; font-size: 16px; color: #e5484d; } #ldView .ldneedtb h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldneedtb.ok { padding: 10px 14px; background: rgba(48, 164, 108, .1); border: 1px solid rgba(48, 164, 108, .3); border-radius: 12px; color: #30a46c; font-weight: 600; }
+#ldView .ldneedtb th { background: #e5484d; }
+#ldView .ldneedtb td small { display: block; font-size: 11.5px; color: var(--sub); white-space: normal; max-width: 220px; }
+#ldView .ldneedtb .nd { margin: 0; font-size: 14px; color: #f59e0b; } #ldView .ldneedtb .nd.long { color: #e5484d; }
+#ldView .ldneedtb .goto { background: none; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0; font: inherit; }
+#ldView .ldneedtb td.nn { min-width: 260px; width: 45%; }
+#ldView .ldneedtb textarea { width: 100%; min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.45; font-family: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; resize: vertical; field-sizing: content; }
+#ldView tr.flash td { background: rgba(224, 209, 32, .35) !important; transition: background .3s; }
