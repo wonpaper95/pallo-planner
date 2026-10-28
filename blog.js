@@ -292,8 +292,10 @@ function blockHtml(b, i, n) {
   if (b.type === "divider") return `<div class="blk divider" data-i="${i}">${tools}<hr></div>`;
   if (b.type === "map") return `<div class="blk map" data-i="${i}">${tools}<div class="mapbox">📍 지도: ${esc(P().display || BL.teamName)} — 붙여넣은 뒤 스마트에디터 [장소]로 넣어 주세요</div></div>`;
   const p = photoOf(b.pid);
-  return `<div class="blk photo" draggable="true" data-i="${i}">${tools}<span class="tag">사진 ${pad(n)}</span>
+  // 네이버는 대표사진을 따로 안 고르면 첫 사진을 대표(썸네일)로 씀 → 사진 01 = 대표, ⭐ 는 그 사진을 01 자리와 맞바꿈
+  return `<div class="blk photo" draggable="true" data-i="${i}">${tools}<span class="tag">사진 ${pad(n)}${n === 1 ? " · ⭐ 대표" : ""}</span>
     <figure>${p ? `<img src="${p.url}" alt="">` : `<div class="ph">📷 ${esc(b.text || "안 쓴 사진을 여기로 끌어다 놓으세요")}${b.pid ? "<br><small>원본은 처음 만든 기기에만 있어요</small>" : ""}</div>`}</figure>
+    ${p ? `<div class="pacts"><button type="button" class="btn ghost small" data-pcopy="${i}">📋 사진 ${pad(n)} 복사</button>${n === 1 ? "" : `<button type="button" class="btn ghost small" data-cover="${i}">⭐ 대표사진으로</button>`}</div>` : ""}
     <div class="cap" contenteditable="true" data-cap="${i}">${esc(b.caption)}</div></div>`;
 }
 function renderOut() {
@@ -309,7 +311,7 @@ function renderOut() {
     <div class="blchips">${(X.thumbnail_texts ?? []).map((t) => `<button type="button" class="blchip" data-copy="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="mut" style="margin-top:10px">메인 <b>${esc(X.main_keyword)}</b> · 서브 ${esc((X.sub_keywords ?? []).join(", "))} · ${esc(presetName(X.opts?.preset))}</div>
     ${spare.length ? `<div class="mut" style="margin-top:10px">안 쓴 사진 — 본문으로 끌어다 놓으세요</div><div class="bltray">${spare.map((p) => `<div class="blthumb" draggable="true" data-spare="${p.id}"><img src="${p.url}" alt=""></div>`).join("")}</div>` : ""}
-    <div class="mut" style="margin-top:10px">💡 시안의 사진은 네이버 글쓰기 창으로 바로 끌어다 놓을 수 있어요 (크롬)</div>
+    <div class="mut" style="margin-top:10px">💡 네이버에 사진 넣기: <b>📋 본문 복사</b>로 글을 붙인 뒤, '📷 사진 01' 줄을 지우고 그 자리에서 <b>📋 사진 01 복사</b> → 붙여넣기(⌘V / Ctrl+V). 사진 01이 대표사진(썸네일)이 돼요 — 바꾸려면 원하는 사진의 <b>⭐ 대표사진으로</b></div>
     <div class="blpaper" id="blPaper">${X.blocks.map((b, i) => blockHtml(b, i, b.type === "photo" ? ++n : n)).join("")}</div>
     <div class="bltags" id="blTags" contenteditable="true">${esc((X.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" "))}</div>
     <details style="margin-top:10px"><summary class="mut">🔁 AI 자체 검수 메모</summary><div class="mut" style="white-space:pre-wrap;margin-top:6px">${esc(X.self_review)}</div></details>
@@ -359,6 +361,18 @@ async function richHtml(embed) {
   }
   out.push(`<p>${esc(tagsText())}</p>`);
   return out.join("");
+}
+// 사진 한 장을 '이미지'로 클립보드에 (캡처 붙여넣기와 같은 길 → 스마트에디터가 사진으로 올림. HTML 속 주소는 글자로 들어갈 때가 있음)
+// 크롬 클립보드는 PNG 만 받음 → 긴 변 1600px PNG 로. Safari 는 클릭 직후 write 를 불러야 해서 내용은 Promise 로
+async function copyImg(p) {
+  if (!p) return false;
+  const png = createImageBitmap(p.blob).then((bm) => {
+    const k = Math.min(1, 1600 / Math.max(bm.width, bm.height)), c = document.createElement("canvas");
+    c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+    return new Promise((ok) => c.toBlob(ok, "image/png"));
+  });
+  try { await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]); return true; }
+  catch (e) { console.warn("사진 복사 실패", e); toast("이 브라우저에선 사진 복사가 안 돼요. 🖼 사진 번호대로 받기로 받아서 올려 주세요"); return false; }
 }
 async function photosOut() {
   const list = []; let n = 0;
@@ -538,7 +552,9 @@ function wire() {
     if (d.mv) { const i = +d.i, j = i + +d.mv, B = X.blocks; if (j < 0 || j >= B.length) return; [B[i], B[j]] = [B[j], B[i]]; renderOut(); return; }
     if (d.add) { X.blocks.splice(+d.add + 1, 0, { type: "text", text: "", photo: 0, caption: "", pid: 0 }); renderOut(); v.querySelector(`[data-tx="${+d.add + 1}"]`)?.focus(); return; }
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
-    if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 스마트에디터 본문에 붙여넣고 📷 사진 01 자리에 01번 사진을 올리세요"); return; }
+    if (d.pcopy) { const no = t.textContent.match(/\d+/)?.[0]; if (await copyImg(photoOf(X.blocks[+d.pcopy].pid))) toast(`사진 ${no} 복사! 네이버 글쓰기 '📷 사진 ${no}' 자리에 붙여넣으세요(⌘V / Ctrl+V)`); return; }
+    if (d.cover) { const B = X.blocks, i = +d.cover, f = B.findIndex((b) => b.type === "photo"); [B[f], B[i]] = [B[i], B[f]]; renderOut(); toast("이 사진이 사진 01(대표사진)이 됐어요"); return; }
+    if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 붙여넣은 뒤 '📷 사진 01' 자리마다 시안의 [📋 사진 복사] → 붙여넣기 하세요"); return; }
     if (t.id === "blCopyAll") {
       t.textContent = "🧪 사진 올리는 중…"; let failed = false;
       const html = richHtml(true); html.catch(() => { failed = true; });
