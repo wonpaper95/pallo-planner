@@ -84,6 +84,17 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldneedtb .goto { background: none; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0; font: inherit; }
 #ldView .ldneedtb td.nn { min-width: 260px; width: 45%; }
 #ldView .ldneedtb textarea { width: 100%; min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.45; font-family: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; resize: vertical; field-sizing: content; }
+/* 🔴 현황 접기: 한 줄 긴 막대 (기본 접힘) — 누르면 표가 펼쳐짐 */
+#ldView .ldfold { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 16px; list-style: none; cursor: pointer; user-select: none; background: rgba(229, 72, 77, .09); border: 1.5px solid rgba(229, 72, 77, .45); border-radius: 12px; color: #e5484d; font-size: 15.5px; }
+#ldView .ldfold::-webkit-details-marker { display: none; }
+#ldView .ldfold:hover { background: rgba(229, 72, 77, .15); }
+#ldView .ldfold .cnt { font-weight: 800; }
+#ldView .ldfold .bdgs { margin: 0; }
+#ldView .ldfold .fold { margin-left: auto; padding: 4px 12px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
+#ldView .ldfold .fold::after { content: "▼ 펼쳐 보기"; }
+#ldView .ldneedtb[open] .ldfold { margin-bottom: 6px; }
+#ldView .ldneedtb[open] .ldfold .fold::after { content: "▲ 접기"; }
+#ldView .ldnh { margin: 0 0 6px; font-size: 12.5px; }
 #ldView tr.flash td { background: rgba(224, 209, 32, .35) !important; transition: background .3s; }
 /* ✏️ 한 번 눌러 고치는 칸: 빈 칸은 '+ 적기' 점선, 마우스 올리면 연필 */
 #ldView .addh { display: inline-block; padding: 2px 8px; border: 1.5px dashed var(--line); border-radius: 7px; color: var(--sub); font-size: 12px; font-weight: 600; cursor: pointer; }

@@ -116,8 +116,10 @@ function needTable() {
       + `<td>${ed(r, "level", esc(r.level), "레벨")} · ${ed(r, "seat", esc(r.seat), "자리")}</td>`
       + `<td>${ed(r, "name", r.name === VACANT ? `<span class="mut">빈자리</span>` : esc(r.name), "이름")}<small>${ed(r, "note", esc(r.note), "메모")}</small></td>`
       + `<td class="nn"><textarea data-nn="${r.id}" rows="1" maxlength="500" placeholder="이 팀 특이사항 — 구하는 이유 · 팀 분위기 · 원하는 리더 · 진행 상황">${esc(r.need_note ?? "")}</textarea></td></tr>`; }).join("");
-  return `<section class="ldneedtb"><h3>🔴 리더 구해야 함 현황 <span class="mut">${rs.length}자리 · 시간대별 · 2주 넘으면 빨강 · 칸 누르면 고쳐요</span></h3><div class="bdgs">${legend}</div>
-    <div class="ldtw"><table><tr><th>비어 있은 지</th><th>반 · 시간대</th><th>레벨 · 자리</th><th>원래 리더 · 메모</th><th>팀 특이사항</th></tr>${body}</table></div></section>`;
+  // 접었다 폈다 (기본 접힘 · 화면 다시 그려도 그대로) — 접힌 줄에도 자리 수·시간대 배지는 보임
+  return `<details class="ldneedtb" ${LD.needOpen ? "open" : ""}><summary class="ldfold"><b>🔴 리더 구해야 함 현황</b> <span class="cnt">${rs.length}자리</span><span class="bdgs">${legend}</span><span class="fold"></span></summary>
+    <p class="mut ldnh">시간대별 · 2주 넘으면 빨강 · 칸 누르면 고쳐요</p>
+    <div class="ldtw"><table><tr><th>비어 있은 지</th><th>반 · 시간대</th><th>레벨 · 자리</th><th>원래 리더 · 메모</th><th>팀 특이사항</th></tr>${body}</table></div></details>`;
 }
 
 // 📜 자격증: 첫 시작일부터 6개월 → 2급, 1년 → 1급. 발급하면 날짜·누가 남김 (누르면 취소) · 아직이면 다음 급까지 남은 날
@@ -564,6 +566,7 @@ function findLeader(q) {
   if (trs.length > 1) toast(`${LD.findI + 1}/${trs.length}번째 — Enter 누르면 다음`);
 }
 document.addEventListener("keydown", (e) => { if (e.target.id === "ldFind" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); findLeader(e.target.value.trim()); } });
+document.addEventListener("toggle", (e) => { if (e.target.classList?.contains("ldneedtb")) LD.needOpen = e.target.open; }, true); // 🔴 구해야 함 현황 접힘 기억 (toggle 은 안 퍼져서 capture)
 document.addEventListener("change", (e) => { if (e.target.id === "ldFind" && LD.rows.some((r) => r.name === e.target.value)) findLeader(e.target.value); }); // 자동완성 목록에서 고르면 바로
 document.addEventListener("contextmenu", (e) => {
   const v = V(); if (!v || !v.contains(e.target) || e.target.closest("input")) return;
