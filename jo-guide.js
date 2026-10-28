@@ -71,7 +71,7 @@
     const step = (s) => `<details class="jgstep ${s.must ? "must" : "add"}"><summary><span class="tag">${s.must ? "🔴" : "🟡"}</span><span class="when">${esc(s.when)}</span><b>${esc(s.t)}</b></summary>
       ${s.how ? body(s.how.map((x) => "• " + x)) : ""}${refBox(s.ref)}</details>`;
     const must = d.steps.filter((s) => s.must), add = d.steps.filter((s) => !s.must);
-    return `<div class="jgcard"><h3>${d.day}일차 · ${esc(d.title)}</h3><p class="jggoal">🎯 ${esc(d.goal)}</p>${d.tip ? `<p class="jgmut">💡 ${esc(d.tip)}</p>` : ""}</div>
+    return `<div class="jgcard"><h3>${d.day}일차 · ${esc(d.title)}</h3><p class="jggoal">🎯 ${esc(d.goal)}</p>${d.tip ? `<p class="jgmut">💡 ${esc(d.tip)}</p>` : ""}${(d.files || []).map(([f, n]) => `<a class="jgbtn" href="${f}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`).join(" ")}</div>
       <div class="jgcard"><h3>오늘 순서</h3>${must.map(step).join("")}${add.length ? `<h4>🟡 4시간 근무면 이어서</h4>${add.map(step).join("")}` : ""}</div>
       <div class="jgcard"><h3>✅ 통과 체크 <small>${doneOf(d)}/${d.pass.length} · 매니저와 같이 확인</small></h3>
       ${d.pass.map((p, i) => ck(`d${d.day}-${i}`, p)).join("")}</div>
