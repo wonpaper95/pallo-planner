@@ -85,3 +85,9 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldneedtb td.nn { min-width: 260px; width: 45%; }
 #ldView .ldneedtb textarea { width: 100%; min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.45; font-family: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; resize: vertical; field-sizing: content; }
 #ldView tr.flash td { background: rgba(224, 209, 32, .35) !important; transition: background .3s; }
+/* ✏️ 한 번 눌러 고치는 칸: 빈 칸은 '+ 적기' 점선, 마우스 올리면 연필 */
+#ldView .addh { display: inline-block; padding: 2px 8px; border: 1.5px dashed var(--line); border-radius: 7px; color: var(--sub); font-size: 12px; font-weight: 600; cursor: pointer; }
+#ldView td.ed1 { cursor: pointer; position: relative; }
+#ldView td.ed1:hover { background: rgba(73, 48, 135, .07); box-shadow: inset 0 0 0 1.5px rgba(73, 48, 135, .35); }
+#ldView td.ed1:hover .addh { border-color: var(--accent); color: var(--accent); }
+#ldView td.ed1:hover::after { content: "✏️"; position: absolute; top: 3px; right: 4px; font-size: 11px; }
