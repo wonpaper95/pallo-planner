@@ -162,3 +162,5 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .cfm { border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13.5px; cursor: pointer; }
 #ldView .cfm.on { border-color: #1f9d55; background: rgba(31, 157, 85, .1); } #ldView .cfm small { color: var(--sub); font-size: 11px; }
 #ldView .cfm.vac { cursor: default; color: #e5484d; border-style: dashed; }
+#ldView .ldcerttb summary { cursor: pointer; list-style: none; } #ldView .ldcerttb summary::-webkit-details-marker { display: none; }
+#ldView .ldcerttb summary h3::before { content: "▸ "; } #ldView .ldcerttb[open] summary h3::before { content: "▾ "; }

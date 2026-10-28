@@ -145,8 +145,9 @@ function certTable() {
   if (!due.length && !next.length) return "";
   const row = ({ r, c }, ok) => `<tr data-id="${r.id}"><td><b>${esc(r.name)}</b>${isSub(r) ? ` <span class="mut">서브</span>` : ""}</td><td>${esc([r.grp, r.slot].filter(Boolean).join(" ") || "–")}</td><td>${esc(r.start_day)}</td>`
     + `<td>${ok ? `<button class="cert due" data-cert="${c.grade}">📜 ${c.grade}급 발급</button>` : `<span class="cert wait">${c.grade}급 · ${md(c.on)}부터</span>`}</td></tr>`;
-  return `<section class="ldcerttb"><h3>📜 자격증 발급 대상 <span class="mut">근속 6개월 → 2급 · 1년 → 1급 · 발급 ${due.length}${next.length ? ` · 30일 안 ${next.length}` : ""}</span></h3>
-    <div class="ldtw"><table><tr><th>리더</th><th>반 · 시간대</th><th>첫 시작일</th><th>자격증</th></tr>${due.map((x) => row(x, true)).join("")}${next.map((x) => row(x, false)).join("")}</table></div></section>`;
+  // 기본은 접힘 · 눌러서 펼침 (펼친 상태는 화면 다시 그려도 유지, 새로고침하면 다시 접힘)
+  return `<details class="ldcerttb" id="ldCert" ${LD.certOpen ? "open" : ""}><summary><h3>📜 자격증 발급 대상 <span class="mut">근속 6개월 → 2급 · 1년 → 1급 · 발급 ${due.length}${next.length ? ` · 30일 안 ${next.length}` : ""} · 눌러서 ${LD.certOpen ? "접기" : "펼치기"}</span></h3></summary>
+    <div class="ldtw"><table><tr><th>리더</th><th>반 · 시간대</th><th>첫 시작일</th><th>자격증</th></tr>${due.map((x) => row(x, true)).join("")}${next.map((x) => row(x, false)).join("")}</table></div></details>`;
 }
 // 🔁 서브리더 (대기·대타 풀): 반 없이 빈자리·결석을 채움 · 대타는 출석 칸 '대타' 이름으로 자동 집계 · ⭐ 승격 후보 → ✏️ 에서 구분을 리더로
 function subTable(sm) {
@@ -568,6 +569,7 @@ function findLeader(q) {
 document.addEventListener("keydown", (e) => { if (e.target.id === "ldFind" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); findLeader(e.target.value.trim()); } });
 document.addEventListener("toggle", (e) => { if (e.target.classList?.contains("ldneedtb")) LD.needOpen = e.target.open; }, true); // 🔴 구해야 함 현황 접힘 기억 (toggle 은 안 퍼져서 capture)
 document.addEventListener("change", (e) => { if (e.target.id === "ldFind" && LD.rows.some((r) => r.name === e.target.value)) findLeader(e.target.value); }); // 자동완성 목록에서 고르면 바로
+document.addEventListener("toggle", (e) => { if (e.target.id !== "ldCert") return; LD.certOpen = e.target.open; const t = e.target.querySelector("summary .mut"); if (t) t.textContent = t.textContent.replace(/눌러서 \S+$/, `눌러서 ${LD.certOpen ? "접기" : "펼치기"}`); }, true); // toggle 은 버블 안 됨 → capture
 document.addEventListener("contextmenu", (e) => {
   const v = V(); if (!v || !v.contains(e.target) || e.target.closest("input")) return;
   const tr = e.target.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
