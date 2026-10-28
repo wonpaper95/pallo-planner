@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610281605">
+<meta name="app-version" content="202610281609">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610281605"></script>
+<script src="theme.js?v=202610281609"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -678,9 +678,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610281605"></script>
-<script src="week.js?v=202610281605"></script>
-<script src="pick.js?v=202610281605"></script>
+<script src="config.js?v=202610281609"></script>
+<script src="week.js?v=202610281609"></script>
+<script src="pick.js?v=202610281609"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -720,6 +720,7 @@ async function loadProfile() {
   myRole = previewTeam || previewUser ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   document.body.classList.toggle("is-assist", myRole === "assistant"); // 🧑‍🎓 조교: 탭 4개만 (서버에서도 막힘, 조교 가이드는 DB 없음)
+  if (myRole === "assistant") joHome(); // 🧑‍🎓 아이폰 홈 화면 앱도 조교 링크로 열리게
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
   if (isBoss) loadFeedback(); // 🐞 처리 전 개수 배지
@@ -771,6 +772,21 @@ async function joLogin(token) { // 폰은 첫 연결이 느리거나 끊기기 �
   }
   throw last;
 }
+// 🧑‍🎓 조교 기기: 홈 화면에 추가하면 그 주소(?jo=링크)가 앱 시작 주소가 되게 — 아이폰 홈 화면 앱은 사파리와 저장 공간이 따로라
+// 기억한 링크를 모름. 매니페스트를 빼면 아이폰은 지금 주소를 그대로 앱으로 저장함 (안드로이드도 바로가기로 같은 주소)
+function joHome() {
+  let t = null; try { t = localStorage.getItem("jo-token"); } catch {} if (!t) return;
+  document.querySelector('link[rel="manifest"]')?.remove();
+  if (new URLSearchParams(location.search).get("jo") !== t) history.replaceState(null, "", `${location.pathname}?jo=${t}`);
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent), home = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  let seen = false; try { seen = !!localStorage.getItem("jo-home-tip"); } catch {}
+  if (!ios || home || seen || document.getElementById("joTip")) return;
+  const d = document.createElement("div"); d.id = "joTip";
+  d.style.cssText = "position:fixed;left:12px;right:12px;bottom:14px;z-index:9000;padding:12px 40px 12px 14px;border-radius:14px;background:var(--panel);border:1.5px solid var(--accent);box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:14px;line-height:1.5";
+  d.innerHTML = `📲 <b>앱처럼 쓰려면</b> 아래 <b>공유 ⬆️ → 홈 화면에 추가</b>를 눌러 주세요. 홈 화면 아이콘으로 열면 바로 조교 화면이에요.<button type="button" style="position:absolute;top:8px;right:10px;border:0;background:none;font-size:18px;cursor:pointer" aria-label="닫기">✕</button>`;
+  d.querySelector("button").onclick = () => { d.remove(); try { localStorage.setItem("jo-home-tip", "1"); } catch {} };
+  document.body.appendChild(d);
+}
 // 🧑‍🎓 조교 기기: 로그인 칸 대신 "여는 중 / 다시 시도" (조교는 로그인할 일이 없음)
 function joScreen(state, msg = "") {
   let d = document.getElementById("joWait");
@@ -785,12 +801,14 @@ async function boot() {
   if (jo) {
     const cur = (await sb.auth.getSession()).data.session;
     const curRole = cur ? (await sb.from("profiles").select("role").eq("user_id", cur.user.id).maybeSingle()).data?.role : null;
-    if (!cur || curRole === "assistant" || confirm("조교 링크예요. 지금 계정에서 나가고 조교 화면으로 들어갈까요?\n(대표·매니저님은 '취소')")) {
+    let known = null; try { known = localStorage.getItem("jo-token"); } catch {}
+    if (cur && curRole === "assistant" && known === jo) { /* 이미 이 링크로 들어와 있음 */ }
+    else if (!cur || curRole === "assistant" || confirm("조교 링크예요. 지금 계정에서 나가고 조교 화면으로 들어갈까요?\n(대표·매니저님은 '취소')")) {
       try { localStorage.setItem("jo-token", jo); } catch {} // 먼저 기억 → 중간에 끊겨도 다시 열면 이 링크로 들어감
       joScreen("busy");
       try { await joLogin(jo); } catch (e) { joFail = e; if (e.gone) try { localStorage.removeItem("jo-token"); } catch {} }
     }
-    history.replaceState(null, "", location.pathname); // 링크 값은 주소창에서 지움 (기억은 이 기기에)
+    if (!localStorage.getItem("jo-token")) history.replaceState(null, "", location.pathname); // 조교가 아니면(취소) 링크 값은 주소창에서 지움 — 조교면 joHome 이 주소를 남겨 둠(홈 화면 추가용)
   } else if (!(await sb.auth.getSession()).data.session) { // 조교 기기: 로그인이 풀렸으면 기억한 링크로 다시
     let t = null; try { t = localStorage.getItem("jo-token"); } catch {}
     if (t) { joScreen("busy"); try { await joLogin(t); } catch (e) { joFail = e; if (e.gone) try { localStorage.removeItem("jo-token"); } catch {} } }
@@ -2095,29 +2113,29 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610281605"></script>
-<script src="photo.js?v=202610281605"></script>
-<script src="blog.js?v=202610281605"></script>
-<script src="mk-core.js?v=202610281605"></script>
-<script src="mkc-core.js?v=202610281605"></script>
-<script src="marketing.js?v=202610281605"></script>
-<script src="sns-core.js?v=202610281605"></script>
-<script src="post.js?v=202610281605"></script>
-<script src="someday.js?v=202610281605"></script>
-<script src="contacts.js?v=202610281605"></script>
-<script src="refs.js?v=202610281605"></script>
-<script src="sim-merge.js?v=202610281605"></script>
-<script src="simtb.js?v=202610281605"></script>
-<script src="leaders-core.js?v=202610281605"></script>
-<script src="leaders.js?v=202610281605"></script>
-<script src="links.js?v=202610281605"></script>
-<script src="edu-data.js?v=202610281605"></script>
-<script src="edu.js?v=202610281605"></script>
-<script src="reports.js?v=202610281605"></script>
-<script src="jo-guide-data.js?v=202610281605"></script>
-<script src="jo-guide.js?v=202610281605"></script>
-<script src="wiki-data.js?v=202610281605"></script>
-<script src="wiki.js?v=202610281605"></script>
-<script src="qna.js?v=202610281605"></script>
+<script src="sales.js?v=202610281609"></script>
+<script src="photo.js?v=202610281609"></script>
+<script src="blog.js?v=202610281609"></script>
+<script src="mk-core.js?v=202610281609"></script>
+<script src="mkc-core.js?v=202610281609"></script>
+<script src="marketing.js?v=202610281609"></script>
+<script src="sns-core.js?v=202610281609"></script>
+<script src="post.js?v=202610281609"></script>
+<script src="someday.js?v=202610281609"></script>
+<script src="contacts.js?v=202610281609"></script>
+<script src="refs.js?v=202610281609"></script>
+<script src="sim-merge.js?v=202610281609"></script>
+<script src="simtb.js?v=202610281609"></script>
+<script src="leaders-core.js?v=202610281609"></script>
+<script src="leaders.js?v=202610281609"></script>
+<script src="links.js?v=202610281609"></script>
+<script src="edu-data.js?v=202610281609"></script>
+<script src="edu.js?v=202610281609"></script>
+<script src="reports.js?v=202610281609"></script>
+<script src="jo-guide-data.js?v=202610281609"></script>
+<script src="jo-guide.js?v=202610281609"></script>
+<script src="wiki-data.js?v=202610281609"></script>
+<script src="wiki.js?v=202610281609"></script>
+<script src="qna.js?v=202610281609"></script>
 </body>
 </html>
