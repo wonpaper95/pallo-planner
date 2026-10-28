@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610281656">
+<meta name="app-version" content="202610281700">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610281656"></script>
+<script src="theme.js?v=202610281700"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -258,6 +258,12 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 .seg button { position: relative; user-select: none; }
 .seg button.dragging { z-index: 2; background: var(--hover); color: var(--text); box-shadow: 0 6px 16px rgba(0,0,0,.45); scale: 1.06; cursor: grabbing; }
 .seg button.on { background: var(--hover); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+@media (min-width: 900px) { /* PC: 탭이 많아져서 두 줄 (칸 수 = 보이는 탭 ÷ 2, JS 가 --tabcols 로 넣음) */
+  body .seg div { display: grid; grid-template-columns: repeat(var(--tabcols, 9), auto); gap: 2px 0; border-radius: 22px; overflow: visible; }
+  body .seg button { padding: 7px 18px; white-space: nowrap; }
+}
+header #fbBtn { background: #f04438; border-color: #f04438; color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(240, 68, 56, .35); } /* 🐞 신고·제안 눈에 띄게 */
+header #fbBtn:hover { background: #d92d20; }
 /* 월간 보기 (애플 캘린더 모양) */
 body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.wkv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
@@ -684,9 +690,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610281656"></script>
-<script src="week.js?v=202610281656"></script>
-<script src="pick.js?v=202610281656"></script>
+<script src="config.js?v=202610281700"></script>
+<script src="week.js?v=202610281700"></script>
+<script src="pick.js?v=202610281700"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -726,6 +732,7 @@ async function loadProfile() {
   myRole = previewTeam || previewUser ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
   document.body.classList.toggle("is-assist", myRole === "assistant"); // 🧑‍🎓 조교: 탭 4개만 (서버에서도 막힘, 조교 가이드는 DB 없음)
+  tabCols(); // 역할마다 보이는 탭 수가 달라서 두 줄 칸 수 다시
   if (myRole === "assistant") joHome(); // 🧑‍🎓 아이폰 홈 화면 앱도 조교 링크로 열리게
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
@@ -1644,7 +1651,7 @@ function openPop(anchor, t, kind) {
 const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
-function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); applyTabOrder(); }
+function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); applyTabOrder(); tabCols(); }
 async function savePrefs(next) {
   me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
   const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
@@ -1652,25 +1659,29 @@ async function savePrefs(next) {
 }
 // 탭 순서: 탭을 끌어다 놓으면 바뀌고 계정(prefs.tabs)에 저장 → 폰·노트북 같이 적용. 터치 끌기는 안 됨(노트북에서 바꾸면 폰도 따라옴)
 const segBox = document.querySelector(".seg div");
+const tabCols = () => segBox.style.setProperty("--tabcols", Math.ceil([...segBox.children].filter((b) => getComputedStyle(b).display !== "none").length / 2)); // 보이는 탭(역할마다 다름) 반씩 두 줄
+addEventListener("resize", tabCols);
 function applyTabOrder() { const o = prefs().tabs; if (!Array.isArray(o)) return; const bs = [...segBox.children]; for (const v of o) { const b = bs.find((x) => x.dataset.v === v); if (b) segBox.appendChild(b); } }
 // 끌기: 누른 채 움직이면 버튼이 손을 따라오고, 지나친 탭은 스르륵 비켜줌(FLIP). 놓으면 제자리에 붙고 저장. 마우스·펜만(터치는 가로 스크롤과 겹쳐서 안 함)
 let dt = null, dragged = false; // dt: {b, grab, from}
-const slide = (b, dx) => { if (!dx) return; b.style.transition = "none"; b.style.transform = `translateX(${dx}px)`; requestAnimationFrame(() => { b.style.transition = "transform .18s"; b.style.transform = ""; }); };
-const placeDragged = (x) => { // 손 위치 기준으로 옮기고, 비켜난 이웃은 FLIP
-  const b = dt.b; b.style.transform = ""; const base = b.getBoundingClientRect(); const mid = x - dt.grab + base.width / 2;
-  for (let n = 0; n < 9; n++) { // 휙 끌어도 지나친 탭을 전부 비켜 줌
-    const prev = b.previousElementSibling, next = b.nextElementSibling;
-    if (prev && mid < prev.getBoundingClientRect().left + prev.offsetWidth / 2) { const l = prev.getBoundingClientRect().left; prev.before(b); slide(prev, l - prev.getBoundingClientRect().left); }
-    else if (next && mid > next.getBoundingClientRect().left + next.offsetWidth / 2) { const l = next.getBoundingClientRect().left; next.after(b); slide(next, l - next.getBoundingClientRect().left); }
-    else break;
+const flip = (els, before) => els.forEach((el) => { const r = el.getBoundingClientRect(), o = before.get(el); if (!o) return; const dx = o.left - r.left, dy = o.top - r.top; if (!dx && !dy) return;
+  el.style.transition = "none"; el.style.transform = `translate(${dx}px, ${dy}px)`; requestAnimationFrame(() => { el.style.transition = "transform .18s"; el.style.transform = ""; }); });
+const placeDragged = (x, y) => { // 두 줄 탭: 손에서 가장 가까운 탭 기준으로 그 앞/뒤에 끼움 (가로·세로 둘 다)
+  const b = dt.b; b.style.transform = "";
+  const others = [...segBox.children].filter((el) => el !== b && getComputedStyle(el).display !== "none");
+  let best = null, bd = Infinity;
+  for (const el of others) { const r = el.getBoundingClientRect(), d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)); if (d < bd) { bd = d; best = el; } }
+  if (best) {
+    const r = best.getBoundingClientRect(), after = x > r.left + r.width / 2, before = new Map(others.map((el) => [el, el.getBoundingClientRect()]));
+    if (after ? best.nextElementSibling !== b : best.previousElementSibling !== b) { after ? best.after(b) : best.before(b); flip(others, before); }
   }
-  b.style.transform = `translateX(${x - dt.grab - b.getBoundingClientRect().left}px)`;
+  const r = b.getBoundingClientRect(); b.style.transform = `translate(${x - dt.grab - r.left}px, ${y - dt.grabY - r.top}px)`;
 };
-segBox.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (!b || e.button || e.pointerType === "touch") return; dt = { b, grab: e.clientX - b.getBoundingClientRect().left, x0: e.clientX, from: [...segBox.children].map((x) => x.dataset.v) }; });
+segBox.addEventListener("pointerdown", (e) => { const b = e.target.closest("button"); if (!b || e.button || e.pointerType === "touch") return; dt = { b, grab: e.clientX - b.getBoundingClientRect().left, grabY: e.clientY - b.getBoundingClientRect().top, x0: e.clientX, y0: e.clientY, from: [...segBox.children].map((x) => x.dataset.v) }; });
 segBox.addEventListener("pointermove", (e) => {
   if (!dt) return;
-  if (!dragged) { if (Math.abs(e.clientX - dt.x0) < 5) return; dragged = true; dt.b.classList.add("dragging"); dt.b.style.transition = "none"; segBox.setPointerCapture(e.pointerId); }
-  placeDragged(e.clientX);
+  if (!dragged) { if (Math.hypot(e.clientX - dt.x0, e.clientY - dt.y0) < 5) return; dragged = true; dt.b.classList.add("dragging"); dt.b.style.transition = "none"; segBox.setPointerCapture(e.pointerId); }
+  placeDragged(e.clientX, e.clientY);
 });
 const dropTab = () => {
   if (!dt) return; const { b, from } = dt; dt = null;
@@ -2127,29 +2138,29 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610281656"></script>
-<script src="photo.js?v=202610281656"></script>
-<script src="blog.js?v=202610281656"></script>
-<script src="mk-core.js?v=202610281656"></script>
-<script src="mkc-core.js?v=202610281656"></script>
-<script src="marketing.js?v=202610281656"></script>
-<script src="sns-core.js?v=202610281656"></script>
-<script src="post.js?v=202610281656"></script>
-<script src="someday.js?v=202610281656"></script>
-<script src="contacts.js?v=202610281656"></script>
-<script src="refs.js?v=202610281656"></script>
-<script src="sim-merge.js?v=202610281656"></script>
-<script src="simtb.js?v=202610281656"></script>
-<script src="leaders-core.js?v=202610281656"></script>
-<script src="leaders.js?v=202610281656"></script>
-<script src="links.js?v=202610281656"></script>
-<script src="edu-data.js?v=202610281656"></script>
-<script src="edu.js?v=202610281656"></script>
-<script src="reports.js?v=202610281656"></script>
-<script src="jo-guide-data.js?v=202610281656"></script>
-<script src="jo-guide.js?v=202610281656"></script>
-<script src="wiki-data.js?v=202610281656"></script>
-<script src="wiki.js?v=202610281656"></script>
-<script src="qna.js?v=202610281656"></script>
+<script src="sales.js?v=202610281700"></script>
+<script src="photo.js?v=202610281700"></script>
+<script src="blog.js?v=202610281700"></script>
+<script src="mk-core.js?v=202610281700"></script>
+<script src="mkc-core.js?v=202610281700"></script>
+<script src="marketing.js?v=202610281700"></script>
+<script src="sns-core.js?v=202610281700"></script>
+<script src="post.js?v=202610281700"></script>
+<script src="someday.js?v=202610281700"></script>
+<script src="contacts.js?v=202610281700"></script>
+<script src="refs.js?v=202610281700"></script>
+<script src="sim-merge.js?v=202610281700"></script>
+<script src="simtb.js?v=202610281700"></script>
+<script src="leaders-core.js?v=202610281700"></script>
+<script src="leaders.js?v=202610281700"></script>
+<script src="links.js?v=202610281700"></script>
+<script src="edu-data.js?v=202610281700"></script>
+<script src="edu.js?v=202610281700"></script>
+<script src="reports.js?v=202610281700"></script>
+<script src="jo-guide-data.js?v=202610281700"></script>
+<script src="jo-guide.js?v=202610281700"></script>
+<script src="wiki-data.js?v=202610281700"></script>
+<script src="wiki.js?v=202610281700"></script>
+<script src="qna.js?v=202610281700"></script>
 </body>
 </html>
