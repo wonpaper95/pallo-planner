@@ -128,3 +128,17 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .mixw textarea { position: relative; z-index: 1; display: block; width: 100%; min-height: 140px; field-sizing: content; resize: vertical; background: transparent; color: transparent; caret-color: var(--text); }
 #ldView .mixw textarea::placeholder { color: var(--sub); } #ldView .mixw textarea::selection { color: var(--text); background: rgba(73, 48, 135, .35); }
 #ldView .mixw .tbbk { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; color: var(--text); border-color: transparent; margin: 0; }
+/* 📜 자격증 · 🔁 서브리더 */
+#ldView .certc { white-space: nowrap; }
+#ldView .cert { display: inline-block; border: 1px solid #b8860b; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; margin: 1px 2px; background: none; color: #b8860b; }
+#ldView button.cert { cursor: pointer; }
+#ldView .cert.due { background: #E0D120; border-color: #c9b800; color: #1f1d2b; }
+#ldView .cert.done { background: rgba(48, 164, 108, .12); border-color: #30a46c; color: #30a46c; }
+#ldView .cert.wait { border-style: dashed; color: var(--muted, #888); border-color: var(--line); font-weight: 500; }
+#ldView .ldcerttb { margin-bottom: 14px; }
+#ldView .ldcerttb h3 { margin: 4px 0 6px; font-size: 16px; color: #b8860b; } #ldView .ldcerttb h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldsubblk h3 .btn { margin-left: 6px; }
+#ldView .promo { border: 1.5px solid var(--line); border-radius: 999px; background: var(--bg); padding: 2px 8px; cursor: pointer; font-size: 12px; }
+#ldView .promo.on { background: rgba(224, 209, 32, .25); border-color: #c9b800; font-weight: 700; }
+#ldView .ldfind input { width: 150px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line, #ddd); background: var(--card, #fff); color: inherit; font: inherit; }
+#ldView .endb.del { margin-left: 4px; padding: 4px 7px; }

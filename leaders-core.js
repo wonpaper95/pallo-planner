@@ -32,6 +32,7 @@ const LDC = {
   matchSub(sub, rows) {
     const n = (x) => String(x).replace(/\(.*?\)|\s/g, ""), s = n(sub).replace(/(이랑|랑|님|리더)$/, "");
     if (s.length < 2) return null;
+    const same = rows.filter((r) => n(r.name).split("/").some((p) => p === s)); if (same.length === 1) return same[0]; // 이름이 딱 맞으면 우선 ('민지' vs '민지2')
     const hit = rows.filter((r) => n(r.name).split("/").some((p) => p.includes(s)));
     return hit.length === 1 ? hit[0] : null;
   },
@@ -116,6 +117,14 @@ const LDC = {
     const s = LDC.parseDay(start); if (!s) return "";
     const n = Math.round((D.parse(today) - D.parse(s)) / 864e5);
     return n > 0 ? `D+${n}` : n === 0 ? "D-day" : `D${n}`;
+  },
+  // 📜 자격증: 첫 시작일부터 6개월 → 2급, 1년 → 1급. on = 받을 수 있는 날, ok = 오늘(그만뒀으면 그만둔 날)까지 채웠나. 시작일 모르면 []
+  CERTS: [[2, 6], [1, 12]],
+  certs(start, end, today) {
+    const s = LDC.parseDay(start); if (!s) return [];
+    const until = end && end < today ? end : today;
+    return LDC.CERTS.map(([grade, n]) => { const p = D.parse(s), d = p.getDate(); p.setMonth(p.getMonth() + n); if (p.getDate() !== d) p.setDate(0); // 8/31 + 6개월 = 2/28
+      const on = D.ymd(p); return { grade, on, ok: on <= until }; });
   },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
   slotMin(s) {
