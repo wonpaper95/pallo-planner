@@ -12,10 +12,16 @@ const h12 = (h) => (h % 12 === 0 ? 12 : h % 12);
 // plan.w = { 칸: ["줄1 쓴 사람", "줄2 쓴 사람", …] | "쓴 사람" }. 글은 투명 textarea 뒤 .tbbk 에 색 입혀 그림
 const COLORS = { 민주: "#e64980", 올리비아: "#339af0", 준석: "#37b24d", 마야: "#e64980", 박혁: "#845ef7", 원빈: "#1098ad", 해민: "#f03e3e", 채림: "#74b816", 은서: "#cc5de8", 세연: "#4263eb", 헤이즐: "#b08968" }; // 마야 = 민주 (같은 사람, 핑크)
 const EXTRA = ["#d6336c", "#0ca678", "#e67700", "#7950f2", "#1971c2", "#a61e4d"]; // 새 매니저: 이름으로 고정 배정
-TB.color = (n) => !n || n === "대표" ? "" : n.startsWith("조교") ? "#f76707" : COLORS[n] ?? EXTRA[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length];
+TB.color = (n) => typeof n !== "string" || !n || n === "대표" ? "" : n.startsWith("조교") ? "#f76707" : COLORS[n] ?? EXTRA[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % EXTRA.length];
 const wOf = (root) => (root._w ??= JSON.parse(root.dataset.w || "{}"));
 const linesW = (a, n) => Array.from({ length: n }, (_, i) => (Array.isArray(a) ? a[i] ?? "" : a ?? "")); // 예전(칸 통째 이름)도 줄마다로
-const bk = (v, a) => v.split("\n").map((l, i) => { const c = TB.color(linesW(a, i + 1)[i]); return `<span${c ? ` style="color:${c}"` : ""}>${esc(l)}</span>`; }).join("\n") + "\n";
+const span = (n, s) => { const c = TB.color(n); return `<span${c ? ` style="color:${c}"` : ""}>${esc(s)}</span>`; };
+const bk = (v, a) => v.split("\n").map((l, i) => { // 줄 who 가 [["이름", 글자 수], …] 면 글자 구간마다 색 (SIMMERGE.rechars)
+  const x = linesW(a, i + 1)[i]; if (!Array.isArray(x)) return span(x, l);
+  const cs = [...l]; let at = 0; const h = x.map(([n, c]) => span(n, cs.slice(at, (at += c)).join(""))).join("");
+  return h + (at < cs.length ? span(x.at(-1)?.[0], cs.slice(at).join("")) : "");
+}).join("\n") + "\n";
+const who1 = (x) => (Array.isArray(x) ? x.map(([n]) => n) : [x]); // 줄 who → 이름들 (범례)
 // 바뀐 줄만 내 이름: 그대로 남은 줄은 원래 쓴 사람 유지
 const relines = (prev, next, a, me) => {
   const old = prev.split("\n"), aa = linesW(a, old.length), pool = new Map();
@@ -26,7 +32,7 @@ const paint = (root) => {
   const w = wOf(root), names = [];
   root.querySelectorAll("[data-k]").forEach((el) => {
     const a = w[el.dataset.k];
-    if (el.tagName === "TEXTAREA") { const b = el.previousElementSibling; if (b?.classList.contains("tbbk")) b.innerHTML = bk(el.value, a); el.value.split("\n").forEach((l, i) => l.trim() && names.push(linesW(a, i + 1)[i])); }
+    if (el.tagName === "TEXTAREA") { const b = el.previousElementSibling; if (b?.classList.contains("tbbk")) b.innerHTML = bk(el.value, a); el.value.split("\n").forEach((l, i) => l.trim() && names.push(...who1(linesW(a, i + 1)[i]))); }
     else { el.style.color = TB.color(a); if (el.value.trim()) names.push(a); }
   });
   const leg = root.querySelector(".tbLeg");
@@ -41,7 +47,7 @@ TB.html = (st, tid, day = "") => {
   const ta = (cls, k, v, extra = "") => `<div class="tbw ${cls === "tbc" ? "wc" : "wd"}"><div class="tbbk" aria-hidden="true">${bk(v, w[k])}</div><textarea class="${cls}" data-k="${k}"${extra}>${esc(v)}</textarea></div>`;
   return `<div class="tb" data-tb="${tid}" ${day ? `data-day="${day}"` : ""} data-w="${esc(JSON.stringify(w))}">
     <div class="tbL">
-      <div class="tbLeg">${[...new Set(Object.values(w).flat())].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("")}</div>
+      <div class="tbLeg">${[...new Set(Object.values(w).flat().flatMap(who1))].filter((n) => n && n !== "대표").map((n) => `<span style="color:${TB.color(n)}">● ${esc(n)}</span>`).join("")}</div>
       <div class="tbPri"><div class="tbH">우선순위 3가지</div>${[0, 1, 2].map((i) => `<label><b>${i + 1}.</b><input data-k="p${i}"${sty(`p${i}`)} value="${esc(p[i] ?? "")}" placeholder="가장 중요한 일"></label>`).join("")}</div>
       <div class="tbDH">브레인 덤프 — 옮겨 적기</div>
       ${ta("tbDump", "body", st?.body ?? "", ` placeholder="떠오르는 걸 다 적고, 시간표로 옮겨 적어요"`)}
@@ -137,7 +143,7 @@ document.addEventListener("input", (e) => {
   const root = el.closest(".tb"), mine = root.dataset.tb === "me", tid = mine ? "me" : +root.dataset.tb, day = root.dataset.day || today();
   const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small:last-of-type");
   if (el.matches(".tbDump, .tbc")) fit(el);
-  if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? relines(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 바꾼 줄만 내 색
+  if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? SIMMERGE.rechars(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 쓴 글자만 내 색, 원래 있던 문장은 그 색 그대로
   if (who) who.textContent = "적는 중…";
   root._dirty = true; // 저장 전엔 서버 글로 안 덮음 (TB.sync)
   if (!mine) { (root._chg ??= new Set()).add(el.dataset.k); (root._send ??= new Set()).add(el.dataset.k); } // 💾 바뀐 칸만 저장·전송
@@ -222,7 +228,7 @@ TB.history = async (tid, title = "") => {
     : await sb.rpc("team_note_days", { p_team: tid }); if (fail(error)) return;
   const rows = (data ?? []).filter(filled);
   let d = document.getElementById("simRecDlg"); if (!d) { d = document.createElement("dialog"); d.id = "simRecDlg"; d.className = "wide"; document.body.appendChild(d); }
-  const names = (r) => [...new Set(Object.values(r.plan?.w ?? {}).flat())].filter((n) => n && n !== "대표");
+  const names = (r) => [...new Set(Object.values(r.plan?.w ?? {}).flat().flatMap(who1))].filter((n) => n && n !== "대표");
   const show = (i) => {
     const r = rows[i], v = d.querySelector(".srView"); d.querySelectorAll(".srList button").forEach((b) => b.classList.toggle("on", +b.dataset.sr === i));
     v.innerHTML = `<div class="srHead"><b>${md(r.day)}(${DOWS[W.parse(r.day).getDay()]})</b> <small class="mut">${r.who ? `${esc(r.who)} · ` : ""}${r.at ? `${md(r.at.slice(0, 10))} ${pad(new Date(r.at).getHours())}:${pad(new Date(r.at).getMinutes())} 마지막 저장` : ""}</small></div>${TB.html({ body: r.body, plan: r.plan }, "rec", r.day)}`;

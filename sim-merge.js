@@ -21,5 +21,18 @@ function merge3(base, mine, theirs) {
   }
   return { lines: out.map(([l]) => l), who: out.map(([, w]) => w) };
 }
-globalThis.SIMMERGE = { merge3 };
+// ✍️ 줄 안에서도 쓴 사람 나눔: 줄마다 "이름" 또는 [["이름", 글자 수], …]. 남의 문장은 그 사람 그대로, 내가 끼워 쓴 글자만 내 이름
+// rechars(직전 글, 지금 글, 직전 who(칸 통째 이름 | 줄마다), 나) → 줄마다 who. 바뀐 곳 = 앞·뒤 같은 글자 빼고 가운데
+const lineW = (a, i) => (Array.isArray(a) ? a[i] ?? "" : a ?? "");
+const charsOf = (l, x) => { const cs = [...l], r = (Array.isArray(x) ? x : [[x ?? "", cs.length]]).flatMap(([n, c]) => Array(Math.max(0, c)).fill(n)); return cs.map((_, j) => r[j] ?? r.at(-1) ?? ""); };
+const pack = (cs) => { const r = []; for (const n of cs) r.at(-1)?.[0] === n ? r.at(-1)[1]++ : r.push([n, 1]); return r.length === 1 ? r[0][0] : r; };
+function rechars(prev, next, a, me) {
+  const P = [...prev], N = [...next], who = prev.split("\n").flatMap((l, i) => [...charsOf(l, lineW(a, i)), ""]); who.pop(); // "" = 줄바꿈 자리
+  let i = 0; while (i < P.length && i < N.length && P[i] === N[i]) i++;
+  let j = 0; while (j < P.length - i && j < N.length - i && P[P.length - 1 - j] === N[N.length - 1 - j]) j++;
+  const nw = [...who.slice(0, i), ...Array(N.length - i - j).fill(me), ...who.slice(P.length - j)];
+  let at = 0;
+  return next.split("\n").map((l) => { const n = [...l].length, x = l.trim() ? pack(nw.slice(at, at + n)) : ""; at += n + 1; return x; });
+}
+globalThis.SIMMERGE = { merge3, rechars };
 })();
