@@ -102,7 +102,7 @@ function renderThumbs() {
     ${p.faced ? `<span class="face">🙂${p.edits.blurs.length || ""}</span>` : ""}
     <div class="psmv"><button type="button" data-mv="-1" data-i="${i}" title="앞으로">◀</button><button type="button" data-mv="1" data-i="${i}" title="뒤로">▶</button></div></div>`).join("");
   const n = PS.photos.length, unchecked = PS.photos.filter((p) => !p.faced).length;
-  $p("#psFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="psFaceAll">🙂 얼굴 자동 모자이크${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서 처리한 뒤 올려요</small>` : "";
+  $p("#psFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="psFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서 처리한 뒤 올려요</small>` : "";
   $p("#psRatio").innerHTML = n ? `<span class="mut">한 번에 자르기</span><span class="blseg">${[["4:5", "4:5 세로 (인스타 추천)"], ["1:1", "1:1"], ["orig", "원본"]].map(([r, t]) => `<button type="button" data-ratio="${r}">${t}</button>`).join("")}</span>` : "";
 }
 async function addFiles(files) {
@@ -118,7 +118,7 @@ async function faceAll() {
   const btn = $p("#psFaceAll"); if (btn) { btn.disabled = true; btn.textContent = "🙂 얼굴 찾는 중…"; }
   try { // 버튼은 매번 모든 사진을 다시 봄 (놓친 얼굴만 더하고, 이미 칠한 곳은 그대로)
     const n = await PHOTO.faceAll(PS.photos, true, (i, all) => btn && (btn.textContent = `🙂 얼굴 찾는 중… ${i}/${all}`));
-    toast(n ? `얼굴 ${n}개를 모자이크했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
+    toast(n ? `얼굴 ${n}개를 블러 처리했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
   } catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요. [편집]에서 직접 칠해 주세요"); }
   renderThumbs(); photosChanged();
 }

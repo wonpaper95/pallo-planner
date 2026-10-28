@@ -57,12 +57,34 @@ function cropRect(p) {
   let w = W, h = W / r; if (h > H) { h = H; w = H * r; }
   return { x: (W - w) * p.edits.ox, y: (H - h) * p.edits.oy, w, h };
 }
+// 얼굴 가리기 = 블러 (10-28 모자이크 → 블러). 아주 작게 줄였다가(얼굴 정보 날림) 부드럽게 키움 → 어느 폰에서나 흐릿한 덩어리.
+// 캔버스 블러(ctx.filter)를 아는 브라우저는 한 번 더 가우시안으로 문질러 더 매끈하게 (옛 아이폰 사파리는 몰라서 위 방식만으로도 안 보이게)
 function mosaic(ctx, x, y, w, h) {
   if (w < 2 || h < 2) return;
-  const cell = Math.max(6, Math.round(Math.max(w, h) / 9), Math.round(Math.max(ctx.canvas.width, ctx.canvas.height) / 120)), t = document.createElement("canvas"); // 작은(먼) 얼굴도 알아보지 못하게: 사진 크기에 맞춘 최소 칸
-  t.width = Math.max(1, Math.ceil(w / cell)); t.height = Math.max(1, Math.ceil(h / cell));
-  t.getContext("2d").drawImage(ctx.canvas, x, y, w, h, 0, 0, t.width, t.height);
-  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, t.width, t.height, x, y, w, h); ctx.restore();
+  const cell = Math.max(6, Math.round(Math.max(w, h) / 7), Math.round(Math.max(ctx.canvas.width, ctx.canvas.height) / 110)); // 작은(먼) 얼굴도 알아보지 못하게: 사진 크기에 맞춘 최소 크기
+  const s = document.createElement("canvas"); s.width = Math.max(2, Math.ceil(w / cell)); s.height = Math.max(2, Math.ceil(h / cell));
+  const sc = s.getContext("2d"); sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = "high"; sc.drawImage(ctx.canvas, x, y, w, h, 0, 0, s.width, s.height);
+  const m = document.createElement("canvas"); m.width = s.width * 8; m.height = s.height * 8; // 두 번에 나눠 키워야 네모 자국이 덜 남
+  const mc = m.getContext("2d"); mc.imageSmoothingEnabled = true; mc.imageSmoothingQuality = "high"; mc.drawImage(s, 0, 0, m.width, m.height);
+  const t = document.createElement("canvas"); t.width = Math.max(1, Math.round(w)); t.height = Math.max(1, Math.round(h));
+  const tc = t.getContext("2d"); tc.imageSmoothingEnabled = true; tc.imageSmoothingQuality = "high";
+  if ("filter" in tc) { const r = Math.max(2, cell * 0.6); tc.filter = `blur(${r}px)`; tc.drawImage(m, -r, -r, t.width + 2 * r, t.height + 2 * r); tc.filter = "none"; } // 가장자리까지 꽉 차게 조금 크게 그림
+  else { tc.drawImage(m, 0, 0, t.width, t.height); boxBlur(tc, t.width, t.height, Math.max(2, Math.round(cell * 0.5))); } // 옛 사파리: 직접 문지르기
+  ctx.drawImage(t, x, y, w, h);
+}
+// 상자 블러 3번 = 가우시안과 거의 같음 (가로·세로 따로, 가장자리는 끝 픽셀로 채움). 얼굴 칸만이라 가벼움
+function boxBlur(c, w, h, r) {
+  const img = c.getImageData(0, 0, w, h), a = img.data, tmp = new Uint8ClampedArray(a.length);
+  const pass = (src, dst, horiz) => {
+    const n = horiz ? w : h, m = horiz ? h : w, st = horiz ? 4 : w * 4, ln = horiz ? w * 4 : 4;
+    for (let j = 0; j < m; j++) for (let ch = 0; ch < 3; ch++) {
+      const o = j * ln + ch, at = (i) => src[o + Math.min(n - 1, Math.max(0, i)) * st];
+      let sum = 0; for (let i = -r; i <= r; i++) sum += at(i);
+      for (let i = 0; i < n; i++) { dst[o + i * st] = sum / (2 * r + 1); sum += at(i + r + 1) - at(i - r); dst[o + i * st + 3 - ch] = 255; }
+    }
+  };
+  for (let k = 0; k < 3; k++) { pass(a, tmp, true); pass(tmp, a, false); }
+  c.putImageData(img, 0, 0);
 }
 function tone(ctx, e) {
   if (!e.bright && !e.contrast) return;
@@ -146,11 +168,11 @@ function editorDom() {
   dlg = document.createElement("dialog"); dlg.id = "phEditDlg";
   dlg.innerHTML = `<h3 style="margin:0 0 8px">🖼 사진 편집 <small class="mut" id="phEdNo"></small></h3>
     <div class="tb"><span class="mut">비율</span><span class="blseg" id="phEdRatio">${Object.keys(RATIOS).map((r) => `<button type="button" data-ratio="${r}">${r === "orig" ? "원본" : r}</button>`).join("")}</span></div>
-    <div class="tb"><span class="blseg" id="phEdMode"><button type="button" data-emode="blur">🟦 모자이크 그리기</button><button type="button" data-emode="pan">✋ 자르기 위치</button></span>
-      <button type="button" class="btn ghost small" id="phEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="phEdClear">모자이크 지우기</button>
+    <div class="tb"><span class="blseg" id="phEdMode"><button type="button" data-emode="blur">🟦 블러 그리기</button><button type="button" data-emode="pan">✋ 자르기 위치</button></span>
+      <button type="button" class="btn ghost small" id="phEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="phEdClear">블러 지우기</button>
       <span class="mut">밝기</span><input type="range" id="phEdBright" min="-40" max="40" value="0"><span class="mut">대비</span><input type="range" id="phEdContrast" min="-40" max="40" value="0"></div>
     <div class="cv"><canvas id="phEdCv"></canvas></div>
-    <div class="mut" style="margin-top:6px">모자이크: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요.</div>
+    <div class="mut" style="margin-top:6px">블러: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요.</div>
     <label>사진 메모 (AI에게 알려줄 내용, 선택)</label><input id="phEdNote" placeholder="예) 토요반 프리토킹 시간, 원어민 강사">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn ghost" id="phEdCancel">취소</button><button type="button" class="btn" id="phEdSave">적용</button></div>`;
   document.body.append(dlg);

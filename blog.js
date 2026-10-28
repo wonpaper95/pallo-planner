@@ -235,7 +235,7 @@ function renderThumbs() {
     <button type="button" class="x" data-rm="${p.id}" title="빼기">✕</button><button type="button" class="ed" data-ed="${p.id}">편집</button>${p.faced ? `<span class="face">🙂${p.edits.blurs.length || ""}</span>` : ""}
     <input data-note="${p.id}" value="${esc(p.note)}" placeholder="메모"></div>`).join("");
   const n = BL.photos.length, unchecked = BL.photos.filter((p) => !p.faced).length;
-  $b("#blFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="blFaceAll">🙂 얼굴 자동 모자이크${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서만 처리돼요</small>` : "";
+  $b("#blFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="blFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서만 처리돼요</small>` : "";
 }
 function renderChips() {
   const el = $b("#blChips"); if (!el) return;
@@ -251,7 +251,7 @@ async function faceAll() {
   const btn = $b("#blFaceAll"); if (btn) { btn.disabled = true; btn.textContent = "🙂 얼굴 찾는 중…"; }
   try { // 버튼은 매번 모든 사진을 다시 봄 (놓친 얼굴만 더하고, 이미 칠한 곳은 그대로)
     const n = await PHOTO.faceAll(BL.photos, true, (i, all) => btn && (btn.textContent = `🙂 얼굴 찾는 중… ${i}/${all}`));
-    toast(n ? `얼굴 ${n}개를 모자이크했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
+    toast(n ? `얼굴 ${n}개를 블러 처리했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
   } catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요. [편집]에서 직접 칠해 주세요"); }
   renderThumbs(); if (BL.post) renderOut();
 }
@@ -388,7 +388,7 @@ function check() {
   add(todo ? "bad" : "ok", todo ? `[확인 필요] ${todo}곳 — 채우거나 지우고 발행하세요` : "[확인 필요] 없음");
   if (review) add("warn", `[강사 검수] ${review}곳 — 외국어 표현을 강사님께 확인받고 표시를 지우세요`);
   add(empty ? "warn" : "info", empty ? `사진 자리 ${empty}곳이 비어 있어요` : `사진 ${placed.length}장 (장 수는 순위와 무관 — 내용에 맞게)`);
-  if (placed.length) add(unfaced ? "warn" : "ok", unfaced ? `얼굴 확인 안 한 사진 ${unfaced}장 — 🙂 얼굴 자동 모자이크 또는 [편집]` : "사진 얼굴 확인 완료");
+  if (placed.length) add(unfaced ? "warn" : "ok", unfaced ? `얼굴 확인 안 한 사진 ${unfaced}장 — 🙂 얼굴 자동 블러 또는 [편집]` : "사진 얼굴 확인 완료");
   add(tags >= 8 && tags <= 12 ? "ok" : "warn", `해시태그 ${tags}개 (8~12개)`);
   add(cl.length >= 3 ? "warn" : "ok", cl.length >= 3 ? `AI 티 나는 표현: ${esc(cl.join(", "))}` : "AI 티 나는 상투어 적음");
   el.innerHTML = L.join("") + `<div class="info" id="blSim"><b>·</b><span>다른 글과 겹침 확인 중…</span></div>`;
