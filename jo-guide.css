@@ -13,6 +13,9 @@ body:not(.jgv) #jgView { display: none; }
 .jgcard { background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: 18px; box-shadow: var(--hi, none); padding: 14px 16px; margin-top: 12px; }
 .jgafter { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
 
+.jglang { display: inline-flex; gap: 4px; margin-left: auto; }
+.jglang button { padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--sub); font: inherit; font-size: 13px; cursor: pointer; }
+.jglang button.on { background: var(--on, var(--hover)); color: var(--text); font-weight: 600; border-color: var(--edge, var(--line)); }
 .jgtitle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
 .jgsub .must, .jgsub .add { white-space: nowrap; font-weight: 600; color: var(--text); }
 .jgtabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px 0 2px; }

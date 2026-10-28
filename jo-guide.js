@@ -9,6 +9,9 @@
   let st = load(); st.c ||= {};
   let el, opts = {}, tab = "pre", q = "";
   try { tab = localStorage.getItem("jg-tab") || "pre"; } catch {}
+  let lang = "en"; // 🇯🇵 일본어 가이드: REF 의 ja 본문을 씀. 링크 ?lang=ja 가 먼저, 없으면 이 기기에서 고른 것
+  try { lang = new URLSearchParams(location.search).get("lang") || localStorage.getItem("jg-lang") || "en"; } catch {}
+  const txt = (r) => (lang === "ja" && r.ja) || r.body;
   const REF = () => Object.fromEntries(JG.REF.map((r) => [r.id, r]));
 
   function body(lines) {
@@ -23,7 +26,7 @@
     return h + (ul ? "</ul>" : "");
   }
   const br = (r) => r.br ? ` <span class="jgbr" title="이 지점 기준이에요 — 우리 지점에 맞게 읽어요">${esc(r.br)} 기준</span>` : "";
-  const refBox = (ids, open) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${esc(r.t)}${br(r)}</summary>${body(r.body)}</details>` : ""; }).join("");
+  const refBox = (ids, open) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${esc(r.t)}${br(r)}</summary>${body(txt(r))}</details>` : ""; }).join("");
   const ck = (id, label, sub) => `<label class="jgck${st.c[id] ? " on" : ""}"><input type="checkbox" data-jgc="${id}"${st.c[id] ? " checked" : ""}><span><b>${esc(label)}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
   const doneOf = (d) => d.pass.filter((_, i) => st.c[`d${d.day}-${i}`]).length;
 
@@ -33,7 +36,8 @@
       const ok = k === "pre" ? JG.PRE.hw.every((h) => st.c[h.id]) : d && doneOf(d) === d.pass.length;
       return `<button data-jgt="${k}" class="${tab === k ? "on" : ""}${ok ? " ok" : ""}">${ok ? "✓ " : ""}${n}</button>`;
     }).join("");
-    return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · 1주일</h2>
+    return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · 1주일${lang === "ja" ? " · 일본어" : ""}</h2>
+      <div class="jglang">${[["en", "🇺🇸 영어"], ["ja", "🇯🇵 일본어"]].map(([k, n]) => `<button data-jgl="${k}" class="${lang === k ? "on" : ""}">${n}</button>`).join("")}</div>
       ${opts.standalone ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 열리는 사전숙제 링크">🔗 사전숙제 링크 복사</button>`}</div>
       <p class="jgsub">사전 준비 → 1~4일차 → 5일차부터 혼자 근무. <span class="must">🔴 필수</span> = 2시간 30분 근무도 이것만은 · <span class="add">🟡 추가</span> = 4시간 근무면 더</p>
       <nav class="jgtabs">${chips}</nav></div>`;
@@ -74,7 +78,7 @@
 
   function ref() {
     const k = q.trim().toLowerCase();
-    const hit = (r) => !k || JSON.stringify([r.t, r.ch, r.body]).toLowerCase().includes(k);
+    const hit = (r) => !k || JSON.stringify([r.t, r.ch, txt(r)]).toLowerCase().includes(k);
     const chs = [...new Set(JG.REF.map((r) => r.ch))];
     const html = chs.map((c) => { const rs = JG.REF.filter((r) => r.ch === c && hit(r)); return rs.length ? `<h4>${esc(c)}</h4>${refBox(rs.map((r) => r.id), !!k)}` : ""; }).join("");
     return `<div class="jgcard"><h3>📚 전체 가이드북 — 필요할 때 찾아보기</h3><p class="jgmut">1~4일차에 안 넣은 업무(신규 등록·결제·환불·구멤버·재무 등)도 다 여기 있어요. 처음 하는 건 매니저와 같이.</p>
@@ -92,6 +96,7 @@
   function bind() {
     el.addEventListener("click", async (e) => {
       const t = e.target.closest("[data-jgt]"); if (t) return go(t.dataset.jgt);
+      const l = e.target.closest("[data-jgl]"); if (l) { lang = l.dataset.jgl; try { localStorage.setItem("jg-lang", lang); } catch {} return render(); }
       if (e.target.closest("[data-jgscore]")) {
         const r = JG.QUIZ.map((_, i) => { const v = el.querySelector(`input[name=jgq${i}]:checked`); return v ? +v.value : null; });
         if (r.includes(null) && !confirm(`안 푼 문제가 ${r.filter((x) => x == null).length}개 있어요. 그래도 채점할까요?`)) return;
@@ -101,8 +106,8 @@
       if (e.target.closest("[data-jgretry]")) { delete st.quiz; save(); render(); el.querySelector("#jgquiz")?.scrollIntoView({ block: "start" }); return; }
       if (e.target.closest("[data-jgreset]") && confirm("이 기기의 체크와 퀴즈 점수를 모두 지울까요?")) { st = { c: {} }; save(); return render(); }
       if (e.target.closest("[data-jgcopy]")) {
-        const url = new URL("guide.html", location.href.split("?")[0]).href;
-        try { await navigator.clipboard.writeText(url); (window.toast || alert)("🔗 사전숙제 링크를 복사했어요 — 카톡에 붙여 보내세요"); } catch { prompt("이 링크를 복사해 보내세요", url); }
+        const url = new URL("guide.html", location.href.split("?")[0]).href + (lang === "ja" ? "?lang=ja" : "");
+        try { await navigator.clipboard.writeText(url); (window.toast || alert)(`🔗 ${lang === "ja" ? "일본어 " : ""}사전숙제 링크를 복사했어요 — 카톡에 붙여 보내세요`); } catch { prompt("이 링크를 복사해 보내세요", url); }
       }
     });
     el.addEventListener("change", (e) => {
