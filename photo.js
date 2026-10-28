@@ -1,4 +1,4 @@
-// 🖼 사진 공용 (블로그·게시물 탭): 읽기 · 자르기·밝기·모자이크 굽기 · 얼굴 자동 찾기 · 편집 창 · 복사 · 번호대로 받기.
+// 🖼 사진 공용 (블로그·게시물 탭): 읽기 · 자르기·밝기·모자이크·꾸미기(필터·테두리·글자·이모지) 굽기 · 얼굴 자동 찾기 · 편집 창 · 복사 · 번호대로 받기.
 // 사진 처리는 이 기기 안에서만 한다 (AI 에는 1024px 사본만). index.html 전역 toast 를 씀 → window.PHOTO
 // cropRect 는 Node 테스트(tests/photo.test.mjs)에서도 불러서, 위쪽 코드는 DOM 없이 읽혀야 한다.
 (function (root, factory) {
@@ -15,7 +15,14 @@ let seq = 0;
 
 const loadScript = (src) => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); });
 const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-const blankEdits = () => ({ ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast: 0, blurs: [] });
+const blankEdits = () => ({ ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast: 0, blurs: [], filter: "none", frame: "none", items: [] });
+// ── 꾸미기 ── 필터 값 = [채도, R·G·B 배율, 더할 밝기, 대비]
+const FILTERS = { none: "원본", warm: "따뜻하게", cool: "시원하게", vivid: "선명하게", soft: "부드럽게", mono: "흑백", vintage: "빈티지" };
+const FX = { warm: [1.05, 1.08, 1, 0.88, 6, 1], cool: [1, 0.92, 1, 1.1, 4, 1], vivid: [1.4, 1, 1, 1, 0, 1.08], soft: [0.85, 1, 1, 1, 14, 0.85], mono: [0, 1, 1, 1, 0, 1.05], vintage: [0.55, 1.08, 1, 0.82, 18, 0.88] };
+const FRAMES = { none: ["없음"], white: ["흰 테두리", "#fff"], polaroid: ["폴라로이드", "#fff"], purple: ["퍼플", "#493087"], yellow: ["옐로", "#E0D120"] };
+const COLORS = { "#ffffff": "흰색", "#111111": "검정", "#493087": "퍼플", "#E0D120": "옐로" };
+const EMOJI = ["😊", "😍", "🤣", "👍", "🔥", "✨", "🎉", "❤️", "⭐", "💬", "📚", "☕", "🌸", "🌏"];
+const TEXT_FONT = '"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif', EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 // ── 읽기 ──
 async function fromBlob(blob, name, faced = false) {
@@ -86,12 +93,39 @@ function boxBlur(c, w, h, r) {
   for (let k = 0; k < 3; k++) { pass(a, tmp, true); pass(tmp, a, false); }
   c.putImageData(img, 0, 0);
 }
+// 밝기·대비·필터 (a = RGBA 픽셀 배열, Uint8ClampedArray 라 0~255 로 알아서 잘림). Node 테스트에서도 부름
+function toneData(a, e) {
+  const [sat, kr, kg, kb, add, con] = FX[e.filter] || [1, 1, 1, 1, 0, 1], k = [kr, kg, kb];
+  const c = (100 + e.contrast) / 100 * con, b = e.bright * 2.2 + add;
+  for (let i = 0; i < a.length; i += 4) {
+    const y = 0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2];
+    for (let j = 0; j < 3; j++) a[i + j] = ((y + (a[i + j] - y) * sat) * k[j] - 128) * c + 128 + b;
+  }
+}
 function tone(ctx, e) {
-  if (!e.bright && !e.contrast) return;
-  const { width: w, height: h } = ctx.canvas, d = ctx.getImageData(0, 0, w, h), a = d.data;
-  const b = e.bright * 2.2, c = (100 + e.contrast) / 100;
-  for (let i = 0; i < a.length; i += 4) for (let k = 0; k < 3; k++) a[i + k] = Math.max(0, Math.min(255, (a[i + k] - 128) * c + 128 + b));
-  ctx.putImageData(d, 0, 0);
+  if (!e.bright && !e.contrast && !FX[e.filter]) return;
+  const { width: w, height: h } = ctx.canvas, d = ctx.getImageData(0, 0, w, h);
+  toneData(d.data, e); ctx.putImageData(d, 0, 0);
+}
+// 테두리는 자르기 칸 안쪽에 칠함 → 고른 비율(인스타 4:5 등)이 그대로 유지됨
+function frame(ctx, e, x, y, w, h) {
+  const col = FRAMES[e.frame]?.[1]; if (!col) return;
+  const t = Math.min(w, h) * 0.035, bot = e.frame === "polaroid" ? Math.min(w, h) * 0.16 : t;
+  ctx.fillStyle = col; ctx.beginPath(); ctx.rect(x, y, w, h); ctx.rect(x + t, y + t, w - 2 * t, h - t - bot); ctx.fill("evenodd");
+}
+// 글자·이모지: x·y 는 원본 사진 좌표(가운데), size 는 사진 긴 변의 % → 비율을 바꿔도 크기·자리가 안 변함
+function items(ctx, e, s, ox, oy, long) {
+  for (const it of e.items) {
+    const fs = it.size / 100 * long * s, lines = it.t.split("\n"), lh = fs * 1.25, x = (it.x - ox) * s, y = (it.y - oy) * s;
+    ctx.save(); ctx.font = it.k === "emoji" ? `${fs}px ${EMOJI_FONT}` : `800 ${fs}px ${TEXT_FONT}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)), h = lh * lines.length, dark = it.color === "#111111" || it.color === "#493087";
+    if (it.k === "text" && it.band) { ctx.fillStyle = dark ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.5)"; ctx.beginPath(); ctx.roundRect(x - w / 2 - fs * 0.4, y - h / 2 - fs * 0.15, w + fs * 0.8, h + fs * 0.3, fs * 0.3); ctx.fill(); }
+    else if (it.k === "text" && !dark) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = fs * 0.18; }
+    ctx.fillStyle = it.color; lines.forEach((l, i) => ctx.fillText(l, x, y - h / 2 + lh * (i + 0.5)));
+    ctx.restore();
+    it._box = { x: it.x - w / 2 / s, y: it.y - h / 2 / s, w: w / s, h: h / s }; // 편집 창에서 눌러 고르기용 (사진 좌표)
+  }
 }
 // 편집 반영한 사진 (crop: 자르기 적용 여부)
 function draw(p, maxSide, e = p.edits, crop = true) {
@@ -101,6 +135,8 @@ function draw(p, maxSide, e = p.edits, crop = true) {
   const ctx = cv.getContext("2d"); ctx.drawImage(p.img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
   e.blurs.forEach((r) => mosaic(ctx, (r.x - c.x) * s, (r.y - c.y) * s, r.w * s, r.h * s));
   tone(ctx, e);
+  const k = cropRect({ ...p, edits: e }); frame(ctx, e, (k.x - c.x) * s, (k.y - c.y) * s, k.w * s, k.h * s);
+  items(ctx, e, s, c.x, c.y, Math.max(W, H));
   return { cv, s, c };
 }
 async function bake(p) {
@@ -160,7 +196,7 @@ async function faceAll(list, again = false, onStep) {
 }
 
 // ── 편집 창 (처음 열 때 body 에 붙임) ──
-const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null };
+const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null, sel: null };
 let dlg = null;
 const $e = (s) => dlg.querySelector(s);
 function editorDom() {
@@ -172,7 +208,16 @@ function editorDom() {
       <button type="button" class="btn ghost small" id="phEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="phEdClear">블러 지우기</button>
       <span class="mut">밝기</span><input type="range" id="phEdBright" min="-40" max="40" value="0"><span class="mut">대비</span><input type="range" id="phEdContrast" min="-40" max="40" value="0"></div>
     <div class="cv"><canvas id="phEdCv"></canvas></div>
-    <div class="mut" style="margin-top:6px">블러: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요.</div>
+    <div class="mut" style="margin-top:6px">블러: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요. 글자·이모지는 눌러서 고르고 끌어서 옮겨요.</div>
+    <div class="deco"><b>✨ 꾸미기</b>
+      <div class="tb"><span class="mut">필터</span><span class="blseg" id="phEdFilter">${Object.entries(FILTERS).map(([k, v]) => `<button type="button" data-filter="${k}">${v}</button>`).join("")}</span></div>
+      <div class="tb"><span class="mut">테두리</span><span class="blseg" id="phEdFrame">${Object.entries(FRAMES).map(([k, v]) => `<button type="button" data-frame="${k}">${v[0]}</button>`).join("")}</span></div>
+      <div class="tb"><textarea id="phEdText" rows="1" placeholder="사진에 넣을 글자 (엔터로 줄바꿈)"></textarea><button type="button" class="btn ghost small" id="phEdAddText">✏️ 글자 넣기</button></div>
+      <div class="tb" id="phEdEmoji"><span class="mut">이모지</span>${EMOJI.map((x) => `<button type="button" class="emo" data-emo="${x}">${x}</button>`).join("")}</div>
+      <div class="tb sel" id="phEdSel" hidden><span class="mut">고른 것</span><span class="mut">크기</span><input type="range" id="phEdSize" min="2" max="30" step="0.5">
+        <span class="txo blseg" id="phEdColor">${Object.entries(COLORS).map(([k, v]) => `<button type="button" data-color="${k}" title="${v}"><i style="background:${k}"></i>${v}</button>`).join("")}</span>
+        <button type="button" class="txo btn ghost small" id="phEdBand">글자 뒤 띠</button><button type="button" class="btn ghost small" id="phEdDel">🗑 빼기</button></div>
+    </div>
     <label>사진 메모 (AI에게 알려줄 내용, 선택)</label><input id="phEdNote" placeholder="예) 토요반 프리토킹 시간, 원어민 강사">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn ghost" id="phEdCancel">취소</button><button type="button" class="btn" id="phEdSave">적용</button></div>`;
   document.body.append(dlg);
@@ -180,13 +225,13 @@ function editorDom() {
 }
 function edit(p, { title = "", onSave } = {}) {
   editorDom();
-  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave;
+  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave; ED.sel = null;
   $e("#phEdNo").textContent = title;
   $e("#phEdBright").value = ED.e.bright; $e("#phEdContrast").value = ED.e.contrast; $e("#phEdNote").value = p.note;
   dlg.showModal(); edDraw();
 }
 function edDraw() {
-  const { p, e } = ED, maxW = Math.min(940, window.innerWidth - 60), maxH = window.innerHeight * 0.55;
+  const { p, e } = ED, maxW = Math.min(940, window.innerWidth - 60), maxH = window.innerHeight * 0.5;
   const s = Math.min(maxW / p.img.naturalWidth, maxH / p.img.naturalHeight, 1); ED.s = s;
   const { cv: src } = draw(p, Math.max(p.img.naturalWidth, p.img.naturalHeight) * s, e, false);
   const cv = $e("#phEdCv"); cv.width = src.width; cv.height = src.height;
@@ -198,18 +243,39 @@ function edDraw() {
   ctx.setLineDash([5, 4]); ctx.strokeStyle = "#ffd400";
   e.blurs.forEach((r) => ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s));
   if (ED.drag?.rect) { const r = ED.drag.rect; ctx.strokeStyle = "#4dabf7"; ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s); }
+  if (ED.sel?._box) { const r = ED.sel._box, m = 6 / s; ctx.strokeStyle = "#4dabf7"; ctx.strokeRect((r.x - m) * s, (r.y - m) * s, (r.w + 2 * m) * s, (r.h + 2 * m) * s); }
   ctx.setLineDash([]);
   dlg.querySelectorAll("[data-ratio]").forEach((b) => b.classList.toggle("on", b.dataset.ratio === e.ratio));
   dlg.querySelectorAll("[data-emode]").forEach((b) => b.classList.toggle("on", b.dataset.emode === ED.mode));
+  dlg.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("on", b.dataset.filter === e.filter));
+  dlg.querySelectorAll("[data-frame]").forEach((b) => b.classList.toggle("on", b.dataset.frame === e.frame));
+  const it = ED.sel; $e("#phEdSel").hidden = !it;
+  if (it) {
+    $e("#phEdSize").value = it.size; dlg.querySelectorAll(".txo").forEach((x) => (x.hidden = it.k !== "text"));
+    dlg.querySelectorAll("[data-color]").forEach((b) => b.classList.toggle("on", b.dataset.color === it.color));
+    $e("#phEdBand").classList.toggle("on", it.band);
+  }
+}
+// 고르면 글자 칸에 그 글자를 띄움 → 칸을 고치면 바로 바뀜
+function select(it) { ED.sel = it; if (it?.k === "text") $e("#phEdText").value = it.t; }
+function addItem(k, t, size) {
+  const c = cropRect({ ...ED.p, edits: ED.e }), it = { k, t, x: c.x + c.w / 2, y: c.y + c.h / 2, size, color: "#ffffff", band: false };
+  ED.e.items.push(it); select(it); edDraw();
 }
 function edPoint(ev) { const cv = $e("#phEdCv"), r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (ev.clientX - r.left) * k / ED.s, y: (ev.clientY - r.top) * k / ED.s }; }
 function wireEditor() {
   const cv = $e("#phEdCv");
-  cv.onpointerdown = (ev) => { cv.setPointerCapture(ev.pointerId); const pt = edPoint(ev); ED.drag = { start: pt, last: pt, moved: false }; };
+  cv.onpointerdown = (ev) => {
+    cv.setPointerCapture(ev.pointerId); const pt = edPoint(ev), m = 10 / ED.s; // 손가락으로도 잡히게 둘레 여유
+    const item = ED.e.items.findLast((it) => it._box && pt.x >= it._box.x - m && pt.x <= it._box.x + it._box.w + m && pt.y >= it._box.y - m && pt.y <= it._box.y + it._box.h + m);
+    if (item) select(item);
+    ED.drag = { start: pt, last: pt, moved: false, item }; edDraw();
+  };
   cv.onpointermove = (ev) => {
     const d = ED.drag; if (!d) return; const pt = edPoint(ev);
     if (Math.abs(pt.x - d.start.x) + Math.abs(pt.y - d.start.y) > 6 / ED.s) d.moved = true;
-    if (ED.mode === "blur") d.rect = { x: Math.min(d.start.x, pt.x), y: Math.min(d.start.y, pt.y), w: Math.abs(pt.x - d.start.x), h: Math.abs(pt.y - d.start.y) };
+    if (d.item) { d.item.x += pt.x - d.last.x; d.item.y += pt.y - d.last.y; }
+    else if (ED.mode === "blur") d.rect = { x: Math.min(d.start.x, pt.x), y: Math.min(d.start.y, pt.y), w: Math.abs(pt.x - d.start.x), h: Math.abs(pt.y - d.start.y) };
     else {
       const c = cropRect({ ...ED.p, edits: ED.e }), W = ED.p.img.naturalWidth, H = ED.p.img.naturalHeight;
       if (W > c.w) ED.e.ox = Math.max(0, Math.min(1, ED.e.ox + (pt.x - d.last.x) / (W - c.w)));
@@ -219,7 +285,8 @@ function wireEditor() {
   };
   cv.onpointerup = () => {
     const d = ED.drag; ED.drag = null; if (!d) return;
-    if (ED.mode === "blur") {
+    if (!d.item && !d.moved) select(null);
+    if (!d.item && ED.mode === "blur") {
       if (d.moved && d.rect.w > 4 && d.rect.h > 4) ED.e.blurs.push(d.rect);
       else if (!d.moved) { const { x, y } = d.start, i = ED.e.blurs.findIndex((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h); if (i >= 0) ED.e.blurs.splice(i, 1); }
     }
@@ -230,6 +297,15 @@ function wireEditor() {
   $e("#phEdBright").oninput = (ev) => { ED.e.bright = +ev.target.value; edDraw(); };
   $e("#phEdContrast").oninput = (ev) => { ED.e.contrast = +ev.target.value; edDraw(); };
   $e("#phEdClear").onclick = () => { ED.e.blurs = []; edDraw(); };
+  $e("#phEdFilter").onclick = (ev) => { const f = ev.target.closest("[data-filter]")?.dataset.filter; if (f) { ED.e.filter = f; edDraw(); } };
+  $e("#phEdFrame").onclick = (ev) => { const f = ev.target.closest("[data-frame]")?.dataset.frame; if (f) { ED.e.frame = f; edDraw(); } };
+  $e("#phEdAddText").onclick = () => { const t = $e("#phEdText").value.trim(); if (!t) return toast("넣을 글자를 먼저 써 주세요"); addItem("text", t, 7); };
+  $e("#phEdEmoji").onclick = (ev) => { const t = ev.target.closest("[data-emo]")?.dataset.emo; if (t) addItem("emoji", t, 10); };
+  $e("#phEdText").oninput = (ev) => { if (ED.sel?.k === "text") { ED.sel.t = ev.target.value; edDraw(); } };
+  $e("#phEdSize").oninput = (ev) => { if (ED.sel) { ED.sel.size = +ev.target.value; edDraw(); } };
+  $e("#phEdColor").onclick = (ev) => { const c = ev.target.closest("[data-color]")?.dataset.color; if (c && ED.sel) { ED.sel.color = c; edDraw(); } };
+  $e("#phEdBand").onclick = () => { if (ED.sel) { ED.sel.band = !ED.sel.band; edDraw(); } };
+  $e("#phEdDel").onclick = () => { ED.e.items.splice(ED.e.items.indexOf(ED.sel), 1); ED.sel = null; edDraw(); };
   $e("#phEdFace").onclick = async (ev) => {
     ev.target.disabled = true; ev.target.textContent = "찾는 중…";
     try { const n = addFaces(ED.e, await findFaces(ED.p)); toast(n ? `얼굴 ${n}개를 더 찾았어요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 직접 칠해 주세요"); }
@@ -270,5 +346,5 @@ async function share(list, prefix) {
   toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
-return { RATIOS, pad, loadScript, cropRect, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
+return { RATIOS, FILTERS, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
 });

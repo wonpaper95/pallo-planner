@@ -8,3 +8,14 @@
 #phEditDlg .btn.small { padding: 5px 9px; font-size: 13px; }
 #phEditDlg .blseg button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
 #phEditDlg .blseg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#phEditDlg .deco { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
+#phEditDlg .deco .tb { margin: 6px 0; }
+#phEditDlg #phEdText { flex: 1 1 220px; min-width: 160px; resize: vertical; font: inherit; font-size: 15px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+#phEditDlg .emo { font-size: 20px; line-height: 1; padding: 4px 6px; border: 1px solid transparent; border-radius: 8px; background: none; cursor: pointer; }
+#phEditDlg .emo:hover { background: var(--hover); }
+#phEditDlg .sel { background: var(--hover); border-radius: 10px; padding: 6px 8px; }
+#phEditDlg [hidden] { display: none !important; }
+#phEditDlg [data-color] i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); margin-right: 4px; vertical-align: -1px; }
+#phEditDlg #phEdBand.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#phEditDlg .blseg { flex-wrap: wrap; } #phEditDlg .blseg button { flex: none; white-space: nowrap; }
+#phEditDlg { box-sizing: border-box; max-width: calc(100vw - 24px); }
