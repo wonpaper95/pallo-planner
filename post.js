@@ -163,16 +163,36 @@ function renderOut() {
     <div class="pssel">${C.CHANNELS.map((x) => { const jj = jobOf(x.key), b = jj ? C.badge(jj) : null;
       return `<label><input type="checkbox" data-sel="${x.key}" ${PS.sel.has(x.key) ? "checked" : ""} ${jj?.status === "done_manual" ? "disabled" : ""}> ${x.label}${b ? ` <span class="blbadge ${b.cls}">${esc(b.text)}</span>` : ""}</label>`; }).join("")}</div>
     <div class="pstabs pschs">${C.CHANNELS.map((x) => `<button type="button" data-ch="${x.key}" class="${x.key === k ? "on" : ""}">${x.label}${worst(x.key) === "bad" ? " ⚠" : ""}</button>`).join("")}</div>
+    ${goBar(k)}
     <div id="psEd">${editorHtml(k, ch)}</div>
     <div class="blcheck" id="psCheck"></div>
     <div class="blacts">
       <button type="button" class="btn" id="psCopy">📋 문구 복사</button>
       <button type="button" class="btn ghost" id="psPhotos">🖼 사진 ${k === "google" ? "1장" : "번호대로"} 받기</button>
-      <a class="btn ghost" href="${esc(linkOf(k))}" target="_blank" rel="noopener">↗ ${esc(c.label.replace(/^\S+\s/, ""))} 열기</a>
+      <a class="btn ${PS.links?.[k] ? "psgo" : "ghost"}" href="${esc(linkOf(k))}" target="_blank" rel="noopener">↗ ${PS.links?.[k] ? `${esc(PS.teamName ?? "")} ` : ""}${esc(c.label.replace(/^\S+\s/, ""))} 열기${PS.links?.[k] ? "" : " (지점 주소 없음)"}</a>
       ${doneBtn}
     </div></div>`;
   check();
 }
+// 📍 올리는 곳: 이 지점 이 채널 바로가기를 크게 — 없으면 그 자리에서 넣기
+function goBar(k) {
+  const c = chOf(k), u = PS.links?.[k], nm = c.label.replace(/^\S+\s/, "");
+  return u ? `<div class="psgobar"><a class="psgo" href="${esc(u)}" target="_blank" rel="noopener">📍 ${esc(PS.teamName ?? "")} ${esc(nm)} 올리는 곳 열기 ↗</a><span class="psgourl">${esc(u.replace(/^https?:\/\//, ""))}</span><button type="button" class="btn ghost small" data-goedit="${k}">✏️ 주소 바꾸기</button></div>`
+    : `<div class="psgobar none"><span>📍 아직 <b>${esc(PS.teamName ?? "")} ${esc(nm)}</b> 올리는 곳 주소가 없어요 — 넣어 두면 여기서 바로 열려요</span><input data-goin="${k}" placeholder="${esc(LINK_HINT[k])}"><button type="button" class="btn small" data-gosave="${k}">저장</button></div>`;
+}
+async function saveOneLink(k, raw) {
+  let u = (raw ?? "").trim(); if (!u) return toast("주소를 붙여 넣어 주세요");
+  if (!/^[a-z]+:\/\//i.test(u)) u = "https://" + u; if (!okUrl(u)) return toast("주소는 http(s)로 시작해야 해요");
+  const team = PS.team, row = (await sb.from("blog_profiles").select("data").eq("team_id", team).maybeSingle()).data; // 블로그 지점 설정을 덮어쓰지 않게 읽고 합친다
+  const L = { ...(row?.data?.links ?? {}), [k]: u };
+  const { error } = await sb.from("blog_profiles").upsert({ team_id: team, data: { ...(row?.data ?? {}), links: L }, updated_at: new Date().toISOString() }); if (fail(error)) return;
+  PS.links = L; if (window.BL?.profile && window.BL.team === team) window.BL.profile.links = L;
+  toast("📍 바로가기를 저장했어요"); renderLinks(); renderOut();
+}
+document.addEventListener("click", (e) => {
+  const s = e.target.closest?.("[data-gosave]"); if (s) return saveOneLink(s.dataset.gosave, s.parentElement.querySelector("[data-goin]").value);
+  const ed = e.target.closest?.("[data-goedit]"); if (ed) { const v = prompt(`${chOf(ed.dataset.goedit).label} 올리는 곳 주소`, PS.links?.[ed.dataset.goedit] ?? ""); if (v != null) saveOneLink(ed.dataset.goedit, v); }
+});
 function check() {
   const el = $p("#psCheck"); if (!el || !PS.post) return;
   const k = PS.ch;
