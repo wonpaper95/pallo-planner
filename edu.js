@@ -26,7 +26,7 @@ const BOOKS = [
   ["book2", "일의 격", "일하는 마인드셋에"],
   ["book3", "데일 카네기 인간관계론", "지점 사람들 대할 때"],
 ];
-const IMPROVE_N = 30;   // 지점 개선안 칸 수 (직접 적는 목록)
+const IMPROVE_N = 20;   // 지점 개선안 칸 수 (직접 적는 목록)
 // 업무 툴 세팅 체크리스트 — 입사 순서대로 (계정 → 내 컴퓨터 → 업무 도구 → 대외 채널)
 // 키는 저장된 체크가 날아가지 않게 그대로 둔다.
 const TOOLS = [
@@ -143,7 +143,7 @@ function mission(d, role) {
             `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
         </details>
       </div>
-      <div><b>필독서 ${BOOKS.length}권</b>${BOOKS.map(([k, t, why]) => {
+      <div><b>필독서 ${BOOKS.length}권</b> <span class="mut">자습 · 선택</span>${BOOKS.map(([k, t, why]) => {
         const b = (m.books || {})[k] || {};
         return `<div class="eduline book"><span>${esc(t)} <span class="mut">${why}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
       }).join("")}

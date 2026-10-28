@@ -82,7 +82,7 @@ function shell() {
     <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button><button data-bt="fb">개선사항 보내기</button></div>
     <span id="blQuota" class="mut"></span></div>
   <div id="blBody"></div>
-  <input type="file" id="blFile" accept="image/*" multiple hidden>
+  <input type="file" id="blFile" accept="image/*,.heic,.heif" multiple hidden>
   <dialog id="blConvDlg" class="wide"><h3 style="margin:0 0 8px">🔁 다른 채널용</h3><div id="blConvBody"></div>
     <div style="text-align:right;margin-top:12px"><button type="button" class="btn ghost" onclick="this.closest('dialog').close()">닫기</button></div></dialog>
   <dialog id="blStyleDlg"><h3 style="margin:0 0 4px">➕ 블로그 스타일 추가</h3><p class="mut" style="margin:0">잘 쓴다고 생각하는 네이버 블로그 글 주소를 넣으면 구조·톤·사진 리듬만 분석해서 프리셋으로 저장해요. 문장은 베끼지 않아요.</p>

@@ -9,6 +9,7 @@
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
 const JSZIP = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+const HEIC = "https://cdn.jsdelivr.net/npm/heic-to@1.6.5/dist/heic-to.js"; // 아이폰 HEIC → JPG (크롬·윈도우는 HEIC를 못 읽음, 사파리는 바로 읽음). 3MB라 HEIC 올 때만 받음
 const RATIOS = { orig: 0, "4:5": 4 / 5, "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "16:9": 16 / 9 };
 const pad = (n) => String(n).padStart(2, "0");
 let seq = 0;
@@ -27,8 +28,14 @@ async function fromBlob(blob, name, faced = false) {
 async function fromFiles(files) {
   const out = [];
   for (const f of files) {
-    if (!/^image\//.test(f.type) && !/\.(heic|heif)$/i.test(f.name)) continue;
-    try { out.push(await fromBlob(f, f.name)); } catch { toast(`${f.name}: 이 형식은 못 읽어요 (HEIC면 JPG로 바꿔서 올려 주세요)`); }
+    const heic = /hei[cf]/i.test(f.type) || /\.(heic|heif)$/i.test(f.name);
+    if (!/^image\//.test(f.type) && !heic) continue;
+    try { out.push(await fromBlob(f, f.name)); continue; } catch { if (!heic) { toast(`${f.name}: 이 형식은 못 읽어요`); continue; } }
+    try { // 이 브라우저가 HEIC를 못 읽음 → JPG로 바꿔서 다시
+      toast(`${f.name}: 아이폰 사진(HEIC)을 JPG로 바꾸는 중…`);
+      const { heicTo } = await import(HEIC);
+      out.push(await fromBlob(await heicTo({ blob: f, type: "image/jpeg", quality: 0.92 }), f.name.replace(/\.hei[cf]$/i, ".jpg")));
+    } catch (e) { console.error(e); toast(`${f.name}: HEIC를 바꾸지 못했어요. JPG로 바꿔서 올려 주세요`); }
   }
   return out;
 }

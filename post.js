@@ -41,7 +41,7 @@ function shell() {
     <span id="psQuota" class="mut"></span></div>
   <div id="psLinks" class="pslinks"></div>
   <div id="psBody"></div>
-  <input type="file" id="psFile" accept="image/*" multiple hidden>`;
+  <input type="file" id="psFile" accept="image/*,.heic,.heif" multiple hidden>`;
   wire();
 }
 
