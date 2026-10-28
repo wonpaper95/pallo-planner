@@ -292,7 +292,7 @@ async function setDone(k, done) {
 async function photosOut() {
   const list = (PS.ch === "google" ? PS.photos.slice(0, 1) : PS.photos).map((p, i) => ({ name: `${pad(i + 1)}.jpg`, blob: p.blob }));
   if (!list.length) return toast("사진이 없어요");
-  await PHOTO.share(list, `${PS.teamName}_${chOf(PS.ch).label.replace(/^\S+\s/, "")}_${kstDay()}_사진${list.length}장.zip`);
+  await PHOTO.share(list, `${PS.teamName}_${chOf(PS.ch).label.replace(/^\S+\s/, "")}_${kstDay()}`);
 }
 
 // ── 바로가기: 지점마다 인스타·구글·네이버·당근 주소를 저장해 두고 한 번에 연다 (blog_profiles.data.links — 블로그 지점 설정과 같은 줄) ──

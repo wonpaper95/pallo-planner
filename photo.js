@@ -8,7 +8,6 @@
 
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
-const JSZIP = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
 const HEIC = "https://cdn.jsdelivr.net/npm/heic-to@1.6.5/dist/heic-to.js"; // 아이폰 HEIC → JPG (크롬·윈도우는 HEIC를 못 읽음, 사파리는 바로 읽음). 3MB라 HEIC 올 때만 받음
 const RATIOS = { orig: 0, "4:5": 4 / 5, "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "16:9": 16 / 9 };
 const pad = (n) => String(n).padStart(2, "0");
@@ -236,17 +235,17 @@ async function copy(text, html) {
     const ok = document.execCommand("copy"); t.remove(); if (!ok) toast("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"); return ok;
   }
 }
-// list: [{name: "01.jpg", blob}] — 폰은 공유 시트(사진 앱 저장), 그 외는 zip 한 개
-async function share(list, zipName) {
-  const files = list.map((x) => new File([x.blob], x.name, { type: "image/jpeg" }));
+// list: [{name: "01.jpg", blob}] — 폰은 공유 시트(사진 앱 저장), 그 외는 JPG 낱장으로 받기 (이름: 앞말_01.jpg)
+async function share(list, prefix) {
+  const files = list.map((x) => new File([x.blob], `${prefix}_${x.name}`, { type: "image/jpeg" }));
   if (/iPhone|iPad|Android/i.test(navigator.userAgent) && navigator.canShare?.({ files })) {
     try { await navigator.share({ files }); return; } catch (e) { if (e.name === "AbortError") return; }
   }
-  await loadScript(JSZIP);
-  const zip = new JSZip(); files.forEach((f) => zip.file(f.name, f));
-  const a = document.createElement("a"); a.href = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
-  a.download = zipName; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요`);
+  for (const f of files) { // 크롬은 처음에 "여러 파일 다운로드 허용?"을 한 번 물어봄
+    const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000); await new Promise((r) => setTimeout(r, 300));
+  }
+  toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
 return { RATIOS, pad, loadScript, cropRect, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };

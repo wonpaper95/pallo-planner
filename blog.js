@@ -364,7 +364,7 @@ async function photosOut() {
   const list = []; let n = 0;
   BL.post.blocks.forEach((b) => { if (b.type === "photo") { n++; const p = photoOf(b.pid); if (p) list.push({ name: `${pad(n)}.jpg`, blob: p.blob }); } });
   if (!list.length) return toast("시안에 들어간 사진이 없어요");
-  await PHOTO.share(list, `${BL.teamName}_${today()}_사진${list.length}장.zip`);
+  await PHOTO.share(list, `${BL.teamName}_${today()}`);
 }
 
 // ── 발행 전 점검 ──
