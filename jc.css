@@ -1,4 +1,4 @@
-/* ✅ 조체 탭 (jc.js) */
+/* ✅ 조교체크리스트 탭 (jc.js) */
 body:not(.jcv) #jcView { display: none; }
 #jcView { max-width: 1080px; margin: 0 auto; padding: 16px 20px 100px; }
 #jcView .jcbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }

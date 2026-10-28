@@ -1,4 +1,4 @@
-// ✅ [조체] 조교 체크리스트 탭 — claude.ai 아티팩트 '조교 체크리스트'를 플래너로 옮김. 지점 공용(매니저·조교 링크·대표), 다른 기기 실시간 (DB 0060_jc)
+// ✅ [조교체크리스트] 탭 (옛 이름 조체) — claude.ai 아티팩트 '조교 체크리스트'를 플래너로 옮김. 지점 공용(매니저·조교 링크·대표), 다른 기기 실시간 (DB 0060_jc)
 // 평일오전·평일오후·주말 페이지마다: 할일 × 이번 주(월~일) 칸에 담당 조교 이름표 + 메모장 2개. 지점 공용: 조교 이름(색)·대타 명단·링크 모음
 // index.html 의 sb·me·myRole·isBoss·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.JC
 (() => {
@@ -35,7 +35,7 @@ const pinFirst = (a) => a.slice().sort((x, y) => (y.pinned ? 1 : 0) - (x.pinned 
 JC.load = async function () {
   if (admin()) { if (!JC.team) { try { JC.team = +localStorage.getItem("jc-team") || null; } catch {} } if (!teams.some((t) => t.id === JC.team)) JC.team = teams[0]?.id ?? null; }
   else JC.team = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data ?? null; // 매니저·미리보기: 우리 지점 · 조교: 링크 지점
-  if (!JC.team) { JC.shell = ""; V().innerHTML = `<div class="jcbar"><h2>✅ 조체</h2></div><div class="jcpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
+  if (!JC.team) { JC.shell = ""; V().innerHTML = `<div class="jcbar"><h2>✅ 조교체크리스트</h2></div><div class="jcpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = JC.team, mon = W.monday(today());
   const [n, tk, me2, s, l] = await Promise.all([
     sb.from("jc_names").select("*").eq("team_id", t).order("sort").order("id"),
@@ -52,7 +52,7 @@ JC.load = async function () {
   listen();
 };
 
-// ⚡ 실시간: 다른 사람이 바꾸면 0.3초 뒤 다시 읽기 (조체 탭 보고 있을 때만)
+// ⚡ 실시간: 다른 사람이 바꾸면 0.3초 뒤 다시 읽기 (조교체크리스트 탭 보고 있을 때만)
 let chan = null;
 function listen() {
   if (chan) return;
@@ -72,7 +72,7 @@ function render() {
 }
 function shell() {
   const tabs = `<nav class="jctabs">${PAGES.map(([id, label]) => `<button data-pg="${id}">${label}</button>`).join("")}</nav>`;
-  const top = `<div class="jcbar"><h2>✅ 조체 <small class="mut">조교 체크리스트 · 지점 공용 · 실시간</small></h2>
+  const top = `<div class="jcbar"><h2>✅ 조교체크리스트 <small class="mut">지점 공용 · 실시간</small></h2>
     ${admin() ? `<select id="jcTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === JC.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}</div>`;
   if (JC.page === "links") return top + tabs + `<section class="jcpanel"><h3>링크 모음</h3>
     <form class="jcform" data-f="link"><input name="label" maxlength="40" placeholder="제목 (예: 네이버 예약 관리)"><input name="url" maxlength="500" inputmode="url" placeholder="https://..."><button class="btn">추가</button></form>
