@@ -27,12 +27,14 @@ LD.load = async function () {
   const { data: rows, error } = await sb.from("leaders").select("*").eq("team_id", LD.team).order("sort").order("id");
   if (fail(error)) return;
   const ids = rows.map((r) => r.id);
-  const [a, w, mo, ce, rp] = ids.length ? await Promise.all([sb.from("leader_att").select("leader_id, day, state, sub").in("leader_id", ids).gte("day", aFrom).lte("day", aTo),
+  const [a, w, mo, ce, rp, cf] = ids.length ? await Promise.all([sb.from("leader_att").select("leader_id, day, state, sub").in("leader_id", ids).gte("day", aFrom).lte("day", aTo),
     sb.from("leader_awards").select("*").in("leader_id", ids),
     sb.from("leader_months").select("*").in("leader_id", ids).gte("month", LDC.addMonths(aFrom, -1)).lte("month", aTo),
     sb.from("leader_certs").select("*").in("leader_id", ids),
-    sb.from("leader_rapports").select("*").in("leader_id", ids).gte("month", LDC.addMonths(aFrom, -1)).lte("month", aTo).order("name")]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }]; // 지난달 라포도 (흐리게 보여 주려고)
-  if (fail(a.error || w.error || mo.error || ce.error || rp.error)) return;
+    sb.from("leader_rapports").select("*").in("leader_id", ids).gte("month", LDC.addMonths(aFrom, -1)).lte("month", aTo).order("name"),
+    sb.from("leader_confirm").select("*").in("leader_id", ids).eq("day", today())]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }]; // 지난달 라포도 (흐리게 보여 주려고)
+  if (fail(a.error || w.error || mo.error || ce.error || rp.error || cf.error)) return;
+  LD.cfm = new Map(cf.data.map((x) => [x.leader_id, x]));
   LD.raps = new Map(); rp.data.forEach((x) => { const k = `${x.leader_id}:${x.month}`; LD.raps.set(k, [...(LD.raps.get(k) ?? []), x]); });
   LD.certs = new Map(ce.data.map((x) => [`${x.leader_id}:${x.grade}`, x]));
   LD.mon = new Map(mo.data.map((x) => [`${x.leader_id}:${x.month}`, x]));
@@ -206,6 +208,7 @@ LD.render = function () {
       <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(sm)} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
     ${certTable()}
+    ${todayHtml()}
     ${mixHtml()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.cert ? `<span class="on" title="근속 6개월 2급 · 1년 1급 — 아직 발급 안 함">📜 자격증 발급 <b>${cnt.cert}</b></span>` : ""}${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
@@ -313,6 +316,19 @@ async function mixLoad() {
   const { data } = await sb.from("leader_mix").select("body, who, by_name, updated_at").eq("team_id", LD.team).eq("month", month).maybeSingle();
   LD.mix = { team: LD.team, month, body: data?.body ?? "", who: data?.who ?? [], base: data?.body ?? "", sent: null, at: data?.updated_at ?? null, by: data?.by_name ?? "" };
   mixListen();
+}
+// 📋 오늘 리더 사전 확인: 오늘 요일 반 리더를 시간대별로 · 연락해서 온다고 하면 ✅ (누가·몇 시) · 실제 출석 O/X 는 보드 출석 칸(전산 연동)
+const hm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+function todayHtml() {
+  const td = today(), dow = W.parse(td).getDay(), g = LDC.GRPS.find((x) => LDC.DAYS[x].includes(dow));
+  if (!g) return `<section class="ldtoday"><h3>📋 오늘 리더 확인 <span class="mut">${md(td)}(${dw(td)}) 수업 없음</span></h3></section>`;
+  const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && LDC.activeIn(r, td, td)).sort((a, b) => LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || a.sort - b.sort);
+  if (!rs.length) return "";
+  const ok = rs.filter((r) => r.status === "확정"), done = ok.filter((r) => LD.cfm?.has(r.id)).length;
+  const slots = [...new Set(rs.map((r) => r.slot))].map((sl) => `<div class="tdrow"><b>${esc(sl || "시간 미정")}</b>${rs.filter((r) => r.slot === sl).map((r) => { const c = LD.cfm?.get(r.id);
+    return r.status !== "확정" ? `<span class="cfm vac">🔴 ${esc(r.level || "")} 빈자리</span>`
+      : `<button class="cfm ${c ? "on" : ""}" data-cfm="${r.id}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(r.name)}${c ? ` <small>${hm(c.at)} ${esc(c.by_name)}</small>` : ""}</button>`; }).join("")}</div>`).join("");
+  return `<section class="ldtoday"><h3>📋 오늘 리더 확인 <span class="mut">${md(td)}(${dw(td)}) ${g} · 연락해서 온다고 하면 체크 · <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}명</b></span></h3>${slots}</section>`;
 }
 function mixHtml() {
   const m = LD.mix; if (!m) return "";
@@ -435,6 +451,9 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.goto) { // 현황표 → 보드의 그 줄 (지금 보기 필터·달에 없으면 알려 줌)
     const t = v.querySelector(`.ldblk tr[data-id="${b.dataset.goto}"]`); if (!t) return toast("지금 보기(필터·달)에는 없는 줄이에요 — 전체 · 오늘로 바꿔 보세요");
     t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); return setTimeout(() => t.classList.remove("flash"), 1600); }
+  if (b.dataset.cfm) { const id = +b.dataset.cfm, td = today(), c = LD.cfm.get(id); // 📋 오늘 온다 확인 · 다시 누르면 취소
+    const { data, error } = c ? await sb.from("leader_confirm").delete().match({ leader_id: id, day: td }) : await sb.from("leader_confirm").upsert({ leader_id: id, day: td, by_name: myName ?? "", at: new Date().toISOString() }).select().single(); if (fail(error)) return;
+    c ? LD.cfm.delete(id) : LD.cfm.set(id, data); return LD.render(); }
   const tr = b.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   const sm = statMonth();
   if (b.dataset.star) { if (myRole === "assistant") return toast("라포는 매니저가 매겨요"); // 그달 내 라포 · 같은 별 다시 누르면 지움 → 평균은 서버가 leader_months 에

@@ -144,3 +144,10 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .endb.del { margin-left: 4px; padding: 4px 7px; }
 #ldView .rpwho { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); white-space: nowrap; }
 #ldView .rpwho .me { color: var(--accent); font-weight: 700; }
+#ldView .ldtoday { margin-bottom: 14px; }
+#ldView .ldtoday h3 { margin: 4px 0 6px; font-size: 16px; color: var(--accent); } #ldView .ldtoday h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldtoday .on { color: #1f9d55; } #ldView .ldtoday .re { color: #e5484d; }
+#ldView .tdrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; } #ldView .tdrow > b { min-width: 64px; font-size: 13px; }
+#ldView .cfm { border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13.5px; cursor: pointer; }
+#ldView .cfm.on { border-color: #1f9d55; background: rgba(31, 157, 85, .1); } #ldView .cfm small { color: var(--sub); font-size: 11px; }
+#ldView .cfm.vac { cursor: default; color: #e5484d; border-style: dashed; }
