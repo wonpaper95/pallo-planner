@@ -20,13 +20,15 @@
       const li = typeof x === "string" && x.startsWith("• ");
       if (li && !ul) { h += "<ul>"; ul = true; } else if (!li && ul) { h += "</ul>"; ul = false; }
       if (x.table) h += `<div class="jgtw"><table>${x.table.map((r, i) => `<tr${x.hi?.includes(i) ? ' class="hi"' : ""}>${r.map((c) => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table></div>`;
-      else if (li) h += `<li>${esc(x.slice(2))}</li>`;
-      else h += `<p${x.startsWith("❗") ? ' class="jgwarn"' : ""}>${esc(x)}</p>`;
+      else if (li) h += `<li>${imp(x.slice(2))}</li>`;
+      else h += `<p${x.startsWith("❗") ? ' class="jgwarn"' : ""}>${imp(x)}</p>`;
     }
     return h + (ul ? "</ul>" : "");
   }
+  const imp = (s) => esc(s).replace(/\(중요!!\)/g, '<b class="jgimp">(중요!!)</b>'); // 전화·회신 강조
+  const shots = (r) => (r.img || []).map((f) => `<a class="jgshot" href="img/jg/${f}.jpg" target="_blank" rel="noopener"><img src="img/jg/${f}.jpg" alt="${esc(r.t)} 실제 화면" loading="lazy"></a>`).join("") + (r.img ? '<p class="jgcap">실제 전산 화면 · 이름·번호·메모는 예시로 바꿨어요 · 누르면 크게</p>' : "");
   const br = (r) => r.br ? ` <span class="jgbr" title="이 지점 기준이에요 — 우리 지점에 맞게 읽어요">${esc(r.br)} 기준</span>` : "";
-  const refBox = (ids, open) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${esc(r.t)}${br(r)}</summary>${body(txt(r))}</details>` : ""; }).join("");
+  const refBox = (ids, open) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${esc(r.t)}${br(r)}</summary>${body(txt(r))}${shots(r)}</details>` : ""; }).join("");
   const ck = (id, label, sub) => `<label class="jgck${st.c[id] ? " on" : ""}"><input type="checkbox" data-jgc="${id}"${st.c[id] ? " checked" : ""}><span><b>${esc(label)}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
   const doneOf = (d) => d.pass.filter((_, i) => st.c[`d${d.day}-${i}`]).length;
 
