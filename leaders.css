@@ -96,3 +96,20 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .endb:hover { border-color: #e5484d; color: #e5484d; background: rgba(229, 72, 77, .08); }
 #ldView .endb.back:hover { border-color: var(--accent); color: var(--accent); background: rgba(73, 48, 135, .08); }
 #ldView tr.gone td.endc { opacity: 1; }
+/* 🎨 현황표 시간대 색: 평일 오전 노랑 · 오후 주황 · 저녁 보라 · 주말 초록 · 기타 회색 */
+#ldView .ldneedtb .b-am { --bc: #c9b800; --bg2: rgba(224, 209, 32, .13); }
+#ldView .ldneedtb .b-pm { --bc: #ea8a00; --bg2: rgba(245, 158, 11, .12); }
+#ldView .ldneedtb .b-ev { --bc: #6b4fc4; --bg2: rgba(73, 48, 135, .1); }
+#ldView .ldneedtb .b-we { --bc: #30a46c; --bg2: rgba(48, 164, 108, .11); }
+#ldView .ldneedtb .b-etc { --bc: #8b8d98; --bg2: rgba(139, 141, 152, .1); }
+#ldView .ldneedtb tr[class*="b-"] td { background: var(--bg2); }
+#ldView .ldneedtb tr[data-id] td:first-child { box-shadow: inset 5px 0 0 var(--bc); }
+#ldView .ldneedtb tr.bhead td { text-align: left; font-weight: 800; color: var(--bc); font-size: 13.5px; padding: 7px 12px; border-top: 2px solid var(--bc); }
+#ldView .ldneedtb tr.bhead span { font-weight: 600; opacity: .8; margin-left: 4px; }
+#ldView .ldneedtb .bdgs { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 8px; vertical-align: middle; }
+#ldView .ldneedtb .bdg { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--bc); background: var(--bg2); border: 1px solid var(--bc); }
+#ldView .ldneedtb .slotchip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1.5px solid var(--bc); background: var(--panel); }
+#ldView .ldneedtb .slotchip .goto { color: var(--bc); text-decoration: none; }
+#ldView .ldneedtb .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; padding: 0 4px; opacity: .6; } #ldView .ldneedtb .slotedit:hover { opacity: 1; }
+#ldView .ldneedtb span.ed1 { cursor: pointer; border-radius: 5px; padding: 1px 3px; } #ldView .ldneedtb span.ed1:hover { box-shadow: 0 0 0 1.5px rgba(73, 48, 135, .4); background: rgba(73, 48, 135, .06); }
+#ldView .ldneedtb .ldin { min-width: 120px; }

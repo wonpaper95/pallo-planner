@@ -96,6 +96,13 @@ const LDC = {
     if (+mo < 1 || +mo > 12 || +d < 1 || +d > 31) return null;
     return `${y}-${String(+mo).padStart(2, "0")}-${String(+d).padStart(2, "0")}`;
   },
+  // 🎨 시간대 묶음 (구해야 함 현황표 색 구분): 평일 오전 < 12시 · 오후 12~18시 · 저녁 18시~ · 주말 · 기타(반 없음·시간 미정)
+  BANDS: [["am", "평일 오전"], ["pm", "평일 오후"], ["ev", "평일 저녁"], ["we", "주말"], ["etc", "기타"]],
+  band(r) {
+    if (r.grp === "토일") return "we";
+    const t = LDC.slotMin(r.slot);
+    return !r.grp || t >= 9999 ? "etc" : t < 720 ? "am" : t < 1080 ? "pm" : "ev";
+  },
   // 📊 기록용 고르기 칸 (DB check 와 같게)
   END_REASONS: ["취업·이직", "이사", "학업·시험", "건강", "개인 사정", "불만·갈등", "연락 두절", "기타"],
   SOURCES: ["회원 전환", "지인 추천", "알바몬", "인스타", "당근", "기타"],

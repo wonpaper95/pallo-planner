@@ -86,18 +86,25 @@ function monthCell(r, m) {
   return `<td class="m">${st.o + st.x + st.cover ? `<span class="ldo">O ${st.o}</span> <span class="ldx">X ${st.x}</span>${st.blank ? ` <span class="mut">미체크 ${st.blank}</span>` : ""}` : `<span class="mut">–</span>`}${extra ? ` ${extra}` : ""}<br>${flags(r, m)}</td>`;
 }
 
-// 🔴 맨 위 구해야 함 현황표: 지금 비어 있는 자리 전부 (보기 필터·달과 상관없이), 오래 비어 있는 순 · 팀 특이사항은 바로 적음
+// 🔴 맨 위 구해야 함 현황표: 지금 비어 있는 자리 전부 (보기 필터·달과 상관없이) · 시간대별 색으로 묶고 그 안에서 오래 비어 있는 순
+// 칸은 눌러서 바로 고침 (구해야 함 시작일·레벨·자리·이름·메모) · 반·시간대는 ✏️ → 고치기 창 · 팀 특이사항은 바로 적음
+const ed = (r, f, txt, hint) => `<span class="ed1 nf" data-f="${f}" title="누르면 고치기">${txt || `<span class="addh">+ ${hint}</span>`}</span>`;
 function needTable() {
-  const td = today(), rs = LD.rows.filter((r) => r.status === "구해야 함" && (!r.end_day || r.end_day >= td))
-    .sort((a, b) => (needDays(b) ?? 0) - (needDays(a) ?? 0) || LDC.GRPS.indexOf(a.grp) - LDC.GRPS.indexOf(b.grp) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot));
+  const td = today(), bi = (r) => LDC.BANDS.findIndex(([k]) => k === LDC.band(r));
+  const rs = LD.rows.filter((r) => r.status === "구해야 함" && (!r.end_day || r.end_day >= td))
+    .sort((a, b) => bi(a) - bi(b) || LDC.GRPS.indexOf(a.grp) - LDC.GRPS.indexOf(b.grp) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || (needDays(b) ?? 0) - (needDays(a) ?? 0));
   if (!rs.length) return `<div class="ldneedtb ok">🎉 지금 리더 빈자리 없어요</div>`;
-  const body = rs.map((r) => { const n = needDays(r);
-    return `<tr><td><b class="nd ${n >= 14 ? "long" : ""}">${n ? `${n}일째` : "–"}</b>${r.need_since ? `<small>${md(r.need_since)}부터</small>` : ""}</td>`
-      + `<td><button class="goto" data-goto="${r.id}" title="보드에서 이 줄 보기">${esc([r.grp, r.slot].filter(Boolean).join(" ") || "반 없음")}</button></td>`
-      + `<td>${esc([r.level, r.seat].filter(Boolean).join(" · ")) || `<span class="mut">–</span>`}</td>`
-      + `<td>${r.name === VACANT ? `<span class="mut">빈자리</span>` : esc(r.name)}${r.note ? `<small>${esc(r.note)}</small>` : ""}</td>`
+  const cnt = {}; rs.forEach((r) => { const k = LDC.band(r); cnt[k] = (cnt[k] ?? 0) + 1; });
+  const legend = LDC.BANDS.filter(([k]) => cnt[k]).map(([k, l]) => `<span class="bdg b-${k}">${l} ${cnt[k]}</span>`).join("");
+  let prev = "";
+  const body = rs.map((r) => { const n = needDays(r), k = LDC.band(r), first = k !== prev; prev = k;
+    return `${first ? `<tr class="bhead b-${k}"><td colspan="5">${LDC.BANDS.find(([x]) => x === k)[1]} <span>${cnt[k]}자리</span></td></tr>` : ""}`
+      + `<tr data-id="${r.id}" class="b-${k}"><td class="ed1 nf" data-f="need_since" title="누르면 구해야 함 시작일 고치기"><b class="nd ${n >= 14 ? "long" : ""}">${n ? `${n}일째` : "–"}</b>${r.need_since ? `<small>${md(r.need_since)}부터</small>` : ""}</td>`
+      + `<td><span class="slotchip b-${k}"><button class="goto" data-goto="${r.id}" title="보드에서 이 줄 보기">${esc([r.grp, r.slot].filter(Boolean).join(" ") || "반 없음")}</button><button class="slotedit" data-ldedit title="반·시간대 고치기">✏️</button></span></td>`
+      + `<td>${ed(r, "level", esc(r.level), "레벨")} · ${ed(r, "seat", esc(r.seat), "자리")}</td>`
+      + `<td>${ed(r, "name", r.name === VACANT ? `<span class="mut">빈자리</span>` : esc(r.name), "이름")}<small>${ed(r, "note", esc(r.note), "메모")}</small></td>`
       + `<td class="nn"><textarea data-nn="${r.id}" rows="1" maxlength="500" placeholder="이 팀 특이사항 — 구하는 이유 · 팀 분위기 · 원하는 리더 · 진행 상황">${esc(r.need_note ?? "")}</textarea></td></tr>`; }).join("");
-  return `<section class="ldneedtb"><h3>🔴 리더 구해야 함 현황 <span class="mut">${rs.length}자리 · 오래 비어 있는 순 · 2주 넘으면 빨강</span></h3>
+  return `<section class="ldneedtb"><h3>🔴 리더 구해야 함 현황 <span class="mut">${rs.length}자리 · 시간대별 · 2주 넘으면 빨강 · 칸 누르면 고쳐요</span></h3><div class="bdgs">${legend}</div>
     <div class="ldtw"><table><tr><th>비어 있은 지</th><th>반 · 시간대</th><th>레벨 · 자리</th><th>원래 리더 · 메모</th><th>팀 특이사항</th></tr>${body}</table></div></section>`;
 }
 
@@ -268,6 +275,7 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.edu !== undefined) { const v = !r.edu_done; // 🎓 리더교육 했는지
     const { error } = await sb.from("leaders").update({ edu_done: v }).eq("id", r.id); if (fail(error)) return; r.edu_done = v; return LD.render(); }
   if (b.dataset.end !== undefined) return endDlg(r);
+  if (b.dataset.ldedit !== undefined) return editDlg(r);
   if (b.dataset.endback !== undefined) { if (!confirm(`${r.name} 그만둠(${md(r.end_day)} · ${r.end_reason || "이유 없음"})을 취소하고 다시 활동으로 바꿀까요?`)) return;
     const { error } = await sb.from("leaders").update({ end_day: null, end_reason: "", end_note: "" }).eq("id", r.id); if (fail(error)) return; toast("다시 활동으로 바꿨어요"); return LD.load(); }
   if (b.dataset.st !== undefined) { const s = r.status === "구해야 함" ? "확정" : "구해야 함", up = { status: s };
@@ -334,14 +342,14 @@ function cellEdit(e) {
   const v = V(); if (!v || !v.contains(e.target)) return;
   const c = e.target.closest("[data-f]"), tr = c?.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r || c.querySelector("input")) return;
   const f = c.dataset.f, inp = document.createElement("input");
-  inp.className = "ldin"; if (f === "start_day") inp.type = "date"; inp.value = f === "start_day" ? LDC.parseDay(r[f]) ?? "" : r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무" }[f] ?? "";
+  inp.className = "ldin"; if (f === "start_day" || f === "need_since") inp.type = "date"; inp.value = f === "start_day" ? LDC.parseDay(r[f]) ?? "" : r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무", level: "레벨", seat: "자리" }[f] ?? "";
   c.replaceChildren(inp); inp.focus(); inp.select();
   let done = false;
   const save = async () => {
     if (done) return; done = true; const val = inp.value.trim();
     if (val === (r[f] ?? "") || (f === "name" && !val)) return LD.render();
-    const { error } = await sb.from("leaders").update({ [f]: val }).eq("id", r.id); if (fail(error)) return LD.render();
-    r[f] = val; toast("저장했어요"); LD.render();
+    const { data: nr, error } = await sb.from("leaders").update({ [f]: f === "need_since" ? val || null : val }).eq("id", r.id).select(f).single(); if (fail(error)) return LD.render(); // 구해야 함 시작일 비우면 서버가 오늘로
+    r[f] = nr[f]; toast("저장했어요"); LD.render();
   };
   inp.onkeydown = (k) => { if (k.key === "Enter" && !k.isComposing) { k.preventDefault(); save(); } if (k.key === "Escape") { done = true; LD.render(); } };
   inp.onblur = save;
