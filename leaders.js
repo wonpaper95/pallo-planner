@@ -51,7 +51,9 @@ const stars = (r, m) => { const c = mon(r, m), p = mon(r, LDC.addMonths(m, -1)),
   return `<span class="ldstars r${v ? (v <= 2 ? "low" : v === 3 ? "mid" : "high") : "none"} ${g ? "ghost" : ""}" title="${ym(m)} 라포 ${v ?? "아직"}/5${c?.rapport_by ? ` · ${esc(c.rapport_by)}` : ""}${g ? ` · 지난달 ★${g} — 이번 달도 매겨 주세요` : ""}">`
   + [1, 2, 3, 4, 5].map((i) => `<button data-star="${i}">${i <= (v ?? g ?? 0) ? "★" : "☆"}</button>`).join("") + `</span>`; };
 const nightBox = (r, m) => { const on = !!mon(r, m)?.night; return `<button class="night ${on ? "on" : ""}" data-night title="${ym(m)} 리더나잇 ${on ? "왔음" : "안 옴"} — 누르면 바뀜">${on ? "🌙" : ""}</button>`; };
-const goneTag = (r) => r.end_day ? `<span class="gonetag" title="그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}">👋 ${md(r.end_day)} 그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}</span>` : "";
+// 👋 그만둠 버튼 (줄마다 보임) → 날짜·이유 창. 그만둔 줄은 ↩️ 취소 · 빈자리 줄은 없음
+const endBtn = (r) => `<td class="endc">${r.end_day ? `<button class="endb back" data-endback title="${md(r.end_day)} 그만둠 취소 — 다시 활동">↩️ 취소</button>` : r.name === VACANT ? "" : `<button class="endb" data-end title="그만둔 날·이유 기록 (지우지 않고 남겨요)">👋 그만둠</button>`}</td>`;
+const goneTag = (r) => r.end_day ? `<span class="gonetag" title="그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}${r.end_note ? ` — ${esc(r.end_note)}` : ""}">👋 ${md(r.end_day)} 그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}</span>` : "";
 const eduBox = (r) => `<button class="edu ${r.edu_done ? "on" : ""}" data-edu title="리더교육 ${r.edu_done ? "했음" : "아직"}${r.edu ? ` · ${esc(r.edu)}` : ""} — 누르면 바뀜">${r.edu_done ? "✓" : ""}</button>`;
 // 🔴 구해야 함 + 며칠째 (구해야 함이 된 날부터, 그날 = 1일째) · 줄 색: 🚨 재관리 주황, 구해야 함 분홍
 const needDays = (r) => r.need_since ? Math.round((W.parse(today()) - W.parse(r.need_since)) / 864e5) + 1 : null;
@@ -117,21 +119,21 @@ LD.render = function () {
     for (const s of slots) {
       const rs = leaders.filter((r) => r.grp === g && r.slot === s), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
-      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
+      const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th>리더교육</th><th>🌙 리더나잇</th>` : ""}</tr>`;
       const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="level">${esc(r.level)}</td><td data-f="seat">${esc(r.seat)}</td>`
         + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
-        + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>`
+        + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : `<td class="att2">${attGrid(r, ses, g)}</td><td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `<td class="nt ed1" data-f="note" title="누르면 특이사항 적기">${r.note ? esc(r.note) : `<span class="addh">+ 적기</span>`}</td><td>${eduBox(r)}</td><td>${nightBox(r, sm)}</td>` : "") + `</tr>`).join("");
       blocks.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
     }
   }
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
-    const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
+    const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포</th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
     const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="slot">${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
       + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
-      + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>`
+      + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
       + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("")
         : `<td class="ina">${r.grp ? LDC.sessions(r.grp, from, to).map((d) => attBtn(r, d, `${md(d)}(${dw(d)})`)).join("") : `<span class="mut">–</span>`}</td><td>${flags(r, sm)}</td>`)
       + `<td class="nt ed1" data-f="note" title="누르면 특이사항 적기">${r.note ? esc(r.note) : `<span class="addh">+ 적기</span>`}</td></tr>`).join("");
@@ -145,7 +147,7 @@ LD.render = function () {
       <span class="ldact"><button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
-      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 그만두면 줄 오른쪽 클릭 → 👋 그만둠 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
+      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
 };
 
@@ -190,7 +192,7 @@ function editDlg(r) {
   };
   d.querySelector("#ldEnd")?.addEventListener("click", () => endDlg(r));
   d.querySelector("#ldBack")?.addEventListener("click", async () => {
-    const { error } = await sb.from("leaders").update({ end_day: null, end_reason: "" }).eq("id", r.id); if (fail(error)) return; d.close(); toast("다시 활동으로 바꿨어요"); LD.load();
+    const { error } = await sb.from("leaders").update({ end_day: null, end_reason: "", end_note: "" }).eq("id", r.id); if (fail(error)) return; d.close(); toast("다시 활동으로 바꿨어요"); LD.load();
   });
   d.querySelector("#ldDel")?.addEventListener("click", async () => {
     if (!confirm(`'${r.name}' 줄을 완전히 지울까요?\n잘못 넣은 줄만 지우세요. 그만둔 리더는 👋 그만둠으로 남겨야 근속·이탈 기록이 쌓여요.\n(출석·라포 기록도 같이 지워져요)`)) return;
@@ -203,13 +205,14 @@ function endDlg(r) {
     <p class="mut" style="margin:0">지우지 않고 기록으로 남겨요 — 근속일·이탈 이유·어느 달에 많이 빠지는지 분석에 쓰여요</p>
     <label>그만둔 날<input type="date" name="end_day" value="${today()}" required></label>
     <label>이유<select name="end_reason" required><option value="">고르세요</option>${LDC.END_REASONS.map((x) => `<option>${x}</option>`).join("")}</select></label>
+    <label>자세한 사유<textarea name="end_note" rows="3" maxlength="300" placeholder="예: 11월부터 회사 야근 많아짐 · 다음 학기 복귀 가능성 있음"></textarea></label>
     ${r.kind !== "staff" ? `<label>빈 자리<span><input type="checkbox" name="seat" checked> 이 자리(${esc(r.grp)} ${esc(r.slot)}) 새 리더 구해야 함 줄 만들기</span></label>` : ""}
     <div class="row"><span style="flex:1"></span><button type="button" class="btn ghost" id="ldX">취소</button><button class="btn">그만둠 기록</button></div></form>`);
   const f = d.querySelector("form");
   d.querySelector("#ldX").onclick = () => d.close();
   f.onsubmit = async (e) => {
     e.preventDefault();
-    const { error } = await sb.from("leaders").update({ end_day: f.end_day.value, end_reason: f.end_reason.value }).eq("id", r.id); if (fail(error)) return;
+    const { error } = await sb.from("leaders").update({ end_day: f.end_day.value, end_reason: f.end_reason.value, end_note: f.end_note.value.trim() }).eq("id", r.id); if (fail(error)) return;
     if (f.seat?.checked) { const { error: e2 } = await sb.from("leaders").insert({ team_id: r.team_id, kind: r.kind, grp: r.grp, slot: r.slot, level: r.level, seat: r.seat, name: VACANT, status: "구해야 함", note: `${r.name} 자리 (${md(f.end_day.value)} 그만둠)`, sort: r.sort + 0.001 });
       if (fail(e2)) return; }
     d.close(); toast("👋 그만둠 기록했어요"); LD.load();
@@ -264,6 +267,9 @@ document.addEventListener("click", async (e) => {
     LD.mon.set(`${r.id}:${sm}`, nr); return LD.render(); }
   if (b.dataset.edu !== undefined) { const v = !r.edu_done; // 🎓 리더교육 했는지
     const { error } = await sb.from("leaders").update({ edu_done: v }).eq("id", r.id); if (fail(error)) return; r.edu_done = v; return LD.render(); }
+  if (b.dataset.end !== undefined) return endDlg(r);
+  if (b.dataset.endback !== undefined) { if (!confirm(`${r.name} 그만둠(${md(r.end_day)} · ${r.end_reason || "이유 없음"})을 취소하고 다시 활동으로 바꿀까요?`)) return;
+    const { error } = await sb.from("leaders").update({ end_day: null, end_reason: "", end_note: "" }).eq("id", r.id); if (fail(error)) return; toast("다시 활동으로 바꿨어요"); return LD.load(); }
   if (b.dataset.st !== undefined) { const s = r.status === "구해야 함" ? "확정" : "구해야 함", up = { status: s };
     if (s === "확정" && r.name === VACANT) { const n = prompt("새 리더 이름은요? (오늘이 첫 시작일로 들어가요)", ""); if (!n?.trim()) return; Object.assign(up, { name: n.trim(), start_day: today() }); } // 빈 자리 줄 → 새 리더
     const { data: nr, error } = await sb.from("leaders").update(up).eq("id", r.id).select("status, need_since, name, start_day").single(); if (fail(error)) return; Object.assign(r, nr); return LD.render(); } // need_since 는 서버가 정함
