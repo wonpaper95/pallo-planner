@@ -34,7 +34,7 @@ const TOOLS = [
   ["ai", "Claude"], ["discord", "Discord"], ["gmail", "Gmail 라벨"], ["icloud", "iCloud 공유파일"],
   ["colortag", "Mac 컬러태그"], ["rectangle", "Rectangle"], ["keyrepl", "키보드 대치 세팅"],
   ["bookmark", "북마크 최적화 세팅"], ["insta", "인스타그램 계정 세팅"],
-  ["splace", "네이버 스마트플레이스 세팅"], ["nblog", "네이버 블로그 세팅"],
+  ["splace", "네이버 스마트플레이스 세팅"], ["gbp", "구글 비즈니스 프로필 세팅"], ["nblog", "네이버 블로그 세팅"], ["daangn", "당근 세팅"],
   ["meta", "META 광고 관리자 세팅"], ["alba", "알바몬·알바천국 세팅"],
 ];
 const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
