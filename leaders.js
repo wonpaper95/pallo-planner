@@ -151,7 +151,7 @@ LD.render = function () {
       <span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
-      <span class="ldact"><button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
+      <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(sm)} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 새로 매겨요</b>(흐린 별 = 지난달) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
@@ -226,6 +226,29 @@ function endDlg(r) {
   };
 }
 const VACANT = "(구하는 중)"; // 빈 자리 줄 이름 → 확정 누르면 새 리더 이름 물어봄
+// 🤖 AI 전략: 서버 함수 planner-leader-ai (Claude) 가 지점 리더 데이터를 읽고 그달 전략을 씀 · 지점·달마다 1개 저장, 다시 만들면 덮어씀
+async function aiDlg(month = statMonth()) {
+  const cur = LDC.monthStart(today()), tname = teams.find((t) => t.id === LD.team)?.name ?? (await sb.from("teams").select("name").eq("id", LD.team).maybeSingle()).data?.name ?? "우리 지점";
+  const { data: list } = await sb.from("leader_ai").select("month, text, by_name, created_at").eq("team_id", LD.team).order("month", { ascending: false }).limit(24);
+  const saved = new Map((list ?? []).map((x) => [x.month, x])), ms = [...new Set([cur, month, ...saved.keys()])].filter((m) => m <= cur).sort().reverse();
+  if (month > cur) month = cur;
+  const it = saved.get(month), fmt = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  const at = it && new Date(it.created_at);
+  const d = dlg(`<div class="ldform ldai"><h2>🤖 ${esc(tname)} 리더 AI 전략</h2>
+    <div class="row" style="margin:0;align-items:center"><select id="aiMonth">${ms.map((m) => `<option value="${m}" ${m === month ? "selected" : ""}>${m.slice(0, 4)}년 ${ym(m)}${saved.has(m) ? " ✓" : ""}</option>`).join("")}</select>
+      <span class="mut" style="flex:1">${it ? `${at.getMonth() + 1}/${at.getDate()} ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")} · ${esc(it.by_name)} 만듦` : "아직 없어요"}</span></div>
+    <div class="aitext">${it ? fmt(it.text) : `<p class="mut">이 달 출석·라포·리더나잇·공석·그만둠 기록을 AI 가 읽고 <b>공석 채우기 · 신경 쓸 리더 · 핵심 리더 · 이번 달 체크리스트</b>를 써 줘요.<br>기록이 많을수록 정확해져요. 만드는 데 1분 정도 걸려요.</p>`}</div>
+    <div class="row"><span class="mut" style="flex:1;font-size:12px">지점·달마다 하나 저장 · 다시 만들면 새 데이터로 덮어써요</span><button type="button" class="btn ghost" id="ldX">닫기</button><button type="button" class="btn" id="aiGo">${it ? "🔄 다시 만들기" : "✨ 전략 만들기"}</button></div></div>`);
+  d.querySelector("#ldX").onclick = () => d.close();
+  d.querySelector("#aiMonth").onchange = (e) => aiDlg(e.target.value);
+  d.querySelector("#aiGo").onclick = async (e) => {
+    if (it && !confirm(`${ym(month)} 전략을 지금 데이터로 다시 만들까요? (지금 것은 덮어써요)`)) return;
+    const b = e.target; b.disabled = true; b.textContent = "🤖 만드는 중… (1분 정도)";
+    const { error } = await sb.functions.invoke("planner-leader-ai", { body: { team: LD.team, month, force: !!it } });
+    if (error) { let m = "전략을 만들지 못했어요"; try { m = (await error.context.json()).error || m; } catch {} b.disabled = false; b.textContent = it ? "🔄 다시 만들기" : "✨ 전략 만들기"; return toast(m); }
+    aiDlg(month);
+  };
+}
 function pasteDlg() {
   const d = dlg(`<div class="ldform"><h2>📋 구글시트에서 붙여넣기</h2>
     <p class="mut" style="margin:0">리더 시트에서 <b>구역 제목 줄부터</b>(예: ☀️ 오전 | 월수 11AM …) 리더 줄까지 드래그해 복사(⌘C) → 아래에 붙여넣기(⌘V). 여러 구역을 한 번에 넣어도 돼요. 이름 끝 숫자(예: 김주란4+)는 라포 ⭐로 바뀌어요.</p>
@@ -260,6 +283,7 @@ document.addEventListener("click", async (e) => {
   }
   if (b.id === "ldAdd") return editDlg(null);
   if (b.id === "ldPaste") return pasteDlg();
+  if (b.id === "ldAI") return aiDlg();
   if (b.dataset.goto) { // 현황표 → 보드의 그 줄 (지금 보기 필터·달에 없으면 알려 줌)
     const t = v.querySelector(`.ldblk tr[data-id="${b.dataset.goto}"]`); if (!t) return toast("지금 보기(필터·달)에는 없는 줄이에요 — 전체 · 오늘로 바꿔 보세요");
     t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); return setTimeout(() => t.classList.remove("flash"), 1600); }

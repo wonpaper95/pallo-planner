@@ -113,3 +113,9 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldneedtb .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; padding: 0 4px; opacity: .6; } #ldView .ldneedtb .slotedit:hover { opacity: 1; }
 #ldView .ldneedtb span.ed1 { cursor: pointer; border-radius: 5px; padding: 1px 3px; } #ldView .ldneedtb span.ed1:hover { box-shadow: 0 0 0 1.5px rgba(73, 48, 135, .4); background: rgba(73, 48, 135, .06); }
 #ldView .ldneedtb .ldin { min-width: 120px; }
+#ldView .btn.ai { background: linear-gradient(135deg, #493087, #6b4fc4); color: #fff; border: 0; } /* 🤖 AI 전략 */
+#ldDlg .ldai { width: 100%; }
+#ldDlg:has(.ldai) { width: min(760px, 96vw); }
+#ldDlg .aitext { max-height: 62vh; overflow: auto; white-space: pre-wrap; line-height: 1.65; font-size: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+#ldDlg .aitext p { margin: 0; white-space: normal; }
+#ldDlg .ldai select { flex: 0 0 auto; width: auto; } #ldDlg .ldai .row .mut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
