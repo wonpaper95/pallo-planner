@@ -42,3 +42,20 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .copybox { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
 #mkView .copybox pre { white-space: pre-wrap; margin: 6px 0 0; font: inherit; font-size: 13.5px; }
 #mkView .warnline { color: #7a4b00; }
+/* 📊 일일 현황 (표는 table.mkd, 상태 칩은 .mkchip — 플래너 전역 .chip 과 이름을 분리) */
+#mkView .mkchips { display: flex; flex-wrap: wrap; gap: 4px; }
+#mkView .mkchip { padding: 2px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); white-space: nowrap; }
+#mkView .mkchip.st-ok { background: #d9f5df; color: #13692a; border-color: transparent; }
+#mkView .mkchip.st-partial, #mkView .mkchip.st-failed { background: #fff1c9; color: #7a5800; border-color: transparent; }
+#mkView .mkchip.st-login_required { background: #fde0de; color: #a3201a; border-color: transparent; }
+#mkView table.mkd td small { display: block; font-size: 11px; line-height: 1.2; }
+#mkView table.mkd .good { color: #5fd08a; }
+#mkView table.mkd .bad { color: #ff8a80; }
+#mkView table.mkd .flat { color: var(--sub); }
+:root[data-theme=light] #mkView table.mkd .good { color: #13692a; }
+:root[data-theme=light] #mkView table.mkd .bad { color: #a3201a; }
+#mkView table.mkd tr.ch td { background: var(--bg); text-align: left; }
+#mkView table.mkd tr.ch.has td { cursor: pointer; }
+#mkView table.mkd tr.sub { display: none; }
+#mkView table.mkd tbody.open tr.sub { display: table-row; }
+#mkView table.mkd tbody.core td:first-child { font-weight: 600; }

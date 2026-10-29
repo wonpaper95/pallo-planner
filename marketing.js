@@ -2,7 +2,7 @@
 // 숫자 계산은 mk-core.js(MKCORE), 문장(notes·persona)은 스킬이 쓴다. 이 화면은 CSV 올리기와 보여주기만.
 // index.html 의 sb·me·$·esc·toast·fail·isBoss·previewTeam·teams 를 씀 → window.MK
 (() => {
-const MK = (window.MK = { tab: "report", team: null, week: null, grp: null, ctab: "today", cday: null });
+const MK = (window.MK = { tab: "daily", team: null, week: null, grp: null, ctab: "today", cday: null, dteam: null });
 const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별"], ads_demo: ["mk_ad_demo", "team_id,period_from,period_to,ad_name,age,gender", "광고 연령·성별"], organic: ["mk_organic", "team_id,platform,post_id", "인스타·페북 게시물"] };
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
@@ -20,12 +20,13 @@ MK.load = async function () {
     if (!teams.some((t) => t.id === MK.team)) MK.team = teams[0]?.id ?? null;
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
-    ${admin ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ...(admin ? [["upload", "데이터 올리기"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    ${admin && MK.tab !== "daily" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
+    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ...(admin ? [["upload", "데이터 올리기"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
   if (MK.tab === "compet") return renderCompet(admin);
+  if (MK.tab === "daily") return renderDaily(admin);
   if (!MK.team) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
   if (MK.tab === "upload") return renderUpload();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
@@ -70,6 +71,70 @@ function personaHtml(d) {
     + `<div class="card"><b>근거 숫자</b><p class="mut">리드 → 상담 → 방문 → 등록: ${["lead", "consult", "visit", "enroll"].map((k) => n(d.funnel?.[k])).join(" → ")} (이탈 ${n(d.funnel?.lost)})</p>
        <p class="mut">등록자 나이대: ${dist(d.enrolledByAge)}</p><p class="mut">등록자 과목: ${dist(d.enrolledBySubject)}</p>
        <p class="mut">광고 리드 연령·성별: ${(d.leadsByAgeGender ?? []).slice(0, 6).map((x) => `${esc(x.age)} ${esc(x.gender)} ${pct(x.share)}`).join(" · ") || "–"}</p></div>`;
+}
+
+// ── 일일 현황 (mkd_*) ──
+// 맥미니가 매일 새벽 mkd_daily 에 쌓은 "어제" 숫자를 56일치 읽어 MKDCORE 로 5칸(매일·3일·주간·2주·4주)을 여기서 계산한다. 코멘트·이상 징후는 mkd_reports(daily) 에서 스킬이 쓴 것.
+const STCHIP = { ok: ["✅", "수집됨"], partial: ["⚠️", "일부만"], failed: ["⚠️", "미수집"], login_required: ["🔒", "로그인 필요"], missing: ["⚪", "데이터 없음"] };
+const FLAGICON = { red: "🔴", yellow: "🟡", gray: "⚪" };
+// PostgREST 는 한 번에 1000행까지만 준다 — 4개 지점×56일×캠페인·키워드면 넘을 수 있어 나눠 읽는다 (기본키 순서로 정렬해 쪽마다 겹치거나 빠지지 않게)
+async function mkdRows(end, team) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    let q = sb.from("mkd_daily").select("team_id,date,channel,unit,metrics,status").gte("date", MKDCORE.addDays(end, -55)).lte("date", end).order("date").order("team_id").order("channel").order("unit").range(from, from + 999);
+    if (team) q = q.eq("team_id", team);
+    const { data, error } = await q;
+    if (error) return { error };
+    out.push(...(data ?? []));
+    if ((data ?? []).length < 1000) return { rows: out };
+  }
+}
+async function renderDaily(admin) {
+  const body = $m("#mkBody");
+  MK.dteam = admin ? (MK.dteam ?? 0) : MK.team;
+  if (!admin && !MK.dteam) { body.innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
+  const last = await sb.from("mkd_daily").select("date").order("date", { ascending: false }).limit(1).maybeSingle(); // 기준일 = 가장 최근 수집일
+  if (!body.isConnected || MK.tab !== "daily") return; // 기다리는 사이 다른 탭으로 옮겼으면 그리지 않는다
+  if (fail(last.error)) return;
+  if (!last.data) { body.innerHTML = `<div class="card">아직 쌓인 데이터가 없어요. 맥미니가 매일 새벽 6시에 어제 숫자를 모아요. 급하면 Claude에게 "일일 현황 수집해줘"라고 하면 돼요.</div>`; return; }
+  const end = last.data.date;
+  const [rr, rp] = await Promise.all([mkdRows(end, MK.dteam), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle()]);
+  if (!body.isConnected || MK.tab !== "daily") return;
+  if (fail(rr.error)) return;
+  if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
+  const rep = rp.data?.data;
+  const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end), st = MKDCORE.status(rows, end);
+  // 이상 징후는 선택한 지점 것만, 대표 "전체 합계" 는 전부(지점 이름표 붙여서)
+  const flags = (Array.isArray(rep?.flags) ? rep.flags : []).filter((f) => !MK.dteam || Number(f.team_id) === MK.dteam);
+  const chips = MKDCORE.CHANNELS.map((c) => { const [i, t] = STCHIP[st[c]] ?? STCHIP.missing; return `<span class="mkchip st-${esc(st[c])}" title="${t}">${i} ${esc(MKDCORE.CHANNEL_LABEL[c])}</span>`; }).join("");
+  const teamSel = admin ? `<select id="mkdTeam"><option value="0">전체 합계</option>${teams.map((t) => `<option value="${t.id}" ${t.id === MK.dteam ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : "";
+  const repHtml = !rep ? `<div class="card"><span class="mut">${rp.error ? "코멘트·이상 징후를 못 읽었어요" : "이 날짜의 코멘트·이상 징후 리포트가 아직 없어요"}</span></div>`
+    : (rep.comment ? `<div class="card"><b>오늘 한 줄</b><p>${esc(rep.comment)}</p></div>` : "")
+      + (flags.length ? `<div class="card warn"><b>이상 징후 ${flags.length}건</b><ul>${flags.map((f) => `<li>${FLAGICON[f.level] ?? ""} ${!MK.dteam && f.team ? `<span class="tag">${esc(f.team)}</span> ` : ""}${esc(f.msg)}</li>`).join("")}</ul></div>` : `<div class="card"><span class="mut">이상 징후 없음</span></div>`);
+  body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(어제까지)</span></span><div class="mkchips">${chips}</div></div>`
+    + repHtml
+    + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
+       <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요.</p></div>`;
+  $m("#mkdTeam")?.addEventListener("change", (e) => { MK.dteam = +e.target.value; renderDaily(admin); });
+  body.querySelectorAll("tr.ch.has").forEach((tr) => tr.addEventListener("click", () => tr.closest("tbody").classList.toggle("open")));
+}
+const mkdHead = () => `<thead><tr><th>지표</th>${MKDCORE.WINDOWS.map((w) => `<th>${esc(w.label)}</th>`).join("")}</tr></thead>`;
+const mkdHas = (l) => l.cells.some((c) => c.value !== null && c.value !== undefined); // 5칸 모두 비면 줄을 숨긴다 (예: 아직 데이터가 없는 등록)
+// 칸: 값 + 증감(좋은 방향이면 good). 보류 = 표본 적음 / 비교할 직전 기간이 절반 미만이면 데이터 일수 / 직전이 충분한데 증감을 못 구하면(직전 0 등) 값만.
+function mkdCell(c, i, good, unit) {
+  if (c.value === null || c.value === undefined) return `<td>–</td>`;
+  let sub = "";
+  if (c.hold) sub = `<small class="mut">보류</small>`;
+  else if (c.change === null || c.change === undefined) { if (n(c.prevDays) * 2 < MKDCORE.WINDOWS[i].days) sub = `<small class="mut">${n(c.days)}일</small>`; }
+  else { const p = Math.round(n(c.change) * 100), up = p > 0; sub = `<small class="${p === 0 ? "flat" : up === (good === "up") ? "good" : "bad"}">${p === 0 ? "=" : up ? "▲" : "▼"}${Math.abs(p)}%</small>`; }
+  return `<td>${esc(MKDCORE.fmt(c.value, unit))}${sub}</td>`;
+}
+const mkdLine = (l, prefix, cls = "") => `<tr class="${cls}"><td>${prefix ? `<span class="mut">${esc(prefix)} › </span>` : ""}${esc(l.label)}</td>${l.cells.map((c, i) => mkdCell(c, i, l.good, l.unit)).join("")}</tr>`;
+function mkdChannel(ch) {
+  const lines = ch.metrics.filter(mkdHas), units = ch.units.map((u) => ({ unit: u.unit, metrics: u.metrics.filter(mkdHas) })).filter((u) => u.metrics.length);
+  return `<tbody><tr class="ch${units.length ? " has" : ""}"><td colspan="6"><b>${esc(ch.label)}</b>${units.length ? `<span class="mut"> · 세부 ${units.length}개 ▾</span>` : ""}</td></tr>
+    ${lines.map((l) => mkdLine(l, "")).join("") || `<tr><td colspan="6" class="mut">이 기간엔 숫자가 없어요</td></tr>`}
+    ${units.map((u) => `<tr class="sub"><td colspan="6" class="mut">↳ ${esc(u.unit)}</td></tr>${u.metrics.map((l) => mkdLine(l, "", "sub")).join("")}`).join("")}</tbody>`;
 }
 
 // ── 경쟁사 광고 정찰 (mkc_*) ──
