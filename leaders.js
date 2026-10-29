@@ -76,6 +76,17 @@ const rowCls = (r, m) => `${r.status === "구해야 함" ? "need" : ""} ${stat(r
 const nameCell = (r) => `<td class="nm"><b data-f="name">${esc(r.name)}</b>${goneTag(r)}${r.phone ? `<span class="ph"><span data-f="phone">${esc(r.phone)}</span><a href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}" title="전화 걸기">📞</a></span>` : `<span class="ph ed1 addh" data-f="phone" title="누르면 전화번호 적기">+ 전화</span>`}</td>`;
 const cov = (r, m) => LD.cover.get(r.id)?.get(m) ?? 0;
 const stat = (r, m) => LDC.monthStat(r.grp, m, LD.att.get(r.id), today(), cov(r, m));
+// ↩ 출석 되돌리기: 칸을 누른 뒤 8초 동안 아래에 [되돌리기] — 누르기 전 상태(비움·O·X·대타)로
+const setAtt = (id, d, st, sub) => st ? sb.from("leader_att").upsert({ leader_id: id, day: d, state: st, sub: sub ?? "", by_name: myName ?? "", at: new Date().toISOString() })
+  : sb.from("leader_att").delete().eq("leader_id", id).eq("day", d);
+const attLabel = (st, sub) => !st ? "비움" : st === "X" && sub ? `대타(${sub})` : st;
+function undoBar(msg, undo) {
+  let el = document.getElementById("ldUndo");
+  if (!el) { el = document.body.appendChild(Object.assign(document.createElement("div"), { id: "ldUndo" })); el.className = "hidden"; }
+  el.innerHTML = `<span>${esc(msg)}</span><button type="button">↩ 되돌리기</button>`;
+  el.classList.remove("hidden"); clearTimeout(undoBar.t); undoBar.t = setTimeout(() => el.classList.add("hidden"), 8000);
+  el.querySelector("button").onclick = async () => { el.classList.add("hidden"); const { error } = await undo(); if (!fail(error)) { toast("↩ 되돌렸어요"); LD.load(); } };
+}
 // 출석 버튼: 누르면 O → X → X+대타(이름) → 비움
 const attBtn = (r, d, label = "") => { const s = LD.att.get(r.id)?.get(d) ?? "", sb_ = LD.subs.get(r.id)?.get(d) ?? "", fut = d > today();
   return `<button class="att ${s === "O" ? "o" : s === "X" ? "x" : ""} ${sb_ ? "sub" : ""} ${fut ? "fut" : ""} ${d === today() ? "tdy" : ""}" data-att="${d}" title="${md(d)}(${dw(d)})${sb_ ? ` 대타 ${esc(sb_)}` : ""} · 누르면 O → X → 대타 → 비움">${label ? `<small>${label}</small>` : ""}${s || "·"}${sb_ ? `<i>${esc(sb_)}</i>` : ""}</button>`; };
@@ -214,7 +225,7 @@ LD.render = function () {
     ${todayHtml()}
     ${mixHtml()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.cert ? `<span class="on" title="근속 6개월 2급 · 1년 1급 — 아직 발급 안 함">📜 자격증 발급 <b>${cnt.cert}</b></span>` : ""}${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
-      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
+      <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 (잘못 누르면 아래 <b>↩ 되돌리기</b>) · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
 };
 
@@ -486,9 +497,10 @@ document.addEventListener("click", async (e) => {
     let nx = cur === "" ? "O" : cur === "O" ? "X" : "", sub = "";
     if (cur === "X" && !cs) { const v = prompt(`${md(d)}(${dw(d)}) ${r.name} 대신 누가 와줬나요? (대타 이름 — 그 리더는 출석으로 인정돼요)\n비우고 확인하면 기록을 지워요`, ""); if (v === null) return;
       if (v.trim()) { nx = "X"; sub = v.trim().slice(0, 40); } }
-    const { error } = nx ? await sb.from("leader_att").upsert({ leader_id: r.id, day: d, state: nx, sub, by_name: myName ?? "", at: new Date().toISOString() })
-      : await sb.from("leader_att").delete().eq("leader_id", r.id).eq("day", d);
-    if (fail(error)) return; return LD.load(); // 대타 인정은 다른 리더 줄에도 반영돼서 다시 불러옴
+    const { error } = await setAtt(r.id, d, nx, sub);
+    if (fail(error)) return;
+    undoBar(`${md(d)} ${r.name}: ${attLabel(cur, cs)} → ${attLabel(nx, sub)}`, () => setAtt(r.id, d, cur, cs)); // ↩ 잘못 눌렀을 때 (신고 10-29 올리비아)
+    return LD.load(); // 대타 인정은 다른 리더 줄에도 반영돼서 다시 불러옴
   }
   if (b.dataset.aw) { const k = `${r.id}:${b.dataset.aw}`, aw = LD.awards.get(k);
     if (aw) { if (!confirm(`${ym(b.dataset.aw)} 개근 혜택 기록을 지울까요? (${aw.by_name} · ${aw.note || "메모 없음"})`)) return;
