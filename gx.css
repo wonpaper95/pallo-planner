@@ -1,0 +1,46 @@
+/* 🌏 언어교환 탭 (gx.js) */
+body:not(.gxv) #gxView { display: none; }
+#gxView { max-width: 1280px; margin: 0 auto; padding: 16px 20px 100px; }
+#gxView .gxbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+#gxView .gxbar h2 { margin: 0; }
+#gxView select, #gxView input, #gxView textarea { padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; }
+#gxView .gxsub { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; }
+#gxView .gxsub button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub); font: inherit; font-weight: 600; cursor: pointer; }
+#gxView .gxsub button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#gxView .gxsub button.on .mut { color: #fff; opacity: .8; }
+#gxView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
+#gxView .gxlay { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; align-items: start; }
+@media (max-width: 1300px) { #gxView .gxlay { grid-template-columns: 1fr; } }
+#gxView .gxlist > input { width: 100%; margin-bottom: 10px; }
+#gxView .gxlist .card { overflow-x: auto; padding: 4px 10px; }
+#gxView .gxt { width: 100%; border-collapse: collapse; font-size: 13px; }
+#gxView .gxt th { text-align: left; color: var(--sub); font-weight: 600; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#gxView .gxt td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#gxView .gxt tr:last-child td { border-bottom: 0; }
+#gxView .gxt tbody tr[data-id] { cursor: pointer; } #gxView .gxt tbody tr[data-id]:hover, #gxView .gxt tr.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#gxView .gxtag { display: inline-block; padding: 1px 8px; margin: 1px 3px 1px 0; border-radius: 999px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); white-space: nowrap; }
+#gxView .gxtag.confirmed, #gxView .gxtag.matched { background: #E0D120; color: #1d1d1f; }
+#gxView .gxtag.attended { background: #493087; color: #fff; }
+#gxView .gxtag.cancelled { opacity: .5; text-decoration: line-through; }
+@media (max-width: 1300px) { #gxView .gxpanel { position: static; max-height: none; } }
+#gxView .gxpanel { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; padding: 14px; }
+#gxView .gxpanel h3 { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px; font-size: 16px; }
+#gxView .gxpanel dl { display: grid; grid-template-columns: 96px 1fr; gap: 4px 10px; margin: 0 0 12px; font-size: 13px; }
+#gxView .gxpanel dt { color: var(--sub); } #gxView .gxpanel dd { margin: 0; word-break: break-word; }
+#gxView .gxctl { display: flex; gap: 6px; align-items: flex-start; margin: 8px 0; }
+#gxView .gxctl textarea { flex: 1; min-height: 52px; resize: vertical; }
+#gxView .gxapp { border-top: 1px solid var(--line); padding: 10px 0; }
+#gxView .gxapp pre { white-space: pre-wrap; font: inherit; font-size: 12px; color: var(--sub); margin: 8px 0; }
+#gxView .gxmt { background: var(--bg); border-radius: 10px; padding: 10px; margin-top: 8px; display: grid; gap: 6px; }
+#gxView .gxh { font-size: 12px; color: var(--sub); margin-top: 4px; }
+#gxView .gxmrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+#gxView .gxmrow .btn { padding: 4px 10px; flex: none; }
+#gxView .gxdel { color: #d93025; margin-top: 12px; }
+#gxView .gxempty { padding: 30px; text-align: center; }
+#gxView .gxevf { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr auto; gap: 8px; padding: 12px 14px; }
+@media (max-width: 800px) { #gxView .gxevf { grid-template-columns: 1fr 1fr; } }
+#gxView .gxlinks { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+#gxView .gxlc { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
+#gxView .gxlc > div:last-child { min-width: 0; display: grid; gap: 4px; justify-items: start; }
+#gxView .gxlc code { font-size: 11px; color: var(--sub); word-break: break-all; }
+#gxView .gxqr { flex: none; background: #fff; padding: 6px; border-radius: 8px; width: 122px; height: 122px; }

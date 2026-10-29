@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#493087">
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg"><link rel="manifest" href="manifest.json">
+<title>PALLO! · Programs for Foreigners</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<header><a class="logo" href="./" aria-label="PALLO!"><img src="brand/sig-h.svg" alt="PALLO!"></a><button id="restart" hidden>Start over</button></header>
+<main>
+
+<section class="screen on" id="s-welcome">
+  <div class="hero">
+    <img class="symbol" src="brand/symbol.svg" alt="">
+    <h1>Welcome to PALLO!</h1>
+    <p>Join Korean classes, meet Korean friends, and take part in events.</p>
+    <img class="slogan" src="brand/slogan-en.svg" alt="The stage for you">
+  </div>
+  <p class="muted" style="text-align:center">It takes about 2 minutes. First, tell us a bit about yourself.</p>
+  <div id="returning" hidden>
+    <div class="who">Welcome back, <b id="ret-name"></b>! <a href="#" data-go="basic">Not you?</a></div>
+    <button class="btn" data-go="menu">Continue</button>
+  </div>
+  <button class="btn yellow" id="start" data-go="basic">Get started</button>
+</section>
+
+<section class="screen" id="s-basic">
+  <h2>Basic information</h2>
+  <form id="f-basic">
+    <label>Full name <input type="text" name="name" required></label>
+    <label>Phone number <input type="tel" name="phone" required placeholder="010-1234-5678"></label>
+    <label>Email <input type="email" name="email" required></label>
+    <label>Which Pallo branch? <select name="branch" required></select></label>
+    <label>Nationality <input type="text" name="nationality" required></label>
+    <label>Gender
+      <select name="gender"><option value="">Select</option><option>Female</option><option>Male</option><option>Other / prefer not to say</option></select></label>
+    <label>Age range
+      <select name="age_range"><option value="">Select</option><option>Under 20</option><option>20s</option><option>30s</option><option>40s</option><option>50+</option></select></label>
+    <label>Do you currently live in Korea?
+      <select name="lives_in_korea"><option value="">Select</option><option value="true">Yes</option><option value="false">No, visiting</option></select></label>
+    <label>How long have you lived in Korea?
+      <select name="korea_duration"><option value="">Select</option><option>Less than 3 months</option><option>3–12 months</option><option>1–3 years</option><option>3+ years</option><option>Not living in Korea</option></select></label>
+    <label>Korean level
+      <select name="korean_level"><option value="">Select</option><option>Zero</option><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option>Native</option></select></label>
+    <label>English level
+      <select name="english_level"><option value="">Select</option><option>Native</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option><option>None</option></select></label>
+    <label>Languages you speak <input type="text" name="languages_spoken" placeholder="e.g. English, Spanish"></label>
+    <label>Languages you want to learn <input type="text" name="languages_learning" placeholder="e.g. Korean"></label>
+    <label>How did you hear about Pallo?
+      <select name="referral_source"><option value="">Select</option><option>Instagram</option><option>Google</option><option>Friend</option><option>Walked by</option><option>Other</option></select></label>
+    <label class="consent"><input type="checkbox" name="consent" required>
+      <span>I agree to the collection and use of my personal information (name, contact, nationality, language info) by Pallo for program registration and management. Data is kept until you ask us to delete it.</span></label>
+    <div class="err" id="e-basic"></div>
+    <button class="btn" type="submit">Continue</button>
+  </form>
+</section>
+
+<section class="screen" id="s-menu">
+  <h2>What do you want to do?</h2>
+  <p class="muted">Pick one. You can come back and apply for more later.</p>
+  <a class="card" data-go="korean_class"><span class="em">🇰🇷</span><span><b>Korean Class</b><br><span class="muted">Learn Korean with other foreigners</span></span></a>
+  <a class="card" data-go="language_exchange"><span class="em">🤝</span><span><b>1:1 Language Exchange</b><br><span class="muted">Get matched with a Korean partner</span></span></a>
+  <a class="card" data-go="socializing"><span class="em">🗣</span><span><b>Socializing</b><br><span class="muted">Join our English conversation study with Koreans</span></span></a>
+  <a class="card" data-go="events"><span class="em">🎉</span><span><b>Events</b><br><span class="muted">Parties, culture exchange, social events</span></span></a>
+</section>
+
+<!-- ①  Korean Class -->
+<section class="screen" id="s-korean_class">
+  <h2>🇰🇷 Korean Class</h2>
+  <p id="kc-intro"></p>
+  <dl class="info" id="kc-info"></dl>
+  <form id="f-korean_class" data-program="korean_class">
+    <div class="who"></div>
+    <label>Which class? <select name="level" id="kc-level" required></select></label>
+    <label>Anything we should know? (optional) <textarea name="message" placeholder="Your goals, preferred start date, questions..."></textarea></label>
+    <div class="err"></div>
+    <button class="btn" type="submit">Apply for Korean Class</button>
+    <a class="btn ghost" data-go="menu">Back</a>
+  </form>
+</section>
+
+<!-- ②  Language Exchange -->
+<section class="screen" id="s-language_exchange">
+  <h2>🤝 1:1 Language Exchange</h2>
+  <p>We match you with a Korean member who wants to learn your language. You help each other. Free.</p>
+  <p class="muted">Tell us your preferences. Our staff will review and contact you when we find a good match.</p>
+  <form id="f-language_exchange" data-program="language_exchange">
+    <div class="who"></div>
+    <label>Your English / other language level
+      <select name="other_language_level"><option>Native</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select></label>
+    <label>Preferred exchange style
+      <select name="exchange_style"><option>Casual conversation</option><option>Structured study (textbook / topics)</option><option>Mixed</option></select></label>
+    <label>Preferred partner (optional) <input type="text" name="preferred_partner" placeholder="e.g. similar age, any gender, interested in music"></label>
+    <label>Available days</label>
+    <div class="chips" data-name="available_days">
+      <label><input type="checkbox" value="Mon"><span>Mon</span></label><label><input type="checkbox" value="Tue"><span>Tue</span></label>
+      <label><input type="checkbox" value="Wed"><span>Wed</span></label><label><input type="checkbox" value="Thu"><span>Thu</span></label>
+      <label><input type="checkbox" value="Fri"><span>Fri</span></label><label><input type="checkbox" value="Sat"><span>Sat</span></label>
+      <label><input type="checkbox" value="Sun"><span>Sun</span></label>
+    </div>
+    <label>Available times</label>
+    <div class="chips" data-name="available_times">
+      <label><input type="checkbox" value="Morning"><span>Morning</span></label><label><input type="checkbox" value="Afternoon"><span>Afternoon</span></label>
+      <label><input type="checkbox" value="Evening"><span>Evening</span></label>
+    </div>
+    <label>How often?
+      <select name="frequency"><option>Once a week</option><option>Twice a week</option><option>Every other week</option><option>Flexible</option></select></label>
+    <label>Online or offline?
+      <select name="mode"><option>Offline (at Pallo)</option><option>Online</option><option>Either</option></select></label>
+    <label>Other requests (optional) <textarea name="note"></textarea></label>
+    <div class="err"></div>
+    <button class="btn" type="submit">Request a match</button>
+    <a class="btn ghost" data-go="menu">Back</a>
+  </form>
+</section>
+
+<!-- ③  Socializing -->
+<section class="screen" id="s-socializing">
+  <h2>🗣 Socializing</h2>
+  <dl class="info">
+    <dt>What is it?</dt><dd>Join Pallo's English conversation study as a guest. Koreans practice English with you; you make Korean friends and use Korean naturally.</dd>
+    <dt>How it works</dt><dd>Small tables of 4–6 people. A host leads with topic cards. Half English, half free talk.</dd>
+    <dt>Timetable</dt><dd>Mon–Fri 19:30, Sat 14:00 (placeholder)</dd>
+    <dt>Length</dt><dd>About 90 minutes</dd>
+    <dt>Branches</dt><dd id="branch-list"></dd>
+    <dt>Fee</dt><dd>Free for first visit (placeholder)</dd>
+    <dt>Notes</dt><dd>Please book at least 1 day before. Be on time, the host will introduce you.</dd>
+  </dl>
+  <form id="f-socializing" data-program="socializing">
+    <div class="who"></div>
+    <label>Branch <select name="branch" required></select></label>
+    <label>Preferred days</label>
+    <div class="chips" data-name="days">
+      <label><input type="checkbox" value="Mon"><span>Mon</span></label><label><input type="checkbox" value="Tue"><span>Tue</span></label>
+      <label><input type="checkbox" value="Wed"><span>Wed</span></label><label><input type="checkbox" value="Thu"><span>Thu</span></label>
+      <label><input type="checkbox" value="Fri"><span>Fri</span></label><label><input type="checkbox" value="Sat"><span>Sat</span></label>
+    </div>
+    <label>Preferred times</label>
+    <div class="chips" data-name="times">
+      <label><input type="checkbox" value="Afternoon"><span>Afternoon</span></label><label><input type="checkbox" value="Evening"><span>Evening</span></label>
+    </div>
+    <label>English level
+      <select name="english_level"><option>Native</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select></label>
+    <label>Other requests (optional) <textarea name="note"></textarea></label>
+    <div class="err"></div>
+    <button class="btn" type="submit">Apply to join</button>
+    <a class="btn ghost" data-go="menu">Back</a>
+  </form>
+</section>
+
+<!-- ④  Events -->
+<section class="screen" id="s-events">
+  <h2>🎉 Events</h2>
+  <p>Parties, culture exchange, and social events with Korean members.</p>
+  <a class="btn ghost" id="ig" target="_blank" rel="noopener">📸 See what's on now · Instagram</a>
+  <div id="event-list"><p class="muted">Loading…</p></div>
+  <a class="btn ghost" data-go="menu">Back</a>
+</section>
+
+<section class="screen" id="s-event_apply">
+  <h2 id="ev-title"></h2>
+  <form id="f-event" data-program="event">
+    <div class="who"></div>
+    <input type="hidden" name="event_id">
+    <label>Anything we should know? (optional) <textarea name="note" placeholder="Bringing a friend? Dietary needs?"></textarea></label>
+    <div class="err"></div>
+    <button class="btn" type="submit">Apply for this event</button>
+    <a class="btn ghost" data-go="events">Back</a>
+  </form>
+</section>
+
+<section class="screen done" id="s-done">
+  <img class="symbol" src="brand/symbol.svg" alt="">
+  <h2>You're in! 🎉</h2>
+  <p id="done-msg"></p>
+  <p class="muted">Our staff will contact you by phone or email. Questions? Ask at the front desk or DM us on Instagram.</p>
+  <button class="btn" data-go="menu">Apply for another program</button>
+</section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const C = window.CONFIG;
+const db = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_ANON_KEY, { auth: { persistSession: false } }); // 플래너와 같은 주소라 직원 로그인 세션을 건드리지 않게
+const $ = s => document.querySelector(s);
+const KEY = 'cg_member';
+let member = null;
+try { member = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+
+
+
+const LABELS = { korean_class: 'Korean Class', language_exchange: '1:1 Language Exchange', socializing: 'Socializing', event: 'the event' };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-' + id));
+  $('#restart').hidden = id === 'welcome';
+  window.scrollTo(0, 0);
+  if (id === 'events') loadEvents();
+  if (id === 'korean_class') renderKC();
+  if (['korean_class','language_exchange','socializing','event_apply'].includes(id) && !member) return show('basic');
+  document.querySelectorAll('.who').forEach(w => w.innerHTML = member ? `Applying as <b>${esc(member.name)}</b> · ${esc(member.phone)} <a href="#" data-go="basic">Edit</a>` : '');
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-go]');
+  if (t) { e.preventDefault(); show(t.dataset.go); }
+});
+$('#restart').onclick = () => { localStorage.removeItem(KEY); member = null; location.reload(); };
+
+// ---- deep link: ?p=korean_class|language_exchange|socializing|events → skip menu after basic info
+const DEEP = new URLSearchParams(location.search).get('p');
+const DEEP_OK = ['korean_class','language_exchange','socializing','events'].includes(DEEP) ? DEEP : null;
+
+
+// ---- Korean Class info per branch (edit text here)
+const KC = {
+  'daegu-en': {
+    intro: 'Want to learn Korean and actually use it in real conversations? 🇰🇷✨ Join the Pallo Korean Class and improve your Korean with a level-based program designed for international learners.',
+    schedule: [
+      ['Pre-Beginner', 'Mon & Wed', '7:00–8:00 PM'],
+      ['Beginner', 'Tue & Thu', '8:00–9:00 PM'],
+      ['Intermediate 1', 'Tue & Thu', '7:00–8:00 PM'],
+      ['Intermediate 2', 'Mon & Wed', '8:00–9:00 PM'],
+      ['Free Talking', 'Tue & Thu', '6:00–7:00 PM'],
+    ],
+    length: '60 minutes per class, twice a week',
+    location: 'Pallo Daegu · Dongseong-ro',
+    format: 'Offline, level-based small group. 🇰🇷 Learn Korean · 🗣️ Practice speaking · 🤝 Meet new people · ✨ Enjoy Korean culture together',
+    learn: 'Whether you are just starting Korean or want to become more comfortable speaking, there is a class for you.',
+    fee: 'Registration fee KRW 30,000 — one-time payment upon registration',
+    join: 'Pick your class below and apply. We will contact you by phone or email to confirm your level and start date.',
+    cancel: 'Apply here. To cancel or change class, message us at least 1 day before.',
+    notes: 'Please arrive 5 minutes early. Classes may be rescheduled on public holidays.',
+  },
+};
+KC.default = {
+  intro: 'A small-group Korean class for foreigners living in or visiting Korea. Practical, conversation-first.',
+  schedule: [['Korean Class', 'Every Saturday (placeholder)', '14:00–15:30']],
+  length: '90 minutes per class', location: 'Ask at the front desk', format: 'Offline, small group (max 8).',
+  learn: 'Survival Korean, daily conversation, reading Hangul, cultural tips.', fee: 'Ask at the front desk',
+  join: 'Apply below. We will contact you by phone or email to confirm your level and start date.',
+  cancel: 'To cancel, message us at least 1 day before class.', notes: 'Please arrive 5 minutes early.',
+};
+function renderKC() {
+  const b = (member && member.branch) || DEEP_B || $('#f-basic select[name=branch]').value || 'daegu-en';
+  const k = KC[b] || KC.default;
+  $('#kc-intro').textContent = k.intro;
+  $('#kc-info').innerHTML = `
+    <dt>Class schedule</dt><dd>${k.schedule.map(([l, d, t]) => `🔹 <b>${esc(l)}</b><br>&nbsp;&nbsp;&nbsp;${esc(d)} | ${esc(t)}`).join('<br>')}</dd>
+    <dt>Length</dt><dd>${esc(k.length)}</dd>
+    <dt>Location</dt><dd>${esc(k.location)}</dd>
+    <dt>Format</dt><dd>${esc(k.format)}</dd>
+    <dt>Who is it for</dt><dd>${esc(k.learn)}</dd>
+    <dt>💰 Fee</dt><dd>${esc(k.fee)}</dd>
+    <dt>How to join</dt><dd>${esc(k.join)}</dd>
+    <dt>Apply / cancel</dt><dd>${esc(k.cancel)}</dd>
+    <dt>Notes</dt><dd>${esc(k.notes)}</dd>`;
+  $('#kc-level').innerHTML = k.schedule.map(([l, d, t]) => `<option>${esc(l)} (${esc(d)} ${esc(t)})</option>`).join('');
+}
+
+// ---- welcome
+if (member) { $('#returning').hidden = false; $('#ret-name').textContent = member.name; $('#start').hidden = true; if (DEEP_OK) show(DEEP_OK); }
+$('#ig').href = 'https://www.instagram.com/' + C.INSTAGRAM_HANDLE + '/';
+$('#branch-list').textContent = C.BRANCHES.map(b => b.en).join(', ');
+const BR_OPTS = C.BRANCHES.map(b => `<option value="${b.id}">${esc(b.en)}</option>`).join('');
+$('#f-socializing select[name=branch]').innerHTML = BR_OPTS;
+$('#f-basic select[name=branch]').innerHTML = '<option value="">Select</option>' + BR_OPTS;
+const DEEP_B = new URLSearchParams(location.search).get('b');
+if (C.BRANCHES.some(b => b.id === DEEP_B)) { $('#f-basic select[name=branch]').value = DEEP_B; $('#f-socializing select[name=branch]').value = DEEP_B; }
+if (DEEP_OK || DEEP_B) history.replaceState(null, '', location.pathname);
+
+// ---- basic info → members
+$('#f-basic').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button'), err = $('#e-basic');
+  const p = Object.fromEntries(new FormData(f));
+  p.consent = f.consent.checked ? 'true' : 'false';
+  btn.disabled = true; err.textContent = '';
+  const { data, error } = await db.rpc('gx_register_member', { p });
+  btn.disabled = false;
+  if (error) { err.textContent = 'Could not save. Please check your details and try again.'; console.error(error); return; }
+  member = { id: data, name: p.name, phone: p.phone, branch: p.branch };
+  localStorage.setItem(KEY, JSON.stringify(member));
+  show(DEEP_OK || 'menu');
+};
+
+// ---- program forms → applications
+function formData(f) {
+  const d = Object.fromEntries(new FormData(f));
+  f.querySelectorAll('.chips[data-name]').forEach(g => {
+    d[g.dataset.name] = [...g.querySelectorAll('input:checked')].map(i => i.value);
+  });
+  return d;
+}
+document.querySelectorAll('form[data-program]').forEach(f => f.onsubmit = async e => {
+  e.preventDefault();
+  if (!member) return show('basic');
+  const btn = f.querySelector('button[type=submit]'), err = f.querySelector('.err');
+  const data = formData(f);
+  const row = { member_id: member.id, program: f.dataset.program, data };
+  if (data.event_id) { row.event_id = data.event_id; delete data.event_id; }
+  btn.disabled = true; err.textContent = '';
+  const { error } = await db.from('gx_applications').insert(row);
+  btn.disabled = false;
+  if (error) { err.textContent = 'Could not submit. Please try again.'; console.error(error); return; }
+  $('#done-msg').textContent = `Your application for ${LABELS[f.dataset.program]} has been received.`;
+  f.reset();
+  show('done');
+});
+
+// ---- events
+async function loadEvents() {
+  const box = $('#event-list');
+  const { data, error } = await db.from('gx_events').select('*').eq('is_active', true).order('event_date');
+  if (error) { box.innerHTML = '<p class="muted">Could not load events.</p>'; return; }
+  if (!data.length) { box.innerHTML = '<p class="muted">No upcoming events right now. Check Instagram for updates.</p>'; return; }
+  box.innerHTML = data.map(ev => `
+    <div class="ev">
+      <b>${esc(ev.title)}</b>
+      <p class="muted">📅 ${esc(ev.event_date ?? 'TBA')} ${esc(ev.event_time ?? '')} · 📍 ${esc(ev.location ?? 'TBA')}</p>
+      <p>${esc(ev.description ?? '')}</p>
+      <p class="muted">Fee: ${esc(ev.fee || 'Free')}${ev.how_to_apply ? ' · ' + esc(ev.how_to_apply) : ''}</p>
+      <button class="btn" data-ev="${ev.id}" data-title="${esc(ev.title)}">Apply</button>
+    </div>`).join('');
+  box.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => {
+    $('#f-event input[name=event_id]').value = b.dataset.ev;
+    $('#ev-title').textContent = '🎉 ' + b.dataset.title;
+    show('event_apply');
+  });
+}
+</script>
+</body>
+</html>
