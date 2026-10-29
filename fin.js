@@ -1,6 +1,6 @@
-// 💼 [재무] 탭 — 지점 재무제표(구글 시트 월 탭)를 플래너로 (DB 0070_fin). 시트 '{YYYYMM} 매출(플래너)'·'{YYYYMM} 비용(플래너)' 탭과 양방향 (planner-fin)
+// 💼 [재무] 탭 — 지점 재무제표(구글 시트 월 탭)를 플래너로 (DB 0070_fin). 시트 '{YYYYMM} 매출(플래너)'·'{YYYYMM} 비용(플래너)' 탭으로 한 방향 — 플래너가 기준 (planner-fin, 10-29)
 // 대표 = 전부 + 📎첨부 열람 / 매니저 = 첨부 열람만 빼고 전부(📎 올리기는 됨) / 조교 = [보기 요청] → 대표 승인 동안 보기만
-// 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트에서 고친 건 5분마다 들어옴. 다른 기기 실시간
+// 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트는 공유 사본 — 시트에서 고친 건 5분마다 플래너 값으로 되돌림. 다른 기기 실시간
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail·today·view 를 씀 → window.FN
 (() => {
 const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, shell: "" });
@@ -67,7 +67,7 @@ async function syncNow(loud, team = FN.team, month = FN.month) {
   const { data, error } = await sb.functions.invoke("planner-fin", { body: { action: "sync", team, month } });
   const err = error?.message ?? data?.error;
   if (err) { if (st) st.textContent = "⚠️ 시트 연동 실패"; return loud && toast("시트 연동 실패: " + err); }
-  if (loud) { const n = (k) => (data?.sale?.[k] ?? 0) + (data?.cost?.[k] ?? 0); toast(`🔄 시트 → 플래너 ${n("fromSheet")}줄 · 플래너 → 시트 ${n("toSheet")}줄${n("deleted") ? ` · 시트에서 지운 ${n("deleted")}줄` : ""}`); }
+  if (loud) { const n = (k) => (data?.sale?.[k] ?? 0) + (data?.cost?.[k] ?? 0); toast(`🔄 플래너 → 시트 ${n("toSheet")}줄${n("removed") ? ` · 시트에만 있던 ${n("removed")}줄 지움` : ""}`); }
   FN.load();
 }
 
@@ -103,11 +103,11 @@ function renderStatus() {
     : `🔗 <a href="https://docs.google.com/spreadsheets/d/${esc(c.sheet_id)}/edit" target="_blank" rel="noopener">구글 시트</a> ${c.last_sync ? new Date(c.last_sync).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + " 맞춤" : ""}`;
 }
 function shell() {
-  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : "대표·매니저 · 구글 시트와 자동 연동"}</small></h2>
+  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : "대표·매니저 · 여기가 기준 → 구글 시트로 자동 복사"}</small></h2>
     <div class="fnrow">${admin() ? `<select id="fnTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === FN.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <button class="btn ghost" data-act="prev">‹</button><b class="fnym">${ymLabel(FN.month)}</b><button class="btn ghost" data-act="next">›</button>
       ${FN.month !== ymNow() ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
-  <div class="fnrow fntools"><span id="fnSync" class="mut"></span>${jo() ? "" : `<button class="btn ghost" data-act="sync" title="시트에서 고친 걸 바로 가져오고, 플래너 것도 보내요">🔄 지금 맞추기</button>`}${admin() ? `<button class="btn ghost" data-act="cfg">⚙️ 시트 설정</button>` : ""}
+  <div class="fnrow fntools"><span id="fnSync" class="mut"></span>${jo() ? "" : `<button class="btn ghost" data-act="sync" title="플래너 내용을 지금 시트에 써요 (시트에서 고친 건 플래너 값으로 돌아가요)">🔄 지금 맞추기</button>`}${admin() ? `<button class="btn ghost" data-act="cfg">⚙️ 시트 설정</button>` : ""}
     <input id="fnQ" type="search" placeholder="🔍 이름·전화번호·사용처 찾기" value="${esc(FN.q)}"></div>
   <div id="fnBody"></div>`;
 }
