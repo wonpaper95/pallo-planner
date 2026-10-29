@@ -98,7 +98,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .rtw td a { color: var(--accent); text-decoration: none; }
 #routinebox summary #rtCount { color: var(--sub); font-weight: 400; font-size: 14px; margin-right: auto; }
 .adminonly { display: none; } body.is-admin .adminonly { display: inline-block; }
-body.is-assist .seg button:not([data-v="gx"]):not([data-v="ld"]):not([data-v="blog"]):not([data-v="post"]):not([data-v="jg"]):not([data-v="jc"]):not([data-v="wr"]):not([data-v="fn"]), body.is-assist header .btn:not(#outBtn):not(#themeBtn), body.is-assist #previewBar { display: none !important; } /* 🧑‍🎓 조교 */
+body.is-assist .seg button:not([data-v="gx"]):not([data-v="ld"]):not([data-v="blog"]):not([data-v="post"]):not([data-v="jg"]):not([data-v="jc"]):not([data-v="wr"]):not([data-v="fn"]):not([data-v="at"]), body.is-assist header .btn:not(#outBtn):not(#themeBtn), body.is-assist #previewBar { display: none !important; } /* 🧑‍🎓 조교 */
 #rtEdit { padding: 3px 10px; font-size: 13px; }
 .rtbar { height: 6px; margin: 8px 0 4px; } .rtbar i { background: var(--green); }
 .rt { display: flex; gap: 10px; align-items: flex-start; padding: 6px 6px; border-bottom: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
@@ -266,7 +266,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 header #fbBtn { background: #f04438; border-color: #f04438; color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(240, 68, 56, .35); } /* 🐞 신고·제안 눈에 띄게 */
 header #fbBtn:hover { background: #d92d20; }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.wkv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.wkv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -447,7 +447,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.wkv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.wkv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 /* 🌱 언젠가 할 일 자리: PC(넓은 화면) = 주간·월간 오른쪽 칸(스크롤해도 따라옴), 폰 = 맨 위 */
@@ -560,6 +560,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="work.css?v=202610292035">
 <link rel="stylesheet" href="fin.css?v=202610292035">
 <link rel="stylesheet" href="gx.css?v=202610292035">
+<link rel="stylesheet" href="att.css?v=202610292035">
 <link rel="stylesheet" href="wiki.css?v=202610292035">
 <link rel="stylesheet" href="glass.css?v=202610292035">
 <link rel="stylesheet" href="sidebar.css?v=202610292035">
@@ -602,7 +603,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="wiki">백과사전</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="wiki">백과사전</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
   <div id="updBar" class="hidden"></div><!-- 📣 업데이트 소식 (새 것만, 확인하면 사라짐) -->
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
@@ -647,6 +648,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="jcView"></section>
   <section id="wrView"></section>
   <section id="gxView"></section>
+  <section id="atView"></section>
   <section id="fnView"></section>
   <section id="tkView"></section>
   <section id="wkView"></section>
@@ -920,6 +922,7 @@ async function boot() {
   if (view === "wr") window.WR?.load(); // 🕒 근무기록
   if (view === "fn") window.FN?.load(); // 💼 재무
   if (view === "gx") window.GX?.load(); // 🌏 언어교환
+  if (view === "at") window.AT?.load(); // 📷 출석 스캔
   await rpInit;
   if (view === "rp") RP.ok ? RP.load() : setView("week");
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
@@ -1681,10 +1684,10 @@ addEventListener("appinstalled", () => { installEvt = null; $("#installBtn").cla
 $("#installBtn").onclick = async () => { if (!installEvt) return toast("크롬 주소창 오른쪽 '설치' 아이콘으로 설치할 수 있어요"); installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("#installBtn").classList.add("hidden"); };
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
-const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx"]; // 🧑‍🎓 조교가 볼 수 있는 탭
+const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx", "at"]; // 🧑‍🎓 조교가 볼 수 있는 탭
 function setView(v) {
   if (document.body.classList.contains("is-assist") && !JO_VIEWS.includes(v)) v = "ld";
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("wkv", v === "wiki"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("wkv", v === "wiki"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1705,6 +1708,7 @@ function setView(v) {
   if (v === "wr" && me && window.WR) WR.load(); // 🕒 근무기록
   if (v === "fn" && me && window.FN) FN.load(); // 💼 재무 (조교는 승인 받아야)
   if (v === "gx" && me && window.GX) GX.load(); // 🌏 언어교환 (누구나)
+  if (v === "at" && me && window.AT) AT.load(); // 📷 출석 스캔 (지점 공용)
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   if (v !== "edu") document.body.classList.remove("edurep");
   try { localStorage.setItem("planner-view", v); } catch {}
@@ -2295,6 +2299,7 @@ boot();
 <script src="fin-core.js?v=202610292035"></script>
 <script src="fin.js?v=202610292035"></script>
 <script src="gx.js?v=202610292035"></script>
+<script src="att.js?v=202610292035"></script>
 <script src="wiki-data.js?v=202610292035"></script>
 <script src="wiki.js?v=202610292035"></script>
 <script src="qna.js?v=202610292035"></script>

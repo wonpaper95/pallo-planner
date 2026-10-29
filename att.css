@@ -1,0 +1,28 @@
+/* 📷 출석 스캔 탭 (att.js) */
+body:not(.atv) #atView { display: none; }
+#atView { max-width: 1080px; margin: 0 auto; padding: 16px 20px 100px; }
+#atView .atbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#atView .atbar h2 { margin: 0; }
+#atView select, #atView input { padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; min-width: 0; }
+#atView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+#atView .atrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; }
+#atView .atrow label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+#atView .atcam { display: block; width: 100%; padding: 16px; margin: 6px 0; text-align: center; font-size: 18px; font-weight: 700; cursor: pointer; box-sizing: border-box; }
+#atView .atguide { font-size: 12px; }
+#atView .athead { display: flex; gap: 12px; align-items: flex-start; }
+#atView .athead img { width: 72px; height: 96px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+#atView .atinfo { flex: 1; display: grid; gap: 3px; font-size: 14px; }
+#atView .atst { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--accent) 14%, transparent); }
+#atView .atst.review { background: #E0D120; color: #1d1d1f; }
+#atView .atst.done { background: #493087; color: #fff; }
+#atView .atst.error { background: #e5484d; color: #fff; }
+#atView .atask { color: #e5484d; }
+#atView .atnote { font-size: 13px; white-space: pre-wrap; }
+#atView .atscroll { overflow-x: auto; margin-top: 10px; }
+#atView .att { width: 100%; border-collapse: collapse; font-size: 13px; }
+#atView .att th { text-align: left; color: var(--sub); font-weight: 600; font-size: 12px; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#atView .att td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#atView .att tr.skip td { opacity: .55; }
+#atView .att tr.ask td { background: color-mix(in srgb, #e5484d 10%, transparent); }
+#atView .att select, #atView .att input { padding: 4px 6px; font-size: 13px; }
+#atView .att td { white-space: nowrap; } #atView .att td.atw { white-space: normal; min-width: 120px; }
