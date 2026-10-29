@@ -1,4 +1,4 @@
-// 📮 월말 보고 (매출 탭 맨 위): 매니저는 다음 달 목표 2개(지점 매출 목표·내 목표) + 전략 5칸을 적고, 그달 매출 계획 [1]·[2]·[5]를 다 채워야 [제출] → 대표에게 푸시+카톡(planner-push).
+// 📮 월말 보고 (매출 탭 맨 위): 매니저는 다음 달 목표 2개(지점 매출 목표·내 목표) + 전략(직접 한 칸)을 적고, 그달 매출 계획 [1]·[2]·[5]를 다 채워야 [제출] → 대표에게 푸시+카톡(planner-push).
 // 대표는 그달 지점별 제출 현황을 보고 [이 금액을 지점 목표로] = 그달 sales_plans 의 월 목표 순매출로 넣음. DB = month_goals (0068).
 (() => {
 const MG = window.MG = { month: null, row: null, subscribed: false };
@@ -18,64 +18,41 @@ MG.load = async function () {
   return mgBoss() ? MG.loadBoss() : MG.loadMine();
 };
 
-// ── 매니저: 내 보고 한 장. 전략은 가이드 5칸(■ 제목 줄로 묶어 strategy 글 하나에 저장), 그달 매출 계획 [1]·[2]·[5]가 다 차야 제출 ──
-const PARTS = [
-  { k: "mk", t: "📣 마케팅·지원자", q: "지원자를 늘리려고 마케팅에 어떻게 신경 쓸지", ph: "예) 인스타 게시물 주 3회 · 메타 광고 소재 2개 새로 · 블로그 주 2회 → 지원자 하루 16명" },
-  { k: "rp", t: "☎️ 회신 관리", q: "지원자 회신을 어떻게 관리할지", ph: "예) 지원 30분 안에 첫 연락 · 부재면 그날 2번 더 · 마감 때 미회신 0명 확인" },
-  { k: "cs", t: "📅 달력 하루 최소 상담", q: "달력에 하루 최소 몇 명 상담을 잡을지, 어떻게 채울지", ph: "예) 오전 2·오후 2 슬롯 고정, 빈 날은 전날 리마인드 문자", n: true },
-  { k: "pay", t: "💳 결제율", q: "결제율 목표와 올리는 방법", ph: "예) 40% — 상담 후 당일 클로징 멘트, 고민하는 분은 3일 안에 다시 연락" },
-  { k: "ms", t: "🎫 멤버십 비율", q: "멤버십 비율을 어떻게 가져갈지", ph: "예) 프리미엄 25% · 프로맥스 25% — 상담 때 1년 플랜부터 제안" },
-];
-const parseStr = (s) => { // "■ 제목 — 4명\n내용" 묶음 → { mk: 글, …, csN: 4 }
-  const out = {}; if (!s) return out;
-  if (!s.includes("■ ")) { out.mk = s; return out; } // 예전 한 칸짜리
-  for (const ch of s.split(/^■ /m).slice(1)) {
-    const nl = ch.indexOf("\n"), head = nl < 0 ? ch : ch.slice(0, nl), body = nl < 0 ? "" : ch.slice(nl + 1).replace(/\n+$/, "");
-    const p = PARTS.find((x) => head.startsWith(x.t)); if (!p) continue;
-    out[p.k] = body; const m = head.match(/— (\d+)명/); if (p.n && m) out.csN = +m[1];
-  }
-  return out;
-};
-const joinStr = (o) => PARTS.map((p) => `■ ${p.t}${p.n && o.csN ? ` — ${o.csN}명` : ""}\n${(o[p.k] || "").trim()}`).join("\n\n");
+// ── 매니저: 내 보고 한 장(목표 2개 + 직접 쓰는 전략 한 칸). 그달 매출 계획 [1]·[2]·[5]를 저장하면 체크가 ✅ — 다 ✅ 여야 제출 ──
+const GUIDE = "직접 적어 주세요. 이런 내용이면 좋아요 ↓\n· 마케팅 — 지원자를 늘리려고 어떻게 신경 쓸지\n· 회신 관리 — 회신을 어떻게 관리할지\n· 달력 — 하루 최소 상담 몇 명을 잡을지\n· 결제율 — 목표와 올리는 방법\n· 멤버십 비율 — 어떻게 가져갈지";
 
 MG.loadMine = async function () {
   const { data, error } = await sb.from("month_goals").select("*").eq("user_id", me.id).eq("month", MG.month).maybeSingle();
   if (fail(error)) return;
   MG.row = data ?? { team_goal: null, my_goal: null, strategy: "", submitted_at: null, updated_at: null };
-  MG.parts = parseStr(MG.row.strategy);
-  const r = MG.row, P = MG.parts, ro = !!(previewTeam || previewUser), dis = ro ? "readonly" : "", mon = mgMon(MG.month);
+  const r = MG.row, ro = !!(previewTeam || previewUser), dis = ro ? "readonly" : "", mon = mgMon(MG.month);
   const now = (() => { try { const x = SL.now(); return x.month === todayIso().slice(0, 7) ? x : null; } catch { return null; } })();
   mgEl().innerHTML = `<section class="slcard mg"><div class="mghead"><h3>📮 월말 보고 — ${mon} 목표</h3><input type="month" id="mgMonth" value="${MG.month}" aria-label="목표 달"><span id="mgState" class="mgstate"></span></div>
-    <p class="slhint">매달 말, 다음 달 목표 2개와 달성 전략을 적어서 대표님께 제출해요. ${mon} 매출 계획([1] 월별 목표 · [2] 목표 객단가 비율 · [5] 일일 실행 목표)을 다 채워야 제출할 수 있어요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)}` : ""}</p>
+    <p class="slhint">다음 달 목표 2개와 달성 전략을 적고, 아래 체크가 모두 ✅ 이면 대표님께 제출해요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)}` : ""}</p>
     <div class="mggrid"><label>🏢 지점(팀) 매출 목표<span class="u"><input data-mg="team_goal" inputmode="numeric" placeholder="예) 60,000,000" value="${r.team_goal != null ? won(r.team_goal) : ""}" ${dis}><i>원</i></span></label>
       <label>🙋 내 목표<span class="u"><input data-mg="my_goal" inputmode="numeric" placeholder="예) 20,000,000" value="${r.my_goal != null ? won(r.my_goal) : ""}" ${dis}><i>원</i></span></label></div>
-    <div class="mglab">🧭 달성 전략 — 스스로 어떻게 할지 (5칸 모두)</div>
-    ${PARTS.map((p) => `<div class="mgpart"><b>${p.t}</b> <small class="mut">${p.q}</small>${p.n ? `<span class="u mgn"><input data-mgn="csN" inputmode="numeric" placeholder="예) 4" value="${P.csN ?? ""}" ${dis}><i>명</i></span><small class="mut" id="mgCsHint"></small>` : ""}
-      <textarea data-mgp="${p.k}" class="grow" maxlength="1000" ${dis} placeholder="${p.ph}">${esc(P[p.k] || "")}</textarea></div>`).join("")}
+    <label class="mglab">🧭 달성 전략 — 스스로 어떻게 할지</label>
+    <textarea data-mg="strategy" class="grow mgstrat" maxlength="5000" ${dis} placeholder="${GUIDE}">${esc(r.strategy)}</textarea>
     <div id="mgChk" class="mgchk"></div>
     <div class="mgfoot">${ro ? `<small class="mut">👀 미리보기 중엔 제출할 수 없어요</small>` : `<button class="btn" id="mgSubmit" type="button"></button>`}</div></section>`;
   MG.state(); MG.recheck();
 };
-// 제출 조건 체크리스트: 목표 2개 · 전략 5칸 · 그달 매출 계획 [1]·[2]·[5]
+// 제출 전 체크: 목표 2개 · 전략 · 그달 매출 계획 [1]·[2]·[5] (매출 탭에서 저장되면 자동 ✅)
 MG.recheck = async function () {
   if (mgBoss() || !document.getElementById("mgChk")) return;
   const team = SL.team, mon = mgMon(MG.month);
   const { data } = team ? await sb.from("sales_plans").select("data").eq("team_id", team).eq("month", MG.month).maybeSingle() : { data: null };
-  const pc = data ? SL.planCheck(data.data, MG.month) : null, r = MG.row, P = MG.parts;
-  if (pc?.consultMin) document.getElementById("mgCsHint").textContent = `${mon} 계획대로면 하루 최소 상담 ${pc.consultMin}명`;
-  if (pc?.goal && r.team_goal == null) { const i = mgEl().querySelector('[data-mg="team_goal"]'); if (i) i.placeholder = `${mon} 계획: ${won(pc.goal)}`; }
-  const shortP = PARTS.filter((p) => (P[p.k] || "").trim().length < 5).map((p) => p.t.replace(/^\S+ /, ""));
+  const pc = data ? SL.planCheck(data.data, MG.month) : null, r = MG.row;
   const items = [
-    [r.team_goal > 0 && r.my_goal > 0, "목표 2개 (지점 목표 · 내 목표)"],
-    [!shortP.length && P.csN > 0, "달성 전략 5칸" + (shortP.length ? ` — 빈 칸: ${shortP.join(", ")}` : "") + (P.csN > 0 ? "" : " · 하루 최소 상담 명수")],
-    [pc && !pc.s1.length, `${mon} [1] 월별 목표` + (!pc ? " — 아직 이 달 계획이 없어요" : pc.s1.length ? ` — 빈 칸: ${pc.s1.join(", ")}` : "")],
-    [pc && !pc.s2.length, `${mon} [2] 목표 객단가 비율` + (pc?.s2.length ? ` — ${pc.s2.join(", ")}` : "")],
-    [pc && !pc.s5.length, `${mon} [5] 일일 실행 목표` + (pc?.s5.length ? ` — ${pc.s5.join(", ")}` : "")],
+    [r.team_goal > 0 && r.my_goal > 0, "목표 2개"],
+    [(r.strategy || "").trim().length >= 10, "달성 전략"],
+    [pc && !pc.s1.length, `${mon} [1] 월별 목표`],
+    [pc && !pc.s2.length, `${mon} [2] 목표 객단가 비율`],
+    [pc && !pc.s5.length, `${mon} [5] 일일 실행 목표`],
   ];
   MG.ok = items.every((x) => x[0]);
-  const onMonth = SL.month === MG.month;
-  document.getElementById("mgChk").innerHTML = `<b>제출 전 체크</b>${items.map(([ok, t]) => `<div class="${ok ? "ok" : "no"}">${ok ? "✅" : "⬜"} ${esc(t)}</div>`).join("")}`
-    + (pc?.ok ? "" : `<button class="btn ghost" type="button" id="mgGoPlan">📝 ${mon} 매출 계획 ${onMonth ? "아래에서 채우기" : "채우러 가기"}</button>`);
+  document.getElementById("mgChk").innerHTML = `<b>제출 전 체크</b>${items.map(([ok, t]) => `<span class="${ok ? "ok" : "no"}">${ok ? "✅" : "⬜"} ${esc(t)}</span>`).join("")}`
+    + (pc?.ok ? "" : `<button class="btn ghost" type="button" id="mgGoPlan">📝 ${mon} 매출 계획 ${SL.month === MG.month ? "아래에서" : ""} 채우기</button>`);
 };
 MG.state = function (msg) {
   const r = MG.row, st = document.getElementById("mgState"), b = document.getElementById("mgSubmit");
@@ -91,11 +68,10 @@ MG.save = async function (extra = {}) {
   MG.row = data; MG.state(); return true;
 };
 document.addEventListener("input", (e) => {
-  const el = e.target.closest?.("#mgCard [data-mg], #mgCard [data-mgp], #mgCard [data-mgn]"); if (!el || el.readOnly) return;
-  if (el.dataset.mgp) MG.parts[el.dataset.mgp] = el.value;
-  else { const n = String(el.value).replace(/[^\d]/g, ""), v = n ? +n : null; el.value = n ? (el.dataset.mgn ? n : won(+n)) : "";
-    if (el.dataset.mgn) MG.parts.csN = v; else MG.row[el.dataset.mg] = v; }
-  MG.row.strategy = joinStr(MG.parts);
+  const el = e.target.closest?.("#mgCard [data-mg]"); if (!el || el.readOnly) return;
+  const k = el.dataset.mg;
+  if (k === "strategy") MG.row.strategy = el.value;
+  else { const n = String(el.value).replace(/[^\d]/g, ""); MG.row[k] = n ? +n : null; el.value = n ? won(+n) : ""; }
   MG.state("저장 중…"); clearTimeout(mgT); mgT = setTimeout(() => MG.save(), 700);
   clearTimeout(chkT); chkT = setTimeout(() => MG.recheck(), 400);
 });
@@ -137,11 +113,12 @@ MG.loadBoss = async function () {
     sb.from("month_goals").select("*").eq("month", MG.month), sb.from("sales_plans").select("team_id, data").eq("month", MG.month)]);
   if (fail(t.error || p.error || g.error || sp.error)) return;
   const by = new Map(g.data.map((x) => [x.user_id, x])), set = new Map(sp.data.map((x) => [x.team_id, x.data?.goal]));
+  const chk = new Map(sp.data.map((x) => [x.team_id, SL.planCheck(x.data, MG.month)])), mark = (c, k) => `${c && !c[k].length ? "✅" : "⬜"}`; // 그달 매출 계획 [1]·[2]·[5]
   const mgrs = p.data.filter((x) => x.role === "manager" && x.team_id), done = mgrs.filter((m) => by.get(m.user_id)?.submitted_at).length;
   const teamHtml = t.data.map((tm) => {
     const ms = mgrs.filter((m) => m.team_id === tm.id); if (!ms.length) return "";
     const sub = ms.map((m) => by.get(m.user_id)).filter((x) => x?.submitted_at), sumMy = sub.reduce((a, x) => a + (x.my_goal || 0), 0);
-    return `<div class="mgteam"><div class="mgth"><b>${esc(tm.name)}</b><small>제출 ${sub.length}/${ms.length} · 내 목표 합 ${mgWon(sumMy)} · 지금 정해진 ${mgMon(MG.month)} 목표 <b>${set.has(tm.id) ? mgWon(set.get(tm.id)) : "없음"}</b></small></div>`
+    return `<div class="mgteam"><div class="mgth"><b>${esc(tm.name)}</b><small>제출 ${sub.length}/${ms.length} · 내 목표 합 ${mgWon(sumMy)} · 지금 정해진 ${mgMon(MG.month)} 목표 <b>${set.has(tm.id) ? mgWon(set.get(tm.id)) : "없음"}</b></small><span class="mgplan" title="${mgMon(MG.month)} 매출 계획 (매출 탭)">${(() => { const c = chk.get(tm.id); return `[1] 월별 목표 ${mark(c, "s1")} · [2] 객단가 비율 ${mark(c, "s2")} · [5] 일일 실행 ${mark(c, "s5")}`; })()}</span></div>`
       + ms.map((m) => { const x = by.get(m.user_id);
         if (!x?.submitted_at) return `<div class="mgp none"><span class="who">${esc(m.name)}</span><span class="mut">${x?.updated_at ? "쓰는 중 (아직 제출 안 함)" : "아직 안 냄"}</span></div>`;
         return `<details class="mgp"><summary><span class="who">${esc(m.name)}</span><span>🏢 ${mgWon(x.team_goal)}</span><span>🙋 ${mgWon(x.my_goal)}</span><small class="mut">${mgHm(x.submitted_at)}${x.updated_at > x.submitted_at ? " · 이후 고치는 중" : ""}</small>
