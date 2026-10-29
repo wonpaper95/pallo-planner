@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ACCOUNTS, parseEnv, accountKeys, campaignRows, emptyRows, failRows, sanitizeNote } from "../scripts/mkd/naver-rows.mjs";
+import { ACCOUNTS, parseEnv, accountKeys, keyOutcome, campaignRows, emptyRows, failRows, sanitizeNote, maskSecrets, apiErrorMessage, errorNote } from "../scripts/mkd/naver-rows.mjs";
 import { toRowsPure } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
@@ -33,6 +33,27 @@ test("accountKeys: 셋 다 없으면 absent(건너뜀 후보), 일부만 있으�
   assert.equal(accountKeys({ NAVER_AD_CUSTOMER_ID: "c1", NAVER_AD_API_KEY: "  ", NAVER_AD_SECRET: "s1" }, DAEGU).state, "partial");
   assert.equal(accountKeys({ NAVER_AD_CUSTOMER_ID: " ", NAVER_AD_API_KEY: "", NAVER_AD_SECRET: "" }, DAEGU).state, "absent");
   assert.equal(accountKeys({ NAVER_AD_CUSTOMER_ID: " c1 ", NAVER_AD_API_KEY: "k1", NAVER_AD_SECRET: "s1" }, DAEGU).cid, "c1");
+});
+
+// ── 계정별 키 처리 결과 (건너뜀 / 사용 / 실패) ──
+const FULL = { NAVER_AD_CUSTOMER_ID: "c1", NAVER_AD_API_KEY: "k1", NAVER_AD_SECRET: "s1", NAVER_AD_CUSTOMER_ID_ULSAN: "c2", NAVER_AD_API_KEY_ULSAN: "k2", NAVER_AD_SECRET_ULSAN: "s2" };
+test("keyOutcome: 셋 다 있으면 use(키 세 개), 서로 섞이지 않는다", () => {
+  assert.deepEqual(keyOutcome(DAEGU, FULL), { action: "use", keys: { cid: "c1", key: "k1", secret: "s1" } });
+  assert.deepEqual(keyOutcome(ULSAN, FULL), { action: "use", keys: { cid: "c2", key: "k2", secret: "s2" } });
+});
+test("keyOutcome: 울산(보조) 키가 셋 다 없으면 skip — 실패가 아니다", () => {
+  assert.deepEqual(keyOutcome(ULSAN, {}), { action: "skip" });
+  assert.deepEqual(keyOutcome(ULSAN, { NAVER_AD_CUSTOMER_ID: "c1", NAVER_AD_API_KEY: "k1", NAVER_AD_SECRET: "s1" }), { action: "skip" }); // 대구 키만 있어도 울산은 건너뜀
+});
+test("keyOutcome: 대구(기본) 키가 셋 다 없으면 '네이버 키 없음' 실패", () => {
+  assert.deepEqual(keyOutcome(DAEGU, {}), { action: "fail", note: "네이버 키 없음" });
+  assert.deepEqual(keyOutcome(DAEGU, { NAVER_AD_CUSTOMER_ID_ULSAN: "c2", NAVER_AD_API_KEY_ULSAN: "k2", NAVER_AD_SECRET_ULSAN: "s2" }), { action: "fail", note: "네이버 키 없음" });
+});
+test("keyOutcome: 일부만 있으면 어느 계정이든 '네이버 키 일부 없음' 실패 — 키 값은 note 에 싣지 않는다", () => {
+  const d = keyOutcome(DAEGU, { NAVER_AD_CUSTOMER_ID: "c1", NAVER_AD_API_KEY: "k1" }), u = keyOutcome(ULSAN, { NAVER_AD_SECRET_ULSAN: "s2" });
+  assert.deepEqual(d, { action: "fail", note: "네이버 키 일부 없음" });
+  assert.deepEqual(u, { action: "fail", note: "네이버 키 일부 없음" });
+  assert.deepEqual(Object.keys(u).sort(), ["action", "note"]);
 });
 
 // ── 지점 매핑 ──
@@ -75,10 +96,35 @@ test("울산 계정: 모든 캠페인이 ulsan", () => {
 });
 
 // ── 같은 이름 합치기 ──
-test("같은 지점·같은 이름 캠페인은 한 행으로: 노출·클릭·비용 합, ctr·cpc 는 합에서 다시, 평균순위는 노출 가중, id·상태는 첫 번째", () => {
-  const rows = real(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "id-1"), camp("대구 영어", "ELIGIBLE", "id-2"), camp("대구 영어 ", "PAUSED", "id-3")], [st("id-1", 100, 10, 10000, 2), st("id-2", 300, 10, 20000, 4), st("id-3", 100, 0, 0, 6)]));
+test("같은 지점·같은 이름 캠페인은 한 행으로: 노출·클릭·비용 합, ctr·cpc 는 합에서 다시, 평균순위는 노출 가중, id·상태는 첫 번째 운영 중(PAUSED 아닌) 캠페인", () => {
+  const rows = real(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "id-1"), camp("대구 영어", "ELIGIBLE", "id-2"), camp("대구 영어 ", "PAUSED", "id-3")], [st("id-1", 100, 10, 10000, 2), st("id-2", 300, 10, 20000, 4), st("id-3", 100, 0, 0, 10)]));
   assert.equal(rows.length, 1);
-  assert.deepEqual(rows[0], { team_key: "dsr", unit: "대구 영어", metrics: { impressions: 500, clicks: 20, spend: 30000, ctr: 0.04, cpc: 1500, avg_rank: (100 * 2 + 300 * 4 + 100 * 6) / 500, campaign_id: "id-1", status: "ELIGIBLE" } });
+  // 가중 (100*2 + 300*4 + 100*10) / 500 = 4.8 — 단순 평균이면 5.33
+  assert.deepEqual(rows[0], { team_key: "dsr", unit: "대구 영어", metrics: { impressions: 500, clicks: 20, spend: 30000, ctr: 0.04, cpc: 1500, avg_rank: 4.8, campaign_id: "id-1", status: "ELIGIBLE" } });
+});
+test("avg_rank 는 노출 가중 평균 — 노출 100/300, 순위 2/4 → 3.5 (단순 평균이면 3)", () => {
+  const m = campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a"), camp("대구 영어", "ELIGIBLE", "b")], [st("a", 100, 1, 100, 2), st("b", 300, 1, 100, 4)])[0].metrics;
+  assert.equal(m.avg_rank, 3.5);
+});
+test("avg_rank 는 소수 둘째 자리까지 반올림 — (1*1 + 2*2)/3 = 1.6667 → 1.67", () => {
+  assert.equal(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a"), camp("대구 영어", "ELIGIBLE", "b")], [st("a", 1, 0, 0, 1), st("b", 2, 0, 0, 2)])[0].metrics.avg_rank, 1.67);
+  assert.equal(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a")], [st("a", 3, 0, 0, 2.3456)])[0].metrics.avg_rank, 2.35);
+});
+test("avg_rank: 노출이 있어도 순위(avgRnk)가 없는 캠페인은 가중 평균에서 뺀다 — 0 순위로 끌어내리지 않는다", () => {
+  const noRank = (id, impCnt) => ({ id, impCnt, clkCnt: 0, salesAmt: 0 }); // avgRnk 자체가 없는 통계
+  // 순위 있는 쪽(노출 100, 순위 2)만으로 계산 → 2 (빠뜨리지 않으면 (100*2 + 300*0)/400 = 0.5)
+  assert.equal(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a"), camp("대구 영어", "ELIGIBLE", "b")], [st("a", 100, 0, 0, 2), noRank("b", 300)])[0].metrics.avg_rank, 2);
+  // 순위 값이 NaN·문자열·0 이어도 없는 값으로 본다
+  for (const bad of [NaN, "3", null, 0]) assert.equal(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a"), camp("대구 영어", "ELIGIBLE", "b")], [st("a", 100, 0, 0, 2), { id: "b", impCnt: 300, clkCnt: 0, salesAmt: 0, avgRnk: bad }])[0].metrics.avg_rank, 2, String(bad));
+  // 순위가 하나도 없으면 null (노출이 있어도)
+  const m = campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "a")], [noRank("a", 50)])[0].metrics;
+  assert.equal(m.impressions, 50); assert.equal(m.avg_rank, null);
+});
+test("전부 PAUSED(활동 있음)인 같은 이름 그룹은 첫 번째 멤버의 id·상태를 쓴다", () => {
+  const rows = real(campaignRows(DAEGU, [camp("대구 영어", "PAUSED", "p1"), camp("대구 영어", "PAUSED", "p2")], [st("p1", 10, 1, 500, 3), st("p2", 30, 1, 900, 5)]));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].metrics.campaign_id, "p1"); assert.equal(rows[0].metrics.status, "PAUSED");
+  assert.equal(rows[0].metrics.impressions, 40); assert.equal(rows[0].metrics.avg_rank, 4.5); // (10*3 + 30*5)/40 = 4.5
 });
 test("합칠 때 노출이 하나도 없으면 ctr·cpc·avg_rank 는 null", () => {
   const rows = real(campaignRows(DAEGU, [camp("대구 영어", "ELIGIBLE", "1"), camp("대구 영어", "ELIGIBLE", "2")], []));
@@ -128,6 +174,57 @@ test("sanitizeNote: 4자리 이상 숫자는 #, 120자 컷, 문자열 아닌 것
   assert.equal(sanitizeNote("가".repeat(300)).length, 120);
   assert.equal(sanitizeNote(undefined), "undefined");
   assert.equal(sanitizeNote(new Error("x 99999")), "Error: x #");
+});
+// ── 키·시크릿 가리기: 자르기 전의 전체 문장에서 — 잘린 앞부분이 새어 나가지 않게 ──
+const KEYS = { cid: "3141592", key: "01000000aBcDeFgHiJkLmNoPqRsTuVwXyZ", secret: "Zq8Lm3Vx9RtWk7Yp4HnBcDfGjSaUeIoMr" };
+// 비밀 값의 연속 n(기본 6)글자 조각이 text 에 하나라도 남아 있으면 true
+const leaks = (text, secret, n = 6) => { for (let i = 0; i + n <= secret.length; i++) if (String(text).includes(secret.slice(i, i + n))) return true; return false; };
+test("maskSecrets: 고객번호·키·시크릿을 전부 *** 로, 값이 없거나 3자 미만이면 건드리지 않는다, 순수 함수", () => {
+  const before = JSON.stringify(KEYS);
+  const t = `a ${KEYS.secret} b ${KEYS.key} c ${KEYS.cid} d ${KEYS.secret}`;
+  assert.equal(maskSecrets(t, KEYS), "a *** b *** c *** d ***");
+  assert.equal(JSON.stringify(KEYS), before);
+  assert.equal(maskSecrets("그대로 ab", { cid: "ab", key: "", secret: undefined }), "그대로 ab");
+  assert.equal(maskSecrets(undefined, KEYS), "undefined");
+  assert.equal(maskSecrets("x", undefined), "x");
+});
+test("maskSecrets: 한 값이 다른 값의 일부여도(고객번호가 키 안에 있어도) 긴 값부터 가려 조각이 남지 않는다", () => {
+  const k = { cid: "1234567", key: "AAA1234567BBB", secret: "S3cr3tS3cr3tS3cr3t" };
+  const out = maskSecrets(`키 ${k.key} 고객 ${k.cid}`, k);
+  assert.equal(out, "키 *** 고객 ***");
+  assert.ok(!out.includes("BBB") && !out.includes("AAA"));
+});
+test("apiErrorMessage: title 에 시크릿이 60자 경계에 걸쳐 있어도 앞부분이 남지 않는다 (가린 뒤에 자른다)", () => {
+  for (const pad of [0, 10, 40, 50, 55, 58]) { // 옛 코드는 title.slice(0, 60) 먼저 → 시크릿 앞 (60-pad)자가 그대로 남았다
+    const msg = apiErrorMessage("/stats", 401, "x".repeat(pad) + KEYS.secret + " 인증 실패", KEYS);
+    assert.ok(!leaks(msg, KEYS.secret), `pad=${pad}: ${msg}`);
+    assert.match(msg, /^네이버 API \/stats 401/);
+  }
+  // 키·고객번호도 마찬가지
+  for (const v of [KEYS.key, KEYS.cid]) assert.ok(!leaks(apiErrorMessage("/ncc/campaigns", 403, "y".repeat(52) + v, KEYS), v, v === KEYS.cid ? 4 : 6));
+  // title 이 없으면 상태코드까지만
+  assert.equal(apiErrorMessage("/stats", 500, "", KEYS), "네이버 API /stats 500");
+  assert.equal(apiErrorMessage("/stats", 500, undefined, KEYS), "네이버 API /stats 500");
+  assert.equal(apiErrorMessage("/stats", 401, "Invalid Signature", KEYS), "네이버 API /stats 401: Invalid Signature");
+});
+test("errorNote: 시크릿이 120자 경계에 걸쳐 있어도 앞부분이 남지 않는다, 긴 숫자는 #", () => {
+  for (const pad of [0, 60, 100, 110, 115, 118]) {
+    const note = errorNote(new Error("가".repeat(pad) + KEYS.secret + " 끝"), KEYS);
+    assert.ok(note.length <= 120);
+    assert.ok(!leaks(note, KEYS.secret), `pad=${pad}: ${note}`);
+  }
+  assert.equal(errorNote(new Error("고객 1234567 오류"), KEYS), "고객 # 오류");
+});
+test("errorNote: 시간 초과·원인 코드 문구, 문자열 오류도 안전", () => {
+  assert.equal(errorNote(Object.assign(new Error("x"), { name: "TimeoutError" }), KEYS), "응답 시간 초과");
+  assert.equal(errorNote(Object.assign(new Error("fetch failed"), { cause: { code: "ENOTFOUND" } }), KEYS), "fetch failed (ENOTFOUND)");
+  assert.equal(errorNote("그냥 문자열", KEYS), "그냥 문자열");
+  assert.equal(errorNote(undefined, undefined), "undefined");
+});
+test("끝에서 끝까지: api 오류 문장 → errorNote → failRows 에도 시크릿 조각이 없다", () => {
+  const msg = apiErrorMessage("/stats", 401, "z".repeat(45) + KEYS.secret + KEYS.key, KEYS);
+  const rows = failRows(DAEGU, errorNote(new Error(msg), KEYS));
+  for (const r of rows) { assert.ok(!leaks(r.metrics.note, KEYS.secret)); assert.ok(!leaks(r.metrics.note, KEYS.key)); }
 });
 test("failRows 의 note 는 전화번호처럼 보이는 숫자열을 가린다", () => {
   const rows = failRows(DAEGU, "네이버 API 실패 010-1234-5678 / 01012345678");

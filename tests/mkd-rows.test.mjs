@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cleanMetrics, toRowsPure, looksPersonal } from "../scripts/mkd/rows.mjs";
+import { cleanMetrics, toRowsPure, looksPersonal, staleAllPlan } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
 const D = "2026-10-28";
@@ -228,4 +228,28 @@ test("campaign_id: 유한한 숫자는 문자열로 바꿔 저장, 그 밖의 �
   // 긴 숫자 id 는 전화번호 검사 대상이 아니다
   const out = rows("naver_ad", { rows: [{ team_key: "dsr", unit: "대구 a", metrics: { campaign_id: 1012345678901, clicks: 1 } }] });
   assert.equal(out[0].metrics.campaign_id, "1012345678901");
+});
+
+// ── saveRows 의 옛 '전체' 행 정리 계획 (순수 부분 — DB 삭제는 lib.mjs, 로컬 DB 로 따로 확인) ──
+const R = (team_id, unit, status = "ok", channel = "naver_ad", date = D) => ({ team_id, date, channel, unit, status, metrics: {} });
+test("staleAllPlan: '전체' 행 없이 unit 행(ok/partial)만 쓴 지점 → 그 지점의 옛 '전체' 행(어떤 상태든)을 지운다", () => {
+  assert.deepEqual(staleAllPlan([R(1, "a"), R(1, "b", "partial"), R(2, "c")]), [{ channel: "naver_ad", date: D, teamIds: [1, 2] }]);
+});
+test("staleAllPlan: 이번에 '전체' 행을 쓴 지점은 지우지 않는다 (ok·failed 무엇이든 — 같은 키로 이미 덮어썼다)", () => {
+  assert.deepEqual(staleAllPlan([R(1, "전체"), R(1, "a")]), []);
+  assert.deepEqual(staleAllPlan([R(1, "전체", "failed"), R(1, "a")]), []);
+  assert.deepEqual(staleAllPlan([R(3, "전체", "ok")]), []); // 0 행만 쓴 지점
+  assert.deepEqual(staleAllPlan([R(1, "전체", "ok"), R(1, "a"), R(2, "b")]), [{ channel: "naver_ad", date: D, teamIds: [2] }]); // 지점별로 따로
+});
+test("staleAllPlan: 실패 표시만 쓴 지점·ok 가 아닌 unit 행만 쓴 지점은 지우지 않는다 (옛 값이 쓸 만한 마지막 데이터)", () => {
+  assert.deepEqual(staleAllPlan([R(1, "전체", "login_required")]), []);
+  assert.deepEqual(staleAllPlan([R(1, "a", "failed"), R(2, "b", "login_required")]), []);
+});
+test("staleAllPlan: 배치에 없는 지점은 계획에 없다, 채널·날짜마다 따로", () => {
+  const plan = staleAllPlan([R(1, "a"), R(1, "a", "ok", "google_ad"), R(1, "a", "ok", "naver_ad", "2026-10-27")]);
+  assert.deepEqual(plan.map((p) => [p.channel, p.date, p.teamIds]), [["naver_ad", D, [1]], ["google_ad", D, [1]], ["naver_ad", "2026-10-27", [1]]]);
+  assert.deepEqual(staleAllPlan([]), []);
+});
+test("staleAllPlan: 같은 지점의 unit 행이 여러 개여도 지점은 한 번만", () => {
+  assert.deepEqual(staleAllPlan([R(1, "a"), R(1, "b"), R(1, "c")])[0].teamIds, [1]);
 });

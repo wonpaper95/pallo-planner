@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dateArg, run } from "../mk/db.mjs";
 import { toRows, saveRows, teams } from "./lib.mjs";
-import { ACCOUNTS, parseEnv, accountKeys, campaignRows, failRows, sanitizeNote } from "./naver-rows.mjs";
+import { ACCOUNTS, parseEnv, keyOutcome, campaignRows, failRows, apiErrorMessage, errorNote } from "./naver-rows.mjs";
 
 const date = dateArg(2, "date"), print = process.argv.includes("--print");
 const file = process.env.MK_ENV || `${homedir()}/.config/pallo/marketing.env`;
@@ -20,27 +20,19 @@ const BASE = "https://api.searchad.naver.com";
 async function api(k, path, query = "") {
   const ts = String(Date.now()), sig = createHmac("sha256", k.secret).update(`${ts}.GET.${path}`).digest("base64");
   const r = await fetch(`${BASE}${path}${query}`, { headers: { "X-Timestamp": ts, "X-API-KEY": k.key, "X-Customer": k.cid, "X-Signature": sig }, signal: AbortSignal.timeout(30_000) });
-  if (!r.ok) { // 본문 전체는 키를 되풀이할 수 있어 읽어도 title 만 쓴다
-    let title = ""; try { const j = await r.json(); if (typeof j?.title === "string") title = j.title.slice(0, 60); } catch { /* 본문 없음 */ }
-    throw new Error(`네이버 API ${path} ${r.status}${title ? `: ${title}` : ""}`);
+  if (!r.ok) { // 본문 전체는 키를 되풀이할 수 있어 읽어도 title 만 쓴다 (가리고 나서 자르기: apiErrorMessage)
+    let title = ""; try { const j = await r.json(); if (typeof j?.title === "string") title = j.title; } catch { /* 본문 없음 */ }
+    throw new Error(apiErrorMessage(path, r.status, title, k));
   }
   return r.json();
 }
-// 키·시크릿·고객번호가 메시지에 섞여 있으면 가린다 (그 위에 sanitizeNote 가 긴 숫자를 한 번 더 가림)
-const noteOf = (e, k) => {
-  let m = `${e?.name === "TimeoutError" ? "응답 시간 초과" : (e?.message ?? e)}${e?.cause?.code ? ` (${e.cause.code})` : ""}`;
-  for (const v of [k?.key, k?.secret, k?.cid]) if (v && v.length >= 3) m = m.split(v).join("***");
-  return sanitizeNote(m);
-};
 
 // 한 계정 → { rows } | { skipped } ; 실패하면 { rows: 그 계정 지점들의 failed 행, failed: note }
 async function collect(acct) {
-  const k = accountKeys(env, acct);
-  if (k.state === "absent") {
-    if (acct.suffix) return { skipped: true }; // 보조 계정(울산)은 키가 없으면 안 쓰는 것
-    return { rows: failRows(acct, "네이버 키 없음"), failed: "네이버 키 없음" };
-  }
-  if (k.state === "partial") return { rows: failRows(acct, "네이버 키 일부 없음"), failed: "네이버 키 일부 없음" };
+  const o = keyOutcome(acct, env);
+  if (o.action === "skip") return { skipped: true }; // 보조 계정(울산)은 키가 없으면 안 쓰는 것
+  if (o.action === "fail") return { rows: failRows(acct, o.note), failed: o.note };
+  const k = o.keys;
   try {
     const camps = await api(k, "/ncc/campaigns"), stats = [];
     if (Array.isArray(camps) && camps.length) {
@@ -53,7 +45,7 @@ async function collect(acct) {
       }
     }
     return { rows: campaignRows(acct, camps, stats) };
-  } catch (e) { const note = noteOf(e, k); return { rows: failRows(acct, note), failed: note }; }
+  } catch (e) { const note = errorNote(e, k); return { rows: failRows(acct, note), failed: note }; }
 }
 
 await run(async () => {

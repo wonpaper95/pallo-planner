@@ -130,3 +130,21 @@ export function toRowsPure(channel, date, input, teams) {
   if (dups.length) throw new Error(`같은 지점·unit 이 여러 번 나왔어요: ${dups.map(([k, n]) => `${k} ×${n}`).join(", ")} — 같은 이름이면 숫자를 더해 한 행으로 보내 주세요`);
   return out;
 }
+
+// saveRows 가 지울 옛 '전체' 행 계획 (순수). 한 배치에서 (채널, 날짜, 지점)마다:
+//   · 이번에 '전체' 행을 쓴 지점 → 지우지 않는다 (같은 키라 이미 덮어썼고, 방금 쓴 행을 지우면 안 된다).
+//   · '전체' 행 없이 쓸 수 있는(ok/partial) unit 행만 쓴 지점 → 그 지점·날짜·채널의 옛 '전체' 행을 상태와 상관없이 지운다.
+//     (옛 "운영 캠페인 없음" 0 행이나 실패 표시가 남으면 합계 계산이 '전체' ok 행을 우선해 새 unit 행을 가린다.)
+//   · 배치에 없는 지점, 실패 표시/실패 unit 행만 쓴 지점은 건드리지 않는다.
+// → [{ channel, date, teamIds }]
+export function staleAllPlan(rows) {
+  const groups = new Map(); // `${channel}|${date}` → { channel, date, withAll: Set, withUnits: Set }
+  for (const r of rows) {
+    const k = `${r.channel}|${r.date}`;
+    if (!groups.has(k)) groups.set(k, { channel: r.channel, date: r.date, withAll: new Set(), withUnits: new Set() });
+    const g = groups.get(k);
+    if (r.unit === D.ALL) g.withAll.add(r.team_id);
+    else if (r.status === "ok" || r.status === "partial") g.withUnits.add(r.team_id);
+  }
+  return [...groups.values()].map((g) => ({ channel: g.channel, date: g.date, teamIds: [...g.withUnits].filter((id) => !g.withAll.has(id)) })).filter((p) => p.teamIds.length);
+}
