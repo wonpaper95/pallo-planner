@@ -1,9 +1,10 @@
 // 🕒 [근무기록] 탭 — 조교 근무기록지 (구글 시트 대구영어·울산·대구일중 이식). 지점 공용(대표·매니저·조교 링크), 다른 기기 실시간 (DB 0064_work)
 // 달마다 줄(조교·대타 필요·대타 해준) × 날짜 칸(월~목 오전/오후, 금·토·일 한 칸) = 시간 + 사유 + 🔴빠짐/🟢대타. 총시간·급여(시급) 자동, 계좌·연락처는 대표·매니저만
 // 정해진 시간(근무시간 글, work-core.js)과 다르게 적으면 사유 칸이 빨개짐 — 사유 없으면 칸에 '!' 표시
+// 줄은 시간대(평일 오전·오후·주말·여러·대타)별로 묶어 색칠. 조교체크리스트 대타 명단 → 🟢/🔴 칸 자동(DB 트리거 0066). 📄 근무계약서 = 비공개 버킷 work-docs
 // index.html 의 sb·myRole·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.WR
 (() => {
-const WR = (window.WR = { team: null, ym: null, month: null, rows: [], cells: new Map(), people: [], shell: "" });
+const WR = (window.WR = { team: null, ym: null, month: null, rows: [], cells: new Map(), people: [], docs: [], only: null, shell: "" });
 const V = () => document.getElementById("wrView");
 const { KD, slotsOf, num, parseShift, off, needReason, planText } = WRC;
 const SL = { am: "오전", pm: "오후", d: "" };
@@ -19,6 +20,11 @@ const key = (row, day, slot) => `${row}|${day}|${slot}`;
 const plans = new Map(); // 근무시간 글 → 정해진 시간 (같은 글 다시 안 읽음)
 const planOf = (r) => { if (r.kind !== "staff") return {}; if (!plans.has(r.shift)) plans.set(r.shift, parseShift(r.shift)); return plans.get(r.shift); };
 const dowOf = (k) => W.parse(k).getDay();
+// 시간대 묶음: 정해진 칸이 월~목 오전만 = am, 오후만 = pm, 금·토·일만 = we, 섞이면 mix, 정해진 시간 없음(대타·백업) = etc
+const GROUPS = [["am", "평일 오전"], ["pm", "평일 오후"], ["mix", "여러 시간대"], ["we", "주말"], ["etc", "대타·기타"]];
+const groupOf = (r) => { const ks = Object.keys(planOf(r)); if (!ks.length) return "etc"; const g = new Set(ks.map((k) => (k[0] >= "1" && k[0] <= "4" ? k.slice(1) : "we"))); return g.size === 1 ? [...g][0] : "mix"; };
+const ordered = () => { const rank = (r) => (r.kind === "staff" ? GROUPS.findIndex(([g]) => g === groupOf(r)) : 9); return WR.rows.slice().sort((a, b) => rank(a) - rank(b) || a.sort - b.sort || a.id - b.id); };
+const safeKey = (name) => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || ""); const ext = m ? "." + m[1].toLowerCase() : ""; const base = (name || "file").slice(0, 40).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""); return `${Date.now()}_${base || "file"}${ext}`; }; // Storage 키는 ASCII 만
 
 WR.load = async function () {
   if (admin()) { if (!WR.team) { try { WR.team = +localStorage.getItem("wr-team") || null; } catch {} } if (!teams.some((t) => t.id === WR.team)) WR.team = teams[0]?.id ?? null; }
@@ -26,14 +32,16 @@ WR.load = async function () {
   if (!WR.ym) WR.ym = ymOf(today());
   if (!WR.team) { WR.shell = ""; V().innerHTML = `<div class="wrbar"><h2>🕒 조교 근무기록</h2></div><div class="wrpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = WR.team, ym = WR.ym;
-  const [m, r, p] = await Promise.all([
+  const [m, r, p, dc] = await Promise.all([
     sb.from("work_months").select("*").eq("team_id", t).eq("ym", ym).maybeSingle(),
     sb.from("work_rows").select("*").eq("team_id", t).eq("ym", ym).order("sort").order("id"),
-    jo() ? { data: [] } : sb.from("work_people").select("*").eq("team_id", t).order("name")]);
+    jo() ? { data: [] } : sb.from("work_people").select("*").eq("team_id", t).order("name"),
+    jo() ? { data: [] } : sb.from("work_docs").select("*").eq("team_id", t).order("created_at")]);
   if ([m, r, p].some((x) => fail(x.error))) return;
+  if (dc.error) { console.warn(dc.error); dc.data = []; } // 계약서 표 없어도(0066 전) 근무표는 보이게
   const c = r.data.length ? await sb.from("work_cells").select("*").in("row_id", r.data.map((x) => x.id)) : { data: [] };
   if (fail(c.error) || t !== WR.team || ym !== WR.ym) return; // 그 사이 지점·달 바꿈
-  Object.assign(WR, { month: m.data, rows: r.data, people: p.data, cells: new Map(c.data.map((x) => [key(x.row_id, x.day, x.slot), x])) });
+  Object.assign(WR, { month: m.data, rows: r.data, people: p.data, docs: dc.data, cells: new Map(c.data.map((x) => [key(x.row_id, x.day, x.slot), x])) });
   render();
   listen();
 };
@@ -44,7 +52,7 @@ function listen() {
   if (chan) return;
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "wr" && WR.load(), 300); };
   chan = sb.channel("wr");
-  for (const tb of ["work_months", "work_rows", "work_cells"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
+  for (const tb of ["work_months", "work_rows", "work_cells", "work_docs"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
   chan.subscribe();
 }
 
@@ -74,13 +82,14 @@ function shell() {
       ${WR.ym !== ymOf(today()) ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
   <section class="wrpanel"><details id="wrNoticeBox"><summary>📌 안내 <span class="mut">시간 적는 법 · 추가근무 사유 규칙 (누구나 고칠 수 있어요)</span></summary>
     <textarea id="wrNotice" maxlength="4000" placeholder="예) 추가근무는 사유를 적지 않으면 인정하지 않아요"></textarea></details>
-    <div class="wrhow mut">칸을 누르면 시간을 적어요. <b>정해진 시간과 다르면 사유</b>를 적어 주세요 — 사유가 없으면 칸에 <span class="wrneed-dot">!</span> 표시가 남아요. 🔴 빠짐 = 대타 필요 · 🟢 대타 근무 · 모서리 ◥ = 사유 있음</div></section>
-  <section class="wrpanel"><div class="wrgbar"><h3>근무표</h3><span id="wrSum" class="mut"></span>
+    <div class="wrhow mut">칸을 누르면 시간을 적어요. <b>정해진 시간과 다르면 사유</b>를 적어 주세요 — 사유가 없으면 칸에 <span class="wrneed-dot">!</span> 표시가 남아요. 🔴 빠짐 = 대타 필요 · 🟢 대타 근무 · 모서리 ◥ = 사유 있음 · 색칠된 칸 = 그 사람의 정해진 근무 칸.<br>
+      ✅ 조교체크리스트 <b>대타 명단</b>에 대타 이름을 넣으면 여기에 🟢(대타한 사람·시간)·🔴(빠진 사람)이 자동으로 들어가요.</div></section>
+  <section class="wrpanel"><div class="wrgbar"><h3>근무표</h3><span id="wrSum" class="mut"></span><span id="wrLegend" class="wrlegend"></span>
     <span class="wrrow"><span class="mut">시급</span><input id="wrRate" type="number" min="1000" max="100000" step="10" inputmode="numeric"><span class="mut">원</span>
     <button class="btn ghost" data-act="today">오늘로</button></span></div>
     <div id="wrGrid"></div>
     <form class="wrform" data-f="row"><input name="name" maxlength="40" placeholder="조교 이름"><input name="shift" maxlength="300" placeholder="근무시간 (예: 월수 오후 (19:00~22:00)(3h))"><button class="btn">조교 추가</button></form></section>
-  ${jo() ? "" : `<section class="wrpanel"><details id="wrPeopleBox"><summary>💳 계좌 · 연락처 <span class="mut">대표·매니저만 보여요 (조교 링크엔 안 보임)</span></summary>
+  ${jo() ? "" : `<section class="wrpanel"><details id="wrPeopleBox"><summary>💳 계좌 · 연락처 · 📄 근무계약서 <span class="mut">대표·매니저만 보여요 (조교 링크엔 안 보임)</span></summary>
     <div id="wrPeople"></div>
     <form class="wrform" data-f="person"><input name="name" maxlength="40" placeholder="이름"><input name="phone" maxlength="40" placeholder="연락처"><input name="bank" maxlength="200" placeholder="은행 계좌번호"><button class="btn">추가</button></form></details></section>`}`;
 }
@@ -99,34 +108,58 @@ function renderGrid() {
     const nr = r.kind === "staff" && needReason(plan, d.dw, s, c); if (nr) need++;
     const o = r.kind === "staff" && c ? off(plan, d.dw, s, c.val) : 0;
     const tip = [planned ? `정해진 시간 ${planned}h` : "", c?.reason ? `사유: ${c.reason}` : "", nr ? "⚠️ 정해진 시간과 달라요 — 사유를 적어 주세요" : "", c?.by_name ? `입력: ${c.by_name}` : ""].filter(Boolean).join("\n");
-    return `<td class="wrc ${planned ? "plan" : ""} ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""} ${c?.mark ? "mk-" + c.mark : ""} ${nr ? "need" : ""} ${c?.reason ? "has" : ""} ${s === "am" ? "l" : ""}"
+    return `<td class="wrc ${planned ? "plan" : ""} ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""} ${c?.mark ? "mk-" + c.mark : ""} ${nr ? "need" : ""} ${c?.reason ? "has" : ""} ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""}"
       ${tip ? `title="${esc(tip)}"` : ""}><button data-act="cell" data-row="${r.id}" data-day="${d.k}" data-slot="${s}">${esc(c?.val ?? "")}${o ? `<i class="${o > 0 ? "up" : "dn"}">${o > 0 ? "+" : ""}${o}</i>` : ""}</button></td>`;
   };
-  const head1 = ds.map((d) => `<th colspan="${d.slots.length}" class="wrd ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""}" data-day="${d.k}">${+d.k.slice(5, 7)}/${+d.k.slice(8)}<br><small>${KD[d.dw]}</small></th>`).join("");
-  const head2 = ds.map((d) => d.slots.map((s) => `<th class="wrs ${s === "am" ? "l" : ""} ${d.k === tk ? "today" : ""}">${SL[s]}</th>`).join("")).join("");
-  const body = WR.rows.map((r) => {
+  const head1 = ds.map((d) => `<th colspan="${d.slots.length}" class="wrd ${d.dw === 1 ? "wrwk" : ""} ${d.dw === 0 || d.dw === 6 ? "wrwe" : ""} ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""}" data-day="${d.k}">${+d.k.slice(5, 7)}/${+d.k.slice(8)}<br><small>${KD[d.dw]}</small></th>`).join("");
+  const head2 = ds.map((d) => d.slots.map((s) => `<th class="wrs ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""} ${d.k === tk ? "today" : ""}">${SL[s]}</th>`).join("")).join("");
+  const ncol = ds.reduce((n, d) => n + d.slots.length, 0), list = ordered();
+  let body = "", lastG = null;
+  for (const r of list) {
+    const g = r.kind === "staff" ? groupOf(r) : r.kind;
+    if (r.kind === "staff" && WR.only && g !== WR.only) continue;
+    if (r.kind === "staff" && g !== lastG) { // 묶음 머리줄
+      const rs = list.filter((x) => x.kind === "staff" && groupOf(x) === g), gh = rs.reduce((n, x) => n + rowHours(x), 0);
+      body += `<tr class="wrgrp g-${g}"><th class="wrname"><span><i></i>${GROUPS.find(([k]) => k === g)[1]} <small>${rs.length}명 · ${hrs(gh)}</small></span></th><td colspan="${ncol}"></td></tr>`;
+    }
+    lastG = g;
     let lab;
     if (r.kind === "staff") { const h = rowHours(r); totH += h; const pt = planText(planOf(r));
-      lab = `<b>${esc(r.name)}</b><span class="wrshift">${esc(r.shift).replace(/\n/g, "<br>")}</span>${pt ? `<span class="wrplan" title="정해진 시간 (근무시간 글에서 읽음)">${esc(pt)}</span>` : ""}${r.memo ? `<span class="wrmemo">📝 ${esc(r.memo)}</span>` : ""}<span class="wrtot">${hrs(h)} · ${won(h * rate())}</span>`; }
+      lab = `<span class="wrn1"><b>${esc(r.name)}</b>${r.memo ? `<span class="wrmemo" title="${esc(r.memo)}">📝</span>` : ""}<span class="wrtot">${hrs(h)}</span></span>
+        <span class="wrshift" title="${esc(r.shift + (pt ? "\n정해진 시간: " + pt : ""))}">${esc(r.shift.split("\n").join(" / ")) || "근무시간 없음"}</span><span class="wrpay">${won(h * rate())}</span>`; }
     else lab = `<b class="wrk">${esc(r.name || KIND[r.kind])}</b>`;
-    return `<tr class="${r.kind}" data-row="${r.id}"><th class="wrname"><button data-act="row">${lab}</button></th>${ds.map((d) => d.slots.map((s) => cell(r, d, s)).join("")).join("")}</tr>`;
-  }).join("");
+    body += `<tr class="${r.kind} g-${g}" data-row="${r.id}"><th class="wrname"><button data-act="row">${lab}</button></th>${ds.map((d) => d.slots.map((s) => cell(r, d, s)).join("")).join("")}</tr>`;
+  }
+  if (WR.only) for (const r of WR.rows) if (r.kind === "staff" && groupOf(r) !== WR.only) totH += rowHours(r); // 합계는 그대로 전체
   box.innerHTML = `<div class="wrscroll"><table class="wrgrid"><thead><tr><th class="wrname" rowspan="2">이름 · 근무시간</th>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody>
-    <tfoot><tr><th class="wrname"><b>합계</b><span class="wrtot">${hrs(totH)} · ${won(totH * rate())}</span></th><td colspan="${ds.reduce((s, d) => s + d.slots.length, 0)}"></td></tr></tfoot></table></div>`;
+    <tfoot><tr><th class="wrname"><b>합계</b><span class="wrtot">${hrs(totH)} · ${won(totH * rate())}</span></th><td colspan="${ncol}"></td></tr></tfoot></table></div>`;
+  V().querySelector("#wrLegend").innerHTML = GROUPS.filter(([g]) => staff.some((r) => groupOf(r) === g)).map(([g, l]) => `<button class="g-${g} ${WR.only === g ? "on" : ""} ${WR.only && WR.only !== g ? "dim" : ""}" data-act="only" data-g="${g}" title="눌러서 이 시간대만 보기"><i></i>${l}</button>`).join("");
   V().querySelector("#wrSum").innerHTML = `조교 ${staff.length}명 · 총 ${hrs(totH)} · ${won(totH * rate())}${need ? ` · <b class="wrneedtxt">사유 필요 ${need}칸</b>` : ""}`;
   const sc = box.querySelector(".wrscroll");
   if (keep === null) setTimeout(() => scrollToday(false)); else sc.scrollLeft = keep;
 }
 function scrollToday(smooth) {
   const sc = V().querySelector(".wrscroll"), el = sc?.querySelector("th.wrd.today"); if (!el) return;
-  const fix = sc.querySelector("th.wrname").offsetWidth, left = Math.max(0, el.offsetLeft - fix - 40);
+  const fix = sc.querySelector("th.wrname").offsetWidth, left = Math.max(0, sc.scrollLeft + el.getBoundingClientRect().left - sc.getBoundingClientRect().left - fix - 40); // 고정 칸 때문에 offsetLeft 는 body 기준
   smooth ? sc.scrollTo({ left, behavior: "smooth" }) : (sc.scrollLeft = left);
 }
 function renderPeople() {
   const box = V().querySelector("#wrPeople"); if (!box || box.contains(document.activeElement)) return; // 고치는 중
+  const docs = (n) => WR.docs.filter((d) => d.name === n).map((d) => `<span class="wrdoc" data-doc="${d.id}"><button data-act="dopen" title="${esc(d.file_name)} · ${esc(d.by_name)} ${d.created_at.slice(0, 10)}">📄 ${esc(d.file_name)}</button><button class="wricon" data-act="ddel" title="파일 지우기">✕</button></span>`).join("");
   box.innerHTML = WR.people.length ? `<div class="wrppl">${WR.people.map((p) => `<div class="wrp" data-name="${esc(p.name)}"><b>${esc(p.name)}</b>
       <input name="phone" value="${esc(p.phone)}" maxlength="40" placeholder="연락처"><input name="bank" value="${esc(p.bank)}" maxlength="200" placeholder="은행 계좌번호">
-      <button class="wricon" data-act="pdel" title="지우기">✕</button></div>`).join("")}</div>` : `<div class="mut">아직 없어요.</div>`;
+      <label class="btn ghost wrup" title="근무계약서 올리기 (PDF·사진, 20MB까지)">📎 계약서<input type="file" accept=".pdf,image/*,.doc,.docx,.hwp" hidden></label>
+      <button class="wricon" data-act="pdel" title="지우기">✕</button>
+      <div class="wrdocs">${docs(p.name)}</div></div>`).join("")}</div>` : `<div class="mut">아직 없어요.</div>`;
+}
+async function upload(file, name) {
+  if (file.size > 20 * 1024 * 1024) return toast("20MB 넘는 파일은 못 올려요");
+  const path = `${WR.team}/${safeKey(file.name)}`;
+  toast("올리는 중…");
+  if (fail((await sb.storage.from("work-docs").upload(path, file)).error)) return;
+  const r = await sb.from("work_docs").insert({ team_id: WR.team, name, path, file_name: file.name.slice(0, 200), by_name: myName || "" }).select().single();
+  if (fail(r.error)) return;
+  WR.docs.push(r.data); document.activeElement?.blur(); renderPeople(); toast("📄 올렸어요");
 }
 
 // ── 칸·줄 고치는 작은 창 (body 에 하나, 다시 그려도 안 닫힘) ──
@@ -184,7 +217,7 @@ async function saveCell(force) {
   fail((await sb.from("work_cells").upsert(c)).error);
 }
 async function move(dir) {
-  const list = WR.rows.slice(), i = list.findIndex((x) => x.id === ctx.row), j = i + dir; if (j < 0 || j >= list.length) return;
+  const list = ordered(), i = list.findIndex((x) => x.id === ctx.row), j = i + dir; if (j < 0 || j >= list.length) return;
   [list[i], list[j]] = [list[j], list[i]]; list.forEach((x, n) => (x.sort = n + 1)); WR.rows = list; renderGrid();
   const rs = await Promise.all(list.map((x) => sb.from("work_rows").update({ sort: x.sort }).eq("id", x.id))); rs.some((x) => fail(x.error));
 }
@@ -229,7 +262,9 @@ function bind() {
     if (id === "wrTeam") { WR.team = +e.target.value; try { localStorage.setItem("wr-team", WR.team); } catch {} closePop(); return WR.load(); }
     if (id === "wrRate") { const n = Math.round(+e.target.value); if (!(n >= 1000 && n <= 100000)) { e.target.value = rate(); return toast("시급은 1,000~100,000원"); } await saveMonth({ rate: n }); return renderGrid(); }
     if (id === "wrNotice") return saveMonth({ notice: e.target.value });
-    const p = e.target.closest(".wrp"); if (p) return fail((await sb.from("work_people").update({ [e.target.name]: e.target.value.trim() }).eq("team_id", WR.team).eq("name", p.dataset.name)).error);
+    const p = e.target.closest(".wrp");
+    if (p && e.target.type === "file") { const f = e.target.files[0]; e.target.value = ""; return f && upload(f, p.dataset.name); }
+    if (p) return fail((await sb.from("work_people").update({ [e.target.name]: e.target.value.trim() }).eq("team_id", WR.team).eq("name", p.dataset.name)).error);
   });
   v.addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target, t = WR.team; let r;
@@ -255,6 +290,9 @@ function bind() {
     if (act === "row") return openRow(b);
     if (act === "today") return scrollToday(true);
     if (act === "newmonth") return newMonth();
+    if (act === "only") { WR.only = WR.only === b.dataset.g ? null : b.dataset.g; return renderGrid(); }
+    if (act === "dopen") { const d = WR.docs.find((x) => x.id === +b.closest("[data-doc]").dataset.doc), w = window.open("", "_blank"); const { data, error } = await sb.storage.from("work-docs").createSignedUrl(d.path, 600); if (fail(error)) return w?.close(); if (w) w.location = data.signedUrl; else location.href = data.signedUrl; return; }
+    if (act === "ddel") { const d = WR.docs.find((x) => x.id === +b.closest("[data-doc]").dataset.doc); if (!confirm(`${d.file_name} 파일을 지울까요?`)) return; await sb.storage.from("work-docs").remove([d.path]); if (!fail((await sb.from("work_docs").delete().eq("id", d.id)).error)) { WR.docs = WR.docs.filter((x) => x.id !== d.id); renderPeople(); } return; }
     if (act === "prev" || act === "next" || act === "now") {
       WR.ym = act === "now" ? ymOf(today()) : ymAdd(WR.ym, act === "prev" ? -1 : 1);
       closePop(); WR.rows = []; WR.cells = new Map(); WR.month = null; return WR.load();
