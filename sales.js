@@ -423,17 +423,29 @@ const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log:
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
 SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
 SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
-// 📮 월말 보고 제출 조건: 그달 계획(sales_plans.data)에서 [1]·[2]·[5] 빈 칸 + 그 계획의 하루 최소 상담
+// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 월말 보고 달(MG.month)을 보고 있을 때만. 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
+const SEC = { s1: "[1] 월별 목표", s2: "[2] 목표 객단가 비율", s5: "[5] 일일 실행 목표" };
+function renderSec() {
+  const on = !!window.MG && SL.month === MG.month, ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
+  const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
+  V().querySelectorAll(".slsec").forEach((el) => {
+    const k = el.dataset.sec, d = done[k];
+    el.innerHTML = !on ? "" : `<div class="slsecbar">${d ? `<span class="ok">✅ 저장됨 · ${esc(d.by)} ${hm(d.at)}</span>` : `<span class="mut">📮 월말 보고 — 다 채우고 저장하면 ✅</span>`}`
+      + (ro ? "" : `<button class="btn${d ? " ghost" : ""}" type="button" data-secsave="${k}">${d ? "다시 저장" : `💾 ${SEC[k]} 저장`}</button>`) + `</div>`;
+  });
+}
+SL.renderSec = renderSec;
+// 📮 월말 보고 제출 조건: 그달 계획(sales_plans.data)에서 [1]·[2]·[5] 빈 칸 (지원자수는 비우면 계산값이 칸에 보여서 뺌) + 그 계획의 하루 최소 상담
 SL.planCheck = (data, month) => {
   const d = data || {}, pos = (k) => d[k] > 0, ms = Array.isArray(d.members) ? d.members : [];
-  const s1 = [["start", "집계 시작일", !!d.start], ["goal", "월 목표 순매출", pos("goal")], ["appsGoal", "지원자수", pos("appsGoal")], ["reply", "회신율", pos("reply")],
+  const s1 = [["start", "집계 시작일", !!d.start], ["goal", "월 목표 순매출", pos("goal")], ["reply", "회신율", pos("reply")],
     ["consult", "상담률", pos("consult")], ["pay", "결제율", pos("pay")], ["arpu", "객단가", pos("arpu")], ["refundRate", "환불율", typeof d.refundRate === "number" && d.refundRate >= 0]].filter((x) => !x[2]).map((x) => x[1]);
   const sumP = ms.reduce((a, m) => a + (typeof m.p === "number" ? m.p : 0), 0);
   const s2 = !ms.length ? ["멤버십"] : [...(ms.some((m) => !(m.price > 0)) ? ["단가"] : []), ...(ms.some((m) => typeof m.p !== "number") ? ["비율"] : Math.abs(sumP - 100) > 0.05 ? [`비율 합계 ${pct(sumP)}% → 100%`] : [])];
   const s5 = pos("firstContact") ? [] : ["첫 연락 목표"];
   let consultMin = null;
   try { const c = calc(applyAuto(compose({ ...newPlan(month), ...d, month }, {}, null))); consultMin = Math.ceil(c.month.consults / c.month.days - 1e-9); } catch {}
-  return { s1, s2, s5, ok: !s1.length && !s2.length && !s5.length, consultMin, goal: d.goal ?? null };
+  return { s1, s2, s5, ok: !s1.length && !s2.length && !s5.length, consultMin, goal: d.goal ?? null, done: d.mgDone || {} }; // done = 칸별 [저장] 누른 기록
 };
 
 V().innerHTML = `
@@ -460,13 +472,13 @@ V().innerHTML = `
     <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
     <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
-    <div id="slMonth"></div><div id="slCompare"></div></section>
+    <div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr><tr id="slMemRf"></tr><tr id="slMemNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
-    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
+    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p><div class="slsec" data-sec="s2"></div></section>
   <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
     <div class="slr2">
     <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
@@ -482,7 +494,7 @@ V().innerHTML = `
     <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div>
     <div id="slMemRNote"></div></section>
   <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
-    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
+    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div><div class="slsec" data-sec="s5"></div></section>
 </div>
 <div class="slgrid">
   <section class="slcard"><h3>📅 일일 목표 — 날짜별 목표 vs 현재</h3><div id="slDay"></div></section>
@@ -652,6 +664,7 @@ function render() {
   setH("slDaily", `<table class="slt">${dailyRows.map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`);
 
   renderCal(s, c);
+  renderSec();
   const cu = catchUp(s, a);
   const rp = replyPace(s, c), up = rp.dyn > rp.plan;
   setH("slCalNote", `📅 캘린더 = <b>회신자</b>(그날 상담 오기로 한 사람). 실제 순매출 <b>${won(rp.net)}원</b>${s.linked ? " (📗 시트)" : ""} → 남은 목표 매출 <b>${won(rp.remain)}원</b>에 회신 ${rp.n.replies}명 · 상담 ${rp.n.consults}명 · 결제 ${rp.n.payers}명 필요 → 남은 영업일 ${rp.left}일 동안 <b style="color:${up ? "var(--red)" : "var(--green)"}">하루 회신 최소 ${rp.dyn}명 · 상담 ${rp.left ? Math.ceil(rp.n.consults / rp.left - 1e-9) : 0}명</b> (처음 계획 하루 회신 ${rp.plan}명 → 매출이 ${up ? "부족해 늘어남" : "앞서 줄어듦"}).`);
@@ -737,6 +750,14 @@ V().addEventListener("change", async (ev) => {
   }
 });
 V().addEventListener("click", async (ev) => {
+  const sv = ev.target.dataset.secsave; // 📮 칸별 [저장]: 빈 칸 있으면 막고, 다 찼으면 누가·언제 기록
+  if (sv) {
+    const miss = SL.planCheck(SL.plan, SL.month)[sv];
+    if (miss.length) return toast(`${SEC[sv]} — 아직 비었어요: ${miss.join(", ")}`);
+    SL.plan.mgDone = { ...(SL.plan.mgDone || {}), [sv]: { by: myName, at: new Date().toISOString() } };
+    savePlan(); renderSec(); toast(`✅ ${SEC[sv]} 저장 — 월말 보고 체크에 표시돼요`);
+    return;
+  }
   const fx = ev.target.dataset.mixfix;
   if (fx) {
     const p = SL.plan, s2 = S(), c2 = calc(s2), mp = mixPlan(s2, c2), cur = memberMix(s2, 0);
