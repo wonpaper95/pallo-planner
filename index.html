@@ -491,6 +491,11 @@ dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--p
 .fbi .b { flex: 1; white-space: pre-wrap; word-break: break-word; } .fbi .m { color: var(--sub); font-size: 12px; display: block; margin-top: 2px; }
 .fbi.done .b { color: var(--sub); } .fbi .st { white-space: nowrap; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
 .fbi .st.new { color: #fff; background: var(--orange); border-color: var(--orange); } .fbi .st.done { color: var(--green); }
+.fbpics { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; } .fbpics label { font-size: 13px; padding: 5px 12px; cursor: pointer; } .fbpics span { color: var(--sub); font-size: 12px; } /* 📷 신고 사진 */
+#fbThumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } #fbThumbs:empty { display: none; }
+.fbth { position: relative; } .fbth img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.fbth button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0,0,0,.7); color: #fff; font-size: 11px; cursor: pointer; }
+.fbi .fbimgs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } .fbi .fbimgs img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
 .fbi .rp { display: block; margin-top: 4px; padding: 4px 8px; border-radius: 8px; background: var(--hover); color: var(--text); font-size: 13px; } /* 📣 반영 소식 */
 .fbi .side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; } .fbi .up { white-space: nowrap; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--accent); color: var(--accent); background: none; cursor: pointer; }
 #updBar { position: sticky; top: calc(var(--hh, 53px) + 6px); z-index: 4; box-shadow: 0 6px 20px rgba(0,0,0,.12); margin: 8px 12px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--accent); background: var(--bar, var(--bg)); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
@@ -656,6 +661,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <p style="color:var(--sub);font-size:13px;margin:0 0 8px">적어서 보내면 대표님께 바로 알림(푸시·카톡)이 가요</p>
   <div class="fbkind"><label><input type="radio" name="fbk" value="bug" checked> 🐞 버그(안 돼요·이상해요)</label><label><input type="radio" name="fbk" value="idea"> 💡 개선(이렇게 되면 좋겠어요)</label></div>
   <textarea id="fbBody" rows="4" maxlength="2000" placeholder="예) 위젯에서 고정업무 체크가 안 돼요 / 팀 업무에도 데드라인 알림이 오면 좋겠어요"></textarea>
+  <div class="fbpics"><label class="btn ghost">📷 사진 첨부<input type="file" id="fbFile" accept="image/*,.heic,.heif" multiple hidden></label><span>5장까지 · 화면 캡처는 글 칸에 ⌘V 로 붙여 넣어도 돼요</span></div><div id="fbThumbs"></div>
   <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="fbSend" style="flex:1">보내기</button><button class="btn ghost" id="fbClose">닫기</button></div>
   <h4 id="fbListTitle" style="margin:16px 0 6px;color:var(--sub);font-size:13px"></h4><div id="fbList"></div>
   <h4 style="margin:16px 0 6px;color:var(--sub);font-size:13px;display:flex;align-items:center;gap:8px">📣 최근 업데이트 소식<button class="btn ghost adminonly" id="updNew" style="margin-left:auto;font-size:12px;padding:2px 10px">📣 공지 쓰기</button></h4><div id="updHist"></div></dialog>
@@ -1213,16 +1219,41 @@ async function loadFeedback() {
   $("#fbListTitle").textContent = data.length ? (isBoss ? `받은 신고·제안 (처리 전 ${nNew})` : "내가 보낸 것") : "";
   fbRows = data;
   $("#fbList").innerHTML = data.map((x) => { const d = new Date(x.created_at);
-    return `<div class="fbi ${x.status}"><span>${x.kind === "bug" ? "🐞" : "💡"}</span><span class="b">${esc(x.body)}<span class="m">${isBoss ? `${esc(x.who ?? "")}${x.team ? `(${esc(x.team)})` : ""} · ` : ""}${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${x.reply ? `<span class="rp">📣 ${esc(x.reply)}</span>` : ""}</span>`
+    return `<div class="fbi ${x.status}"><span>${x.kind === "bug" ? "🐞" : "💡"}</span><span class="b">${esc(x.body)}<span class="m">${isBoss ? `${esc(x.who ?? "")}${x.team ? `(${esc(x.team)})` : ""} · ` : ""}${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${x.photos?.length ? `<span class="fbimgs" data-fbph="${x.id}">${x.photos.map(() => `<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">`).join("")}</span>` : ""}${x.reply ? `<span class="rp">📣 ${esc(x.reply)}</span>` : ""}</span>`
       + (isBoss ? `<span class="side"><button class="st ${x.status}" data-fb="${x.id}" data-st="${x.status === "new" ? "done" : "new"}" title="눌러서 바꾸기">${x.status === "new" ? "처리 전" : "✓ 처리완료"}</button><button class="up" data-upd="${x.id}" title="반영했다고 알리기">📣 반영 알림</button></span>`
         : `<span class="st ${x.status}">${x.reply ? "✓ 반영됨" : x.status === "new" ? "확인 중" : "✓ 처리완료"}</span>`) + `</div>`; }).join("");
+  const paths = data.flatMap((x) => x.photos ?? []); if (!paths.length) return; // 📷 첨부 사진: 서명 주소(1시간)로 보기 — 누르면 크게(새 탭)
+  const { data: urls, error: e2 } = await sb.storage.from("feedback-photos").createSignedUrls(paths, 3600); if (e2) return console.warn(e2);
+  const at = new Map(urls.map((u) => [u.path, u.signedUrl]));
+  for (const x of data) { const box = document.querySelector(`[data-fbph="${x.id}"]`); if (!box) continue;
+    box.innerHTML = x.photos.map((pth, i) => at.get(pth) ? `<a href="${esc(at.get(pth))}" target="_blank" rel="noopener" title="사진 ${i + 1} 크게 보기"><img src="${esc(at.get(pth))}" alt=""></a>` : "").join(""); }
 }
+// 📷 보낼 사진: 이 기기에서 JPEG 로 줄여(PHOTO.fromFiles, 아이폰 HEIC 도) 5장까지, 보내기 누르면 올림
+let fbPics = [];
+const fbRender = () => { $("#fbThumbs").innerHTML = fbPics.map((p, i) => `<span class="fbth"><img src="${p.url}" alt=""><button type="button" data-rmpic="${i}" title="빼기">✕</button></span>`).join(""); };
+async function fbAdd(files) {
+  const room = 5 - fbPics.length; if (room <= 0) return toast("사진은 5장까지예요");
+  if (files.length > room) toast(`5장까지라 ${files.length - room}장은 뺐어요`);
+  fbPics.push(...await PHOTO.fromFiles(files.slice(0, room))); fbRender();
+}
+$("#fbFile").onchange = (e) => { fbAdd([...e.target.files]); e.target.value = ""; };
+$("#fbBody").addEventListener("paste", (e) => { const fs = [...(e.clipboardData?.files ?? [])].filter((f) => /^image\//.test(f.type)); if (fs.length) { e.preventDefault(); fbAdd(fs); } });
+$("#fbThumbs").onclick = (e) => { const b = e.target.closest("[data-rmpic]"); if (b) { fbPics.splice(+b.dataset.rmpic, 1); fbRender(); } };
 $("#fbBtn").onclick = () => { $("#fbDlg").showModal(); loadFeedback(); loadUpdates(); };
 $("#fbClose").onclick = () => $("#fbDlg").close();
 $("#fbSend").onclick = async () => {
   const body = $("#fbBody").value.trim(); if (body.length < 2) return toast("내용을 적어 주세요");
-  const kind = document.querySelector('input[name="fbk"]:checked').value;
-  const { error } = await sb.from("feedback").insert({ kind, body }); if (fail(error)) return;
+  const kind = document.querySelector('input[name="fbk"]:checked').value, btn = $("#fbSend"), photos = [];
+  btn.disabled = true;
+  try {
+    for (const [i, p] of fbPics.entries()) { // 📷 사진 먼저 올림 (실패하면 글도 안 보냄)
+      btn.textContent = `사진 올리는 중… ${i + 1}/${fbPics.length}`;
+      const path = `${me.id}/${Date.now()}_${i + 1}.jpg`, { error } = await sb.storage.from("feedback-photos").upload(path, p.blob, { contentType: "image/jpeg" });
+      if (fail(error)) return; photos.push(path);
+    }
+    const { error } = await sb.from("feedback").insert({ kind, body, ...(photos.length ? { photos } : {}) }); if (fail(error)) return; // 사진 없으면 photos 칸을 안 보냄 (0072 전 서버에서도 신고가 되게)
+  } finally { btn.disabled = false; btn.textContent = "보내기"; }
+  fbPics = []; fbRender();
   $("#fbBody").value = ""; toast(kind === "bug" ? "🐞 보냈어요. 대표님께 알림이 가요" : "💡 보냈어요. 대표님께 알림이 가요"); loadFeedback();
 };
 $("#fbList").onclick = async (e) => {
