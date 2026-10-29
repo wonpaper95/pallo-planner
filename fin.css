@@ -1,0 +1,55 @@
+/* 💼 재무 탭 (fin.js) */
+body:not(.fnv) #fnView { display: none; }
+#fnView { max-width: 1400px; margin: 0 auto; padding: 16px 20px 100px; }
+#fnView .fnbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+#fnView .fnbar h2 { margin: 0; } #fnView .fnbar small { font-size: 12px; font-weight: 400; margin-left: 6px; }
+#fnView .fnrow, .fndlg .fnrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#fnView .fnym { min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+#fnView .fntools { margin-bottom: 12px; font-size: 13px; } #fnView .fntools #fnQ { margin-left: auto; width: 240px; max-width: 100%; }
+#fnView #fnSync a { color: var(--accent); } #fnView .fnerr { color: var(--red); }
+#fnView select, #fnView input, .fndlg input { padding: 7px 9px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; }
+#fnView .fnpanel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+#fnView .fngbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 10px; }
+#fnView .fngbar h3 { margin: 0; font-size: 15px; } #fnView .fngbar h3 small { font-weight: 400; font-size: 12px; margin-left: 4px; }
+#fnView .fngbar .btn { margin-left: auto; }
+#fnView summary { cursor: pointer; font-weight: 600; font-size: 14px; } #fnView summary .mut { font-weight: 400; font-size: 12px; }
+
+#fnView .fncards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+#fnView .fncard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+#fnView .fncard small { color: var(--sub); font-size: 12px; } #fnView .fncard b { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#fnView .fncard.neg b { color: var(--red); } #fnView .fncard.pos b { color: var(--green); }
+@media (max-width: 1150px) { #fnView .fncards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { #fnView { padding: 12px 16px 100px; } #fnView .fncards { grid-template-columns: repeat(2, minmax(0, 1fr)); } #fnView .fntools #fnQ { width: 100%; } }
+
+#fnView .fnacc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; }
+#fnView .fnacc.requested { border-color: #e9a23b; background: color-mix(in srgb, #e9a23b 12%, var(--panel)); }
+#fnView .fnacc.open { border-color: var(--green); }
+#fnView .fngate { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 36px 16px; }
+
+/* 표: 가로 스크롤, 칸 = 입력칸 */
+#fnView .fnscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; max-height: 70vh; overflow-y: auto; }
+#fnView .fntbl { border-collapse: separate; border-spacing: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
+#fnView .fntbl th, #fnView .fntbl td { border-bottom: 1px solid var(--line); padding: 2px 3px; white-space: nowrap; text-align: left; }
+#fnView .fntbl thead th { position: sticky; top: 0; z-index: 1; background: var(--bg); color: var(--sub); font-weight: 600; padding: 6px 5px; }
+#fnView .fntbl td input { border-color: transparent; background: transparent; padding: 4px 5px; border-radius: 5px; }
+#fnView .fntbl td input:hover { border-color: var(--line); } #fnView .fntbl td input:focus { border-color: var(--accent); background: var(--bg); outline: none; }
+#fnView .fntbl .num { text-align: right; } #fnView .fntbl .neg { color: var(--red); }
+#fnView .fntbl td.fnclip button, #fnView .fntbl td.fndel button { background: none; border: 0; cursor: pointer; padding: 3px 5px; border-radius: 6px; font-size: 13px; opacity: .55; color: var(--text); }
+#fnView .fntbl td.fnclip button:hover, #fnView .fntbl td.fndel button:hover { opacity: 1; background: var(--hover); }
+#fnView .fntbl td.fnclip i { font-style: normal; font-size: 11px; margin-left: 1px; color: var(--accent); font-weight: 700; }
+#fnView .fntbl tr:hover td { background: color-mix(in srgb, var(--hover) 60%, transparent); }
+#fnView .fnnone { text-align: center; padding: 18px; }
+#fnView .fnsech th { position: sticky; top: 30px; background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--text); text-align: left; padding: 6px 8px; }
+#fnView .fnsech th span { font-weight: 700; margin-right: 10px; } #fnView .fnsech th b { font-variant-numeric: tabular-nums; margin-right: 10px; }
+#fnView .fnsech .btn { padding: 2px 10px; font-size: 12px; }
+#fnView .fnauto td { color: var(--sub); padding: 6px 8px; }
+#fnView .fnday td { padding: 5px 10px; }
+
+.fndlg { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); padding: 18px; width: min(520px, calc(100vw - 32px)); }
+.fndlg::backdrop { background: rgba(0, 0, 0, .35); }
+.fndlg h3 { margin: 0 0 12px; } .fndlg h3 small { font-weight: 400; font-size: 13px; }
+.fndlg label:not(.btn) { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; font-size: 13px; flex: 1; }
+.fndlg menu { display: flex; justify-content: flex-end; gap: 8px; margin: 14px 0 0; padding: 0; }
+.fndlg .fnflist { padding-left: 18px; margin: 0 0 12px; font-size: 13px; line-height: 1.9; } .fndlg .fnflist a { color: var(--accent); }
+.fndlg .fnflist button { background: none; border: 0; cursor: pointer; }
+.fndlg p { font-size: 12.5px; line-height: 1.6; }
