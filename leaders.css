@@ -161,6 +161,10 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .tdrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; } #ldView .tdrow > b { min-width: 64px; font-size: 13px; }
 #ldView .cfm { border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13.5px; cursor: pointer; }
 #ldView .cfm.on { border-color: #1f9d55; background: rgba(31, 157, 85, .1); } #ldView .cfm small { color: var(--sub); font-size: 11px; }
+#ldView span.cfm { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 0; cursor: default; }
+#ldView span.cfm > button { all: unset; cursor: pointer; padding: 5px 4px 5px 11px; font-size: 13.5px; }
+#ldView .cfnote { color: #d9730d; font-size: 12px; font-weight: 700; }
+#ldView .cflate { border: 0; background: transparent; color: var(--sub); font: inherit; font-size: 12px; padding: 2px; max-width: 30px; cursor: pointer; border-radius: 999px; } #ldView .cflate:hover { background: var(--hover); }
 #ldView .cfm.vac { cursor: default; color: #e5484d; border-style: dashed; }
 #ldView .ldcerttb summary { cursor: pointer; list-style: none; } #ldView .ldcerttb summary::-webkit-details-marker { display: none; }
 #ldView .ldcerttb summary h3::before { content: "▸ "; } #ldView .ldcerttb[open] summary h3::before { content: "▾ "; }

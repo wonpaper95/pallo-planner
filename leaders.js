@@ -333,6 +333,9 @@ async function mixLoad() {
 }
 // 📋 오늘 리더 사전 확인: 오늘 요일 반 리더를 시간대별로 · 연락해서 온다고 하면 ✅ (누가·몇 시) · 실제 출석 O/X 는 보드 출석 칸(전산 연동)
 const hm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+// ⏰ 확인(✅)한 리더 이름 옆 짧은 표시 — '10분 지각' 등 (leader_confirm.note, 0074)
+const LATE = ["5분 지각", "10분 지각", "15분 지각", "20분 지각", "30분 지각", "조퇴"];
+const lateSel = (id, note) => `<select class="cflate" data-late="${id}" title="이름 옆 표시 (지각 등)"><option value="">⏰</option>${LATE.map((x) => `<option>${esc(x)}</option>`).join("")}<option value="__own">✏️ 직접 적기</option>${note ? `<option value="__clear">✕ 표시 지우기</option>` : ""}</select>`;
 function todayHtml() {
   const td = today(), dow = W.parse(td).getDay(), g = LDC.GRPS.find((x) => LDC.DAYS[x].includes(dow));
   if (!g) return `<section class="ldtoday"><h3>📋 오늘 리더 확인 <span class="mut">${md(td)}(${dw(td)}) 수업 없음</span></h3></section>`;
@@ -341,7 +344,7 @@ function todayHtml() {
   const ok = rs.filter((r) => r.status === "확정"), done = ok.filter((r) => LD.cfm?.has(r.id)).length;
   const slots = [...new Set(rs.map((r) => r.slot))].map((sl) => `<div class="tdrow"><b>${esc(sl || "시간 미정")}</b>${rs.filter((r) => r.slot === sl).map((r) => { const c = LD.cfm?.get(r.id);
     return r.status !== "확정" ? `<span class="cfm vac">🔴 ${esc(r.level || "")} 빈자리</span>`
-      : `<button class="cfm ${c ? "on" : ""}" data-cfm="${r.id}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(r.name)}${c ? ` <small>${hm(c.at)} ${esc(c.by_name)}</small>` : ""}</button>`; }).join("")}</div>`).join("");
+      : `<span class="cfm ${c ? "on" : ""}"><button data-cfm="${r.id}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(r.name)}${c?.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}${c ? ` <small>${hm(c.at)} ${esc(c.by_name)}</small>` : ""}</button>${c ? lateSel(r.id, c.note) : ""}</span>`; }).join("")}</div>`).join("");
   return `<section class="ldtoday"><h3>📋 오늘 리더 확인 <span class="mut">${md(td)}(${dw(td)}) ${g} · 연락해서 온다고 하면 체크 · <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}명</b></span></h3>${slots}</section>`;
 }
 function mixHtml() {
@@ -606,6 +609,13 @@ document.addEventListener("contextmenu", (e) => {
   const v = V(); if (!v || !v.contains(e.target) || e.target.closest("input")) return;
   const tr = e.target.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   e.preventDefault(); editDlg(r);
+});
+document.addEventListener("change", async (e) => { // ⏰ 오늘 리더 확인: 이름 옆 표시
+  const id = e.target.dataset?.late; if (!id) return;
+  let note = e.target.value === "__clear" ? "" : e.target.value; if (!e.target.value) return;
+  if (note === "__own") { note = (prompt("이름 옆에 붙일 표시 (30자까지, 예: 10분 지각 · 교재 안 가져옴)", LD.cfm.get(+id)?.note || "") ?? null); if (note === null) return LD.render(); note = note.trim().slice(0, 30); }
+  const { data, error } = await sb.from("leader_confirm").update({ note }).match({ leader_id: +id, day: today() }).select().single(); if (fail(error)) return LD.render();
+  LD.cfm.set(+id, data); LD.render(); toast(note ? `표시했어요: ${note}` : "표시를 지웠어요");
 });
 document.addEventListener("change", async (e) => {
   const id = e.target.dataset?.nn; if (!id) return; // 🔴 현황표 팀 특이사항 (칸에서 나가면 저장)
