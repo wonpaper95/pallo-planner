@@ -13,7 +13,7 @@
 [매일 06:00 예약 작업 pallo-daily-metrics]
   네이버 광고 API ──┐
   구글 광고(크롬) ──┤
-  메타 광고(크롬) ──┼─▶ mkd_daily (어제, 채널×단위 1행) ─▶ build-report ─▶ mkd_reports(daily: 플래그+코멘트)
+  메타 광고(API) ───┼─▶ mkd_daily (어제, 채널×단위 1행) ─▶ build-report ─▶ mkd_reports(daily: 플래그+코멘트)
   블로그 순위·방문자(크롬) ┤                                      └▶ 월요일: mkd_reports(weekly: 종합)
   당근(크롬) ───────┤
   전산 문의(크롬) ──┘
@@ -30,7 +30,7 @@
   |---|---|---|
   | 네이버 검색광고 | 캠페인별 노출·클릭·비용·CTR·평균CPC·평균순위 | **API** — `/ncc/campaigns`(목록) + `/stats`(그 날 통계). 계정 둘: 대구(기본 키 `NAVER_AD_*`, 지점 dsr·jpcn)·울산(`NAVER_AD_*_ULSAN` 키, 지점 ulsan), 키는 맥미니 `~/.config/pallo/marketing.env`. 꺼져 있고(PAUSED) 그 날 노출·비용이 0 인 캠페인은 건너뜀 |
   | 구글 검색광고 | 캠페인별 노출·클릭·비용·전환(신청클릭) + 비승인·결제 경고 | 크롬 확장 (계정 2개 ocid 6771267051·7116215996, 기존 3일 점검 절차 재사용) |
-  | 메타 광고 | 광고세트별 노출·도달·클릭·리드·비용(USD→원) | 크롬 확장, 광고관리자 계정 3542016502769477, 열 구성 "팔로 마케팅 분석용" → 나중에 API(메타 5단계) |
+  | 메타 광고 | 캠페인별 노출·클릭·리드·비용(USD→원) | 운영 DB `mk_ad_daily`(맥북/맥미니 `pull-meta` 메타 API) → 캠페인별, 환율 frankfurter(ECB). 광고 계정 3542016502769477 은 4개 지점 공용. 도달은 광고끼리 겹쳐 합이 부풀어 싣지 않음. 맥미니에 토큰 파일이 있으면 그날치를 새로 받고, 없으면 맥북 적재 데이터 사용 |
   | 네이버 블로그 순위 | `mkd_keywords` 켜진 키워드별 우리 글 순위(통합검색) | 크롬 확장, 네이버 검색 결과 읽기 |
   | 네이버 블로그 방문자 | 일 방문자·조회수 | 크롬 확장, 블로그 통계 (지점별 블로그 수는 구현 때 확인해 여기 기록) |
   | 당근 | 비즈프로필 조회수·단골(관심)·채팅 문의 | 크롬 확장, 비즈프로필 통계 (지점별 계정 구조는 구현 때 확인해 여기 기록) |
@@ -68,7 +68,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 
 **metrics 키 (채널별):**
 - `naver_ad`, `google_ad`: impressions, clicks, spend(원), ctr, cpc, conversions(구글만), flags[](비승인·결제 등)
-- `meta_ad`: impressions, reach, clicks, leads, spend_usd, fx, spend(원)
+- `meta_ad` unit=캠페인(없으면 광고세트→광고 이름): impressions, clicks, leads, spend_usd, fx, spend(원). 환율을 못 받으면 spend·fx null + partial + note
 - `blog` unit=키워드: rank(1페이지 밖이면 null), top_url, our_url / unit='방문자': visitors, views
 - `daangn`: views, followers, chats
 - `jeonsan` unit=유입경로(meta|gads_*|nad_*|homepage|기타): inquiries, enrolls(그 날 등록 전환된 수)
@@ -84,8 +84,8 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 | 순서 | 채널 | 하는 일 | 스크립트 |
 |---|---|---|---|
 | 1 | 네이버 광고 | 검색광고 API(`/ncc/campaigns` + `/stats`)로 어제 캠페인별 통계 → 바로 저장. 계정 둘: 대구(`NAVER_AD_*`, dsr·jpcn)·울산(`NAVER_AD_*_ULSAN`, ulsan), 한 계정이 실패해도 다른 계정은 계속 | `naver-ad.mjs <date>` |
+| 1-2 | 메타 광고 | `mk_ad_daily` 어제 줄(+토큰 파일 있으면 `pull-meta` 새로고침) → 지점+캠페인 합계 → 환율(당일 → 직전 저장값 → latest → 없으면 비용 null)로 원화 → 바로 저장. 줄이 0 이면 새로고침 결과에 따라 지점별 failed(데이터 아직 없음) / 0 행(집행 없음) | `meta-ad.mjs <date> [--print]` |
 | 2 | 구글 광고 | 크롬: 계정 2개, 날짜 "어제" 맞춤 기간, 캠페인 표 + 알림 읽기 → JSON | Claude가 읽고 `save-daily.mjs google_ad <json>` |
-| 3 | 메타 광고 | 크롬: 광고관리자, 열 구성 "팔로 마케팅 분석용", 기간 어제, 광고세트 보기 → JSON | `save-daily.mjs meta_ad` |
 | 4 | 블로그 순위 | `keywords.mjs` 로 켜진 키워드 목록 → 크롬에서 통합검색 → 우리 글 위치 | `save-daily.mjs blog` |
 | 5 | 블로그 방문자 | 크롬: 블로그 통계 어제 | `save-daily.mjs blog` |
 | 6 | 당근 | 크롬: 비즈프로필 통계 어제 | `save-daily.mjs daangn` |
@@ -138,9 +138,9 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 
 ## 6. 예외 처리
 
-- 환율 조회 실패 → 직전 환율 사용 + 코멘트에 표시.
+- 환율 조회 실패 → 직전 저장 환율(없으면 latest) 사용 + 코멘트에 표시(`meta-ad.mjs` 출력의 `fxSource`). 모두 실패하면 비용 null + partial.
 - 구글 화면 느림 → 10~20초 대기, 스크린샷로 열 확인(기존 절차).
-- 메타 광고관리자 열 구성이 바뀌어 있으면 "팔로 마케팅 분석용"으로 다시 고르고, 없으면 `partial`로 저장.
+- 메타 새로고침이 실패·건너뜀이고 그날 `mk_ad_daily` 줄이 없으면 최근 7일에 광고가 있던 지점에 `failed` 행("메타 데이터 아직 없음(이유)") — 0 으로 보이지 않게.
 - 전산 화면 구조 변경 → `jeonsan` 전부 `failed`, 코멘트에 "전산 읽기 실패".
 - 같은 날 두 번 실행 → upsert, `collected_at` 갱신.
 
@@ -165,3 +165,4 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 ## 진행 기록
 - 2026-10-30 1~2단계 완료: 운영 DB 에 mkd_* 3개 적용(대표 승인), 첫 수동 수집 D=2026-10-29 — 네이버 9캠페인(대구영어 3·대구일중 3·울산 3, ₩46,839) · 구글 8캠페인(대구·울산 모두 일시중지, 노출 0, 두 계정 '계정 보안 강화' 알림 → 🔴 2) · 전산 문의 28건(대구동성로 4·대구일중 11·울산 13). 일일 리포트 저장. 화면은 로컬 데이터로 확인(브랜치 feat/daily-metrics, main 미배포).
 - 실제로 알게 된 것: 전산 표에 '등록' 상태 없음 → 문의만(등록은 3단계). 전산 유입경로에 nad_ 태그 없음 → 네이버 '클릭-문의0' 판단 안 함. 네이버 계정 2개(대구 기본 키, 울산 `_ULSAN` 키).
+- 2026-10-30 메타 광고 추가: 크롬 대신 `scripts/mkd/meta-ad.mjs`(순수 `meta-rows.mjs`, 테스트 `tests/mkd-meta.test.mjs`·`mkd-meta-cli.test.mjs`). 10/29 `--print` 확인 — 3개 지점(대구영어·대구일중·울산) 9캠페인, $334.76, 리드 16. 맥미니에는 메타 토큰 파일이 아직 없어 새로고침은 건너뛰고 맥북 적재분을 쓴다.
