@@ -77,41 +77,50 @@ function personaHtml(d) {
 // 맥미니가 매일 새벽 mkd_daily 에 쌓은 "어제" 숫자를 56일치 읽어 MKDCORE 로 5칸(매일·3일·주간·2주·4주)을 여기서 계산한다. 코멘트·이상 징후는 mkd_reports(daily) 에서 스킬이 쓴 것.
 const STCHIP = { ok: ["✅", "수집됨"], partial: ["⚠️", "일부만"], failed: ["⚠️", "미수집"], login_required: ["🔒", "로그인 필요"], missing: ["⚪", "데이터 없음"] };
 const FLAGICON = { red: "🔴", yellow: "🟡", gray: "⚪" };
-// PostgREST 는 한 번에 1000행까지만 준다 — 4개 지점×56일×캠페인·키워드면 넘을 수 있어 나눠 읽는다 (기본키 순서로 정렬해 쪽마다 겹치거나 빠지지 않게)
+// PostgREST 는 한 번에 1000행까지만(서버 설정이 더 작을 수도) 준다 — 4개 지점×56일×캠페인·키워드면 넘을 수 있어 나눠 읽는다 (기본키 순서로 정렬해 쪽마다 겹치거나 빠지지 않게).
+// 서버가 요청보다 적게 줘도 빠지지 않도록 "받은 만큼"만 앞으로 가고, 빈 쪽이 올 때까지 읽는다.
 async function mkdRows(end, team) {
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    let q = sb.from("mkd_daily").select("team_id,date,channel,unit,metrics,status").gte("date", MKDCORE.addDays(end, -55)).lte("date", end).order("date").order("team_id").order("channel").order("unit").range(from, from + 999);
+  const out = [], SIZE = 1000;
+  for (let from = 0; ; ) {
+    let q = sb.from("mkd_daily").select("team_id,date,channel,unit,metrics,status").gte("date", MKDCORE.addDays(end, -55)).lte("date", end).order("date").order("team_id").order("channel").order("unit").range(from, from + SIZE - 1);
     if (team) q = q.eq("team_id", team);
     const { data, error } = await q;
     if (error) return { error };
-    out.push(...(data ?? []));
-    if ((data ?? []).length < 1000) return { rows: out };
+    if (!Array.isArray(data) || !data.length) return { rows: out };
+    out.push(...data);
+    from += data.length;
   }
 }
 async function renderDaily(admin) {
   const body = $m("#mkBody");
   MK.dteam = admin ? (MK.dteam ?? 0) : MK.team;
-  if (!admin && !MK.dteam) { body.innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
-  const last = await sb.from("mkd_daily").select("date").order("date", { ascending: false }).limit(1).maybeSingle(); // 기준일 = 가장 최근 수집일
-  if (!body.isConnected || MK.tab !== "daily") return; // 기다리는 사이 다른 탭으로 옮겼으면 그리지 않는다
+  const team = MK.dteam; // 지점을 빠르게 바꿔 누르면 먼저 시작한 요청이 나중에 끝날 수 있다 → 이 호출이 시작될 때의 지점을 기억해 뒀다가, 기다린 뒤 달라졌으면 그리지 않는다
+  if (!admin && !team) { body.innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
+  const stale = () => !body.isConnected || MK.tab !== "daily" || team !== MK.dteam; // 다른 탭·다른 화면·다른 지점으로 옮겼으면 true
+  let lq = sb.from("mkd_daily").select("date").order("date", { ascending: false }).limit(1); // 기준일 = 가장 최근 수집일
+  if (!admin) lq = lq.eq("team_id", team); // 매니저·미리보기는 자기 지점의 마지막 수집일 (대표는 전 지점 중 가장 최근)
+  const last = await lq.maybeSingle();
+  if (stale()) return;
   if (fail(last.error)) return;
   if (!last.data) { body.innerHTML = `<div class="card">아직 쌓인 데이터가 없어요. 맥미니가 매일 새벽 6시에 어제 숫자를 모아요. 급하면 Claude에게 "일일 현황 수집해줘"라고 하면 돼요.</div>`; return; }
   const end = last.data.date;
-  const [rr, rp] = await Promise.all([mkdRows(end, MK.dteam), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle()]);
-  if (!body.isConnected || MK.tab !== "daily") return;
+  const [rr, rp] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle()]);
+  if (stale()) return;
   if (fail(rr.error)) return;
   if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
   const rep = rp.data?.data;
   const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end), st = MKDCORE.status(rows, end);
-  // 이상 징후는 선택한 지점 것만, 대표 "전체 합계" 는 전부(지점 이름표 붙여서)
-  const flags = (Array.isArray(rep?.flags) ? rep.flags : []).filter((f) => !MK.dteam || Number(f.team_id) === MK.dteam);
+  // 마지막 수집일이 한국 시각 어제보다 오래됐으면 맥미니 수집이 멈춘 것 → 알려 준다
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), behind = end < MKDCORE.addDays(today, -1), ago = Math.round((Date.parse(today) - Date.parse(end)) / 864e5);
+  // 이상 징후는 선택한 지점 것만, 대표 "전체 합계" 는 전부(지점 이름표 붙여서). 리포트 JSON 은 스킬이 쓴 값이라 모양이 틀려도 죽지 않게 거른다
+  const flags = (Array.isArray(rep?.flags) ? rep.flags : []).filter((f) => f && typeof f === "object").filter((f) => !team || Number(f.team_id) === team);
   const chips = MKDCORE.CHANNELS.map((c) => { const [i, t] = STCHIP[st[c]] ?? STCHIP.missing; return `<span class="mkchip st-${esc(st[c])}" title="${t}">${i} ${esc(MKDCORE.CHANNEL_LABEL[c])}</span>`; }).join("");
-  const teamSel = admin ? `<select id="mkdTeam"><option value="0">전체 합계</option>${teams.map((t) => `<option value="${t.id}" ${t.id === MK.dteam ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : "";
+  const teamSel = admin ? `<select id="mkdTeam"><option value="0">전체 합계</option>${teams.map((t) => `<option value="${t.id}" ${t.id === team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : "";
   const repHtml = !rep ? `<div class="card"><span class="mut">${rp.error ? "코멘트·이상 징후를 못 읽었어요" : "이 날짜의 코멘트·이상 징후 리포트가 아직 없어요"}</span></div>`
-    : (rep.comment ? `<div class="card"><b>오늘 한 줄</b><p>${esc(rep.comment)}</p></div>` : "")
-      + (flags.length ? `<div class="card warn"><b>이상 징후 ${flags.length}건</b><ul>${flags.map((f) => `<li>${FLAGICON[f.level] ?? ""} ${!MK.dteam && f.team ? `<span class="tag">${esc(f.team)}</span> ` : ""}${esc(f.msg)}</li>`).join("")}</ul></div>` : `<div class="card"><span class="mut">이상 징후 없음</span></div>`);
-  body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(어제까지)</span></span><div class="mkchips">${chips}</div></div>`
+    : (rep.comment ? `<div class="card"><b>오늘 한 줄</b><p style="white-space:pre-line">${esc(rep.comment)}</p></div>` : "")
+      + (flags.length ? `<div class="card warn"><b>이상 징후 ${flags.length}건</b><ul>${flags.map((f) => `<li>${Object.hasOwn(FLAGICON, f.level) ? FLAGICON[f.level] : ""} ${!team && f.team ? `<span class="tag">${esc(f.team)}</span> ` : ""}${esc(f.msg)}</li>`).join("")}</ul></div>` : `<div class="card"><span class="mut">이상 징후 없음</span></div>`);
+  body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(${behind ? "마지막 수집일" : "어제까지"})</span></span><div class="mkchips">${chips}</div></div>`
+    + (behind ? `<div class="card warn">⚠️ 마지막 수집이 ${n(ago)}일 전(${esc(end)})이에요 — 맥미니 예약 작업을 확인해 주세요</div>` : "")
     + repHtml
     + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
        <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요.</p></div>`;
