@@ -17,9 +17,9 @@
   body.side-on:not(.mv) #somedayView { padding-left: 24px; }
 }
 /* 주 목록은 주간 화면에서만 (다른 탭에선 숨김 — index.html 의 .layout 숨김 규칙과 같은 목록) */
-body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .ldv, .smv, .eduv, .rpv, .jgv, .wkv, .jcv) .seg #weeks { display: none; }
+body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .ldv, .smv, .eduv, .rpv, .jgv, .wkv, .jcv, .tkv) .seg #weeks { display: none; }
 .seg [data-v=week] { --ic: "◫"; } .seg [data-v=month] { --ic: "▦"; } .seg [data-v=team] { --ic: "◎"; } .seg [data-v=sales] { --ic: "₩"; }
 .seg [data-v=blog] { --ic: "✎"; } .seg [data-v=mk] { --ic: "◆"; } .seg [data-v=post] { --ic: "▤"; } .seg [data-v=qna] { --ic: "?"; }
 .seg [data-v=links] { --ic: "↗"; } .seg [data-v=ct] { --ic: "☎"; } .seg [data-v=ld] { --ic: "☰"; } .seg [data-v=edu] { --ic: "◇"; }
-.seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=wiki] { --ic: "≡"; } .seg [data-v=rp] { --ic: "▣"; }
+.seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=tk] { --ic: "✉"; } .seg [data-v=wiki] { --ic: "≡"; } .seg [data-v=rp] { --ic: "▣"; }
 .seg [data-v=sim] { --ic: "◐"; } .seg [data-v=board] { --ic: "▥"; }

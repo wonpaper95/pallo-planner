@@ -1,0 +1,26 @@
+/* 💬 [톡톡봇] 탭 (talkbot.js) */
+body:not(.tkv) #tkView { display: none; }
+#tkView { max-width: 860px; margin: 0 auto; padding: 16px 20px 100px; }
+#tkView .tkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+#tkView .tkbar h2 { margin: 0; }
+#tkView input, #tkView select, #tkView textarea { padding: 8px 10px; background: var(--bg); color: inherit; border: 1px solid var(--line); border-radius: 8px; min-width: 0; font: inherit; }
+#tkView textarea { width: 100%; min-height: 64px; resize: vertical; box-sizing: border-box; }
+#tkView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+#tkView .tksec h3 { font-size: 17px; margin: 20px 0 8px; }
+#tkView .tkask { display: grid; gap: 8px; }
+#tkView .tkrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
+#tkView .tkrow label { margin-right: auto; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+#tkView .tkform { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+#tkView .tkform textarea, #tkView .tkform .tkrow { grid-column: 1 / -1; }
+#tkView .tkbr { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+#tkView .tkkb { display: grid; grid-template-columns: auto minmax(90px, 0.6fr) 1.6fr auto; align-items: start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+#tkView .tkkb:last-child { border-bottom: 0; }
+#tkView .tkkb > span:nth-child(3) { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+#tkView .tkkb.off { opacity: 0.45; }
+#tkView .tkbtns { display: flex; gap: 2px; }
+#tkView .tkbtns .btn { padding: 4px 8px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 600px) {
+  #tkView .tkkb { grid-template-columns: 1fr auto; }
+  #tkView .tkkb > span:nth-child(3) { grid-column: 1 / -1; }
+  #tkView .tkkb .tkbr { justify-self: start; }
+}
