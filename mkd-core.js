@@ -116,6 +116,77 @@ function buildTable(rows, end) {
   }).filter(Boolean);
 }
 
+// 핵심 4개 (팀 안에서 채널을 가로지름): 전산 문의·등록, 총 광고비(광고 3채널 합), 문의당 비용. 5칸 모두.
+function summary(rows, end) {
+  const jt = totalRows(rows.filter((r) => r.channel === "jeonsan"));
+  const ads = AD_CHANNELS.flatMap((c) => totalRows(rows.filter((r) => r.channel === c)));
+  const line = (label, rs, metric, good, unit) => ({ label, good, unit, cells: WINDOWS.map((w) => ({ key: w.key, ...cell(rs, metric, end, w.days) })) });
+  const inq = line("문의", jt, "inquiries", "up", "int"), enr = line("등록", jt, "enrolls", "up", "int"), sp = line("총 광고비", ads, "spend", "down", "krw");
+  const div = (a, b) => (a === null || a === undefined || !b ? null : a / b); // 문의 0 이면 산출 불가(null)
+  // 문의당 비용은 두 칸(광고비·문의)으로 만든 값이라, 증감도 두 칸 중 덜 찬 쪽 기준으로 cell 과 같은 절반 규칙을 따른다
+  const cpi = { label: "문의당 비용", good: "down", unit: "krw", cells: WINDOWS.map((w, i) => { const s = sp.cells[i], q = inq.cells[i], v = div(s.value, q.value), p = div(s.prev, q.prev), pd = Math.min(s.prevDays, q.prevDays); return { key: w.key, value: v, prev: p, change: pd * 2 >= w.days ? pctChange(v, p) : null, days: Math.min(s.days, q.days), prevDays: pd, hold: false }; }) };
+  return [inq, enr, sp, cpi];
+}
+
+// 채널별 기준일 수집 상태: ok / partial / failed / login_required / missing(행 없음)
+function status(rows, end) {
+  return Object.fromEntries(CHANNELS.map((c) => {
+    const day = rows.filter((r) => r.channel === c && r.date === end); if (!day.length) return [c, "missing"];
+    const st = day.map((r) => r.status);
+    return [c, st.every((s) => s === "ok") ? "ok" : st.some((s) => s === "ok" || s === "partial") ? "partial" : st[0]];
+  }));
+}
+
+// 전산 유입경로(unit) → 광고 채널. 코멘트 토큰 gads_* = 구글, nad_* = 네이버, 광고명 있는 리드폼 = meta.
+function channelOfSource(unit) { const u = String(unit ?? ""); return /^gads_/.test(u) ? "google_ad" : /^nad_/.test(u) ? "naver_ad" : u === "meta" ? "meta_ad" : null; }
+
+// 이상 징후 (rows 는 한 팀 것). 결과: [{level: red|yellow|gray, code, channel, unit, msg}]
+function flags(rows, end) {
+  const out = [], push = (level, code, channel, unit, msg) => out.push({ level, code, channel, unit, msg });
+  const L = (c) => CHANNEL_LABEL[c], pct = (x) => Math.round(x * 100);
+  const chRows = (c) => rows.filter((r) => r.channel === c);
+  // 1 광고 멈춤: 직전 7일(3~9일 전) 안에 노출이 있던 캠페인이 노출 0 으로 3일 연속. 화면 상태가 일시중지면 의도된 것이라 뺀다.
+  for (const c of AD_CHANNELS) for (const u of unitsOf(chRows(c))) {
+    const ur = chRows(c).filter((r) => r.unit === u), at = (d) => ur.find((r) => r.date === d);
+    if (/일시\s*중지|paused|중지됨/i.test(String(at(end)?.metrics?.status ?? ""))) continue;
+    const last3 = [0, 1, 2].map((i) => num(at(addDays(end, -i))?.metrics?.impressions));
+    const ranBefore = [3, 4, 5, 6, 7, 8, 9].some((i) => num(at(addDays(end, -i))?.metrics?.impressions) > 0);
+    if (last3.every((v) => v === 0) && ranBefore) push("red", "ad_stopped", c, u, `${L(c)} '${u}' 노출 0 이 3일째예요`);
+  }
+  // 2 승인/결제 문제: 구글·메타 화면에서 읽은 경고 문구(metrics.flags)
+  for (const c of ["google_ad", "meta_ad"]) for (const r of chRows(c).filter((r) => r.date === end)) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) push("red", "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
+  // 3 비용 급증: 채널 3일 비용 ▲30%↑ 인데 전체 문의 3일은 ▼ 또는 0
+  const sm = summary(rows, end), inq3 = sm[0].cells[1];
+  for (const c of AD_CHANNELS) {
+    const sp = cell(totalRows(chRows(c)), "spend", end, 3);
+    if (sp.change !== null && sp.change >= 0.3 && (!inq3.value || (inq3.change !== null && inq3.change < 0))) push("yellow", "spend_spike", c, ALL, `${L(c)} 3일 비용 ▲${pct(sp.change)}% 인데 문의는 ${inq3.value ? "줄었어요" : "0건이에요"}`);
+  }
+  // 4 문의 급감: 주간 문의가 4주 주평균 대비 ▼40%↑ (전산 데이터가 14일 이상일 때만)
+  const jt = totalRows(chRows("jeonsan")), w1 = cell(jt, "inquiries", end, 7), w4 = cell(jt, "inquiries", end, 28);
+  if (w4.days >= 14 && w1.value !== null && w4.value) { const avg = w4.value / (w4.days / 7); if (avg > 0 && (w1.value - avg) / avg <= -0.4) push("yellow", "inquiry_drop", "jeonsan", ALL, `주간 문의 ${w1.value}건 — 4주 주평균 ${Math.round(avg * 10) / 10}건보다 ${pct(1 - w1.value / avg)}% 적어요`); }
+  // 5 순위 하락: 키워드 순위 3계단↑ 하락 또는 1페이지 이탈(rank→null). 직전에 순위가 있던 날과 비교.
+  for (const u of unitsOf(chRows("blog")).filter((u) => u !== "방문자")) {
+    const ur = chRows("blog").filter((r) => r.unit === u && usable(r)).sort(byDate), today = ur.find((r) => r.date === end); if (!today) continue;
+    const prevR = [...ur].reverse().find((r) => r.date < end && num(r.metrics?.rank) !== null); if (!prevR) continue;
+    const cur = num(today.metrics?.rank), prev = num(prevR.metrics?.rank);
+    if (cur === null) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`);
+    else if (cur - prev >= 3) push("yellow", "rank_drop", "blog", u, `'${u}' ${prev}위 → ${cur}위`);
+  }
+  // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (전산 데이터가 있을 때만)
+  if (chRows("jeonsan").length) for (const c of AD_CHANNELS) {
+    const ck = cell(totalRows(chRows(c)), "clicks", end, 7); if ((ck.value ?? 0) < 50) continue;
+    const q = cell(chRows("jeonsan").filter((r) => channelOfSource(r.unit) === c), "inquiries", end, 7);
+    if (!q.value) push("yellow", "clicks_no_inquiry", c, ALL, `${L(c)} 주간 클릭 ${ck.value}인데 전산 문의 0건 — 추적·폼 확인`);
+  }
+  // 7 결측: 기준일·전날 모두 ok/partial 이 아닌 채널 (데이터가 한 번이라도 있던 채널만)
+  for (const c of CHANNELS) {
+    if (!chRows(c).length) continue;
+    const st = [status(rows, end)[c], status(rows, addDays(end, -1))[c]];
+    if (st.every((s) => s !== "ok" && s !== "partial")) push("gray", "missing", c, ALL, `${L(c)} ${st[0] === "login_required" ? "로그인 필요" : "수집 안 됨"} 2일째`);
+  }
+  return out;
+}
+
 // 표기 (화면·보고 공용)
 function fmt(v, unit) {
   if (v === null || v === undefined) return "–";
@@ -125,5 +196,5 @@ function fmt(v, unit) {
   return Math.round(v).toLocaleString("ko-KR");
 }
 
-return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, fmt };
+return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, fmt };
 });
