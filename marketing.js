@@ -376,12 +376,15 @@ async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(50);
   if (fail(error)) return;
   const all = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
-  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key));
+  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key)), tt = all.filter((r) => r.data?.src === "tt" && /^tt:\d+$/.test(r.key));
   const at = rows[0]?.data?.collected, ytAt = yt[0]?.data?.collected;
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : "");
   // 쇼츠는 썸네일을 누르면 그 자리에서 재생(youtube-nocookie 임베드), 제목은 유튜브로 이동
   const ytList = yt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<button class="agplay" data-yt="${esc(r.key.slice(3))}" title="여기서 재생">${img(d.image, "agthumb")}<span>▶</span></button>` : ""}<div class="cmp-b"><div><a href="https://www.youtube.com/shorts/${esc(r.key.slice(3))}" target="_blank" rel="noopener">${esc(d.title || "(제목 없음)")}</a></div>
       <div class="mut">${esc(d.channel ?? "")} · 조회 ${n(d.views).toLocaleString("ko-KR")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · ${n(d.duration_s)}초 · ${esc(d.published ?? "")}</div></div></div>`; }).join("");
+  const ttUrl = (tag) => `https://www.tiktok.com/tag/${encodeURIComponent(String(tag ?? "").replace(/^#/, ""))}`;
+  const ttList = tt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${img(d.image, "agthumb")}</a>` : ""}<div class="cmp-b"><div><b>${n(d.rank)}위</b> <a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${esc(d.tag ?? "")}</a></div>
+      <div class="mut">게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}</div></div></div>`; }).join("");
   const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agthumb")}<div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
       <span class="mut">${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개로 돌림` : ""} · ${esc(d.media_type || "?")}${d.cta ? ` · ${esc(d.cta)}` : ""}${(d.keywords ?? []).length ? ` · 검색어 ${esc(d.keywords.join(", "))}` : ""}</span></div>
       <div>${esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90))}</div></div></div>`; }).join("");
@@ -392,7 +395,10 @@ async function renderTrend() {
     + `<div class="card"><b>🎬 요즘 뜨는 숏폼 — 유튜브 쇼츠 (한국, 3분 이하)</b>
     <p class="mut">기준: 한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${ytAt ? ` · 수집 ${esc(new Date(ytAt).toLocaleString("ko-KR"))}` : ""}</p>
     ${ytList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요. 썸네일을 누르면 여기서 바로 재생돼요.</p></div>`;
+    <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요. 썸네일을 누르면 여기서 바로 재생돼요.</p></div>`
+    + `<div class="card"><b>🎵 틱톡 인기 해시태그 — 한국</b>
+    <p class="mut">틱톡 크리에이티브 센터 '최근 7일' 순위(틱톡 집계라 며칠 늦을 수 있어요) · 표지는 그 해시태그 인기 영상 · 누르면 틱톡 해시태그 페이지${tt[0]?.data?.collected ? ` · 수집 ${esc(new Date(tt[0].data.collected).toLocaleString("ko-KR"))}` : ""}</p>
+    ${ttList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`;
   V().querySelectorAll("[data-yt]").forEach((b) => b.addEventListener("click", () => {
     if (!/^[\w-]{11}$/.test(b.dataset.yt)) return;
     b.outerHTML = `<iframe class="agyt" src="https://www.youtube-nocookie.com/embed/${b.dataset.yt}?autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
