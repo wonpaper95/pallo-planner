@@ -71,7 +71,7 @@ const visible = () => {
   const q = FN.q.trim().toLowerCase();
   return q ? FN.rows.filter((r) => Object.values(r.vals).some((v) => String(v).toLowerCase().includes(q))) : FN.rows;
 };
-const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length)).sort((a, b) => a.sort - b.sort || a.updated_at.localeCompare(b.updated_at));
+const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length)).sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); // 같은 순서 번호끼리는 id 로 — 고친 시각(updated_at)으로 하면 칸을 고칠 때마다 줄이 서로 자리를 바꿈 (신고 세연)
 
 function render() {
   const sk = `${FN.team}|${FN.month}|${myRole}`;
@@ -198,7 +198,8 @@ async function saveCell(inp) {
 async function addRow(kind, sec) {
   const d = FN.month === ymNow() ? today() : "";
   const vals = kind === "sale" ? { 날짜: d } : { 구분: sec, 날짜: ["본사지출", "지점기타지출"].includes(sec) ? d : "" };
-  const sort = Math.max(0, ...FN.rows.filter((r) => r.kind === kind).map((r) => r.sort)) + 1;
+  const sort = Math.max(FN.lastSort?.[kind] ?? 0, ...FN.rows.filter((r) => r.kind === kind).map((r) => r.sort)) + 1; // [+ 줄] 빨리 두 번 눌러도 같은 번호 안 나오게 (저장 기다리기 전에 잡아 둠)
+  (FN.lastSort ??= {})[kind] = sort;
   const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select("id, kind, vals, sort, files, updated_by, updated_at").single();
   if (fail(error)) return;
   FN.rows.push(data); FN.q = ""; render();
