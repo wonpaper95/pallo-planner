@@ -186,16 +186,19 @@ async function saveCell(inp) {
   const k = inp.dataset.k, raw = inp.value.trim();
   const v = k === "날짜" ? normDate(raw, FN.month) : NUMK.has(k) ? (raw === "" ? "" : toNum(raw) ?? raw) : raw;
   if (String(v) === String(r.vals[k] ?? "")) { inp.value = showOf(k, v); return; }
-  const vals = { ...r.vals, [k]: v }, rate = FN.cfg?.rate ?? 10320;
+  const patch = { [k]: v }, rate = FN.cfg?.rate ?? 10320;
   if (k === "근무시간" && r.vals.구분 === "행정조교" && typeof v === "number") {
     const was = toNum(r.vals.금액), auto = toNum(r.vals.근무시간) !== null ? Math.round(rate * toNum(r.vals.근무시간)) : null;
-    if (was === null || was === 0 || was === auto) vals.금액 = Math.round(rate * v);
+    if (was === null || was === 0 || was === auto) patch.금액 = Math.round(rate * v);
   }
-  r.vals = vals;
+  r.vals = { ...r.vals, ...patch };
   inp.value = showOf(k, v); inp.title = String(v);
-  // 저장은 차례로, 보낼 때의 최신 vals 로 (빨리 여러 칸 고쳐도 서로 덮어쓰지 않게)
-  const { error } = await (save = save.then(() => sb.from("fin_rows").update({ vals: r.vals }).eq("id", r.id)));
+  // 저장은 차례로, 바뀐 칸만 (fin_patch, 0077) — 줄 전체를 보내면 그사이 시트에서 고친 다른 칸이 되돌아감. 돌아온 vals(서버 최신)로 맞춤
+  Object.assign((r._p ??= {}), patch); // 아직 저장 중인 칸 (돌아온 서버 값이 이걸 되돌리지 않게)
+  const { data, error } = await (save = save.then(() => sb.rpc("fin_patch", { p_id: r.id, p_patch: patch })));
+  for (const [x, y] of Object.entries(patch)) if (r._p[x] === y) delete r._p[x];
   if (fail(error)) return;
+  if (data && typeof data === "object") r.vals = { ...data, ...r._p };
   if (k === "근무시간" || NUMK.has(k)) render();
   queueSync();
 }

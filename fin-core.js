@@ -32,7 +32,10 @@ function normDate(s, month) {
 const empty = (v) => String(v ?? "").trim() === "";
 const REFUND = new Set(["환불", "시작전환불"]);
 const isRefund = (r) => r.kind === "sale" && REFUND.has(String(r.vals.거래형태 ?? "").trim());
+// 시트 안내문 줄 (예: 울산 '이 아래부터는 팔로…'): 날짜 칸에만 날짜 아닌 글이 있고 나머지 다 빈 줄 → 확인할 줄에서 뺌
+const noteRow = (r) => { const v = r.vals, d = String(v.날짜 ?? "").trim(); return !!d && !/^\d{4}-\d{2}-\d{2}$/.test(d) && !/\d/.test(d) && Object.entries(v).every(([k, x]) => k === "날짜" || empty(x)); };
 function problems(r) {
+  if (noteRow(r)) return [];
   const v = r.vals, need = r.kind === "sale" ? ["날짜", "멤버쉽", "매출", "이름", "거래형태", "결제수단", "상담자"] : ["사용처", "금액"];
   if (r.kind === "sale" && String(v.결제수단 ?? "").trim() === "카드") need.push("카드사", "할부개월");
   if (r.kind === "sale" && String(v.거래형태 ?? "").trim() === "가입") need.push("전화번호", "가입경로");
