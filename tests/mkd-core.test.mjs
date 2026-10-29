@@ -303,7 +303,7 @@ test("flags: 클릭 있는데 전산 문의 0", () => {
   assert.deepEqual(D.flags([...clicks, ...withSrc], END), []);
   const few = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 5 });
   assert.deepEqual(D.flags([...few, ...noSrc], END), []);
-  assert.deepEqual(D.flags(clicks, END), []); // 전산 데이터 자체가 없으면 판단 안 함
+  assert.ok(!codes([...clicks, trackedBefore("gads_daegu_en_search")]).includes("clicks_no_inquiry")); // 이번 주 전산 데이터가 전혀 없으면 판단 안 함 (지난 이력 행만 있어도; 결측 flag 는 따로 본다)
 });
 
 test("flags: 결측 2일째 (한 번이라도 데이터 있던 채널만)", () => {
@@ -335,8 +335,9 @@ test("flags: 비용 급증 — 전산이 전부 실패했거나 아예 없으면
 test("flags: 클릭 있는데 문의 0 — 전산 쓸 수 있는 행이 이번 주에 없으면 판단 안 함", () => {
   const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });   // 주간 클릭 70
   const failed = days(END, 7, "jeonsan", "전체", { inquiries: 0 }, "failed");
-  assert.ok(!codes([...clicks, ...failed]).includes("clicks_no_inquiry"));
-  const oldOnly = [...failed, row("2026-10-10", "jeonsan", "전체", { inquiries: 3 })];      // 이번 주 밖의 정상 행뿐
+  const hist = trackedBefore("gads_daegu_en_search");   // 이력은 있다 — 그래도 이번 주 쓸 수 있는 전산 날이 없으니 판단 안 함
+  assert.ok(!codes([...clicks, ...failed, hist]).includes("clicks_no_inquiry"));
+  const oldOnly = [...failed, row("2026-10-10", "jeonsan", "전체", { inquiries: 3 }), hist];      // 이번 주 밖의 정상 행뿐
   assert.ok(!codes([...clicks, ...oldOnly]).includes("clicks_no_inquiry"));
 });
 
@@ -395,9 +396,9 @@ test("flags: 비용 급증 — 3일 안에 쓸 수 있는 전산 날이 1일이�
 
 test("flags: 클릭 있는데 문의 0 — 이번 주 쓸 수 있는 전산 날이 4일 미만이면 판단 안 한다", () => {
   const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 }); // 주간 클릭 70
-  assert.ok(!codes([...clicks, row(END, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));           // 쓸 수 있는 전산 1일(0건)
-  assert.ok(!codes([...clicks, ...days(END, 3, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));    // 3일(0건)
-  const hist = trackedBefore("gads_daegu_en_search");
+  const hist = trackedBefore("gads_daegu_en_search");   // 이력은 있다 — 날짜 기준(4일)으로만 막히는지 본다
+  assert.ok(!codes([...clicks, hist, row(END, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));           // 쓸 수 있는 전산 1일(0건)
+  assert.ok(!codes([...clicks, hist, ...days(END, 3, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));    // 3일(0건)
   assert.deepEqual(codes([...clicks, hist, ...days(END, 4, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 4일(0건)이면 판단
   assert.deepEqual(codes([...clicks, hist, ...days(END, 7, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 7일(0건)
 });
@@ -435,6 +436,9 @@ test("flags: 클릭 있는데 문의 0 — 구글도 gads_ 이력이 있어야 �
   assert.ok(!codes([...clicks, ...base, trackedBefore("meta"), trackedBefore("nad_x")]).includes("clicks_no_inquiry")); // 다른 채널 이력
   assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -10), "jeonsan", "gads_x", { inquiries: 0 })]).includes("clicks_no_inquiry")); // 문의 0 이력은 이력 아님
   assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -10), "jeonsan", "gads_x", { inquiries: 1 }, "failed")]).includes("clicks_no_inquiry")); // 실패 행은 이력 아님
-  assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -6), "jeonsan", "gads_x", { inquiries: 1 })]).includes("clicks_no_inquiry")); // 이번 주 안(이번 주 문의가 있는 경우)
+  // 이번 주 첫날(END-6)에 같은 채널 문의 1건 → 이력이 있어도 이번 주 문의로 세서 판단 안 함. 이 줄은 주 첫날이 이번 주 창에 들어가는지를 본다
+  assert.ok(!codes([...clicks, ...base, trackedBefore("gads_x"), row(D.addDays(END, -6), "jeonsan", "gads_x", { inquiries: 1 })]).includes("clicks_no_inquiry"));
+  // 이번 주 바로 전날(END-7) 문의는 이력으로 센다 → 이번 주 문의 없으면 판단 (이력 기준선 = 이번 주 시작 전)
+  assert.deepEqual(codes([...clicks, ...base, row(D.addDays(END, -7), "jeonsan", "gads_x", { inquiries: 1 })]), ["clicks_no_inquiry"]);
   assert.deepEqual(codes([...clicks, ...base, trackedBefore("gads_x")]), ["clicks_no_inquiry"]);           // 이력 있고 이번 주 없음 → 판단
 });
