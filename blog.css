@@ -43,6 +43,9 @@ body:not(.blv) #blogView { display: none; }
 .blbench { margin-bottom: 16px; border-color: var(--accent) !important; }
 .blbench-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; } .blbench-h h3 { margin: 0; font-size: 20px; }
 .blbench-q { display: flex; gap: 8px; margin: 12px 0 6px; } .blbench-q input { flex: 1; min-width: 0; font-size: 17px; padding: 10px 14px; } .blbench-q .btn { white-space: nowrap; padding: 10px 18px; font-size: 15px; }
+.blnew { padding: 2px 9px; border-radius: 99px; background: var(--yellow); color: var(--onyel); font-size: 12.5px; font-weight: 700; }
+.blhow { margin: 10px 0 4px; padding: 8px 12px; border-radius: 10px; background: var(--hover); font-size: 14px; } .blhow summary { cursor: pointer; font-weight: 600; }
+.blhow ol { margin: 8px 0 6px; padding-left: 20px; line-height: 1.55; } .blhow li { margin-bottom: 4px; }
 .blres { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
 .blres h4 { margin: 0 0 8px; font-size: 16px; } .blres p { margin: 6px 0 4px; font-size: 14.5px; }
 .bltrend { width: 100%; height: auto; } .bltrend text { font-size: 12px; fill: var(--sub); } .bltrend .g { stroke: var(--line); stroke-width: 1; }

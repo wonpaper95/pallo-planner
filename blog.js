@@ -185,7 +185,14 @@ function renderNew() {
   const styles = [...PRESETS, ...BL.styles.map((s) => [`custom:${s.id}`, `⭐ ${s.name}${s.team_id ? "" : " (공용)"}`])];
   if (!styles.some(([k]) => k === o.preset)) o.preset = "auto"; // 기본값에 저장된 스타일이 이 지점에서 안 보이면
   $b("#blBody").innerHTML = `<section class="card blbench">
-    <div class="blbench-h"><h3>🔎 쓰기 전에 벤치마킹</h3><span class="mut">키워드 검색 추이와 네이버 블로그 상위 10개 글을 먼저 보고, 우리 글 각도를 정해요</span></div>
+    <div class="blbench-h"><h3>🔎 쓰기 전에 벤치마킹</h3>${seenBench() ? "" : `<span class="blnew">🆕 업데이트</span>`}<span class="mut">키워드 검색 추이와 네이버 블로그 상위 10개 글을 먼저 보고, 우리 글 각도를 정해요</span></div>
+    <details class="blhow" id="blHow" ${seenBench() ? "" : "open"}><summary>❓ 사용법 <small>(10/29 새로 생긴 기능)</small></summary>
+      <ol><li><b>키워드 넣고 엔터</b> (또는 📈 버튼) — 오늘 쓸 글의 메인 키워드. 예) 대구 영어회화</li>
+        <li><b>비교하고 싶으면</b> 아래 키워드 칩을 한 번 눌러 서브로 고르고 다시 조회 → 그래프에 같이 그려져요 (최대 4개)</li>
+        <li><b>그래프</b> — 가장 많이 찾은 달과 이번 달 % 를 봐요. 많이 찾는 시기에 맞춰 모집·이벤트 글을 미리 써 두기</li>
+        <li><b>상위 10개 글</b> — 제목·첫 문단을 훑고 <b>다들 쓰는 각도는 피하고</b>, 우리만 있는 것(1:1 언어교환·소수정예·실제 수강생 변화)을 찾기. 제목을 누르면 새 탭</li>
+        <li><b>그 키워드 그대로 ✨ 시안 만들기</b> — 키워드가 아래 폼에 자동으로 들어가고, AI 도 상위 글을 참고해 겹치지 않게 써요</li></ol>
+      <div class="mut">⚠️ 남의 글 문장은 베끼지 말고 구조·각도만 참고해요. 그래프는 검색 '수'가 아니라 비교값이라, 실제 월 검색수는 폼 아래 🔍 네이버 검색량 보기에서.</div></details>
     <div class="blbench-q"><input data-o="main_keyword" id="blBenchKw" value="${esc(o.main_keyword)}" placeholder="메인 키워드 예) 대구 영어회화" enterkeyhint="search"><button type="button" class="btn" id="blResBtn">📈 추이 · 상위 글 보기</button></div>
     <div class="mut">아래 키워드 칩에서 서브로 고른 것(최대 4개)도 그래프에 같이 그려요. 여기 키워드가 글의 메인 키워드가 돼요.</div>
     <div id="blRes"></div></section>
@@ -520,6 +527,7 @@ function trendSvg(trend) {
   const labels = trend[0].data.map((d, i) => `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${+d.month.slice(5)}월</text>`).join("");
   return `<svg class="bltrend" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 12개월 검색 추이">${grid}${lines}${dots}${labels}</svg>`;
 }
+const seenBench = () => { try { return localStorage.getItem("bl-bench-seen") === "1"; } catch { return false; } }; // 🆕 표시·사용법 펼침은 처음 한 번만
 function renderRes() {
   const el = $b("#blRes"), r = BL.res; if (!el || !r) return;
   const t0 = r.trend[0], d = t0?.data ?? [], peak = d.reduce((a, b) => (b.ratio > a.ratio ? b : a), d[0] ?? { ratio: 0 }), last = d[d.length - 1];
@@ -622,6 +630,7 @@ function wire() {
     if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
     if (t.id === "blFbSend") return sendFb();
   });
+  v.addEventListener("toggle", (ev) => { if (ev.target.id === "blHow" && !ev.target.open) { try { localStorage.setItem("bl-bench-seen", "1"); } catch {} $b(".blnew")?.remove(); } }, true); // 사용법 접으면 '봤음'
   v.addEventListener("keydown", (ev) => { if (ev.target.id === "blBenchKw" && ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); research(); } });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset, X = BL.post;
