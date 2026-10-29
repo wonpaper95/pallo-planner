@@ -50,11 +50,17 @@ function listen() {
 }
 
 // 🔄 고친 뒤 2.5초 모아서 시트로
-function queueSync() { clearTimeout(queueSync.t); if (FN.cfg?.sheet_id) queueSync.t = setTimeout(() => syncNow(false), 2500); }
-async function syncNow(loud) {
+// 고친 지점·달을 기억해 둠 → 그 사이 달을 넘겨도 고친 달로 보냄
+const pend = new Map();
+function queueSync() {
+  if (!FN.cfg?.sheet_id) return;
+  pend.set(`${FN.team}|${FN.month}`, [FN.team, FN.month]); clearTimeout(queueSync.t);
+  queueSync.t = setTimeout(() => { const list = [...pend.values()]; pend.clear(); for (const [t, m] of list) syncNow(false, t, m); }, 2500);
+}
+async function syncNow(loud, team = FN.team, month = FN.month) {
   if (!FN.cfg?.sheet_id) return loud && toast("⚙️ 시트 설정에서 구글 시트 주소부터 넣어 주세요");
   const st = V().querySelector("#fnSync"); if (st) st.textContent = "🔄 시트와 맞추는 중…";
-  const { data, error } = await sb.functions.invoke("planner-fin", { body: { action: "sync", team: FN.team, month: FN.month } });
+  const { data, error } = await sb.functions.invoke("planner-fin", { body: { action: "sync", team, month } });
   const err = error?.message ?? data?.error;
   if (err) { if (st) st.textContent = "⚠️ 시트 연동 실패"; return loud && toast("시트 연동 실패: " + err); }
   if (loud) { const n = (k) => (data?.sale?.[k] ?? 0) + (data?.cost?.[k] ?? 0); toast(`🔄 시트 → 플래너 ${n("fromSheet")}줄 · 플래너 → 시트 ${n("toSheet")}줄${n("deleted") ? ` · 시트에서 지운 ${n("deleted")}줄` : ""}`); }
@@ -252,7 +258,7 @@ function cfgDlg() {
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("#fnView [data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "prev" || a === "next" || a === "now") { FN.month = a === "now" ? ymNow() : ymAdd(FN.month, a === "prev" ? -1 : 1); FN.shell = ""; return FN.load(); }
+  if (a === "prev" || a === "next" || a === "now") { if (pend.size) { clearTimeout(queueSync.t); for (const [t, m] of pend.values()) syncNow(false, t, m); pend.clear(); } FN.month = a === "now" ? ymNow() : ymAdd(FN.month, a === "prev" ? -1 : 1); FN.shell = ""; return FN.load(); }
   if (a === "sync") return syncNow(true);
   if (a === "cfg") return cfgDlg();
   if (a === "add") return addRow(b.dataset.kind, b.dataset.sec);
