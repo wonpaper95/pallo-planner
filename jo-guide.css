@@ -82,3 +82,11 @@ body:not(.jgv) #jgView { display: none; }
 .jgshot { display: block; margin: 8px 0 2px; }
 .jgshot img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
 .jgcap { font-size: 12px; color: var(--sub); margin: 2px 0 6px; }
+/* 🧑‍🎓 진행 연동 (10-29): 조교 '나' + 📍 지금 몇 일차 · 매니저 조교별 진행표 */
+.jg .jgme { margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--accent); background: var(--panel); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.jg .jgme select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14px; }
+.jg .jgnow { font-size: 18px; color: var(--accent); }
+.jg .jgsteps { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; } .jg .jgsteps span { padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--sub); white-space: nowrap; }
+.jg .jgsteps span.ok { color: var(--green); border-color: var(--green); } .jg .jgsteps span.cur { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+.jg .jgsteps.big { font-size: 13px; } .jg .jgsteps.big span { padding: 4px 10px; }
+.jg .jgprog summary { cursor: pointer; } .jg .jgpt { width: 100%; border-collapse: collapse; font-size: 14px; } .jg .jgpt td { padding: 7px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
