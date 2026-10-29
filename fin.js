@@ -3,9 +3,9 @@
 // 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트에서 고친 건 5분마다 들어옴. 다른 기기 실시간
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail·today·view 를 씀 → window.FN
 (() => {
-const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", shell: "" });
+const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, shell: "" });
 const V = () => document.getElementById("fnView");
-const { OPTS, chip, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
+const { OPTS, chip, missing, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
 const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 const canEdit = () => !jo();
@@ -71,7 +71,7 @@ const visible = () => {
   const q = FN.q.trim().toLowerCase();
   return q ? FN.rows.filter((r) => Object.values(r.vals).some((v) => String(v).toLowerCase().includes(q))) : FN.rows;
 };
-const sorted = (kind) => visible().filter((r) => r.kind === kind).sort((a, b) => a.sort - b.sort || a.updated_at.localeCompare(b.updated_at));
+const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length)).sort((a, b) => a.sort - b.sort || a.updated_at.localeCompare(b.updated_at));
 
 function render() {
   const sk = `${FN.team}|${FN.month}|${myRole}`;
@@ -118,26 +118,29 @@ function accessHtml() {
     ${s !== "open" ? `<button class="btn" data-act="acc" data-s="open">${s === "requested" ? "승인" : "열어 주기"}</button>` : ""}${s !== "closed" ? `<button class="btn ghost" data-act="acc" data-s="closed">${s === "requested" ? "거절" : "닫기"}</button>` : ""}
     <small class="mut">열면 이 지점 조교 링크로 매출·비용을 볼 수 있어요 (고치기·📎 첨부는 안 됨)</small></section>`;
 }
+const trOf = (r) => { const m = missing(r); return [m, m.length ? `<tr class="fnmiss" title="⚠️ 덜 쓴 칸: ${esc(m.join(", "))}">` : "<tr>"]; };
+const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴 줄 <b>${n}</b>`}</button>`;
 const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" data-id="${r.id}" title="${admin() ? "📎 첨부 보기·올리기" : "📎 올리기 (열람은 대표님만)"}">📎${r.files ? `<i>${r.files}</i>` : ""}</button></td>`;
 const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
 const shortDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v.slice(0, 4) === FN.month.slice(0, 4) ? v.slice(5).replace("-", "/") : v;
 const showOf = (k, v) => NUMK.has(k) ? fmtNum(v) : k === "날짜" ? shortDay(String(v)) : String(v);
-function cellIn(r, k) {
+function cellIn(r, k, need) {
+  const nd = need ? " fnneed" : "";
   const v = r.vals[k] ?? "", show = showOf(k, v), neg = NUMK.has(k) && (toNum(v) ?? 0) < 0;
   if (OPTS[k]) { // ▾ 시트처럼 고르는 칸
     const c = chip(k, show);
-    if (!canEdit()) return `<td>${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
+    if (!canEdit()) return `<td class="${nd}">${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
     const list = show && !OPTS[k].includes(show) ? [...OPTS[k], show] : OPTS[k];
-    return `<td style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
+    return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
   }
-  if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}">${esc(show)}</td>`;
-  return `<td style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
+  if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}${nd}">${esc(show)}</td>`;
+  return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
-  return `<section class="fnpanel"><div class="fngbar"><h3>매출 <small class="mut">${rows.length}건 · ${won(s.net)}</small></h3>${canEdit() ? `<button class="btn" data-act="add" data-kind="sale">+ 매출 줄</button>` : ""}</div>
+  return `<section class="fnpanel"><div class="fngbar"><h3>매출 <small class="mut">${rows.length}건 · ${won(s.net)}</small></h3>${missBtn(visible().filter((r) => r.kind === "sale" && missing(r).length).length)}${canEdit() ? `<button class="btn" data-act="add" data-kind="sale">+ 매출 줄</button>` : ""}</div>
     <div class="fnscroll"><table class="fntbl"><thead><tr>${SALE_H.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>
-    <tbody>${rows.map((r) => `<tr>${SALE_H.map((k) => cellIn(r, k)).join("")}${clip(r)}${del(r)}</tr>`).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
+    <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${SALE_H.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.miss ? "덜 쓴 줄이 없어요 👍" : FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
 }
 function costHtml() {
   const rows = sorted("cost"), s = summary(rows, 0), fee = summary(visible(), FN.cfg?.fee_pct ?? 5).fee;
@@ -145,13 +148,13 @@ function costHtml() {
   const cols = COST_H.filter((k) => k !== "구분");
   const body = secs.map((sec) => {
     const rs = rows.filter((r) => ((r.vals.구분 || "").trim() || "기타") === sec);
-    if (!rs.length && !canEdit()) return "";
+    if (!rs.length && (!canEdit() || FN.miss)) return "";
     const tot = (s.bySec[sec] ?? 0) + (sec === "고정비" ? fee : 0);
     return `<tbody class="fnsec"><tr class="fnsech"><th colspan="${cols.length + 2}"><span>${esc(sec)}</span><b>${won(tot)}</b>${canEdit() ? `<button class="btn ghost" data-act="add" data-kind="cost" data-sec="${esc(sec)}">+ 줄</button>` : ""}</th></tr>
-      ${rs.map((r) => `<tr>${cols.map((k) => k === "근무시간" && sec !== "행정조교" ? "<td></td>" : cellIn(r, k)).join("")}${clip(r)}${del(r)}</tr>`).join("")}
+      ${rs.map((r) => { const [m, tr] = trOf(r); return `${tr}${cols.map((k) => k === "근무시간" && sec !== "행정조교" ? "<td></td>" : cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("")}
       ${sec === "고정비" ? `<tr class="fnauto"><td></td><td>결제수수료 (순매출 × ${FN.cfg?.fee_pct ?? 5}%) <small class="mut">자동</small></td><td class="num">${fee.toLocaleString("ko-KR")}</td><td colspan="${cols.length - 1}"></td></tr>` : ""}</tbody>`;
   }).join("");
-  return `<section class="fnpanel"><div class="fngbar"><h3>비용 <small class="mut">${rows.length}건 · ${won(s.cost + fee)} (수수료 포함)</small></h3><small class="mut">행정조교는 근무시간을 적으면 금액 = 시급 ${(FN.cfg?.rate ?? 10320).toLocaleString("ko-KR")}원 × 시간</small></div>
+  return `<section class="fnpanel"><div class="fngbar"><h3>비용 <small class="mut">${rows.length}건 · ${won(s.cost + fee)} (수수료 포함)</small></h3>${missBtn(visible().filter((r) => r.kind === "cost" && missing(r).length).length)}<small class="mut">행정조교는 근무시간을 적으면 금액 = 시급 ${(FN.cfg?.rate ?? 10320).toLocaleString("ko-KR")}원 × 시간</small></div>
     <div class="fnscroll"><table class="fntbl fncost"><thead><tr>${cols.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>${body}</table></div></section>`;
 }
 function dailyHtml() {
@@ -264,6 +267,7 @@ document.addEventListener("click", async (e) => {
   if (a === "add") return addRow(b.dataset.kind, b.dataset.sec);
   if (a === "del") return delRow(b.dataset.id);
   if (a === "files") return filesDlg(b.dataset.id);
+  if (a === "miss") { FN.miss = !FN.miss; return render(); }
   if (a === "acc") { if (!fail((await sb.from("fin_access").upsert({ team_id: FN.team, status: b.dataset.s })).error)) { toast(b.dataset.s === "open" ? "🔓 조교 링크로 볼 수 있어요" : "🔒 닫았어요"); FN.load(); } return; }
   if (a === "request") {
     const q = FN.access ? sb.from("fin_access").update({ status: "requested" }).eq("team_id", FN.team) : sb.from("fin_access").insert({ team_id: FN.team, status: "requested" });

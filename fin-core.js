@@ -28,6 +28,15 @@ function normDate(s, month) {
   if (y < 100) y += 2000;
   return m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${p2(m)}-${p2(d)}` : t;
 }
+// ⚠️ 덜 쓴 줄 (울산 마야 제안 10-29): 꼭 있어야 할 칸이 비면 그 칸 이름들
+const empty = (v) => String(v ?? "").trim() === "";
+function missing(r) {
+  const v = r.vals, need = r.kind === "sale" ? ["날짜", "멤버쉽", "매출", "이름", "거래형태", "결제수단", "상담자"] : ["사용처", "금액"];
+  if (r.kind === "sale" && String(v.결제수단 ?? "").trim() === "카드") need.push("카드사", "할부개월");
+  if (r.kind === "sale" && String(v.거래형태 ?? "").trim() === "가입") need.push("전화번호", "가입경로");
+  if (r.kind === "cost" && ["본사지출", "지점기타지출"].includes(String(v.구분 ?? "").trim())) need.push("날짜");
+  return need.filter((k) => empty(v[k]));
+}
 const amt = (r) => toNum(r.vals[r.kind === "sale" ? "매출" : "금액"]) ?? 0;
 // 매출(+)·환불(−)·순매출·구분별 비용·결제수수료(순매출 × %)·수익
 function summary(rows, feePct) {
@@ -53,5 +62,5 @@ function daily(rows) {
   let acc = 0;
   return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => ({ ...x, profit: x.sale - x.cost, acc: (acc += x.sale - x.cost) }));
 }
-window.FNC = { OPTS, chip, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily, amt };
+window.FNC = { OPTS, chip, missing, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily, amt };
 })();
