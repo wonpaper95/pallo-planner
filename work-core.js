@@ -39,5 +39,9 @@ const planText = (plan) => {
   const SL = { am: "오전", pm: "오후", d: "" };
   return Object.entries(by).map(([k, ds]) => { const [s, h] = k.split("|"); return `${ds.sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => KD[d]).join("·")}${SL[s] ? " " + SL[s] : ""} ${+h}h`; }).join(", ");
 };
-window.WRC = { KD, split, slotsOf, num, parseShift, off, needReason, planText };
+// 근무시간 고르기(추가 폼) → 근무시간 글 한 줄. 월~목은 시작 14시 전 = 오전, 금·토·일은 한 칸이라 오전/오후 없음
+const DAYSETS = [["평일", "평일 (월~목)"], ["월수", "월·수"], ["화목", "화·목"], ["월", "월"], ["화", "화"], ["수", "수"], ["목", "목"], ["주말", "주말 (토·일)"], ["토", "토"], ["일", "일"], ["금", "금"]];
+const mins = (hm) => +hm.slice(0, 2) * 60 + +hm.slice(3, 5);
+const shiftLine = (days, start, end, h) => `${days}${/^(주말|토|일|금)$/.test(days) ? "" : mins(start) < 14 * 60 ? " 오전" : " 오후"} (${start}~${end})(${h}h)`;
+window.WRC = { KD, split, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine };
 })();
