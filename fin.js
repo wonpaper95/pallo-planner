@@ -15,7 +15,7 @@ const ymNow = () => today().slice(0, 7);
 const ymAdd = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const ymLabel = (m) => `${+m.slice(0, 4)}년 ${+m.slice(5, 7)}월`;
 const NUMK = new Set(["매출", "금액", "근무시간"]);
-const W_ = { 날짜: 104, 멤버쉽: 120, 매출: 100, 이름: 70, 언어: 56, 거래형태: 112, 결제수단: 88, 카드사: 68, 할부개월: 58, 결제상세: 140, 코멘트: 180, 가입경로: 70, Lv: 40, 전화번호: 110, 상담자: 60, 스포입력: 60, 성별: 40, 나이: 40, 사용처: 200, 금액: 110, 비고: 160, 근무시간: 70 };
+const W_ = { 날짜: 52, 멤버쉽: 84, 매출: 88, 이름: 52, 언어: 36, 거래형태: 84, 결제수단: 70, 카드사: 52, 할부개월: 40, 결제상세: 86, 코멘트: 92, 가입경로: 52, Lv: 28, 전화번호: 96, 상담자: 46, 전산입력: 46, 성별: 28, 나이: 28, 사용처: 200, 금액: 100, 비고: 160, 근무시간: 60 }; // 맥북(1440~) 폭에 매출 18칸이 한 화면에
 const safeKey = (name) => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || ""); const ext = m ? "." + m[1].toLowerCase() : ""; const base = (name || "file").slice(0, 40).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""); return `${Date.now()}_${base || "file"}${ext}`; }; // Storage 키는 ASCII 만
 
 FN.load = async function () {
@@ -114,16 +114,18 @@ function accessHtml() {
 }
 const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" data-id="${r.id}" title="${admin() ? "📎 첨부 보기·올리기" : "📎 올리기 (열람은 대표님만)"}">📎${r.files ? `<i>${r.files}</i>` : ""}</button></td>`;
 const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
+const shortDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v.slice(0, 4) === FN.month.slice(0, 4) ? v.slice(5).replace("-", "/") : v;
+const showOf = (k, v) => NUMK.has(k) ? fmtNum(v) : k === "날짜" ? shortDay(String(v)) : String(v);
 function cellIn(r, k) {
-  const v = r.vals[k] ?? "", show = NUMK.has(k) ? fmtNum(v) : String(v), neg = NUMK.has(k) && (toNum(v) ?? 0) < 0;
+  const v = r.vals[k] ?? "", show = showOf(k, v), neg = NUMK.has(k) && (toNum(v) ?? 0) < 0;
   if (OPTS[k]) { // ▾ 시트처럼 고르는 칸
     const c = chip(k, show);
     if (!canEdit()) return `<td>${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
     const list = show && !OPTS[k].includes(show) ? [...OPTS[k], show] : OPTS[k];
-    return `<td><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}" style="width:${W_[k] ?? 80}px"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
+    return `<td style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
   }
   if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}">${esc(show)}</td>`;
-  return `<td style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ${k === "날짜" ? 'title="10/6 처럼 적어도 돼요"' : ""}></td>`;
+  return `<td style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
@@ -159,14 +161,14 @@ async function saveCell(inp) {
   const r = FN.rows.find((x) => x.id === inp.dataset.id); if (!r) return;
   const k = inp.dataset.k, raw = inp.value.trim();
   const v = k === "날짜" ? normDate(raw, FN.month) : NUMK.has(k) ? (raw === "" ? "" : toNum(raw) ?? raw) : raw;
-  if (String(v) === String(r.vals[k] ?? "")) { inp.value = NUMK.has(k) ? fmtNum(v) : v; return; }
+  if (String(v) === String(r.vals[k] ?? "")) { inp.value = showOf(k, v); return; }
   const vals = { ...r.vals, [k]: v }, rate = FN.cfg?.rate ?? 10320;
   if (k === "근무시간" && r.vals.구분 === "행정조교" && typeof v === "number") {
     const was = toNum(r.vals.금액), auto = toNum(r.vals.근무시간) !== null ? Math.round(rate * toNum(r.vals.근무시간)) : null;
     if (was === null || was === 0 || was === auto) vals.금액 = Math.round(rate * v);
   }
   r.vals = vals;
-  inp.value = NUMK.has(k) ? fmtNum(v) : v;
+  inp.value = showOf(k, v); inp.title = String(v);
   // 저장은 차례로, 보낼 때의 최신 vals 로 (빨리 여러 칸 고쳐도 서로 덮어쓰지 않게)
   const { error } = await (save = save.then(() => sb.from("fin_rows").update({ vals: r.vals }).eq("id", r.id)));
   if (fail(error)) return;
