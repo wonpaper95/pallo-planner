@@ -118,7 +118,12 @@ function accessHtml() {
     ${s !== "open" ? `<button class="btn" data-act="acc" data-s="open">${s === "requested" ? "승인" : "열어 주기"}</button>` : ""}${s !== "closed" ? `<button class="btn ghost" data-act="acc" data-s="closed">${s === "requested" ? "거절" : "닫기"}</button>` : ""}
     <small class="mut">열면 이 지점 조교 링크로 매출·비용을 볼 수 있어요 (고치기·📎 첨부는 안 됨)</small></section>`;
 }
-const trOf = (r) => { const m = missing(r); return [m, m.length ? `<tr class="fnmiss" title="⚠️ 덜 쓴 칸: ${esc(m.join(", "))}">` : "<tr>"]; };
+// 줄 표시: ⚠️ 덜 쓴 줄(주황 띠) + 💚 스탭페이 줄(연두 — 울산 시트에서 손으로 칠하던 색)
+const trOf = (r) => {
+  const m = missing(r), step = r.kind === "sale" && String(r.vals.결제수단 ?? "").trim() === "스탭페이";
+  const cls = [m.length && "fnmiss", step && "fnstep"].filter(Boolean).join(" ");
+  return [m, `<tr data-row="${r.id}" class="${cls}"${m.length ? ` title="⚠️ 덜 쓴 칸: ${esc(m.join(", "))}"` : ""}>`];
+};
 const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴 줄 <b>${n}</b>`}</button>`;
 const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" data-id="${r.id}" title="${admin() ? "📎 첨부 보기·올리기" : "📎 올리기 (열람은 대표님만)"}">📎${r.files ? `<i>${r.files}</i>` : ""}</button></td>`;
 const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
@@ -276,7 +281,7 @@ document.addEventListener("click", async (e) => {
 });
 document.addEventListener("change", (e) => {
   if (e.target.id === "fnTeam") { FN.team = +e.target.value; try { localStorage.setItem("fn-team", FN.team); } catch {} FN.shell = ""; return FN.load(); }
-  if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; }
+  if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") { e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; if (e.target.dataset.k === "결제수단") e.target.closest("tr")?.classList.toggle("fnstep", e.target.value === "스탭페이"); } }
 });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("#fnView input[data-id]")) e.target.blur(); });

@@ -89,3 +89,4 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fntbl td.fnneed { outline: 1.5px dashed #e67e22; outline-offset: -3px; }
 #fnView .fnmissbtn { padding: 3px 10px; font-size: 12px; } #fnView .fngbar .fnmissbtn { margin-left: 0; }
 #fnView .fnmissbtn b { color: #d35400; } #fnView .fnmissbtn.on { background: #e67e22; color: #fff; border-color: #e67e22; }
+#fnView .fntbl tr.fnstep td { background: #d9ead3; } [data-theme="dark"] #fnView .fntbl tr.fnstep td { background: color-mix(in srgb, #6aa84f 28%, transparent); }
