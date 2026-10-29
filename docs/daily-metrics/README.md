@@ -75,7 +75,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 
 **팀 매핑:** 운영 teams = 1 구미점 · 2 대구영어점 · 3 울산점 · 4 대구일중점(`MKCORE.teamKeyOfTeamName` 재사용). 메타 광고세트·구글 캠페인·전산 데이터보드 → 팀은 이름 규칙으로 매핑(`scripts/mkd/teams.mjs`, `scripts/mk/teams.mjs` 확장). 매핑 안 되는 건 team_id = 대구영어점(2)에 두고 unit 앞에 `[미분류]`.
 
-**RLS:** 기존 `mk_*`와 동일 — 매니저는 자기 team 읽기, admin 전체 읽기, `mkd_keywords`만 매니저 자기 팀 insert/update·admin 전체, `mkd_daily`·`mkd_reports` 쓰기는 서비스 키만.
+**RLS:** 기존 `mk_*`와 동일 — 매니저는 자기 team 읽기, admin 전체 읽기, `mkd_keywords`만 매니저 자기 팀 insert/update·admin 전체, `mkd_daily`·`mkd_reports` 쓰기는 서비스 키만. 예외: `mkd_reports`(일일 코멘트·이상 징후)는 로그인한 모든 사용자가 읽는다 — 전 지점 공유, 대표 결정 2026-10-29. 숫자 표 `mkd_daily`는 자기 지점만.
 
 ## 2. 수집 (예약 작업 `pallo-daily-metrics` → 스킬 `~/.claude/skills/pallo-daily-metrics`)
 

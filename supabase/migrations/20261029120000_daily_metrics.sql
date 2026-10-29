@@ -21,7 +21,7 @@ create table if not exists public.mkd_reports (
 );
 
 create table if not exists public.mkd_keywords (
-  id bigserial primary key,
+  id bigint generated always as identity primary key,
   team_id bigint not null references public.teams(id) on delete cascade,
   keyword text not null,
   enabled boolean not null default true,
@@ -36,6 +36,7 @@ alter table public.mkd_reports enable row level security;
 alter table public.mkd_keywords enable row level security;
 
 create policy mkd_daily_read on public.mkd_daily for select using (blog_is_admin() or team_id = blog_my_team());
+-- 일일 리포트(코멘트·이상 징후)는 전 지점 공유 — 대표 결정 2026-10-29. 숫자 표(mkd_daily)는 자기 지점만.
 create policy mkd_reports_read on public.mkd_reports for select using (auth.role() = 'authenticated');
 create policy mkd_keywords_read on public.mkd_keywords for select using (blog_is_admin() or team_id = blog_my_team());
 create policy mkd_keywords_ins on public.mkd_keywords for insert with check (blog_is_admin() or team_id = blog_my_team());
@@ -44,5 +45,4 @@ create policy mkd_keywords_upd on public.mkd_keywords for update using (blog_is_
 -- 이 프로젝트는 새 테이블에 기본 GRANT 가 안 붙는다 (20261025130000_marketing_grants.sql 참고)
 grant select on public.mkd_daily, public.mkd_reports to authenticated;
 grant select, insert, update on public.mkd_keywords to authenticated;
-grant usage, select on sequence public.mkd_keywords_id_seq to authenticated;
 grant select, insert, update, delete on public.mkd_daily, public.mkd_reports, public.mkd_keywords to service_role;
