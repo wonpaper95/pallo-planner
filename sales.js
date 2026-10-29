@@ -423,6 +423,18 @@ const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log:
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
 SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
 SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
+// 📮 월말 보고 제출 조건: 그달 계획(sales_plans.data)에서 [1]·[2]·[5] 빈 칸 + 그 계획의 하루 최소 상담
+SL.planCheck = (data, month) => {
+  const d = data || {}, pos = (k) => d[k] > 0, ms = Array.isArray(d.members) ? d.members : [];
+  const s1 = [["start", "집계 시작일", !!d.start], ["goal", "월 목표 순매출", pos("goal")], ["appsGoal", "지원자수", pos("appsGoal")], ["reply", "회신율", pos("reply")],
+    ["consult", "상담률", pos("consult")], ["pay", "결제율", pos("pay")], ["arpu", "객단가", pos("arpu")], ["refundRate", "환불율", typeof d.refundRate === "number" && d.refundRate >= 0]].filter((x) => !x[2]).map((x) => x[1]);
+  const sumP = ms.reduce((a, m) => a + (typeof m.p === "number" ? m.p : 0), 0);
+  const s2 = !ms.length ? ["멤버십"] : [...(ms.some((m) => !(m.price > 0)) ? ["단가"] : []), ...(ms.some((m) => typeof m.p !== "number") ? ["비율"] : Math.abs(sumP - 100) > 0.05 ? [`비율 합계 ${pct(sumP)}% → 100%`] : [])];
+  const s5 = pos("firstContact") ? [] : ["첫 연락 목표"];
+  let consultMin = null;
+  try { const c = calc(applyAuto(compose({ ...newPlan(month), ...d, month }, {}, null))); consultMin = Math.ceil(c.month.consults / c.month.days - 1e-9); } catch {}
+  return { s1, s2, s5, ok: !s1.length && !s2.length && !s5.length, consultMin, goal: d.goal ?? null };
+};
 
 V().innerHTML = `
 <div class="slbar"><h2>💰 매출 목표</h2><select id="slTeam" class="adminonly" aria-label="지점"></select><b id="slTeamName"></b>
@@ -548,7 +560,7 @@ function savePlan() {
   const team = SL.team, month = SL.month, data = { ...SL.plan }; delete data.month;
   saveT = setTimeout(async () => {
     const { error } = await sb.from("sales_plans").upsert({ team_id: team, month, data });
-    if (!fail(error)) setT("slSaved", "저장됨 ✓");
+    if (!fail(error)) { setT("slSaved", "저장됨 ✓"); window.MG?.recheck?.(); } // 📮 월말 보고 체크리스트도 다시
   }, 600);
 }
 // 다른 매니저가 고치면 다시 불러옴 (입력 중이면 끝난 뒤)
