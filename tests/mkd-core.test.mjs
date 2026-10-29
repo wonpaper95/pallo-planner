@@ -381,3 +381,27 @@ test("flags: 메시지 띄어쓰기 (이/인데 앞에 공백 없음)", () => {
   const zero = days(END, 6, "jeonsan", "전체", { inquiries: 0 });
   assert.match(D.flags([...naverSpike, ...zero], END)[0].msg, /▲100%인데 문의는/);
 });
+
+// ── 재리뷰 수정 2: 전산 문의는 2일 이상·주간은 4일 이상일 때만 판단, 결측 일수는 채널 첫 행부터 ──
+test("flags: 비용 급증 — 3일 안에 쓸 수 있는 전산 날이 1일이면 0건·감소 모두 판단 안 한다", () => {
+  const prior = days(D.addDays(END, -3), 3, "jeonsan", "전체", { inquiries: 3 }); // 직전 기간: 하루 3건
+  const oneUsable = [row(END, "jeonsan", "전체", { inquiries: 0 }), ...days(D.addDays(END, -1), 2, "jeonsan", "전체", {}, "failed")];
+  assert.ok(!codes([...naverSpike, ...oneUsable, ...prior]).includes("spend_spike"));
+  const twoUsable = [row(END, "jeonsan", "전체", { inquiries: 0 }), row(D.addDays(END, -1), "jeonsan", "전체", { inquiries: 0 }), row(D.addDays(END, -2), "jeonsan", "전체", {}, "failed")];
+  assert.deepEqual(codes([...naverSpike, ...twoUsable, ...prior]), ["spend_spike"]); // 쓸 수 있는 날이 2일이면 0건으로 본다
+});
+
+test("flags: 클릭 있는데 문의 0 — 이번 주 쓸 수 있는 전산 날이 4일 미만이면 판단 안 한다", () => {
+  const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 }); // 주간 클릭 70
+  assert.ok(!codes([...clicks, row(END, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));           // 쓸 수 있는 전산 1일(0건)
+  assert.ok(!codes([...clicks, ...days(END, 3, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));    // 3일(0건)
+  assert.deepEqual(codes([...clicks, ...days(END, 4, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 4일(0건)이면 판단
+  assert.deepEqual(codes([...clicks, ...days(END, 7, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 7일(0건)
+});
+
+test("flags: 결측 연속 일수는 채널 첫 행부터만 센다 (3일치뿐이면 3일째, 28일째 아님)", () => {
+  const login3 = days(END, 3, "daangn", "전체", { note: "x" }, "login_required");
+  const f = D.flags(login3, END);
+  assert.deepEqual(f.map((x) => [x.code, x.channel]), [["missing", "daangn"]]);
+  assert.match(f[0].msg, /로그인 필요 3일째/);
+});
