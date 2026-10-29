@@ -10,7 +10,8 @@
 //     광고 채널(naver_ad|google_ad|meta_ad)만 지점이 없으면 unit 이름(MK.teamKeyOf)으로 추정하고, 못 하면 dsr + unit 앞에 '[미분류] '.
 //   · unit 은 문자열(없으면 '전체'), 앞뒤 공백 제거, 접두어를 붙인 뒤 120자로 자른다. 같은 (지점, unit) 이 두 번 나오면 오류 — 같은 이름이면 숫자를 더해 한 행으로 보낸다.
 //   · metrics 숫자 키: impressions clicks spend spend_usd fx ctr cpc avg_rank conversions leads reach rank visitors views followers chats inquiries enrolls
-//     ('1,204' '₩18,200' '$12.50' 허용, '--' 는 null, 음수는 rank·avg_rank 만). 문자열 키: status note campaign_id top_url our_url. 배열 키: flags.
+//     ('1,204' '₩18,200' '$12.50' 허용, '--' 는 null, 음수는 rank·avg_rank 만). 문자열 키: status note campaign_id top_url our_url (campaign_id 는 유한한 숫자로 와도 문자열로 바꿔 받는다). 배열 키: flags.
+//   · 행 하나의 오류는 'rows[3]: …' 로 몇 번째 행인지 앞에 붙여 던진다(메시지 본문은 그대로). 봉투·중복 오류는 접두어 없음.
 //   · 전화번호처럼 보이는 값은 unit·note·flags·문자열 지표에서 거부한다(top_url·our_url·campaign_id 는 제외). jeonsan unit 은 이름 규칙까지 본다.
 import { createRequire } from "node:module";
 const req = createRequire(import.meta.url);
@@ -57,8 +58,9 @@ export function cleanMetrics(m) {
   for (const [k, v] of Object.entries(m)) {
     if (NUM_KEYS.has(k)) out[k] = parseNum(k, v);
     else if (STR_KEYS.has(k)) {
-      if (v !== null && v !== undefined && typeof v !== "string") throw new Error(`${k} 는 문자열이어야 해요`);
-      const s = v ?? ""; if (!NO_PERSONAL_CHECK.has(k)) noPersonal(s, k);
+      const sv = k === "campaign_id" && typeof v === "number" && Number.isFinite(v) ? String(v) : v; // 크롬에서 읽은 id 는 숫자로 올 수 있다
+      if (sv !== null && sv !== undefined && typeof sv !== "string") throw new Error(`${k} 는 문자열이어야 해요`);
+      const s = sv ?? ""; if (!NO_PERSONAL_CHECK.has(k)) noPersonal(s, k);
       out[k] = s.slice(0, 200);
     } else if (k === "flags") {
       out[k] = (Array.isArray(v) ? v : [v]).map((x) => {
@@ -91,8 +93,8 @@ export function toRowsPure(channel, date, input, teams) {
   }
   if (input.note !== undefined) { if (typeof input.note !== "string") throw new Error("note 는 문자열이어야 해요"); noPersonal(input.note, "note"); }
   const defStatus = input.status ?? "ok";
-  const out = input.rows.map((r, i) => {
-    const xk = Object.keys(r).find((k) => !ROW_KEYS.has(k)); if (xk !== undefined) throw bad(`모르는 키: rows[${i}].${xk.slice(0, 40)}`);
+  const rowOf = (r) => {
+    const xk = Object.keys(r).find((k) => !ROW_KEYS.has(k)); if (xk !== undefined) throw bad(`모르는 키: ${xk.slice(0, 40)}`);
     if (r.unit !== undefined && r.unit !== null && typeof r.unit !== "string") throw new Error("unit 은 문자열이어야 해요");
     let unit = (r.unit ?? "").trim() || D.ALL;
     noPersonal(unit, "unit");
@@ -119,7 +121,8 @@ export function toRowsPure(channel, date, input, teams) {
     }
     const status = r.status ?? defStatus; if (!D.STATUS.includes(status)) throw new Error(`status 는 ${D.STATUS.join("/")}: ${status}`);
     return { team_id: team.id, date, channel, unit: unit.slice(0, 120), metrics: cleanMetrics(r.metrics), status };
-  });
+  };
+  const out = input.rows.map((r, i) => { try { return rowOf(r); } catch (e) { throw new Error(`rows[${i}]: ${e.message}`); } }); // 어느 행인지 알려 준다
   // 같은 (지점, unit) 은 한 행으로 — 조용히 합치지 않고 전부 모아 알린다
   const seen = new Map();
   for (const r of out) { const k = `${r.team_id}:${r.unit}`; seen.set(k, (seen.get(k) ?? 0) + 1); }

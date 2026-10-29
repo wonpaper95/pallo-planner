@@ -104,7 +104,7 @@ test("봉투: 빈 rows + failed/login_required → 모든 팀에 '전체' 행 {n
 test("봉투: 모르는 최상위 키·행 키는 거부 (오타로 조용히 버려지지 않게)", () => {
   assert.throws(() => rows("google_ad", { row: [{ unit: "대구 x", metrics: { clicks: 1 } }], status: "failed" }), /모르는 키: row/);
   assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x", metrics: { clicks: 1 } }], team_key: "dsr" }), /모르는 키: team_key/);
-  assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x", metric: { clicks: 1 } }] }), /모르는 키: rows\[0\]\.metric/);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x", metric: { clicks: 1 } }] }), /^Error: rows\[0\]: 입력 형식 오류: 모르는 키: metric$/);
 });
 test("최상위 status(ok|partial)는 자기 status 없는 행의 기본값", () => {
   const out = rows("google_ad", { status: "partial", rows: [{ team_key: "dsr", unit: "a" }, { team_key: "dsr", unit: "b", status: "ok" }, { team_key: "dsr", unit: "c", status: "failed", metrics: { note: "x" } }] });
@@ -116,7 +116,7 @@ test("최상위 status(ok|partial)는 자기 status 없는 행의 기본값", ()
 
 // ── 지점 ──
 test("team_key: 모르는 값은 거부, team_id 는 팀 목록에 있어야", () => {
-  assert.throws(() => rows("google_ad", { rows: [{ team_key: "daegu", unit: "a" }] }), /^Error: team_key 는 dsr\|jpcn\|ulsan\|gumi: daegu$/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "daegu", unit: "a" }] }), /^Error: rows\[0\]: team_key 는 dsr\|jpcn\|ulsan\|gumi: daegu$/);
   assert.throws(() => rows("google_ad", { rows: [{ team_key: "", unit: "a" }] }), /team_key 는 dsr\|jpcn\|ulsan\|gumi/);
   assert.throws(() => rows("google_ad", { rows: [{ team_id: 99, unit: "a" }] }), /team_id/);
   assert.throws(() => rows("google_ad", { rows: [{ team_id: 1, team_key: "ulsan", unit: "a" }] }), /team_id.*team_key/);
@@ -176,7 +176,7 @@ test("중복은 최종 unit 기준 — 같은 이름이라도 다른 지점이�
 test("unit 에 전화번호가 있으면 거부, 메시지에 숫자 안 찍음", () => {
   for (const u of ["대구 010-1234-5678", "01012345678", "010 1234 5678", "(053) 123-4567"]) {
     const msg = errOf(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: u }] }));
-    assert.equal(msg, "개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit", u);
+    assert.equal(msg, "rows[0]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit", u);
   }
 });
 test("note·flags 의 전화번호도 행 단위로 거부", () => {
@@ -194,4 +194,38 @@ test("jeonsan unit 허용 목록: 전체|meta|homepage|기타|gads_*|nad_* 이�
 });
 test("jeonsan 이 아닌 채널은 unit 허용 목록 검사 없음", () => {
   assert.equal(rows("blog", { rows: [{ team_key: "dsr", unit: "대구 영어회화 블로그 글 제목이 아주 길어도 되고 숫자 2026 도 됨" }] }).length, 1);
+});
+
+// ── 행 번호 접두어 (Task 4 리뷰) ──
+test("행 단위 오류는 rows[i]: 접두어 — 몇 번째 행인지 알려 주고 값은 싣지 않는다", () => {
+  const ok = (i) => ({ team_key: "dsr", unit: `대구 ${i}` });
+  const at = (i, bad) => ({ rows: [...Array.from({ length: i }, (_, k) => ok(k)), bad] });
+  // 지점·unit·metrics·status·개인정보·jeonsan 규칙 — 어디서 던져도 같은 접두어
+  assert.equal(errOf(() => rows("google_ad", at(3, { team_key: "daegu", unit: "a" }))), "rows[3]: team_key 는 dsr|jpcn|ulsan|gumi: daegu");
+  assert.equal(errOf(() => rows("google_ad", at(1, { team_key: "dsr", unit: "a", metrics: { name: "홍길동" } }))), "rows[1]: 모르는 지표 키: name");
+  assert.equal(errOf(() => rows("google_ad", at(2, { team_key: "dsr", unit: "a", metrics: { clicks: "12,3,4" } }))), "rows[2]: clicks 는 숫자여야 해요 (길이 6)");
+  assert.equal(errOf(() => rows("google_ad", at(4, { team_key: "dsr", unit: "a", status: "bad" }))), "rows[4]: status 는 ok/partial/failed/login_required: bad");
+  assert.equal(errOf(() => rows("google_ad", at(2, { team_key: "dsr", unit: "대구 010-1234-5678" }))), "rows[2]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit");
+  assert.match(errOf(() => rows("jeonsan", at(1, { team_key: "dsr", unit: "홍길동 0101234" }))), /^rows\[1\]: jeonsan unit/);
+  assert.match(errOf(() => rows("blog", at(5, { unit: "x" }))), /^rows\[5\]: team_key 가 필요해요/);
+  assert.match(errOf(() => rows("google_ad", at(1, { team_key: "dsr", unit: 5 }))), /^rows\[1\]: unit 은 문자열/);
+});
+test("접두어는 행 단위 오류에만 — 봉투·중복 오류는 그대로", () => {
+  assert.equal(errOf(() => rows("meta_ad", { rows: [], status: "ok" })), "rows 가 비었는데 status(failed/login_required)가 없어요");
+  assert.match(errOf(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a" }, { team_key: "dsr", unit: "a" }] })), /^같은 지점·unit 이 여러 번 나왔어요: 1:a ×2/);
+  assert.match(errOf(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a" }, 5] })), /^입력 형식 오류: rows\[1\] 는 객체여야 해요$/);
+});
+
+// ── campaign_id 가 숫자로 온 경우 (크롬에서 읽은 값) ──
+test("campaign_id: 유한한 숫자는 문자열로 바꿔 저장, 그 밖의 타입은 거부", () => {
+  assert.deepEqual(cleanMetrics({ campaign_id: 12345678 }), { campaign_id: "12345678" });
+  assert.deepEqual(cleanMetrics({ campaign_id: 0 }), { campaign_id: "0" });
+  assert.deepEqual(cleanMetrics({ campaign_id: "cmp-a001" }), { campaign_id: "cmp-a001" });
+  for (const v of [NaN, Infinity, true, [1], { a: 1 }]) assert.throws(() => cleanMetrics({ campaign_id: v }), /campaign_id 는 문자열이어야 해요/, String(v));
+  // 다른 문자열 키는 여전히 숫자를 안 받는다
+  assert.throws(() => cleanMetrics({ status: 5 }), /status 는 문자열/);
+  assert.throws(() => cleanMetrics({ note: 5 }), /note 는 문자열/);
+  // 긴 숫자 id 는 전화번호 검사 대상이 아니다
+  const out = rows("naver_ad", { rows: [{ team_key: "dsr", unit: "대구 a", metrics: { campaign_id: 1012345678901, clicks: 1 } }] });
+  assert.equal(out[0].metrics.campaign_id, "1012345678901");
 });
