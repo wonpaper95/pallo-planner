@@ -9,7 +9,7 @@
 <link rel="icon" href="icon-192.png">
 <!-- 📚 로그인 없이 여는 인턴교육 공유 링크(읽기 전용) — 내용은 edu-data.js (플래너 [인턴교육] 탭과 같음).
      진행·제출·평가·확인 질문·주차 자료(DB)는 안 보여 준다. 대표가 탭에서 추가·숨긴 항목(edu_items)은 반영 안 됨. -->
-<script src="theme.js?v=202610291332"></script>
+<script src="theme.js?v=202610291342"></script>
 <style>
 html, body { margin: 0; color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif; -webkit-text-size-adjust: 100%; }
 #eduView summary { cursor: pointer; list-style: none; }
@@ -20,12 +20,12 @@ html, body { margin: 0; color: var(--text); font: 15px/1.5 -apple-system, BlinkM
 #eduView .eduitem > summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 #eduView .eduitem[open] > summary { font-weight: 600; }
 </style>
-<link rel="stylesheet" href="glass.css?v=202610291332">
-<link rel="stylesheet" href="edu.css?v=202610291332">
+<link rel="stylesheet" href="glass.css?v=202610291342">
+<link rel="stylesheet" href="edu.css?v=202610291342">
 </head>
 <body class="eduv">
 <main id="eduView"></main>
-<script src="edu-data.js?v=202610291332"></script>
+<script src="edu-data.js?v=202610291342"></script>
 <script>
 (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
