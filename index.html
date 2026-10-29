@@ -290,6 +290,10 @@ body:not(.sv) #salesView { display: none; }
 .slt th:first-child, .slt td:first-child { text-align: left; } .slt td input { padding: 6px; text-align: right; width: 100%; }
 #salesView pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 14px/1.7 inherit; font-family: inherit; margin: 0; }
 #salesView textarea.grow { width: 100%; field-sizing: content; min-height: 3.5em; resize: vertical; }
+.mgbar { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 14px; padding: 14px 18px; border-radius: 14px; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; box-shadow: 0 6px 18px rgba(0,0,0,.08); } /* 📮 월말 보고 막대 */
+.mgbar b { font-size: 17px; color: var(--accent); } .mgbar span { font-size: 13.5px; color: var(--sub); } .mgbar i { margin-left: auto; font-style: normal; font-weight: 700; color: var(--accent); } .mgbar:hover { background: var(--hover); }
+#mgDlg { max-width: 760px; } #mgDlg input, #mgDlg textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); } #mgDlg textarea { width: 100%; field-sizing: content; resize: vertical; } #mgDlg .slhint { font-size: 12.5px; color: var(--sub); }
+#mgDlg .u { position: relative; display: block; } #mgDlg .u input { width: 100%; padding-right: 34px; } #mgDlg .u i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--sub); font-style: normal; } #mgDlg h3 { color: var(--accent); font-size: 16px; }
 .mg { border-color: var(--accent); } .mghead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .mghead h3 { margin: 0 auto 0 0; } /* 📮 월말 보고 */
 .mgstate { font-size: 12.5px; color: var(--sub); } .mgstate.ok { color: var(--green); font-weight: 600; }
 .mggrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; margin: 6px 0 10px; } .mggrid label, .mglab { font-size: 13px; color: var(--sub); display: block; } .mggrid .u { margin-top: 4px; } .mggrid input { font-size: 16px; font-weight: 600; text-align: right; }
@@ -642,6 +646,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="postView"></section>
 </div>
 
+<dialog id="mgDlg" class="wide"><div id="mgBody"></div></dialog><!-- 📮 월말 보고 창 (month-goal.js) -->
 <dialog id="fbDlg" class="wide"><h3 style="margin:0 0 4px">🐞 버그 신고 · 💡 개선 제안</h3>
   <p style="color:var(--sub);font-size:13px;margin:0 0 8px">적어서 보내면 대표님께 바로 알림(푸시·카톡)이 가요</p>
   <div class="fbkind"><label><input type="radio" name="fbk" value="bug" checked> 🐞 버그(안 돼요·이상해요)</label><label><input type="radio" name="fbk" value="idea"> 💡 개선(이렇게 되면 좋겠어요)</label></div>
