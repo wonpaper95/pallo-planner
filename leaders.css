@@ -151,14 +151,10 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldsubblk h3 .btn { margin-left: 6px; }
 #ldView .promo { border: 1.5px solid var(--line); border-radius: 999px; background: var(--bg); padding: 2px 8px; cursor: pointer; font-size: 12px; }
 #ldView .promo.on { background: rgba(224, 209, 32, .25); border-color: #c9b800; font-weight: 700; }
-#ldView .ldfind { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 14px; padding: 12px 14px; border: 2px solid var(--accent); border-radius: 14px; background: var(--panel); } /* 🔍 리더 찾기 — 팀 믹싱 위, 잘 보이게 */
-#ldView .ldfind label { font-size: 16px; font-weight: 700; color: var(--accent); }
-#ldView .ldfind input { flex: 1 1 220px; min-width: 0; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; -webkit-appearance: none; appearance: none; } /* 배경·글자 둘 다 테마 색 · 16px = 아이폰 확대 안 됨 */
+#ldView .ldfind { margin-bottom: 12px; } /* 🔍 리더 찾기 — 한 줄로 짧게 */
+#ldView .ldfind input { width: 100%; max-width: 420px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; -webkit-appearance: none; appearance: none; } /* 16px = 아이폰 확대 안 됨 */
 #ldView .ldfind input::placeholder { color: var(--sub); opacity: 1; }
 #ldView .ldfind input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-#ldView .ldfind .btn { padding: 10px 18px; }
-#ldView .ldfind small { font-size: 12px; }
-@media (max-width: 680px) { #ldView .ldfind label { flex: 1 1 100%; } #ldView .ldfind small { display: none; } }
 #ldView .endb.del { margin-left: 4px; padding: 4px 7px; }
 #ldView .rpwho { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); white-space: nowrap; }
 #ldView .rpwho .me { color: var(--accent); font-weight: 700; }
@@ -184,3 +180,37 @@ body:not(.ldv) #ldView { display: none; }
 #ldUndo { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 12px; background: #2b2540; color: #fff; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 32px); }
 #ldUndo.hidden { display: none; }
 #ldUndo button { background: #e0d120; color: #2b2540; border: 0; border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; white-space: nowrap; font: inherit; font-weight: 700; }
+
+/* 📌 보드 (10-29): 오늘·내일 리더 · 요일 페이지 · 시간대 칸 · 서브리더·대기 리더 */
+#ldDlg .hidden { display: none !important; }
+#ldView .ldpage button { font-weight: 700; }
+#ldView .ldtd2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+#ldView .ldday { padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+#ldView .ldday h3 { margin: 2px 0 8px; font-size: 16px; color: var(--accent); } #ldView .ldday h3 .dd { color: var(--text); font-size: 14px; } #ldView .ldday h3 .mut { font-size: 12.5px; font-weight: 500; margin-left: 4px; }
+#ldView .ldday .on { color: #1f9d55; } #ldView .ldday .re { color: #e5484d; }
+#ldView .ldday .tdrow { display: grid; grid-template-columns: 48px 1fr; align-items: start; gap: 6px; margin: 6px 0; } #ldView .ldday .tdrow > b { min-width: 0; padding-top: 6px; }
+#ldView .ldday .tdc { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+#ldView .lv, #ldView .lg { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 17px; vertical-align: 1px; white-space: nowrap; }
+#ldView .lv { background: rgba(73, 48, 135, .1); color: var(--accent); }
+#ldView .lg { color: var(--sub); border: 1px solid var(--line); line-height: 15px; }
+#ldView .subadd, #ldView .subtag { all: unset; cursor: pointer; font-size: 12px; padding: 4px 6px; border-radius: 999px; white-space: nowrap; }
+#ldView .subadd { opacity: .45; } #ldView .subadd:hover { opacity: 1; background: var(--hover); }
+#ldView .subtag { background: rgba(59, 130, 246, .14); color: #2563eb; font-weight: 700; margin-right: 2px; }
+#ldView .cfm.hasub > button:first-child b { text-decoration: line-through; opacity: .6; } /* 대타가 들어가는 리더 = 이름 줄 긋기 */
+#ldView .ldmix summary { list-style: none; cursor: pointer; } #ldView .ldmix summary::-webkit-details-marker { display: none; }
+#ldView .ldmix summary h3::before { content: "▸ "; } #ldView .ldmix[open] summary h3::before { content: "▾ "; }
+#ldView .ldmix:not([open]) { padding: 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; } #ldView .ldmix:not([open]) h3 { margin: 0; }
+#ldView .lddays { margin: 6px 0 4px; } #ldView .lddays button { padding: 8px 20px; font-size: 15px; font-weight: 700; }
+#ldView .ldcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+#ldView .ldcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+#ldView .ldcard h3 { margin: 2px 2px 6px; font-size: 15.5px; }
+#ldView .ldcard td { text-align: left; padding: 5px 6px; white-space: normal; }
+#ldView .ldcard td.lvc { width: 64px; color: var(--sub); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+#ldView .ldcard tr.subrow td { border-top: 1px dashed var(--line); background: rgba(59, 130, 246, .06); }
+#ldView .ldcard tr.subrow td.lvc { color: #2563eb; }
+#ldView .sbc { display: inline-block; margin: 1px 6px 1px 0; font-weight: 600; } #ldView .sbc.flash { background: rgba(224, 209, 32, .35); border-radius: 6px; }
+#ldView .tel { margin-left: 4px; text-decoration: none; font-size: 11px; }
+#ldView td.edc { width: 28px; text-align: right; } #ldView .edc .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; opacity: .35; } #ldView .edc .slotedit:hover { opacity: 1; }
+#ldView .ldpool h3 .btn { margin-left: 6px; } #ldView .ldpool td { text-align: left; }
+@media (max-width: 760px) { #ldView .ldtd2 { grid-template-columns: 1fr; } }
+#ldView .ldday span.cfm { flex-wrap: wrap; max-width: 100%; } #ldView .ldday span.cfm > button { white-space: nowrap; } /* 폰: 대타 표시는 칩 안에서 다음 줄로 */

@@ -133,6 +133,11 @@ const LDC = {
     const pm = s.match(/오후\s*(\d{1,2})/); if (pm) return ((+pm[1] % 12) + 12) * 60 + lang;
     return (s.includes("오전") ? 600 : s.includes("오후") ? 840 : s.includes("저녁") ? 1140 : 9999) + lang; // 대기·스터디는 맨 뒤
   },
+  // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
+  langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
+  timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
+  // 레벨 정렬: 숫자(0 · 0.5 · 패턴1 · 2) 순, 숫자 없으면(프토 · 땜빵리더) 뒤
+  lvNum(lv) { const m = String(lv ?? "").match(/\d+(\.\d+)?/); return m ? +m[0] : 99; },
   // 전산 수업 이름('월수 오전', '월수 오후6', '일본어 월수 18시', '영어 화목 11:00') → 반·시간대. 그 반에 비슷한 시간(±90분)·같은 언어 칸이 있으면 그걸 씀
   courseSlot(course, rows) {
     const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0], lang = (c.match(/일본어|중국어/) ?? [""])[0];
