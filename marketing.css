@@ -74,3 +74,18 @@ body:not(.mkv) #mkView { display: none; }
 @media (max-width: 640px) { #mkView .agig-no { width: 80px; } #mkView .agig { width: 100%; max-width: 320px; } }
 #mkView .agref { width: 56px; height: auto; border-radius: 6px; vertical-align: middle; margin: 2px 4px 2px 0; }
 @media (max-width: 640px) { #mkView .agthumb { width: 80px; } #mkView .cmp img.agprop, #mkView .agprop { width: 130px; } }
+/* 📈 트렌드: 하위 탭 + 큰 카드 그리드(세로 영상 9:16), 누르면 카드 자리에서 재생 */
+#mkView .trsub { margin: 0 0 10px; }
+#mkView .trsub button { font-size: 15px; padding: 8px 14px; }
+#mkView .trgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px 14px; margin-top: 10px; }
+#mkView .trc { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#mkView .trc .trm { display: block; position: relative; width: 100%; aspect-ratio: 9 / 16; line-height: 0; border-radius: 12px; overflow: hidden; background: var(--bg); }
+#mkView .trc .trm img, #mkView .trc .agig-no { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+#mkView .trc .agplay span { font-size: 44px; }
+#mkView .trc .agyt { width: 100%; aspect-ratio: 9 / 16; border-radius: 12px; }
+#mkView .trc .agig { width: 100%; height: 600px; aspect-ratio: auto; }
+#mkView .trad .trm { aspect-ratio: auto; }
+#mkView .trad .trm img { position: static; height: auto; object-fit: contain; }
+#mkView .trc-t { font-size: 15px; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#mkView .trc .mut { font-size: 13px; }
+@media (max-width: 640px) { #mkView .trgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; } #mkView .trc .agig { height: 480px; } }

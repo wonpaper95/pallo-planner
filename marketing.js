@@ -379,33 +379,30 @@ async function renderTrend() {
   const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key)), tt = all.filter((r) => r.data?.src === "tt" && /^tt:\d+$/.test(r.key)), ig = all.filter((r) => r.data?.src === "ig" && /^ig:[\w-]{5,40}$/.test(r.key));
   const at = rows[0]?.data?.collected, ytAt = yt[0]?.data?.collected;
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : "");
-  // 쇼츠는 썸네일을 누르면 그 자리에서 재생(youtube-nocookie 임베드), 제목은 유튜브로 이동
-  const ytList = yt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<button class="agplay" data-yt="${esc(r.key.slice(3))}" title="여기서 재생">${img(d.image, "agthumb")}<span>▶</span></button>` : ""}<div class="cmp-b"><div><a href="https://www.youtube.com/shorts/${esc(r.key.slice(3))}" target="_blank" rel="noopener">${esc(d.title || "(제목 없음)")}</a></div>
-      <div class="mut">${esc(d.channel ?? "")} · 조회 ${n(d.views).toLocaleString("ko-KR")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · ${n(d.duration_s)}초 · ${esc(d.published ?? "")}</div></div></div>`; }).join("");
-  // 릴스: 장면을 누르면 인스타 공식 임베드로 그 자리 재생, 링크는 인스타로 이동
-  const igList = ig.map((r) => { const code = r.key.slice(3), d = r.data ?? {}; return `<div class="cmp"><button class="agplay" data-ig="${esc(code)}" title="여기서 재생">${MKACORE.safeImg(d.image) ? img(d.image, "agthumb") : `<span class="agthumb agig-no"></span>`}<span>▶</span></button><div class="cmp-b"><div><a href="https://www.instagram.com/reel/${esc(code)}/" target="_blank" rel="noopener">${esc(d.caption || "(캡션 없음)")}</a></div>
-      <div class="mut">${esc(d.tag ?? "")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · 댓글 ${n(d.comments).toLocaleString("ko-KR")} · ${esc(String(d.timestamp ?? "").replace("T", " "))}</div></div></div>`; }).join("");
+  // 큰 카드 그리드 + 하위 탭(릴스·쇼츠·틱톡·업종 밖 광고)으로 한 번에 한 칸만. 장면을 누르면 그 자리 재생(쇼츠 youtube-nocookie, 릴스 인스타 공식 임베드)
+  const card = (media, title, meta) => `<div class="trc">${media}<div class="trc-b"><div class="trc-t">${title}</div><div class="mut">${meta}</div></div></div>`;
+  const play = (attr, id, src) => `<button class="agplay trm" ${attr}="${esc(id)}" title="여기서 재생">${MKACORE.safeImg(src) ? img(src, "") : `<span class="agig-no"></span>`}<span>▶</span></button>`;
+  const ext = (href, src) => `<a class="trm" href="${esc(href)}" target="_blank" rel="noopener">${MKACORE.safeImg(src) ? img(src, "") : `<span class="agig-no"></span>`}</a>`;
+  const go = (href, t) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(t)}</a>`;
+  const ko = (v) => n(v).toLocaleString("ko-KR");
   const ttUrl = (tag) => `https://www.tiktok.com/tag/${encodeURIComponent(String(tag ?? "").replace(/^#/, ""))}`;
-  const ttList = tt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${img(d.image, "agthumb")}</a>` : ""}<div class="cmp-b"><div><b>${n(d.rank)}위</b> <a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${esc(d.tag ?? "")}</a></div>
-      <div class="mut">게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}</div></div></div>`; }).join("");
-  const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agthumb")}<div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
-      <span class="mut">${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개로 돌림` : ""} · ${esc(d.media_type || "?")}${d.cta ? ` · ${esc(d.cta)}` : ""}${(d.keywords ?? []).length ? ` · 검색어 ${esc(d.keywords.join(", "))}` : ""}</span></div>
-      <div>${esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90))}</div></div></div>`; }).join("");
-  $m("#mkBody").innerHTML = `<div class="card"><b>📈 요즘 오래 도는 광고 — 업종 밖 (눌러서 광고 라이브러리 원문)</b>
-    <p class="mut">기준: 자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일 넘게 돌거나 광고 3개 이상으로 돌리는 것 · 광고주당 2개${at ? ` · 수집 ${esc(new Date(at).toLocaleString("ko-KR"))}` : ""}</p>
-    ${list || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`
-    + `<div class="card"><b>🎬 요즘 뜨는 숏폼 — 유튜브 쇼츠 (한국, 3분 이하)</b>
-    <p class="mut">기준: 한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${ytAt ? ` · 수집 ${esc(new Date(ytAt).toLocaleString("ko-KR"))}` : ""}</p>
-    ${ytList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요. 썸네일을 누르면 여기서 바로 재생돼요.</p></div>`
-    + `<div class="card"><b>🎵 틱톡 인기 해시태그 — 한국</b>
-    <p class="mut">틱톡 크리에이티브 센터 '최근 7일' 순위(틱톡 집계라 며칠 늦을 수 있어요) · 표지는 그 해시태그 인기 영상 · 누르면 틱톡 해시태그 페이지${tt[0]?.data?.collected ? ` · 수집 ${esc(new Date(tt[0].data.collected).toLocaleString("ko-KR"))}` : ""}</p>
-    ${ttList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`
-    + `<div class="card"><b>📸 인스타 릴스 — 해시태그 최근 24시간 반응 좋은 것</b>
-    <p class="mut">#챌린지·#릴스·#밈·#갓생·#공부자극·#영어공부 최근 24시간 게시물 중 릴스를 좋아요+댓글순 · 해시태그당 4개${ig[0]?.data?.collected ? ` · 수집 ${esc(new Date(ig[0].data.collected).toLocaleString("ko-KR"))}` : ""}</p>
-    ${igList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">인스타는 '인기순' 전체 목록을 공개하지 않아서, 해시태그 최근 24시간에서 반응이 빨리 붙는 릴스를 골라요. 장면을 누르면 여기서 재생돼요.</p></div>`;
+  const when = (x) => (x ? ` · 수집 ${esc(new Date(x).toLocaleString("ko-KR"))}` : "");
+  const SUB = {
+    ig: ["📸 릴스", ig, (r) => { const code = r.key.slice(3), d = r.data ?? {}; return card(play("data-ig", code, d.image), go(`https://www.instagram.com/reel/${code}/`, d.caption || "(캡션 없음)"), `${esc(d.tag ?? "")} · 좋아요 ${ko(d.likes)} · 댓글 ${ko(d.comments)}`); },
+      `#챌린지·#릴스·#밈·#갓생·#공부자극·#영어공부 최근 24시간 릴스를 좋아요+댓글순 · 해시태그당 4개${when(ig[0]?.data?.collected)} · 인스타는 인기순 전체 목록을 공개하지 않아 24시간 안에 반응이 빨리 붙는 것을 골라요`],
+    yt: ["🎬 쇼츠", yt, (r) => { const id = r.key.slice(3), d = r.data ?? {}; return card(play("data-yt", id, d.image), go(`https://www.youtube.com/shorts/${id}`, d.title || "(제목 없음)"), `${esc(d.channel ?? "")} · 조회 ${ko(d.views)} · 좋아요 ${ko(d.likes)} · ${n(d.duration_s)}초`); },
+      `한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${when(ytAt)}`],
+    tt: ["🎵 틱톡", tt, (r) => { const d = r.data ?? {}; return card(ext(ttUrl(d.tag), d.image), `<b>${n(d.rank)}위</b> ${go(ttUrl(d.tag), d.tag ?? "")}`, `게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}`); },
+      `틱톡 크리에이티브 센터 한국 '최근 7일' 해시태그 순위(며칠 늦을 수 있어요) · 표지는 그 해시태그 인기 영상${when(tt[0]?.data?.collected)}`],
+    ad: ["📈 업종 밖 광고", rows, (r) => { const d = r.data ?? {}; return card(ext(MKCCORE.libraryUrl(r.key), d.image), esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90)), `${go(MKCCORE.libraryUrl(r.key), d.page_name || "광고")} · ${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개` : ""} · ${esc(d.media_type || "?")}`); },
+      `자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일+ 또는 광고 3개+ · 광고주당 2개${when(at)} · 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요`],
+  };
+  if (!SUB[MK.trsub]) MK.trsub = "ig";
+  const [, items, one, how] = SUB[MK.trsub];
+  $m("#mkBody").innerHTML = `<div class="mktabs trsub">${Object.entries(SUB).map(([k, [t, xs]]) => `<button data-tr="${k}" class="${MK.trsub === k ? "on" : ""}">${t} ${xs.length}</button>`).join("")}</div>
+    <div class="card"><p class="mut">${how}. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요.</p>
+    ${items.length ? `<div class="trgrid${MK.trsub === "ad" ? " trad" : ""}">${items.map(one).join("")}</div>` : `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`;
+  V().querySelectorAll("[data-tr]").forEach((b) => b.addEventListener("click", () => { MK.trsub = b.dataset.tr; renderTrend(); }));
   V().querySelectorAll("[data-ig]").forEach((b) => b.addEventListener("click", () => {
     if (!/^[\w-]{5,40}$/.test(b.dataset.ig)) return;
     b.outerHTML = `<iframe class="agyt agig" src="https://www.instagram.com/reel/${b.dataset.ig}/embed/" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
