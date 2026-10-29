@@ -421,12 +421,15 @@ ${a.days ? `[실적 누계] ${a.days}일 입력 기준
 const V = () => document.getElementById("salesView");
 const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log: {}, sheet: { days: {}, sync: null }, myTeam: undefined };
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
+SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
+SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
 
 V().innerHTML = `
 <div class="slbar"><h2>💰 매출 목표</h2><select id="slTeam" class="adminonly" aria-label="지점"></select><b id="slTeamName"></b>
   <input type="month" data-k="month" aria-label="목표 월"><a href="https://sso.pallo.co.kr/select?pick=branch" target="_blank" rel="noopener" class="btn ghost">지원자 수 확인 (SSO)</a><button class="btn ghost hidden" id="slSync" type="button">🔄 시트 새로고침</button><small id="slSheet"></small><small id="slSaved"></small></div>
 <div id="slEmpty" class="hidden"></div>
 <div id="slBody">
+<div id="mgCard"></div><!-- 📮 월말 보고 (month-goal.js) -->
 <details class="slcard sldefs"><summary><b>📏 단계별 세는 법</b> <small>(모든 매니저가 같은 기준으로 입력)</small></summary><table>
   <tr><td><b>지원자</b></td><td>그날 SSO 지점 화면에 새로 들어온 신청 수 (하루치, 누계 아님)</td></tr>
   <tr><td><b>회신자</b></td><td>그날 상담 오기로 한 사람 — 연락해서 전산 상담 일정(캘린더)에 잡힌 사람</td></tr>
@@ -528,6 +531,7 @@ SL.load = async function () {
   SL.plan = p.data ? { ...newPlan(SL.month), ...p.data.data, month: SL.month } : newPlan(SL.month, prev.data?.data); // 새 달은 지난달 비율·멤버십 이어받기
   await loadDays();
   render();
+  window.MG?.load(); // 📮 월말 보고
 };
 async function loadDays() {
   const s = SL.plan, from = s.base < mStart(s) ? s.base : mStart(s), to = s.end > mEnd(s) ? s.end : mEnd(s);
