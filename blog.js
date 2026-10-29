@@ -203,10 +203,11 @@ function renderNew() {
     <label>메인 키워드 <small>(비우면 AI가 골라요 · 칩 한 번=서브, 두 번=메인)</small></label><input data-o="main_keyword" value="${esc(o.main_keyword)}" style="width:100%" placeholder="예) 동성로 영어회화">
     <div class="blchips" id="blChips"></div>
     <button type="button" class="btn ghost small" id="blKwBtn" style="margin-top:8px">🔍 네이버 검색량 보기</button><div id="blKw"></div>
+    <button type="button" class="btn ghost small" id="blResBtn" style="margin-top:8px">📈 검색 추이 · 상위 글 보기</button><div id="blRes"></div>
     <button type="button" class="btn blgo" id="blGo">✨ 시안 만들기</button><div class="mut" id="blGoNote" style="margin-top:6px"></div>
   </div><div id="blOut"></div></div>`;
   $b("#blTopic").value = o.topic;
-  syncMode(); renderThumbs(); renderChips(); presetWhy(); renderOut();
+  syncMode(); renderThumbs(); renderChips(); presetWhy(); renderOut(); renderRes();
 }
 function syncMode() {
   const topic = BL.opts.mode === "topic";
@@ -494,6 +495,38 @@ function renderKw() {
     <div class="mut">검색량 많고 경쟁 "낮음·중간"인 키워드가 블로그로 노리기 좋아요.</div>`;
 }
 
+// ── 검색 추이·블로그 상위 글 (NAVER API HUB). 상위 글은 시안 만들 때 서버가 메인 키워드로 다시 찾아 AI 에 넘김 ──
+async function research() {
+  const o = BL.opts, kws = [...new Set([o.main_keyword, ...o.sub_keywords].map((k) => k.trim()).filter(Boolean))].slice(0, 5);
+  if (!kws.length) return toast("메인 키워드를 넣거나 칩을 골라 주세요");
+  const btn = $b("#blResBtn"); btn.disabled = true; btn.textContent = "📈 조회 중…";
+  const r = await call("research", { keywords: kws });
+  btn.disabled = false; btn.textContent = "📈 검색 추이 · 상위 글 보기";
+  if (!r) return;
+  BL.res = r; renderRes();
+}
+const LINE = ["var(--accent)", "#e0a020", "#3aa676", "#d0607a", "#4a8fd8"];
+function trendSvg(trend) {
+  const W = 320, H = 110, n = trend[0]?.data.length ?? 0; if (n < 2) return "";
+  const x = (i) => 8 + (i * (W - 16)) / (n - 1), y = (v) => H - 18 - (v / 100) * (H - 28);
+  const lines = trend.map((t, k) => `<polyline fill="none" stroke="${LINE[k]}" stroke-width="${k ? 1.6 : 2.6}" points="${t.data.map((d, i) => `${x(i).toFixed(1)},${y(d.ratio).toFixed(1)}`).join(" ")}"/>`).join("");
+  const labels = trend[0].data.map((d, i) => i % 2 === n % 2 ? "" : `<text x="${x(i).toFixed(1)}" y="${H - 4}" text-anchor="middle">${+d.month.slice(5)}월</text>`).join("");
+  return `<svg class="bltrend" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 12개월 검색 추이">${lines}${labels}</svg>`;
+}
+function renderRes() {
+  const el = $b("#blRes"), r = BL.res; if (!el || !r) return;
+  const t0 = r.trend[0], d = t0?.data ?? [], peak = d.reduce((a, b) => (b.ratio > a.ratio ? b : a), d[0] ?? { ratio: 0 }), last = d[d.length - 1];
+  const note = t0 && peak?.ratio ? `<b>${esc(t0.keyword)}</b> 가장 많이 찾은 달은 ${+peak.month.slice(5)}월 · 이번 달은 그때의 ${Math.round((last.ratio / peak.ratio) * 100)}% (이번 달은 진행 중)` : "검색 추이 데이터가 없어요 (검색이 너무 적은 키워드)";
+  el.innerHTML = `<div class="blres">
+    <div class="mut" style="margin-top:8px">최근 12개월 네이버 검색 추이 — 숫자가 아니라 넣은 키워드 중 최고치를 100으로 본 비교값이에요</div>
+    ${trendSvg(r.trend)}
+    <div class="bllegend">${r.trend.map((t, k) => `<span><i style="background:${LINE[k]}"></i>${esc(t.keyword)}</span>`).join("")}</div>
+    <div class="mut">${note}</div>
+    <div style="margin-top:10px"><b>🏆 '${esc(t0?.keyword ?? "")}' 네이버 블로그 상위 ${r.top.items.length}개</b> <span class="mut">· 전체 ${r.top.total.toLocaleString()}개 글</span></div>
+    <ol class="bltop">${r.top.items.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a><div class="mut">${esc(x.blogger)} · ${esc(x.date.replace(/(\d{4})(\d\d)(\d\d)/, "$1.$2.$3"))}</div></li>`).join("") || `<li class="mut">글이 없어요</li>`}</ol>
+    <div class="mut">✨ 시안 만들 때 메인 키워드의 상위 글 제목을 AI가 함께 보고, 겹치지 않는 각도로 써요.</div></div>`;
+}
+
 // ── 다른 채널 변환 ──
 async function convert() {
   const btn = $b("#blConv"); btn.disabled = true; btn.textContent = "🔁 바꾸는 중…";
@@ -509,7 +542,7 @@ async function convert() {
 function wire() {
   const v = V();
   $b("#blFile").onchange = (ev) => { addFiles([...ev.target.files]); ev.target.value = ""; };
-  $b("#blTeam").onchange = (ev) => { BL.team = +ev.target.value; try { localStorage.setItem("blog-team", ev.target.value); } catch {} BL.profile = null; BL.post = null; BL.postId = null; BL.sim = null; BL.kw = null; BL.load(); };
+  $b("#blTeam").onchange = (ev) => { BL.team = +ev.target.value; try { localStorage.setItem("blog-team", ev.target.value); } catch {} BL.profile = null; BL.post = null; BL.postId = null; BL.sim = null; BL.kw = null; BL.res = null; BL.load(); };
   v.addEventListener("paste", pasteAsText);
   v.addEventListener("click", async (ev) => {
     const t = ev.target, d = t.dataset ?? {}, X = BL.post;
@@ -528,6 +561,7 @@ function wire() {
       $b("[data-o=main_keyword]").value = o.main_keyword; return renderChips();
     }
     if (t.id === "blKwBtn") return keywordVolume();
+    if (t.id === "blResBtn") return research();
     if (t.id === "blKwLocal") { BL.kwLocal = t.checked; return renderKw(); }
     const row = t.closest("[data-kwrow]");
     if (row) { const k = row.dataset.kwrow; if (!BL.extraKw.includes(k)) BL.extraKw.unshift(k); BL.opts.main_keyword = k; $b("[data-o=main_keyword]").value = k; return renderChips(); }

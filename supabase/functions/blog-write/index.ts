@@ -1,6 +1,6 @@
 // ✍️ 블로그 작성기 Edge Function. 화면(blog.js)이 sb.functions.invoke("blog-write", { body: { action, ... } }) 로 부른다.
-// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
-// 비밀값: ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET (supabase secrets set …)
+// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | research(API HUB 검색 추이·블로그 상위 글) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
+// 비밀값: ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import {
@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
       case "sns": return json(await sns(who, team, body));
       case "style": return json(await style(who, team, body));
       case "keywords": return json(await keywords(who, team, body));
+      case "research": return json(await research(who, team, body));
       case "similar": return json(await similar(team, body));
       case "usage": return json(await usage(team));
       default: throw new HttpError(400, "알 수 없는 action");
@@ -136,6 +137,7 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     if (s) preset = { name: s.name, rules: s.rules };
   }
   const recent = (await admin.from("blog_posts").select("title, body, created_at").eq("team_id", team.id).order("created_at", { ascending: false }).limit(8)).data ?? [];
+  const top = o.main_keyword ? await topBlogs(o.main_keyword).catch((e) => (console.error("상위 글 조회 실패", e), null)) : null;
   const p = team.profile as Record<string, any>;
   const lines = [
     `오늘: ${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)}`,
@@ -150,6 +152,7 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     `메인 키워드: ${o.main_keyword || "(지점 키워드 중 이 글에 가장 맞는 롱테일로 골라라)"}`,
     `서브 키워드 후보: ${(o.sub_keywords ?? []).join(", ") || (p.subKeywords ?? []).slice(0, 12).join(", ")}`,
     `사진: ${photos.length}장 (아래 순서가 사진 번호). ${photos.length ? "모든 사진을 한 번씩 photo 블록으로 배치하라. 순서는 글 흐름에 맞게 바꿔도 된다." : "사진이 없으니 photo 블록의 photo=0, text 에 찍으면 좋을 사진을 안내하라 (6~8개)."}`,
+    top?.items.length ? `# 네이버 블로그 '${o.main_keyword}' 상위 글 (경쟁 글 — 제목·첫 문단 각도가 겹치지 않게, 이 글들에 없는 정보·경험으로 차별화. 문장·표현은 가져오지 말 것)\n${top.items.map((t: { title: string; desc: string }, i: number) => `${i + 1}. ${t.title} :: ${t.desc}`).join("\n")}` : "",
     recent.length ? `# 이 지점 최근 글 (겹치지 않게)\n${recent.map((r) => `- ${r.title} :: ${String(r.body).slice(0, 120).replace(/\s+/g, " ")}`).join("\n")}` : "",
   ].filter(Boolean).join("\n");
 
@@ -253,6 +256,45 @@ async function keywords(who: Who, team: Team, b: { hints?: string[] }) {
   }));
   await record(who, team.id, "keywords");
   return { keywords: list.slice(0, 200) };
+}
+
+// ── NAVER API HUB (ncloud): 검색어 트렌드·블로그 검색. 헤더 2개로 인증 ──
+async function hub(path: string, body?: unknown) {
+  const id = Deno.env.get("NAVER_HUB_ID"), secret = Deno.env.get("NAVER_HUB_SECRET");
+  if (!id || !secret) throw new HttpError(503, "NAVER API HUB 키가 아직 연결되지 않았어요");
+  const r = await fetch((Deno.env.get("NAVER_HUB_URL") ?? "https://naverapihub.apigw.ntruss.com") + path, {
+    method: body ? "POST" : "GET", body: body ? JSON.stringify(body) : undefined,
+    headers: { "X-NCP-APIGW-API-KEY-ID": id, "X-NCP-APIGW-API-KEY": secret, ...(body ? { "Content-Type": "application/json" } : {}) },
+  });
+  if (!r.ok) throw new HttpError(502, `NAVER API HUB 오류 ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return await r.json();
+}
+const plain = (s: unknown) => String(s ?? "").replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+async function topBlogs(q: string) {
+  const d = await hub(`/search/v1/blog?${new URLSearchParams({ query: q, display: "10", sort: "sim" })}`);
+  return { total: d.total ?? 0, items: (d.items ?? []).map((x: any) => ({ title: plain(x.title), blogger: plain(x.bloggername), date: x.postdate, link: x.link, desc: plain(x.description).slice(0, 120) })) };
+}
+
+// ── research: 키워드 최근 12개월 검색 추이(넣은 키워드 중 최고치=100 상대값, 최대 5개) + 첫 키워드 블로그 상위 10 ──
+async function research(who: Who, team: Team, b: { keywords?: string[] }) {
+  const kws = [...new Set((b.keywords ?? []).map((k) => String(k).trim()).filter(Boolean))].slice(0, 5);
+  if (!kws.length) throw new HttpError(400, "메인 키워드를 먼저 넣어 주세요");
+  const now = new Date(Date.now() + 9 * 3600e3), end = now.toISOString().slice(0, 10);
+  const start = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10); // 이번 달 포함 12개월
+  const [trend, top] = await Promise.all([
+    hub("/search-trend/v1/search", { startDate: start, endDate: end, timeUnit: "month", keywordGroups: kws.map((k) => ({ groupName: k, keywords: [k] })) }),
+    topBlogs(kws[0]),
+  ]);
+  await record(who, team.id, "research");
+  // 검색이 너무 적은 달은 네이버가 빼고 줌 → 12칸을 채워 0으로 (그래프가 달을 밀려 그리지 않게)
+  const months = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() + 1 + i, 1)).toISOString().slice(0, 7));
+  return {
+    trend: (trend.results ?? []).map((r: any) => {
+      const got = Object.fromEntries((r.data ?? []).map((x: any) => [x.period.slice(0, 7), x.ratio]));
+      return { keyword: r.title, data: months.map((m) => ({ month: m, ratio: got[m] ?? 0 })) };
+    }),
+    top,
+  };
 }
 
 // ── similar: 전 지점 최근 글과 겹침 (3글자 조각 자카드) ──
