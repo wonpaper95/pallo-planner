@@ -1,5 +1,5 @@
 -- 🤖 마케팅 탭 › 에이전트 (대표: 전부 + 승인/킬스위치, 매니저: 자기 지점 것만 읽기, 조교: 안 보임)
--- 맥북의 광고·스레드 에이전트(ad-agent/)가 만든 결과를 맥미니가 서비스 키로 올리고(scripts/mka/push.mjs), 대표는 읽기 + 광고 제안 승인/반려 + 킬스위치만 한다.
+-- 맥북의 광고·스레드 에이전트(ad-agent/)가 만든 결과를 맥북이 비밀값으로 보호된 DB 함수로 올리고(20261030140000_agent_push.sql), 대표는 읽기 + 광고 제안 승인/반려 + 킬스위치만 한다.
 -- kind: thread(스레드 글: status posted|ready) · proposal(광고 제안: proposed|approved|rejected) · topad(리드 많은 우리 광고, 링크) · control(key=kill, status on|off)
 create table if not exists public.mka_items (
   kind text not null check (kind in ('thread', 'proposal', 'topad', 'control')),

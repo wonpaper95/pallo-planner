@@ -53,6 +53,54 @@ grant select, insert, update, delete on public.mka_items to service_role;
 -- 킬스위치 행은 처음부터 꺼진 상태로 둔다 (화면에서 update 만 하면 되게)
 insert into public.mka_items (kind, key, status) values ('control', 'kill', 'off') on conflict do nothing;
 
+-- 🤖 에이전트(맥북)가 서비스 키 없이 mka_items 를 올리는 길: 긴 비밀값으로 보호한 함수 2개.
+-- 비밀값은 맥북 ad-agent/planner-push-secret.txt 에만 있고, DB 에는 sha256 해시만 둔다. 함수는 mka_items 만 건드린다(광고·전산 데이터 접근 없음).
+create extension if not exists pgcrypto with schema extensions;
+create table if not exists public.mka_push_key (hash text primary key);
+alter table public.mka_push_key enable row level security; -- 정책 없음 = API 로는 아무도 못 읽음
+
+create or replace function public.mka_check_key(k text) returns boolean
+language sql stable security definer set search_path = public, extensions as
+$$ select coalesce(length(k), 0) >= 32 and exists (select 1 from mka_push_key where hash = encode(digest(k, 'sha256'), 'hex')) $$;
+
+-- 올리기: items = [{kind: thread|proposal|topad, key, status, data}]. 광고 제안(proposal)은 이미 있으면 대표가 누른 승인 상태를 지킨다.
+-- 이번 묶음에 없는 같은 종류 행은 지운다(끝난 제안·지난 순위 정리). 묶음이 비어 있으면 아무것도 안 지운다.
+create or replace function public.mka_push(k text, items jsonb) returns int
+language plpgsql security definer set search_path = public, extensions as $$
+declare n int := 0; it jsonb; kd text;
+begin
+  if not mka_check_key(k) then raise exception 'bad key' using errcode = '28000'; end if;
+  for it in select * from jsonb_array_elements(items) loop
+    continue when it->>'kind' not in ('thread', 'proposal', 'topad') or coalesce(it->>'key', '') = '';
+    insert into mka_items (kind, key, status, data, updated_at)
+    values (it->>'kind', it->>'key', coalesce(it->>'status', ''), coalesce(it->'data', '{}'::jsonb), now())
+    on conflict (kind, key) do update set data = excluded.data, updated_at = now(),
+      status = case when mka_items.kind = 'proposal' then mka_items.status else excluded.status end;
+    n := n + 1;
+  end loop;
+  if n > 0 then
+    foreach kd in array array['thread', 'proposal', 'topad'] loop
+      delete from mka_items where kind = kd and key not in (select x->>'key' from jsonb_array_elements(items) x where x->>'kind' = kd);
+    end loop;
+  end if;
+  return n;
+end $$;
+
+-- 내려받기: 대표가 화면에서 누른 킬스위치·승인·반려
+create or replace function public.mka_state(k text) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  if not mka_check_key(k) then raise exception 'bad key' using errcode = '28000'; end if;
+  return jsonb_build_object(
+    'kill', exists (select 1 from mka_items where kind = 'control' and key = 'kill' and status = 'on'),
+    'approved', coalesce((select jsonb_agg(key order by key) from mka_items where kind = 'proposal' and status = 'approved'), '[]'::jsonb),
+    'rejected', coalesce((select jsonb_agg(key order by key) from mka_items where kind = 'proposal' and status = 'rejected'), '[]'::jsonb));
+end $$;
+
+revoke all on function public.mka_check_key(text) from public, anon, authenticated;
+grant execute on function public.mka_push(text, jsonb), public.mka_state(text) to anon, authenticated;
+
+insert into public.mka_push_key values (encode(extensions.digest('k'||repeat('x',40), 'sha256'), 'hex'));
 -- 흉내: 역할·지점 (migration 에서 만든 함수를 설정값 기반으로 바꿔 끼움)
 create or replace function public.mk_is_assistant() returns boolean language sql stable as $f$ select current_setting('t.role', true) = 'assistant' $f$;
 create or replace function public.mka_branch_of_team(tid bigint) returns text language sql stable as $f$ select case tid when 1 then 'DAEGUDSR' when 2 then 'ULSAN' when 3 then 'DAEGUJPCH' end $f$;
@@ -88,6 +136,31 @@ insert into public.mkc_ads values ('en', 1);
 insert into public.mka_items (kind,key,status,data) values
   ('proposal','p_dsr','proposed','{"branch":"DAEGUDSR"}'),('proposal','p_ul','proposed','{"branch":"ULSAN"}'),
   ('thread','t_dsr','posted','{"branch":"DAEGUDSR"}'),('topad','a_none','ACTIVE','{"branch":""}');
+set local role anon;
+do $$ declare c int; k text := 'k'||repeat('x',40); st jsonb; begin
+  begin perform public.mka_push('wrong'||repeat('y',40), '[]'::jsonb); assert false, 'bad key must fail'; exception when sqlstate '28000' then null; end;
+  begin perform public.mka_state('short'); assert false, 'short key must fail'; exception when sqlstate '28000' then null; end;
+  assert public.mka_push(k, '[{"kind":"proposal","key":"p_new","status":"proposed","data":{"branch":"ULSAN"}},{"kind":"topad","key":"a_new","status":"ACTIVE","data":{"branch":"ULSAN"}},{"kind":"control","key":"kill","status":"on","data":{}},{"kind":"thread","key":"","status":"x"}]'::jsonb) = 2, 'push counts 2 valid (control/empty key ignored)';
+  reset role;
+  assert (select count(*) from public.mka_items where kind='control' and status='off') = 1, 'push cannot flip kill';
+  assert (select count(*) from public.mka_items where key in ('p_dsr','p_ul','t_dsr','a_none')) = 0, 'old rows of pushed kinds pruned';
+  update public.mka_items set status='approved' where key='p_new';
+  set local role anon;
+  assert public.mka_push(k, '[{"kind":"proposal","key":"p_new","status":"proposed","data":{"branch":"ULSAN","x":1}}]'::jsonb) = 1;
+  reset role;
+  assert (select status from public.mka_items where key='p_new') = 'approved', 'approval survives re-push';
+  update public.mka_items set status='on' where kind='control';
+  set local role anon;
+  st := public.mka_state(k);
+  assert (st->>'kill')::boolean and st->'approved' = '["p_new"]'::jsonb and st->'rejected' = '[]'::jsonb, 'state';
+  assert public.mka_push(k, '[]'::jsonb) = 0, 'empty push deletes nothing';
+  reset role;
+  assert (select count(*) from public.mka_items where key='p_new') = 1;
+  -- 시험 재료 되돌리기(아래 본시험이 쓰던 행 복구)
+  delete from public.mka_items where kind <> 'control';
+  insert into public.mka_items (kind,key,status,data) values ('proposal','p_dsr','proposed','{"branch":"DAEGUDSR"}'),('proposal','p_ul','proposed','{"branch":"ULSAN"}'),('thread','t_dsr','posted','{"branch":"DAEGUDSR"}'),('topad','a_none','ACTIVE','{"branch":""}');
+  update public.mka_items set status='off' where kind='control';
+end $$;
 set local role authenticated;
 do $$ declare c int; begin
   -- 조교(대구 영어 지점): 마케팅·에이전트 전부 안 보임
