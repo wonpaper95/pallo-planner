@@ -183,7 +183,7 @@ LD.render = function () {
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th>리더교육</th><th>🌙 리더나잇</th><th>📜 자격증</th>` : ""}</tr>`;
-      const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="level">${esc(r.level)}</td><td data-f="seat">${esc(r.seat)}</td>`
+      const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="level">${myRole !== "assistant" ? `<span class="lddrag" draggable="true" title="끌어서 이 칸 안 순서 바꾸기 (PC)">⠿</span>` : ""}${esc(r.level)}</td><td data-f="seat">${esc(r.seat)}</td>`
         + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
         + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : `<td class="att2">${attGrid(r, ses, g)}</td><td>${flags(r, sm)}</td>`)
@@ -538,6 +538,26 @@ LD.syncInbox = async function (ticket) {
 };
 document.addEventListener("click", (e) => { const c = e.target.closest(".ed1"); if (c && V()?.contains(c) && !e.target.closest("a")) cellEdit(e); }); // ✏️ 첫 시작일·특이사항·전화: 한 번 누르면 고침
 document.addEventListener("dblclick", (e) => cellEdit(e));
+// ⠿ 끌어서 순서 바꾸기 (PC): 같은 반·시간대 칸 안에서만. 숨은 줄(그만둔 리더 등)까지 그 칸 전체를 1,2,3… 으로 다시 매김
+let drag = null;
+const sameBlk = (a, b) => isLeader(a) && isLeader(b) && a.grp === b.grp && a.slot === b.slot;
+const dropRow = (e) => { const tr = drag && V()?.contains(e.target) && e.target.closest?.("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); return r && sameBlk(r, drag) ? tr : null; };
+document.addEventListener("dragstart", (e) => {
+  const h = e.target.closest?.(".lddrag"); if (!h || !V()?.contains(h)) return;
+  const tr = h.closest("tr[data-id]"); drag = LD.rows.find((x) => x.id == tr.dataset.id);
+  e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(drag.id)); tr.classList.add("lddragging");
+});
+document.addEventListener("dragover", (e) => { const tr = dropRow(e); if (!tr) return; e.preventDefault(); V().querySelectorAll(".ldover").forEach((x) => x.classList.remove("ldover")); if (tr.dataset.id != drag.id) tr.classList.add("ldover"); });
+document.addEventListener("drop", async (e) => {
+  const tr = dropRow(e); if (!tr) return; e.preventDefault();
+  const from = drag, list = LD.rows.filter((x) => sameBlk(x, from)), a = list.indexOf(from), b = list.findIndex((x) => x.id == tr.dataset.id); drag = null;
+  if (a < 0 || b < 0 || a === b) return;
+  list.splice(b, 0, ...list.splice(a, 1));
+  list.forEach((x, i) => (x.sort = i + 1)); LD.rows.sort((x, y) => x.sort - y.sort || x.id - y.id); LD.render();
+  const res = await Promise.all(list.map((x, i) => sb.from("leaders").update({ sort: i + 1 }).eq("id", x.id)));
+  if (!res.some((r) => fail(r.error))) toast("순서를 바꿨어요"); LD.load();
+});
+document.addEventListener("dragend", () => { drag = null; V()?.querySelectorAll(".lddragging,.ldover").forEach((x) => x.classList.remove("lddragging", "ldover")); });
 function cellEdit(e) {
   const v = V(); if (!v || !v.contains(e.target)) return;
   const c = e.target.closest("[data-f]"), tr = c?.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r || c.querySelector("input")) return;
