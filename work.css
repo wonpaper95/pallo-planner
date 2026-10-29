@@ -1,0 +1,75 @@
+/* 🕒 근무기록 탭 (work.js) */
+body:not(.wrv) #wrView { display: none; }
+#wrView { max-width: 1280px; margin: 0 auto; padding: 16px 20px 100px; }
+#wrView .wrbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#wrView .wrbar h2 { margin: 0; } #wrView .wrbar small { font-size: 12px; font-weight: 400; margin-left: 6px; }
+#wrView .wrrow, #wrPop .wrrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#wrView .wrym { min-width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
+#wrView select, #wrView input, #wrView textarea, #wrPop input, #wrPop textarea { padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; }
+#wrView .wrpanel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+#wrView summary { cursor: pointer; font-weight: 600; font-size: 14px; } #wrView summary .mut { font-weight: 400; font-size: 12px; }
+#wrView #wrNotice { display: block; width: 100%; min-height: 140px; margin-top: 10px; resize: vertical; line-height: 1.5; }
+#wrView .wrhow { font-size: 12px; margin-top: 10px; line-height: 1.6; }
+#wrView .wrneed-dot { display: inline-block; width: 15px; height: 15px; border-radius: 50%; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; text-align: center; line-height: 15px; }
+#wrView .wrgbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 10px; }
+#wrView .wrgbar h3 { margin: 0; font-size: 14px; } #wrView #wrSum { font-size: 12px; flex: 1; }
+#wrView .wrgbar .wrrow { margin-left: auto; } #wrView #wrRate { width: 90px; }
+#wrView .wrneedtxt { color: var(--red); }
+#wrView .wrempty { text-align: center; padding: 28px 10px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+#wrView .wrform { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+#wrView .wrform input { flex: 1; min-width: 140px; }
+
+/* 표: 이름 칸 고정, 가로 스크롤 */
+#wrView .wrscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+#wrView .wrgrid { border-collapse: separate; border-spacing: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+#wrView .wrgrid th, #wrView .wrgrid td { border-bottom: 1px solid var(--line); padding: 0; }
+#wrView .wrgrid thead th { position: sticky; top: 0; background: var(--bg); font-weight: 600; color: var(--sub); padding: 4px 2px; text-align: center; white-space: nowrap; }
+#wrView .wrgrid thead small { font-weight: 400; }
+#wrView .wrgrid .wrd { border-left: 1px solid var(--line); } #wrView .wrgrid .wrs { font-size: 10px; font-weight: 400; padding: 2px; }
+#wrView .wrgrid .l { border-left: 1px solid var(--line); }
+#wrView .wrgrid td.fri, #wrView .wrgrid th.fri { background: color-mix(in srgb, var(--sub) 10%, var(--bg)); } /* 금 = 공식 휴무 */
+#wrView .wrgrid th.om { opacity: .55; } #wrView td.wrc.om { opacity: .75; } /* 달 밖 날짜 (시트에서 옮겨 온 기록) */
+#wrView .wrgrid th.today { color: var(--accent); }
+#wrView .wrname { position: sticky; left: 0; z-index: 2; background: var(--bg); min-width: 150px; max-width: 190px; text-align: left; border-right: 1px solid var(--line); }
+#wrView thead .wrname { z-index: 3; padding: 6px 10px; }
+#wrView .wrname button { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 6px 10px; cursor: pointer; }
+#wrView tbody .wrname button:hover { background: var(--hover); }
+#wrView .wrname b { font-size: 13px; color: var(--text); }
+#wrView .wrshift { font-size: 10.5px; color: var(--sub); font-weight: 400; line-height: 1.35; }
+#wrView .wrplan { font-size: 10.5px; color: var(--accent); font-weight: 500; }
+#wrView .wrmemo { font-size: 10.5px; color: var(--orange); font-weight: 400; }
+#wrView .wrtot { font-size: 11px; font-weight: 600; color: var(--text); }
+#wrView tfoot .wrname { padding: 8px 10px; display: table-cell; } #wrView tfoot .wrname b, #wrView tfoot .wrtot { display: block; }
+#wrView tr.need .wrk { color: var(--red); } #wrView tr.done .wrk { color: var(--green); }
+#wrView tr.need .wrname button, #wrView tr.done .wrname button { padding: 10px; }
+#wrView .wrc { position: relative; }
+#wrView .wrc.plan { background: color-mix(in srgb, var(--accent) 8%, transparent); } /* 정해진 근무 칸 */
+#wrView .wrc button { all: unset; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 34px; height: 40px; padding: 0 3px; cursor: pointer; font-weight: 600; color: var(--text); line-height: 1.1; white-space: nowrap; }
+#wrView tr.need .wrc button, #wrView tr.done .wrc button { font-weight: 400; font-size: 11px; white-space: normal; max-width: 70px; text-align: center; }
+#wrView .wrc button:hover { background: var(--hover); }
+#wrView .wrc i { font-style: normal; font-size: 9.5px; font-weight: 600; } #wrView .wrc i.up { color: var(--blue); } #wrView .wrc i.dn { color: var(--orange); }
+#wrView .wrc.today { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+#wrView td.wrc.mk-out { background: color-mix(in srgb, var(--red) 30%, transparent); } /* 🔴 빠짐 (시트 빨간 칸) */
+#wrView td.wrc.mk-sub { background: color-mix(in srgb, var(--green) 30%, transparent); } /* 🟢 대타 근무 (시트 초록 칸) */
+#wrView td.wrc.has::after { content: ""; position: absolute; top: 0; right: 0; border-style: solid; border-width: 0 7px 7px 0; border-color: transparent var(--orange) transparent transparent; pointer-events: none; } /* 시트 메모 모양 = 사유 있음 */
+#wrView td.wrc.need button { box-shadow: inset 0 0 0 2px var(--red); border-radius: 4px; }
+#wrView td.wrc.need::before { content: "!"; position: absolute; top: 1px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); color: #fff; font-size: 9px; font-weight: 700; text-align: center; line-height: 12px; pointer-events: none; }
+#wrView .wrppl { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+#wrView .wrp { display: grid; grid-template-columns: 90px 150px 1fr 26px; gap: 6px; align-items: center; }
+@media (max-width: 680px) { #wrView .wrp { grid-template-columns: 1fr 26px; } #wrView .wrp input { grid-column: 1; } #wrView .wrname { min-width: 120px; max-width: 140px; } }
+#wrView .wricon { border: 0; background: transparent; color: var(--sub); cursor: pointer; font-size: 12px; width: 26px; height: 26px; border-radius: 999px; }
+#wrView .wricon:hover { background: var(--hover); }
+
+/* 칸 고치는 창 */
+.wrpop { position: fixed; z-index: 60; width: 300px; max-width: calc(100vw - 32px); background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.28); display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.wrpop[hidden] { display: none; }
+.wrpop .wrpt { font-weight: 700; }
+.wrpop .wrpl { font-size: 12px; }
+.wrpop input[name=val] { flex: 1; font-size: 15px; font-weight: 600; }
+.wrpop .wrmk { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; } .wrpop .wrmk label { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.wrpop .wrrl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; } .wrpop .wrrl .mut { font-weight: 400; }
+.wrpop textarea { min-height: 64px; resize: vertical; }
+.wrpop textarea.req { border-color: var(--red); box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 25%, transparent); }
+.wrpop .wrwarn { color: var(--red); font-size: 12px; font-weight: 600; }
+.wrpop .wrbtns { justify-content: flex-end; }
+.wrpop .danger { color: var(--red); }

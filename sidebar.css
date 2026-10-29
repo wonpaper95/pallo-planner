@@ -21,5 +21,5 @@ body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .ldv, .smv, .edu
 .seg [data-v=week] { --ic: "◫"; } .seg [data-v=month] { --ic: "▦"; } .seg [data-v=team] { --ic: "◎"; } .seg [data-v=sales] { --ic: "₩"; }
 .seg [data-v=blog] { --ic: "✎"; } .seg [data-v=mk] { --ic: "◆"; } .seg [data-v=post] { --ic: "▤"; } .seg [data-v=qna] { --ic: "?"; }
 .seg [data-v=links] { --ic: "↗"; } .seg [data-v=ct] { --ic: "☎"; } .seg [data-v=ld] { --ic: "☰"; } .seg [data-v=edu] { --ic: "◇"; }
-.seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=tk] { --ic: "✉"; } .seg [data-v=wiki] { --ic: "≡"; } .seg [data-v=rp] { --ic: "▣"; }
+.seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=tk] { --ic: "✉"; } .seg [data-v=wr] { --ic: "◷"; } .seg [data-v=wiki] { --ic: "≡"; } .seg [data-v=rp] { --ic: "▣"; }
 .seg [data-v=sim] { --ic: "◐"; } .seg [data-v=board] { --ic: "▥"; }
