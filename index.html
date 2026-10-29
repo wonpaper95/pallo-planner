@@ -474,6 +474,12 @@ dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--p
 .fbi .b { flex: 1; white-space: pre-wrap; word-break: break-word; } .fbi .m { color: var(--sub); font-size: 12px; display: block; margin-top: 2px; }
 .fbi.done .b { color: var(--sub); } .fbi .st { white-space: nowrap; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); }
 .fbi .st.new { color: #fff; background: var(--orange); border-color: var(--orange); } .fbi .st.done { color: var(--green); }
+.fbi .rp { display: block; margin-top: 4px; padding: 4px 8px; border-radius: 8px; background: var(--hover); color: var(--text); font-size: 13px; } /* 📣 반영 소식 */
+.fbi .side { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; } .fbi .up { white-space: nowrap; font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--accent); color: var(--accent); background: none; cursor: pointer; }
+#updBar { position: sticky; top: calc(var(--hh, 53px) + 6px); z-index: 4; box-shadow: 0 6px 20px rgba(0,0,0,.12); margin: 8px 12px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--accent); background: var(--bar, var(--bg)); -webkit-backdrop-filter: blur(28px) saturate(180%); backdrop-filter: blur(28px) saturate(180%); display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+#updBar .l { flex: 1; } #updBar .l div { margin-top: 4px; white-space: pre-wrap; word-break: break-word; } #updBar .m, #updHist .m { color: var(--sub); font-size: 12px; margin-left: 6px; }
+#updHist div { border-top: 1px solid var(--line); padding: 6px 2px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+#updDlg label { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 14px; color: var(--text); } #updDlg input[type=checkbox] { width: auto !important; }
 dialog::backdrop { background: rgba(0,0,0,.5); }
 dialog label { display: block; font-size: 13px; color: var(--sub); margin: 14px 0 4px; }
 dialog input:not([type=checkbox]), dialog select, dialog textarea { width: 100%; padding: 9px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
@@ -571,6 +577,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
   <nav class="seg"><div><button data-v="week">주간</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교 가이드</button><button data-v="jc">조교체크리스트</button><button data-v="wiki">백과사전</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡봇</button></div></nav>
+  <div id="updBar" class="hidden"></div><!-- 📣 업데이트 소식 (새 것만, 확인하면 사라짐) -->
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
     <aside id="weeks" class="hidden-m"><div id="weekList"></div></aside>
@@ -626,7 +633,14 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <div class="fbkind"><label><input type="radio" name="fbk" value="bug" checked> 🐞 버그(안 돼요·이상해요)</label><label><input type="radio" name="fbk" value="idea"> 💡 개선(이렇게 되면 좋겠어요)</label></div>
   <textarea id="fbBody" rows="4" maxlength="2000" placeholder="예) 위젯에서 고정업무 체크가 안 돼요 / 팀 업무에도 데드라인 알림이 오면 좋겠어요"></textarea>
   <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="fbSend" style="flex:1">보내기</button><button class="btn ghost" id="fbClose">닫기</button></div>
-  <h4 id="fbListTitle" style="margin:16px 0 6px;color:var(--sub);font-size:13px"></h4><div id="fbList"></div></dialog>
+  <h4 id="fbListTitle" style="margin:16px 0 6px;color:var(--sub);font-size:13px"></h4><div id="fbList"></div>
+  <h4 style="margin:16px 0 6px;color:var(--sub);font-size:13px;display:flex;align-items:center;gap:8px">📣 최근 업데이트 소식<button class="btn ghost adminonly" id="updNew" style="margin-left:auto;font-size:12px;padding:2px 10px">📣 공지 쓰기</button></h4><div id="updHist"></div></dialog>
+<dialog id="updDlg" class="wide"><h3 style="margin:0 0 4px">📣 업데이트 소식 보내기</h3>
+  <p id="updFor" style="color:var(--sub);font-size:13px;margin:0 0 8px;white-space:pre-wrap"></p>
+  <textarea id="updBody" rows="4" maxlength="1000" placeholder="예) 위젯에서도 팀 업무가 보여요! 앱을 새로고침하면 바로 써 보실 수 있어요"></textarea>
+  <label><input type="checkbox" id="updAll" checked> 📣 전체 공지 — 모두에게 알림 + 앱 맨 위 배너</label>
+  <label id="updMeL"><input type="checkbox" id="updMe" checked> 💡 제안한 분께 '반영됐어요' 알림</label>
+  <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="updSend" style="flex:1">보내기</button><button class="btn ghost" id="updClose">취소</button></div></dialog>
 <dialog id="tuDlg" style="text-align:center"><h2 id="tuTitle" style="margin:4px 0 8px;color:var(--red)">⏰ 해결목표 끝!</h2><p id="tuTask" style="margin:0 0 14px;font-weight:600"></p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn" data-tu="done">✅ 끝냈어요</button><button class="btn ghost" data-tu="5">+5분</button><button class="btn ghost" data-tu="10">+10분</button><button class="btn ghost" data-tu="0">계속하기</button></div></dialog>
 <dialog id="pwDlg"><h3 style="margin:0 0 4px">🔑 새 비밀번호</h3><p id="pwNote" style="color:var(--sub);font-size:13px;margin:0">6자 이상으로 정해 주세요</p>
@@ -742,6 +756,7 @@ async function loadProfile() {
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
   if (isBoss) loadFeedback(); // 🐞 처리 전 개수 배지
+  if (myRole !== "assistant") loadUpdates(); // 📣 새 업데이트 소식 배너
   if (isBoss) { const k = (await sb.rpc("kakao_status")).data?.[0]; kakaoMe = !!k?.me; kakaoSender = k?.sender ? (k.receiver || "연결됨") : null; } // 💬 카톡 연결 상태
   $("#previewBar").classList.toggle("hidden", !previewTeam && !previewUser);
   if (previewUser) $("#previewBar").textContent = `👀 ${previewName}(${teams.find((x) => x.id === previewTeam)?.name ?? "지점 없음"}) 화면 그대로 보는 중 · 끄기`;
@@ -1165,12 +1180,13 @@ async function loadFeedback() {
   const admin = myRole === "admin" || isBoss, nNew = data.filter((x) => x.status === "new").length;
   $("#fbNew").textContent = nNew; $("#fbNew").classList.toggle("hidden", !(isBoss && nNew));
   $("#fbListTitle").textContent = data.length ? (isBoss ? `받은 신고·제안 (처리 전 ${nNew})` : "내가 보낸 것") : "";
+  fbRows = data;
   $("#fbList").innerHTML = data.map((x) => { const d = new Date(x.created_at);
-    return `<div class="fbi ${x.status}"><span>${x.kind === "bug" ? "🐞" : "💡"}</span><span class="b">${esc(x.body)}<span class="m">${isBoss ? `${esc(x.who ?? "")}${x.team ? `(${esc(x.team)})` : ""} · ` : ""}${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span></span>`
-      + (isBoss ? `<button class="st ${x.status}" data-fb="${x.id}" data-st="${x.status === "new" ? "done" : "new"}" title="눌러서 바꾸기">${x.status === "new" ? "처리 전" : "✓ 처리완료"}</button>`
-        : `<span class="st ${x.status}">${x.status === "new" ? "확인 중" : "✓ 처리완료"}</span>`) + `</div>`; }).join("");
+    return `<div class="fbi ${x.status}"><span>${x.kind === "bug" ? "🐞" : "💡"}</span><span class="b">${esc(x.body)}<span class="m">${isBoss ? `${esc(x.who ?? "")}${x.team ? `(${esc(x.team)})` : ""} · ` : ""}${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}</span>${x.reply ? `<span class="rp">📣 ${esc(x.reply)}</span>` : ""}</span>`
+      + (isBoss ? `<span class="side"><button class="st ${x.status}" data-fb="${x.id}" data-st="${x.status === "new" ? "done" : "new"}" title="눌러서 바꾸기">${x.status === "new" ? "처리 전" : "✓ 처리완료"}</button><button class="up" data-upd="${x.id}" title="반영했다고 알리기">📣 반영 알림</button></span>`
+        : `<span class="st ${x.status}">${x.reply ? "✓ 반영됨" : x.status === "new" ? "확인 중" : "✓ 처리완료"}</span>`) + `</div>`; }).join("");
 }
-$("#fbBtn").onclick = () => { $("#fbDlg").showModal(); loadFeedback(); };
+$("#fbBtn").onclick = () => { $("#fbDlg").showModal(); loadFeedback(); loadUpdates(); };
 $("#fbClose").onclick = () => $("#fbDlg").close();
 $("#fbSend").onclick = async () => {
   const body = $("#fbBody").value.trim(); if (body.length < 2) return toast("내용을 적어 주세요");
@@ -1179,9 +1195,42 @@ $("#fbSend").onclick = async () => {
   $("#fbBody").value = ""; toast(kind === "bug" ? "🐞 보냈어요. 대표님께 알림이 가요" : "💡 보냈어요. 대표님께 알림이 가요"); loadFeedback();
 };
 $("#fbList").onclick = async (e) => {
+  const u = e.target.closest("[data-upd]"); if (u) return updOpen(fbRows.find((x) => x.id === +u.dataset.upd));
   const b = e.target.closest("[data-fb]"); if (!b) return;
   const { error } = await sb.from("feedback").update({ status: b.dataset.st }).eq("id", b.dataset.fb);
   if (!fail(error)) loadFeedback();
+};
+
+// ── 📣 업데이트 소식: 대표가 신고·제안을 반영하면 전체 공지(배너+모두 푸시)·제안한 사람 푸시(planner-push 가 1분마다). 확인한 것은 기기에 기억 ──
+let fbRows = [], updFb = null, updSeen = 0, updMax = 0;
+try { updSeen = +localStorage.getItem("upd-seen") || 0; } catch {}
+const md2 = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
+async function loadUpdates() {
+  const { data, error } = await sb.from("app_updates").select("id, body, created_at, created_by").order("id", { ascending: false }).limit(10);
+  if (error) return; // 표가 아직 없거나 조교면 조용히
+  $("#updHist").innerHTML = data.map((x) => `<div>${esc(x.body)}<span class="m">${md2(x.created_at)}</span></div>`).join("") || `<div style="color:var(--sub)">아직 없어요</div>`;
+  const week = Date.now() - 7 * 864e5; // 처음 여는 기기는 지난 7일 것만
+  const fresh = data.filter((x) => x.id > updSeen && x.created_by !== me.id && (updSeen || new Date(x.created_at) > week)).slice(0, 3);
+  $("#updBar").classList.toggle("hidden", !fresh.length);
+  if (fresh.length) $("#updBar").innerHTML = `<span>📣</span><span class="l"><b>업데이트 소식</b>${fresh.map((x) => `<div>${esc(x.body)}<span class="m">${md2(x.created_at)}</span></div>`).join("")}</span><button class="btn ghost" id="updOk" style="font-size:12px;padding:2px 10px">확인했어요</button>`;
+  updMax = data[0]?.id ?? 0;
+}
+$("#updBar").onclick = (e) => { if (!e.target.closest("#updOk")) return; updSeen = updMax; try { localStorage.setItem("upd-seen", String(updSeen)); } catch {} $("#updBar").classList.add("hidden"); };
+function updOpen(fb) {
+  updFb = fb ?? null;
+  $("#updFor").textContent = updFb ? `${updFb.kind === "bug" ? "🐞" : "💡"} 「${updFb.body.slice(0, 80)}」 — ${updFb.who ?? ""}${updFb.team ? `(${updFb.team})` : ""}` : "제안과 상관없는 전체 공지예요";
+  $("#updMeL").classList.toggle("hidden", !updFb); $("#updMe").checked = !!updFb; $("#updAll").checked = true;
+  $("#updBody").value = ""; $("#updDlg").showModal(); $("#updBody").focus();
+}
+$("#updNew").onclick = () => updOpen(null);
+$("#updClose").onclick = () => $("#updDlg").close();
+$("#updSend").onclick = async () => {
+  const body = $("#updBody").value.trim(), to_all = $("#updAll").checked, to_author = !!updFb && $("#updMe").checked;
+  if (body.length < 2) return toast("무엇이 바뀌었는지 적어 주세요");
+  if (!to_all && !to_author) return toast("받을 사람을 하나는 골라 주세요");
+  const { error } = await sb.from("app_updates").insert({ body, feedback_id: updFb?.id ?? null, to_all, to_author }); if (fail(error)) return;
+  $("#updDlg").close(); toast(`📣 보냈어요 — ${[to_all && "전체 공지", to_author && `${updFb.who ?? "제안자"}님`].filter(Boolean).join(" · ")}에게 1분 안에 알림이 가요`);
+  loadFeedback(); loadUpdates();
 };
 
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
@@ -1489,6 +1538,7 @@ function listen() {
   sb.channel("tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${uid()}` }, softReload).subscribe();
   if (myRole === "admin") // 매니저가 배정받은 일을 끝내면 '배정한 일' 목록 갱신
     sb.channel("assigned").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `assigned_by=eq.${me.id}` }, () => { loadAssigned(); boardSoon(); }).subscribe();
+  if (myRole !== "assistant") sb.channel("upd").on("postgres_changes", { event: "*", schema: "public", table: "app_updates" }, () => loadUpdates()).subscribe(); // 📣 새 소식 바로
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
   sb.channel("qna").on("postgres_changes", { event: "*", schema: "public", table: "qna_items" }, () => window.QA?.remote()).subscribe(); // 💬 질문·확정 바로 반영
   sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
