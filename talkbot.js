@@ -1,7 +1,9 @@
-// 💬 [톡톡봇] 탭 (대표만): 네이버 톡톡 봇이 몰라서 매니저에게 넘긴 질문(talk_asks)에 답을 달면 봇 지식(talk_kb)이 되고, 봇은 다음 질문부터 그 답을 씀
-// 봇 = supabase/functions/talktalk-bot. index.html 의 sb·isBoss·previewTeam·previewUser·esc·toast·fail 을 씀 → window.TK
+// 💬 [톡톡·인스타 봇] 탭 (대표만): 네이버 톡톡 봇·인스타 DM 봇이 몰라서 매니저에게 넘긴 질문(talk_asks)에 답을 달면 봇 지식(talk_kb)이 되고, 봇은 다음 질문부터 그 답을 씀
+// 봇 = supabase/functions/talktalk-bot · insta-bot (지식 talk_kb 하나를 같이 씀 — 한 번 가르치면 둘 다 배움). 인스타 질문은 q 앞에 '[인스타] '. index.html 의 sb·isBoss·previewTeam·previewUser·esc·toast·fail 을 씀 → window.TK
 (() => {
-const TK = (window.TK = { br: "all", asks: [], kb: [], edit: null });
+const TK = (window.TK = { br: "all", ch: "all", asks: [], kb: [], edit: null });
+const IG = "[인스타] ", isIg = (q) => q.startsWith(IG), bare = (q) => (isIg(q) ? q.slice(IG.length) : q);
+const CHS = { all: "톡톡+인스타", talk: "💬 톡톡만", insta: "📷 인스타만" };
 const V = () => document.getElementById("tkView");
 const BR = { all: "3지점 공통", daegu: "대구 동성로점", ulsan: "울산점", "daegu-jpcn": "일본어&중국어 대구동성로점" };
 const opts = (sel, withAll = true) => Object.entries(BR).filter(([k]) => withAll || k !== "all").map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${v}</option>`).join("");
@@ -20,17 +22,20 @@ TK.load = async function () {
 TK.render = function () {
   const show = (b) => TK.br === "all" || b === TK.br || b === "all";
   const groups = []; // 같은 지점·같은 질문은 한 묶음
-  for (const r of TK.asks.filter((r) => show(r.branch))) {
+  const showCh = (q) => TK.ch === "all" || (TK.ch === "insta") === isIg(q);
+  for (const r of TK.asks.filter((r) => show(r.branch) && showCh(r.q))) {
     const g = groups.find((x) => x.branch === r.branch && x.q === r.q);
     g ? g.n++ : groups.push({ branch: r.branch, q: r.q, at: r.at, n: 1 });
   }
   const kb = TK.kb.filter((r) => show(r.branch)), e = TK.edit;
-  V().innerHTML = `<div class="tkbar"><h2>💬 네이버톡톡 봇</h2><select id="tkBr">${opts(TK.br).replace(">3지점 공통<", ">전체 지점 보기<")}</select>
-      <span class="mut">봇은 아래 '봇이 아는 것'만 보고 답해요. 모르는 건 매니저에게 넘기고 여기에 쌓여요.</span></div>
+  V().innerHTML = `<div class="tkbar"><h2>💬 톡톡·인스타 봇</h2><select id="tkBr">${opts(TK.br).replace(">3지점 공통<", ">전체 지점 보기<")}</select>
+      <select id="tkCh">${Object.entries(CHS).map(([k, v]) => `<option value="${k}" ${k === TK.ch ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <span class="mut">두 봇 모두 아래 '봇이 아는 것'만 보고 답해요 — 한 번 가르치면 톡톡·인스타가 같이 배워요. 모르는 건 매니저에게 넘기고 여기에 쌓여요.
+      📷 인스타 봇은 매니저 근무시간 밖에만 답해요(월–목 22시~11시 · 토·일 16시 이후 · 금 종일).</span></div>
     <section class="tksec"><h3>❓ 봇이 몰라서 넘긴 질문 <span class="mut">${groups.length}개</span></h3>
       ${groups.length ? groups.map((g, i) => `<div class="card tkask" data-i="${i}">
-        <div><span class="tkbr">${esc(BR[g.branch] ?? g.branch)}</span> <span class="mut">${when(g.at)}${g.n > 1 ? ` · ${g.n}번 물어봄` : ""}</span></div>
-        <b>“${esc(g.q)}”</b>
+        <div><span class="tkch ${isIg(g.q) ? "ig" : ""}">${isIg(g.q) ? "📷 인스타" : "💬 톡톡"}</span> <span class="tkbr">${esc(BR[g.branch] ?? g.branch)}</span> <span class="mut">${when(g.at)}${g.n > 1 ? ` · ${g.n}번 물어봄` : ""}</span></div>
+        <b>“${esc(bare(g.q))}”</b>
         <textarea placeholder="봇이 이 질문에 할 답 (예: 3개월 ○○만원이에요. 할인은 상담 때 안내드려요)" maxlength="1000"></textarea>
         <div class="tkrow"><label><input type="checkbox" class="tkall"> 3지점 공통 답</label>
           <button class="btn tkok">💾 답 저장 → 봇이 배움</button><button class="btn ghost tkskip">무시</button></div></div>`).join("")
@@ -46,6 +51,7 @@ TK.render = function () {
         <span class="tkbtns"><button class="btn ghost tkon" title="켜기/끄기">${r.on ? "✅ 씀" : "⏸ 안 씀"}</button><button class="btn ghost tkedit" title="고치기">✏️</button><button class="btn ghost tkdel" title="지우기">🗑</button></span></div>`).join("") || `<div class="mut">없어요</div>`}</div></section>`;
 
   V().querySelector("#tkBr").onchange = (ev) => { TK.br = ev.target.value; TK.render(); };
+  V().querySelector("#tkCh").onchange = (ev) => { TK.ch = ev.target.value; TK.render(); };
   V().querySelectorAll(".tkask").forEach((c) => {
     const g = groups[c.dataset.i];
     const close = async (kbId) => {
@@ -55,7 +61,7 @@ TK.render = function () {
     c.querySelector(".tkok").onclick = async () => {
       const a = c.querySelector("textarea").value.trim();
       if (!a) return toast("답을 적어 주세요");
-      const { data, error } = await sb.from("talk_kb").insert({ branch: c.querySelector(".tkall").checked ? "all" : g.branch, q: g.q.slice(0, 200), a }).select("id").single();
+      const { data, error } = await sb.from("talk_kb").insert({ branch: c.querySelector(".tkall").checked ? "all" : g.branch, q: bare(g.q).slice(0, 200), a }).select("id").single();
       if (fail(error)) return;
       toast("봇이 배웠어요 — 다음 질문부터 이 답을 써요"); close(data.id);
     };

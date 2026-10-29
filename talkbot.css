@@ -13,6 +13,8 @@ body:not(.tkv) #tkView { display: none; }
 #tkView .tkform { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
 #tkView .tkform textarea, #tkView .tkform .tkrow { grid-column: 1 / -1; }
 #tkView .tkbr { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--line); white-space: nowrap; }
+#tkView .tkch { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #03c75a22; color: #03a94d; white-space: nowrap; font-weight: 600; } /* 💬 톡톡 = 네이버 초록 */
+#tkView .tkch.ig { background: #e1306c22; color: #d6246a; } /* 📷 인스타 */
 #tkView .tkkb { display: grid; grid-template-columns: auto minmax(90px, 0.6fr) 1.6fr auto; align-items: start; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 #tkView .tkkb:last-child { border-bottom: 0; }
 #tkView .tkkb > span:nth-child(3) { white-space: pre-wrap; word-break: break-word; font-size: 14px; }
