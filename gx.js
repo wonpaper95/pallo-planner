@@ -13,7 +13,7 @@ const K_ST = { new: "대기", matched: "매칭됨", inactive: "쉬는 중" };
 const KEY = { available_days: "요일", available_times: "시간", days: "요일", times: "시간", mode: "방식", frequency: "횟수", exchange_style: "교환 스타일", other_language_level: "언어 레벨", preferred_partner: "원하는 상대", level: "반", message: "메시지", note: "메모" }; // 신청폼 답 이름 → 한국어
 const answers = (a, sep) => Object.entries(a.data || {}).filter(([, v]) => v && v.length).map(([k, v]) => `${KEY[k] || k}: ${Array.isArray(v) ? v.join("/") : v}`).join(sep);
 const TIER = { "VVIP+": 0, VVIP: 1, Basic: 2, Lite: 3 };
-const SUBS = [["db", "📊 현황"], ["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"]];
+const SUBS = [["db", "📊 현황"], ["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"], ["help", "📖 사용법"]];
 const jo = () => myRole === "assistant";
 const day = (s) => (s ? new Date(s).toLocaleDateString("sv-SE") : ""); // 한국 시간 YYYY-MM-DD
 const when = (s) => (s ? new Date(s).toLocaleString("sv-SE").slice(0, 16) : "");
@@ -90,7 +90,7 @@ function render() {
   v.querySelector("#gxBr").onchange = (e) => { GX.br = e.target.value; try { if (myRole === "admin") localStorage.setItem("gx-br", GX.br); } catch {} render(); };
   v.querySelectorAll(".gxsub button").forEach((b) => (b.onclick = () => { GX.sub = b.dataset.s; try { localStorage.setItem("gx-sub", GX.sub); } catch {} render(); }));
   v.querySelector("#gxCsv").onclick = csv;
-  ({ db: renderDash, fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
+  ({ help: renderHelp, db: renderDash, fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
 }
 const inBr = (x) => !GX.br || x.branch === GX.br;
 const body = () => V().querySelector("#gxBody");
@@ -137,11 +137,13 @@ function renderDash() {
         <li><b>🇰🇷 한국인</b> — 한국인 언어교환 회원 · 멤버십(VVIP+·VVIP·Basic·Lite) · 지금 누구랑 매칭됐는지</li>
         <li><b>🎉 이벤트</b> — 이벤트 만들기 · [공개] 켜면 외국인 신청폼에 보임 · 이벤트별 신청자</li>
         <li><b>🔗 신청 링크·QR</b> — 외국인·한국인에게 보낼 링크 (지점 미리 골라진 것 포함)</li>
-        <li><b>⬇️ CSV</b> — 외국인 + 신청 엑셀로 내려받기 · 위 지점 고르기가 모든 화면에 적용</li></ul></section>
+        <li><b>⬇️ CSV</b> — 외국인 + 신청 엑셀로 내려받기 · 위 지점 고르기가 모든 화면에 적용</li></ul>
+        <button class="btn ghost" id="gxHelpGo">📖 자세한 사용법 보기</button></section>
     </div>`;
   const B = body();
   B.querySelectorAll(".gxnum").forEach((b) => (b.onclick = () => { const g = b.dataset.go; if (g === "list") B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); else if (g === "wait") B.querySelector("#gxWait").scrollIntoView({ behavior: "smooth" }); else { GX.sub = g; render(); } }));
   B.querySelectorAll("tr[data-p]").forEach((tr) => (tr.onclick = () => { GX.fp = GX.fp === tr.dataset.p ? "" : tr.dataset.p; renderDash(); B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); }));
+  B.querySelector("#gxHelpGo").onclick = () => { GX.sub = "help"; try { localStorage.setItem("gx-sub", "help"); } catch {} render(); };
   B.querySelector("#gxFp").onchange = (e) => { GX.fp = e.target.value; renderDash(); };
   B.querySelector("#gxFs").onchange = (e) => { GX.fs = e.target.value; renderDash(); };
   B.querySelectorAll("[data-m]").forEach((el) => (el.onclick = (ev) => { ev.preventDefault(); openMember(el.dataset.m); }));
@@ -251,6 +253,61 @@ function renderEvents() {
   };
   body().querySelectorAll("a[data-m]").forEach((el) => (el.onclick = (ev) => { ev.preventDefault(); openMember(el.dataset.m); }));
   body().querySelectorAll("[data-id]").forEach((cb) => (cb.onchange = async () => { const { error } = await sb.from("gx_events").update({ is_active: cb.checked }).eq("id", cb.dataset.id); fail(error); }));
+}
+
+// ---- 📖 사용법 (글만, DB 없음)
+function renderHelp() {
+  const step = (n, t, body) => `<section class="card gxstep"><h3><span class="gxn">${n}</span>${t}</h3>${body}</section>`;
+  const st = (m) => `<table class="gxt gxst">${Object.entries(m).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>`;
+  body().innerHTML = `<div class="gxhelpv">
+    <section class="card"><h3>🌏 언어교환 탭은 이런 곳이에요</h3>
+      <p>외국인 회원이 <b>신청폼</b>으로 들어오면 여기에 쌓여요. 한국인 회원도 언어교환 신청폼으로 들어와요. 직원은 여기서 <b>확인 → 연락 → 상태 바꾸기 → 1:1 매칭</b>을 해요.</p>
+      <p class="mut">대표·매니저·조교 누구나 전 지점을 볼 수 있어요. 위 <b>지점 고르기</b>는 모든 화면(숫자·목록·CSV)에 같이 적용돼요. 처음엔 우리 지점이 골라져 있어요.</p>
+      <div class="gxflow"><span>① 링크·QR 보내기</span>→<span>② 📊 현황에서 새 신청 확인</span>→<span>③ 연락하고 상태 바꾸기</span>→<span>④ 언어교환은 매칭</span>→<span>⑤ 끝나면 매칭 끝내기</span></div></section>
+    ${step(1, "신청 받기 — 🔗 신청 링크·QR", `<ul>
+      <li>외국인용 링크 5개(처음부터 · 한국어 수업 · 1:1 언어교환 · 소셜 · 이벤트)와 한국인용 링크 1개가 있어요.</li>
+      <li><b>지점 이름이 붙은 링크</b>를 쓰면 신청폼에 우리 지점이 미리 골라져 있어요 → 지점 구분이 정확해져요.</li>
+      <li>[링크 복사] → 카톡·인스타 DM·문자로 보내기, 또는 QR을 데스크에 띄워서 폰으로 찍게 하기.</li>
+      <li>외국인 폼은 영어, 한국인 폼은 한국어예요. 같은 전화번호로 다시 신청하면 새 사람이 아니라 정보만 고쳐져요.</li></ul>`)}
+    ${step(2, "새 신청 확인 — 📊 현황", `<ul>
+      <li>맨 위 숫자 4개: <b>외국인 회원 · 한국인 회원 · 신청(처리 안 됨) · 진행 중 매칭</b>. 숫자를 누르면 그 화면으로 가요.</li>
+      <li><b>📋 프로그램별 신청</b>: 줄을 누르면 아래 <b>📝 신청 목록</b>이 그 프로그램만 보여요.</li>
+      <li><b>📝 신청 목록</b>: 최신순. [모든 상태]에서 <b>신청</b>만 고르면 아직 처리 안 한 것만 남아요 — 매일 이걸 0으로 만드는 게 목표예요.</li>
+      <li>이름을 누르면 그 회원 상세(🌍 외국인 탭)로 가요.</li></ul>`)}
+    ${step(3, "연락하고 상태 바꾸기 — 🌍 외국인", `<ul>
+      <li>회원을 누르면 오른쪽(좁은 화면은 아래)에 전체 정보 · 신청한 프로그램 · 신청할 때 적은 답이 나와요.</li>
+      <li>전화·메일로 연락한 뒤 <b>신청마다</b> 상태를 바꾸고 [저장]. 메모 칸에 "10/30 통화, 화목반 등록" 처럼 적어 두면 다른 직원도 알아요.</li>
+      <li>회원 자체 상태(새 회원 · 활동 중 · 쉬는 중)는 이름 밑 칸에서 따로 바꿔요.</li></ul>
+      <h4>신청 상태 뜻</h4>${st({ 신청: "방금 들어옴, 아직 연락 전", 확정: "연락 끝, 참여 확정 (수업 등록·이벤트 자리 확보)", 매칭됨: "언어교환 상대 연결됨 (매칭하면 자동)", 참석: "실제로 왔음", 취소: "안 하기로 함 (목록엔 줄 그어 보여요)" })}`)}
+    ${step(4, "1:1 매칭하기", `<ul>
+      <li>가장 빠른 길: <b>📊 현황 › 🤝 매칭 기다리는 외국인</b> — 사람마다 1순위 추천이 붙어 있어요. 괜찮으면 [매칭].</li>
+      <li>다른 후보를 보고 싶으면 [추천 더 보기] → 외국인 상세의 <b>추천 5명</b>, 또는 맨 아래 <b>직접 고르기</b>에서 아무나.</li>
+      <li>매칭하면 외국인 신청은 <b>매칭됨</b>, 한국인은 <b>매칭됨</b>으로 자동으로 바뀌어요. 매칭 후 두 사람에게 연락해서 첫 만남을 잡아 주세요.</li>
+      <li><b>한국인은 한 번에 한 명</b>만 매칭돼요(매칭 중이면 추천에서 빠짐). 외국인은 여러 명과 매칭할 수 있어요.</li></ul>
+      <h4>추천 점수는 이렇게 매겨요</h4>${st({ "요일·시간 겹침": "겹치는 요일 1개당 +2, 시간대 1개당 +2 (가장 중요)", "언어": "한국인이 배우고 싶은 언어를 외국인이 쓰면 +3 · 영어는 영어 레벨로(Native/Advanced +3, Intermediate +1, None -2) · 모르면 -2", "지점": "같은 지점 +2, 다른 지점 -1", "온/오프라인": "한쪽은 온라인만·한쪽은 오프라인만이면 -3, 둘 다 적었고 맞으면 +1", "점수 같으면": "멤버십 높은 순 (VVIP+ → VVIP → Basic → Lite)" })}
+      <p class="mut">노란 점수 = 4점 이상(잘 맞음). 점수는 참고용 — 실제로는 나이·성격·목적도 보고 직원이 정해요.</p>`)}
+    ${step(5, "매칭 끝내기", `<ul>
+      <li>그만두거나 상대를 바꿀 때: 외국인 상세 › 지금 매칭 › [끝내기].</li>
+      <li>끝낸 매칭은 "지난 매칭"에 기간과 함께 남고, 한국인은 다시 <b>대기</b>가 되어 추천에 나와요.</li>
+      <li>"n주째"가 길게 이어지는 짝은 잘 되는 짝이에요 — 후기·사진 부탁하기 좋아요.</li></ul>`)}
+    ${step(6, "한국인 회원 — 🇰🇷 한국인", `<ul>
+      <li>멤버십 높은 순으로 보여요. 누르면 신청 내용 · 지금 매칭 상대(며칠째)가 나와요.</li>
+      <li>멤버십(VVIP+·VVIP·Basic·Lite)은 본인이 고른 것 — 실제 등급과 다르면 여기서 고치고 [저장].</li>
+      <li>한동안 못 하는 사람은 상태를 <b>쉬는 중</b>으로 → 추천에서 빠져요.</li></ul>`)}
+    ${step(7, "이벤트 — 🎉 이벤트", `<ul>
+      <li>위 칸에 이름(영어로 — 외국인이 봐요)·날짜·시간·장소·참가비·설명 → [추가].</li>
+      <li><b>[공개]</b> 체크가 켜져 있어야 외국인 신청폼 이벤트 목록에 보여요. 끝난 이벤트는 체크를 끄세요.</li>
+      <li>신청자 이름이 이벤트마다 보이고, 누르면 그 회원 상세로 가요. 참석 확인은 그 신청의 상태를 <b>참석</b>으로.</li>
+      <li>이벤트는 전 지점 공용이에요 (지점 고르기와 상관없이 다 보임).</li></ul>`)}
+    ${step(8, "엑셀로 받기 — ⬇️ CSV", `<ul><li>지금 고른 지점의 외국인 + 신청을 한 줄씩 내려받아요. 엑셀·구글 시트에서 바로 열려요.</li></ul>`)}
+    <section class="card"><h3>👥 누가 무엇을 할 수 있나요</h3>${st({ "대표·매니저": "전부 보기 · 상태·메모·멤버십 바꾸기 · 매칭 · 이벤트 · 지우기", 조교: "전부 보기 · 상태·메모 바꾸기 · 매칭 · 이벤트 (지우기만 안 됨)", "외국인·한국인": "신청폼만 (다른 사람 정보는 못 봄)" })}
+      <p class="mut">지우기는 되돌릴 수 없어요. 그만둔 사람은 지우지 말고 <b>쉬는 중</b>으로 바꾸는 걸 추천해요.</p></section>
+    <section class="card"><h3>❓ 자주 묻는 것</h3><ul>
+      <li><b>신청했다는데 안 보여요</b> → 위 지점 고르기를 <b>전 지점</b>으로. 신청자가 다른 지점을 골랐을 수 있어요.</li>
+      <li><b>같은 사람이 두 번 보여요</b> → 전화번호가 다르게 들어간 경우예요. 하나는 쉬는 중으로 두거나 대표·매니저가 지워요.</li>
+      <li><b>추천에 아무도 없어요</b> → 비어 있는 한국인이 없다는 뜻(다 매칭 중이거나 쉬는 중). 🔗 한국인 신청 링크를 더 돌려 주세요.</li>
+      <li><b>점수가 낮은데 매칭해도 되나요</b> → 네. 점수는 참고용이에요. 스케줄만 맞으면 대부분 괜찮아요.</li></ul></section>
+  </div>`;
 }
 
 // ---- 공개 신청 링크 + QR (qrcodejs 는 이 화면 열 때만 불러옴)

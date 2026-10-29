@@ -64,3 +64,15 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxev { padding: 8px 0; border-bottom: 1px solid var(--line); display: grid; gap: 4px; justify-items: start; }
 #gxView .gxev:last-child { border-bottom: 0; }
 #gxView .gxhelp { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+/* 📖 사용법 */
+#gxView .gxhelpv { display: grid; gap: 12px; max-width: 900px; }
+#gxView .gxhelpv .card { margin: 0; padding: 14px 18px; }
+#gxView .gxhelpv h3 { font-size: 16px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+#gxView .gxhelpv h4 { font-size: 13px; margin: 12px 0 6px; color: var(--sub); }
+#gxView .gxhelpv p { margin: 6px 0; font-size: 14px; line-height: 1.6; }
+#gxView .gxhelpv ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; line-height: 1.6; }
+#gxView .gxn { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; flex: none; }
+#gxView .gxflow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--sub); }
+#gxView .gxflow span { padding: 5px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font-weight: 600; }
+#gxView .gxst td:first-child { white-space: nowrap; font-weight: 600; width: 1%; padding-right: 14px; }
+#gxView #gxHelpGo { margin-top: 10px; }
