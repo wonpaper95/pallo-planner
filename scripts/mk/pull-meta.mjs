@@ -19,14 +19,19 @@ const token = readFileSync(process.env.META_TOKEN_FILE || `${homedir()}/Download
 const LEAD_TYPES = ["lead", "onsite_conversion.lead_grouped", "leadgen_grouped"];
 const leadsOf = (actions = []) => { for (const t of LEAD_TYPES) { const a = actions.find((x) => x.action_type === t); if (a) return Math.round(+a.value); } return 0; };
 
+// 기간이 길면(연령+성별 35일) 메타가 "unknown error(1)" 로 거부한다 → 7일씩 나눠 받는다
+const addDays = (d, n) => new Date(Date.parse(d) + n * 864e5).toISOString().slice(0, 10);
 async function insights(params) {
-  const q = new URLSearchParams({ level: "ad", time_increment: "1", time_range: JSON.stringify({ since: from, until: to }), limit: "500",
-    fields: "date_start,ad_name,campaign_name,adset_name,impressions,reach,inline_link_clicks,spend,actions", ...params, access_token: token });
   const out = [];
-  for (let url = `${G}/${ACT}/insights?${q}`; url; ) {
-    const r = await fetch(url), j = await r.json();
-    if (j.error) throw new Error(`메타 API ${j.error.code}: ${j.error.message}`);
-    out.push(...j.data); url = j.paging?.next;
+  for (let since = from; since <= to; since = addDays(since, 7)) {
+    const until = addDays(since, 6) < to ? addDays(since, 6) : to;
+    const q = new URLSearchParams({ level: "ad", time_increment: "1", time_range: JSON.stringify({ since, until }), limit: "500",
+      fields: "date_start,ad_name,campaign_name,adset_name,impressions,reach,inline_link_clicks,spend,actions", ...params, access_token: token });
+    for (let url = `${G}/${ACT}/insights?${q}`; url; ) {
+      const r = await fetch(url), j = await r.json();
+      if (j.error) throw new Error(`메타 API ${j.error.code}: ${j.error.message} (${since}~${until})`);
+      out.push(...j.data); url = j.paging?.next;
+    }
   }
   return out;
 }
