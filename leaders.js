@@ -218,11 +218,11 @@ LD.render = function () {
       <span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
-      <span class="ldfind"><input id="ldFind" type="search" enterkeyhint="search" autocomplete="off" list="ldNames" placeholder="🔍 리더 찾기" value="${esc(LD.findQ ?? "")}" title="이름(일부)·전화 뒷자리 → Enter, 또 누르면 다음 사람"><datalist id="ldNames">${[...new Set(LD.rows.map((r) => r.name).filter((n) => n && n !== VACANT))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist></span>
       <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(sm)} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
     ${certTable()}
     ${todayHtml()}
+    ${findHtml()}
     ${mixHtml()}
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span><span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span><span>🌙 리더나잇 <b>${cnt.night}</b></span>${cnt.cert ? `<span class="on" title="근속 6개월 2급 · 1년 1급 — 아직 발급 안 함">📜 자격증 발급 <b>${cnt.cert}</b></span>` : ""}${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 (잘못 누르면 아래 <b>↩ 되돌리기</b>) · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기 · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균) · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
@@ -347,6 +347,11 @@ function todayHtml() {
       : `<span class="cfm ${c ? "on" : ""}"><button data-cfm="${r.id}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(r.name)}${c?.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}${c ? ` <small>${hm(c.at)} ${esc(c.by_name)}</small>` : ""}</button>${c ? lateSel(r.id, c.note) : ""}</span>`; }).join("")}</div>`).join("");
   return `<section class="ldtoday"><h3>📋 오늘 리더 확인 <span class="mut">${md(td)}(${dw(td)}) ${g} · 연락해서 온다고 하면 체크 · <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}명</b></span></h3>${slots}</section>`;
 }
+// 🔍 리더 찾기 (팀 믹싱 위, 사용자 요청): 이름 일부·전화 뒷자리 → [찾기]/Enter/키보드 [검색], 또 누르면 다음 사람
+const findHtml = () => `<section class="ldfind"><label for="ldFind">🔍 리더 찾기</label>
+  <input id="ldFind" type="search" enterkeyhint="search" autocomplete="off" list="ldNames" placeholder="이름 일부 · 전화 뒷자리 4개" value="${esc(LD.findQ ?? "")}">
+  <button type="button" class="btn" id="ldFindGo">찾기</button><small class="mut">또 누르면 다음 사람</small>
+  <datalist id="ldNames">${[...new Set(LD.rows.map((r) => r.name).filter((n) => n && n !== VACANT))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist></section>`;
 function mixHtml() {
   const m = LD.mix; if (!m) return "";
   const at = m.at && new Date(m.at);
@@ -602,6 +607,7 @@ function findLeader(q) {
   if (trs.length > 1) toast(`${LD.findI + 1}/${trs.length}번째 — Enter 누르면 다음`);
 }
 document.addEventListener("keydown", (e) => { if (e.target.id === "ldFind" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); findLeader(e.target.value.trim()); } });
+document.addEventListener("click", (e) => { if (e.target.id === "ldFindGo") findLeader(document.getElementById("ldFind").value.trim()); });
 document.addEventListener("search", (e) => { if (e.target.id === "ldFind") findLeader(e.target.value.trim()); }, true); // 폰 키보드 [검색]: 한글 조합 중 Enter 는 위에서 걸러지므로 여기서 (keydown 이 막은 경우엔 안 옴)
 document.addEventListener("toggle", (e) => { if (e.target.classList?.contains("ldneedtb")) LD.needOpen = e.target.open; }, true); // 🔴 구해야 함 현황 접힘 기억 (toggle 은 안 퍼져서 capture)
 document.addEventListener("change", (e) => { if (e.target.id === "ldFind" && LD.rows.some((r) => r.name === e.target.value)) findLeader(e.target.value); }); // 자동완성 목록에서 고르면 바로
