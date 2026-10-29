@@ -4,7 +4,7 @@
 // 줄은 시간대(평일 오전·오후·주말·여러·대타)별로 묶어 색칠. 조교체크리스트 대타 명단 → 🟢/🔴 칸 자동(DB 트리거 0066). 📄 근무계약서 = 비공개 버킷 work-docs
 // index.html 의 sb·myRole·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.WR
 (() => {
-const WR = (window.WR = { team: null, ym: null, month: null, rows: [], cells: new Map(), people: [], docs: [], only: null, shell: "" });
+const WR = (window.WR = { team: null, ym: null, month: null, rows: [], cells: new Map(), people: [], docs: [], shifts: [], only: null, shell: "" });
 const V = () => document.getElementById("wrView");
 const { KD, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine } = WRC;
 const SL = { am: "오전", pm: "오후", d: "" };
@@ -32,16 +32,18 @@ WR.load = async function () {
   if (!WR.ym) WR.ym = ymOf(today());
   if (!WR.team) { WR.shell = ""; V().innerHTML = `<div class="wrbar"><h2>🕒 조교 근무기록</h2></div><div class="wrpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = WR.team, ym = WR.ym;
-  const [m, r, p, dc] = await Promise.all([
+  const [m, r, p, dc, sh] = await Promise.all([
     sb.from("work_months").select("*").eq("team_id", t).eq("ym", ym).maybeSingle(),
     sb.from("work_rows").select("*").eq("team_id", t).eq("ym", ym).order("sort").order("id"),
     jo() ? { data: [] } : sb.from("work_people").select("*").eq("team_id", t).order("name"),
-    jo() ? { data: [] } : sb.from("work_docs").select("*").eq("team_id", t).order("created_at")]);
+    jo() ? { data: [] } : sb.from("work_docs").select("*").eq("team_id", t).order("created_at"),
+    sb.from("work_shifts").select("*").eq("team_id", t).order("sort").order("id")]);
   if ([m, r, p].some((x) => fail(x.error))) return;
   if (dc.error) { console.warn(dc.error); dc.data = []; } // 계약서 표 없어도(0066 전) 근무표는 보이게
+  if (sh.error) { console.warn(sh.error); sh.data = []; } // 근무시간대 표 없어도(0069 전)
   const c = r.data.length ? await sb.from("work_cells").select("*").in("row_id", r.data.map((x) => x.id)) : { data: [] };
   if (fail(c.error) || t !== WR.team || ym !== WR.ym) return; // 그 사이 지점·달 바꿈
-  Object.assign(WR, { month: m.data, rows: r.data, people: p.data, docs: dc.data, cells: new Map(c.data.map((x) => [key(x.row_id, x.day, x.slot), x])) });
+  Object.assign(WR, { month: m.data, rows: r.data, people: p.data, docs: dc.data, shifts: sh.data, cells: new Map(c.data.map((x) => [key(x.row_id, x.day, x.slot), x])) });
   render();
   listen();
 };
@@ -52,7 +54,7 @@ function listen() {
   if (chan) return;
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "wr" && WR.load(), 300); };
   chan = sb.channel("wr");
-  for (const tb of ["work_months", "work_rows", "work_cells", "work_docs"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
+  for (const tb of ["work_months", "work_rows", "work_cells", "work_docs", "work_shifts"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
   chan.subscribe();
 }
 
@@ -88,8 +90,12 @@ function shell() {
     <span class="wrrow"><span class="mut">시급</span><input id="wrRate" type="number" min="1000" max="100000" step="10" inputmode="numeric"><span class="mut">원</span>
     <button class="btn ghost" data-act="today">오늘로</button></span></div>
     <div id="wrGrid"></div>
-    <form class="wrform" data-f="row"><input name="name" maxlength="40" placeholder="조교 이름"><span class="wrpick"><select name="shiftPick"></select><input type="hidden" name="shift">
-      <span class="wrbuild" hidden>${slLine()}<button type="button" class="btn ghost" data-act="sladd">+ 다른 요일·시간</button><span class="wrprev mut"></span></span></span><button class="btn">조교 추가</button></form></section>
+    <form class="wrform" data-f="row"><input name="name" maxlength="40" placeholder="조교 이름"><select name="shiftPick"></select><button type="button" class="btn ghost" data-act="shtoggle" title="근무시간대 추가·지우기">⚙️ 근무시간대</button><button class="btn">조교 추가</button></form>
+    <div class="wrshbox" hidden><div class="wrgbar"><h3>⚙️ 근무시간대</h3><span class="mut">지점 공용 · 여기 추가하면 다음 달에도 고르기 목록에 계속 보여요</span><button type="button" class="btn ghost" data-act="shtoggle">닫기</button></div>
+      <div id="wrShList" class="wrshlist"></div>
+      <h4>➕ 요일·시간으로 추가</h4><div class="wrbuild">${slLine()}<button type="button" class="btn ghost" data-act="sladd">+ 다른 요일·시간</button><span class="wrprev mut"></span><button type="button" class="btn" data-act="shsave">이 근무시간대 추가</button></div>
+      <h4>✏️ 직접 적기 <span class="mut">특이한 경우 그대로 — 요일과 (몇h)가 있으면 정해진 시간으로 읽고, 없으면 사유를 안 물어요</span></h4>
+      <div class="wrrow"><input name="sfree" maxlength="300" placeholder="예) 월 목 스페인어 20:00~22:00 (2h) · 연휴 오전 (11:00~13:00)(2h)"><button type="button" class="btn" data-act="shfree">추가</button></div><div class="wrfreeprev mut"></div></div></section>
   ${jo() ? "" : `<section class="wrpanel"><details id="wrPeopleBox"><summary>💳 계좌 · 연락처 · 📄 근무계약서 <span class="mut">대표·매니저만 보여요 (조교 링크엔 안 보임)</span></summary>
     <div id="wrPeople"></div>
     <form class="wrform" data-f="person"><input name="name" maxlength="40" placeholder="이름"><input name="phone" maxlength="40" placeholder="연락처"><input name="bank" maxlength="200" placeholder="은행 계좌번호"><button class="btn">추가</button></form></details></section>`}`;
@@ -256,30 +262,46 @@ document.addEventListener("click", async (e) => {
   if (!e.target.closest("#wrPop") && !e.target.closest("#wrView [data-act=cell], #wrView [data-act=row]")) closePop();
 });
 
-// ⏰ 근무시간 고르기: 이 달에 쓰는 근무시간 그대로 / 정해진 시간 없음(대타·백업) / 새로 만들기(요일·시작·끝·시간 → 근무시간 글)
+// ⏰ 근무시간 고르기: 지점 근무시간대(work_shifts, 0069) + 이 달에만 있는 근무시간 / 정해진 시간 없음(대타·백업)
+// ⚙️ 근무시간대: 요일·시작·끝·시간·메모로 만들기 또는 직접 적기(특이한 경우) → 지점 목록에 저장, ✕ 지우기는 매니저·대표
 const pad2 = (n) => String(n).padStart(2, "0");
 const TIMES = Array.from({ length: 181 }, (_, i) => { const m = 8 * 60 + i * 5; return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`; }); // 08:00~23:00, 5분 단위
 const HOURS = Array.from({ length: 39 }, (_, i) => 0.5 + i * 0.25); // 0.5~10h (휴게 빼고 고칠 수 있게 따로)
 const optList = (list, sel) => list.map(([v, l]) => `<option value="${esc(v)}" ${v == sel ? "selected" : ""}>${esc(l)}</option>`).join("");
 const slLine = () => `<span class="wrsl"><select name="sd">${optList(DAYSETS, "평일")}</select><select name="ss">${optList(TIMES.map((t) => [t, t]), "19:00")}</select>~<select name="se">${optList(TIMES.map((t) => [t, t]), "22:00")}</select>
-  <select name="sh" title="근무 시간 (휴게 빼고)">${optList(HOURS.map((h) => [h, h + "시간"]), 3)}</select><button type="button" class="wrx" data-act="sldel" title="이 줄 빼기">✕</button></span>`;
-function fillPick() {
+  <select name="sh" title="근무 시간 (휴게 빼고)">${optList(HOURS.map((h) => [h, h + "시간"]), 3)}</select><input name="sm" maxlength="20" placeholder="메모 (예: 일어·상담)" class="wrsm"><button type="button" class="wrx" data-act="sldel" title="이 줄 빼기">✕</button></span>`;
+const oneLine = (x) => x.split("\n").join(" / ");
+const readOf = (v) => { const p = planText(parseShift(v)); return p ? `정해진 시간: ${p}` : /\d\s*(h|시간)/i.test(v) ? "요일이 없어 정해진 시간 없음 — 칸마다 사유를 묻지 않아요" : "⚠️ 시간을 못 읽었어요 — 끝에 (2h) 처럼 적으면 정해진 시간으로 읽어요"; };
+function fillPick(pick) {
   const s = V().querySelector("[name=shiftPick]"); if (!s) return;
-  const used = [...new Set(WR.rows.filter((r) => r.kind === "staff" && r.shift.trim() && Object.keys(planOf(r)).length).map((r) => r.shift))].sort((a, b) => a.localeCompare(b, "ko"));
-  const cur = s.value;
-  s.innerHTML = `<option value="">근무시간 고르기</option>${used.length ? `<optgroup label="이 달에 쓰는 근무시간">${optList(used.map((x) => [x, x.split("\n").join(" / ")]))}</optgroup>` : ""}
-    <option value="__new">➕ 새로 만들기 (요일·시간 고르기)</option><option value="__none">정해진 시간 없음 (대타·백업)</option>`;
+  const saved = WR.shifts.map((x) => x.body), extra = [...new Set(WR.rows.filter((r) => r.kind === "staff" && r.shift.trim() && Object.keys(planOf(r)).length).map((r) => r.shift))].filter((x) => !saved.includes(x)).sort((a, b) => a.localeCompare(b, "ko"));
+  const cur = pick ?? s.value;
+  s.innerHTML = `<option value="">근무시간 고르기</option>${saved.length ? `<optgroup label="지점 근무시간대">${optList(saved.map((x) => [x, oneLine(x)]))}</optgroup>` : ""}
+    ${extra.length ? `<optgroup label="이 달에만 있는 근무시간">${optList(extra.map((x) => [x, oneLine(x)]))}</optgroup>` : ""}
+    <option value="__add">⚙️ 근무시간대 추가하기…</option><option value="__none">정해진 시간 없음 (대타·백업)</option>`;
   s.value = [...s.options].some((o) => o.value === cur) ? cur : "";
-  updPick();
+  const list = V().querySelector("#wrShList");
+  list.innerHTML = WR.shifts.length ? WR.shifts.map((x) => `<div class="wrsh" data-sh="${x.id}"><span class="wrgrow">${esc(oneLine(x.body))} <small class="mut">${esc(readOf(x.body))}</small></span>${jo() ? "" : `<button type="button" class="wrx" data-act="shdel" title="지우기 (매니저·대표)">✕</button>`}</div>`).join("")
+    : `<div class="mut">아직 저장된 근무시간대가 없어요. 아래에서 추가해 주세요.</div>`;
+  updBuild();
 }
-function updPick(el) {
-  const box = V().querySelector(".wrpick"), sel = box.querySelector("[name=shiftPick]"), b = box.querySelector(".wrbuild");
-  const l = el?.closest(".wrsl"), q = (n) => l.querySelector(`[name=${n}]`);
+function updBuild(el) {
+  const b = V().querySelector(".wrbuild"), l = el?.closest(".wrsl"), q = (n) => l.querySelector(`[name=${n}]`);
   if (l && (el.name === "ss" || el.name === "se")) { const d = (mins(q("se").value) - mins(q("ss").value)) / 60; if (d > 0) q("sh").value = HOURS.reduce((a, h) => (Math.abs(h - d) < Math.abs(a - d) ? h : a)); } // 시각 바꾸면 시간 자동 (휴게 있으면 직접 줄이기)
-  b.hidden = sel.value !== "__new";
-  const v = sel.value === "__new" ? [...b.querySelectorAll(".wrsl")].map((x) => shiftLine(...["sd", "ss", "se", "sh"].map((n) => x.querySelector(`[name=${n}]`).value))).join("\n") : sel.value === "__none" ? "" : sel.value;
-  box.querySelector("[name=shift]").value = v;
-  b.querySelector(".wrprev").textContent = v ? `→ ${v.split("\n").join(" / ")} · 정해진 시간: ${planText(parseShift(v))}` : "";
+  const v = [...b.querySelectorAll(".wrsl")].map((x) => shiftLine(...["sd", "ss", "se", "sh", "sm"].map((n) => x.querySelector(`[name=${n}]`).value))).join("\n");
+  b.querySelector(".wrprev").textContent = `→ ${oneLine(v)} · ${readOf(v)}`;
+  return v;
+}
+async function addShift(body) {
+  body = body.trim(); if (!body) return toast("근무시간을 적어 주세요");
+  const had = WR.shifts.find((x) => x.body === body);
+  if (!had) {
+    const { data, error } = await sb.from("work_shifts").insert({ team_id: WR.team, body, sort: WR.shifts.reduce((m, x) => Math.max(m, x.sort), 0) + 1 }).select().single();
+    if (fail(error)) return false;
+    WR.shifts.push(data);
+  }
+  fillPick(body); toast(had ? "이미 있는 근무시간대예요 — 골라 뒀어요" : "추가했어요 — 조교 추가 칸에 골라 뒀어요");
+  return true;
 }
 
 function bind() {
@@ -289,10 +311,15 @@ function bind() {
     if (id === "wrTeam") { WR.team = +e.target.value; try { localStorage.setItem("wr-team", WR.team); } catch {} closePop(); return WR.load(); }
     if (id === "wrRate") { const n = Math.round(+e.target.value); if (!(n >= 1000 && n <= 100000)) { e.target.value = rate(); return toast("시급은 1,000~100,000원"); } await saveMonth({ rate: n }); return renderGrid(); }
     if (id === "wrNotice") return saveMonth({ notice: e.target.value });
-    if (e.target.closest(".wrpick")) return updPick(e.target);
+    if (e.target.closest(".wrbuild")) return updBuild(e.target);
+    if (e.target.name === "shiftPick" && e.target.value === "__add") { e.target.value = ""; v.querySelector(".wrshbox").hidden = false; return v.querySelector(".wrshbox").scrollIntoView({ block: "nearest", behavior: "smooth" }); }
     const p = e.target.closest(".wrp");
     if (p && e.target.type === "file") { const f = e.target.files[0]; e.target.value = ""; return f && upload(f, p.dataset.name); }
     if (p) return fail((await sb.from("work_people").update({ [e.target.name]: e.target.value.trim() }).eq("team_id", WR.team).eq("name", p.dataset.name)).error);
+  });
+  v.addEventListener("input", (e) => {
+    if (e.target.name === "sfree") v.querySelector(".wrfreeprev").textContent = e.target.value.trim() ? `→ ${readOf(e.target.value)}` : "";
+    if (e.target.name === "sm") updBuild();
   });
   v.addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target, t = WR.team; let r;
@@ -302,8 +329,8 @@ function bind() {
       if (!WR.month) await saveMonth({});
       const at = WR.rows.findIndex((x) => x.kind !== "staff"), sort = at < 0 ? WR.rows.length + 1 : WR.rows[at].sort; // 대타 줄 위에
       if (at >= 0) await Promise.all(WR.rows.slice(at).map((x) => sb.from("work_rows").update({ sort: x.sort + 1 }).eq("id", x.id)));
-      r = await sb.from("work_rows").insert({ team_id: t, ym: WR.ym, kind: "staff", name, shift: f.shift.value.trim(), sort });
-      if (!r.error) { f.name.value = f.shiftPick.value = ""; f.querySelectorAll(".wrsl").forEach((x, i) => (i ? x.remove() : x.replaceWith(Object.assign(document.createElement("span"), { innerHTML: slLine() }).firstChild))); updPick(); }
+      r = await sb.from("work_rows").insert({ team_id: t, ym: WR.ym, kind: "staff", name, shift: f.shiftPick.value === "__none" ? "" : f.shiftPick.value, sort });
+      if (!r.error) f.name.value = f.shiftPick.value = "";
     }
     if (f.dataset.f === "person") {
       const name = f.name.value.trim(); if (!name) return toast("이름을 넣어 주세요");
@@ -315,8 +342,13 @@ function bind() {
   v.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act;
-    if (act === "sladd") { b.insertAdjacentHTML("beforebegin", slLine()); return updPick(); }
-    if (act === "sldel") { if (v.querySelectorAll(".wrsl").length > 1) b.closest(".wrsl").remove(); return updPick(); }
+    if (act === "sladd") { b.insertAdjacentHTML("beforebegin", slLine()); return updBuild(); }
+    if (act === "sldel") { if (v.querySelectorAll(".wrbuild .wrsl").length > 1) b.closest(".wrsl").remove(); return updBuild(); }
+    if (act === "shtoggle") { const x = v.querySelector(".wrshbox"); x.hidden = !x.hidden; return; }
+    if (act === "shsave") { if (await addShift(updBuild())) { v.querySelectorAll(".wrbuild .wrsl").forEach((x) => x.remove()); v.querySelector("[data-act=sladd]").insertAdjacentHTML("beforebegin", slLine()); updBuild(); } return; }
+    if (act === "shfree") { const i = v.querySelector("[name=sfree]"); if (await addShift(i.value)) { i.value = ""; v.querySelector(".wrfreeprev").textContent = ""; } return; }
+    if (act === "shdel") { const id = +b.closest("[data-sh]").dataset.sh, x = WR.shifts.find((y) => y.id === id); if (!confirm(`근무시간대 '${oneLine(x.body)}' 를 목록에서 지울까요? (이미 추가한 조교 줄은 그대로예요)`)) return;
+      if (fail((await sb.from("work_shifts").delete().eq("id", id)).error)) return; WR.shifts = WR.shifts.filter((y) => y.id !== id); return fillPick(); }
     if (act === "cell") return openCell(b);
     if (act === "row") return openRow(b);
     if (act === "today") return scrollToday(true);
