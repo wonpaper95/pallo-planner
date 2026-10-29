@@ -91,10 +91,10 @@ function shell() {
     <div id="jcSubs" class="jclist"></div></section>
   <section class="jcpanel"><h3>메모장</h3><div class="jcmemo">
     <div><h4>매니저 → 조교님 <span class="mut">(체크박스 = 조교 이행 확인)</span></h4>
-      <form class="jcform" data-f="memo" data-kind="manager"><textarea name="body" maxlength="600" placeholder="조교님께 전달할 내용을 적어주세요"></textarea><button class="btn">추가</button></form>
+      <form class="jcform" data-f="memo" data-kind="manager"><select name="who" class="jcwho" aria-label="보내는 사람"></select><textarea name="body" maxlength="600" placeholder="조교님께 전달할 내용을 적어주세요"></textarea><button class="btn">추가</button></form>
       <div id="jcMemoM" class="jclist jcscroll"></div></div>
     <div><h4>조교님 → 매니저</h4>
-      <form class="jcform" data-f="memo" data-kind="ta"><textarea name="body" maxlength="600" placeholder="매니저님께 전달할 내용을 적어주세요"></textarea><button class="btn">추가</button></form>
+      <form class="jcform" data-f="memo" data-kind="ta"><select name="who" class="jcwho" aria-label="보내는 사람"></select><textarea name="body" maxlength="600" placeholder="매니저님께 전달할 내용을 적어주세요"></textarea><button class="btn">추가</button></form>
       <div id="jcMemoT" class="jclist jcscroll"></div></div></div></section>
   <section class="jcpanel"><details id="jcNamesBox"><summary>조교 이름 관리 <span class="mut">(여기서 바꾸면 모든 탭 드롭다운에 바로 반영돼요)</span></summary>
     <div id="jcNames" class="jcnames"></div>
@@ -120,13 +120,25 @@ function renderSubs() {
         <button class="jcicon" data-act="subedit" title="수정">✏️</button>${jo() ? "" : `<button class="jcicon" data-del="sub" title="삭제 (매니저만)">✕</button>`}</div>`).join("")
     : `<div class="mut jcempty">등록된 대타가 없어요.</div>`;
 }
+// ✍️ 보낸 사람: 매니저는 계정 이름 자동, 조교 링크(지점 공용 계정)는 조교 이름 목록에서 골라야 함 — 기기에 기억(jc-who)
+const whoKey = () => `jc-who-${JC.team}`;
+function renderWho() {
+  let last = ""; try { last = localStorage.getItem(whoKey()) || ""; } catch {}
+  V().querySelectorAll(".jcwho").forEach((sel) => {
+    sel.classList.toggle("hidden", !jo());
+    if (!jo() || sel === document.activeElement) return;
+    const cur = sel.value || last;
+    sel.innerHTML = `<option value="">✍️ 보내는 사람</option>` + JC.names.map((n) => `<option ${n.name === cur ? "selected" : ""}>${esc(n.name)}</option>`).join("");
+  });
+}
 function renderMemos() {
+  renderWho();
   const pg = JC.memos.filter((m) => m.page === JC.page);
   for (const [id, kind] of [["#jcMemoM", "manager"], ["#jcMemoT", "ta"]]) {
     const list = pinFirst(pg.filter((m) => m.kind === kind).slice(0, 150));
     V().querySelector(id).innerHTML = list.length ? list.map((m) => `<div class="jcmi ${m.done ? "done" : ""} ${m.pinned ? "pinned" : ""}" data-id="${m.id}">
         ${kind === "manager" ? `<input type="checkbox" data-act="memodone" ${m.done ? "checked" : ""}>` : ""}
-        <div class="jcgrow"><div class="jcmt">${esc(m.body)}</div><div class="jcts">${ts(m.created_at)}${m.by_name ? ` · ${esc(m.by_name)}` : ""}</div></div>
+        <div class="jcgrow"><div class="jcmt">${esc(m.body)}</div><div class="jcts">${m.by_name ? `<b class="jcby">✍️ ${esc(m.by_name)}</b> · ` : ""}${ts(m.created_at)}</div></div>
         <button class="jcicon jcpin ${m.pinned ? "on" : ""}" data-act="memopin" title="${m.pinned ? "고정 해제" : "고정"}">📌</button><button class="jcicon" data-del="memo" title="삭제">✕</button></div>`).join("")
       : `<div class="mut jcempty">아직 작성된 메모가 없어요.</div>`;
   }
@@ -265,7 +277,7 @@ function bind() {
     e.preventDefault(); const f = e.target, t = JC.team; let r;
     if (f.dataset.f === "task") { const body = f.body.value.trim(); if (!body) return; f.body.value = ""; r = await sb.from("jc_tasks").insert({ team_id: t, page: JC.page, body, sort: nextSort(JC.tasks.filter((x) => x.page === JC.page)) }); }
     if (f.dataset.f === "name") { const name = f.name.value.trim(); if (!name) return; f.name.value = ""; r = await sb.from("jc_names").insert({ team_id: t, name, color: COLORS[JC.names.length % COLORS.length], sort: JC.names.length }); }
-    if (f.dataset.f === "memo") { const body = f.body.value.trim(); if (!body) return; f.body.value = ""; r = await sb.from("jc_memos").insert({ team_id: t, page: JC.page, kind: f.dataset.kind, body, by_name: myName ?? "" }); }
+    if (f.dataset.f === "memo") { const body = f.body.value.trim(); if (!body) return; const who = jo() ? f.who.value : myName ?? ""; if (jo() && !who) return toast("✍️ 보내는 사람(내 이름)을 골라 주세요"); if (jo()) try { localStorage.setItem(whoKey(), who); } catch {} f.body.value = ""; r = await sb.from("jc_memos").insert({ team_id: t, page: JC.page, kind: f.dataset.kind, body, by_name: who }); }
     if (f.dataset.f === "link") {
       const label = f.label.value.trim(); let url = f.url.value.trim(); if (!label || !url) return toast("제목과 주소를 넣어 주세요");
       if (!/^https?:\/\//i.test(url)) url = "https://" + url; f.label.value = f.url.value = "";
