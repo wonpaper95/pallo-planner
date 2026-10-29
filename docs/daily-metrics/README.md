@@ -160,3 +160,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 | 5 | 월요일 주간 종합(`--weekly`) + 화면 카드 |
 
 구현 위치: worktree `~/pallo-planner-daily` (브랜치 `feat/daily-metrics`, main에서 분기). 서비스 키: `~/.config/pallo/marketing.env`.
+
+## 진행 기록
+- 2026-10-30 1~2단계 완료: 운영 DB 에 mkd_* 3개 적용(대표 승인), 첫 수동 수집 D=2026-10-29 — 네이버 9캠페인(대구영어 3·대구일중 3·울산 3, ₩46,839) · 구글 8캠페인(대구·울산 모두 일시중지, 노출 0, 두 계정 '계정 보안 강화' 알림 → 🔴 2) · 전산 문의 28건(대구동성로 4·대구일중 11·울산 13). 일일 리포트 저장. 화면은 로컬 데이터로 확인(브랜치 feat/daily-metrics, main 미배포).
+- 실제로 알게 된 것: 전산 표에 '등록' 상태 없음 → 문의만(등록은 3단계). 전산 유입경로에 nad_ 태그 없음 → 네이버 '클릭-문의0' 판단 안 함. 네이버 계정 2개(대구 기본 키, 울산 `_ULSAN` 키).
