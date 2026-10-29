@@ -281,7 +281,7 @@ function editorDom() {
 function edit(p, { title = "", onSave, hf } = {}) {
   editorDom();
   ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave; ED.sel = null; ED.hf = hf ?? null; ED.oldImg = null; ED.saved = false; ED.hfImg = null;
-  $e("#phEdHf").hidden = !hf; $e("#phEdHfOut").innerHTML = "";
+  $e("#phEdHf").hidden = !hf || !HF_ON; $e("#phEdHfOut").innerHTML = "";
   $e("#phEdNo").textContent = title;
   $e("#phEdBright").value = ED.e.bright; $e("#phEdContrast").value = ED.e.contrast; $e("#phEdNote").value = p.note;
   dlg.showModal(); edDraw();
@@ -379,6 +379,7 @@ function wireEditor() {
 }
 
 // ── 🪄 힉스필드 AI 다듬기 (편집 창): 얼굴 있으면 안 보냄 → 원본(편집 전)을 2048px 로 보내 다시 그린 사진을 받아 나란히 비교 → [이걸로 바꾸기] = 바탕 사진 교체 (적용 눌러야 확정) ──
+const HF_ON = false; // 10-29 대표 결정: 힉스필드 API 잔액 충전 전까지 🪄 칸 숨김 → 충전하면 true 로 (서버 blog-write hf·HF_KEY 는 그대로)
 const HF_ASPECT = [["1:1", 1], ["2:3", 2 / 3], ["3:2", 1.5], ["3:4", 0.75], ["4:3", 4 / 3], ["7:9", 7 / 9], ["9:7", 9 / 7], ["9:16", 9 / 16], ["16:9", 16 / 9], ["21:9", 21 / 9]];
 const nearAspect = (r) => HF_ASPECT.reduce((a, b) => (Math.abs(Math.log(b[1] / r)) < Math.abs(Math.log(a[1] / r)) ? b : a))[0];
 async function hfRun(mode) {
