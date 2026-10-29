@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610291348">
+<meta name="app-version" content="202610291350">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610291348"></script>
+<script src="theme.js?v=202610291350"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -60,7 +60,7 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .weekhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
 .weekhead h1 { font-size: 28px; margin: 0; }
 .weekhead .nav { font-size: 20px; color: var(--sub); padding: 0 6px; }
-.wkhint { margin: 0 0 8px; color: var(--sub); font-size: 13px; } /* 💡 주간 탭 설명 */
+.wkhint { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(224, 209, 32, .55); border-left: 5px solid #E0D120; background: rgba(224, 209, 32, .16); color: var(--text); font-size: 15px; font-weight: 700; line-height: 1.45; } /* 💡 주간 탭 설명 — 눈에 띄게 (브랜드 옐로) */
 .weekhead .range { color: var(--sub); font-size: 14px; }
 .rate { display: flex; align-items: center; gap: 10px; color: var(--sub); font-size: 14px; margin: 6px 0 18px; }
 .rate .bar { flex: 1; max-width: 240px; margin: 0; height: 6px; }
@@ -523,23 +523,23 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202610291348">
-<link rel="stylesheet" href="photo.css?v=202610291348">
-<link rel="stylesheet" href="post.css?v=202610291348">
-<link rel="stylesheet" href="marketing.css?v=202610291348">
-<link rel="stylesheet" href="contacts.css?v=202610291348">
-<link rel="stylesheet" href="leaders.css?v=202610291348">
-<link rel="stylesheet" href="links.css?v=202610291348">
-<link rel="stylesheet" href="reports.css?v=202610291348">
-<link rel="stylesheet" href="edu.css?v=202610291348">
-<link rel="stylesheet" href="qna.css?v=202610291348">
-<link rel="stylesheet" href="jo-guide.css?v=202610291348">
-<link rel="stylesheet" href="jc.css?v=202610291348">
-<link rel="stylesheet" href="talkbot.css?v=202610291348">
-<link rel="stylesheet" href="work.css?v=202610291348">
-<link rel="stylesheet" href="wiki.css?v=202610291348">
-<link rel="stylesheet" href="glass.css?v=202610291348">
-<link rel="stylesheet" href="sidebar.css?v=202610291348">
+<link rel="stylesheet" href="blog.css?v=202610291350">
+<link rel="stylesheet" href="photo.css?v=202610291350">
+<link rel="stylesheet" href="post.css?v=202610291350">
+<link rel="stylesheet" href="marketing.css?v=202610291350">
+<link rel="stylesheet" href="contacts.css?v=202610291350">
+<link rel="stylesheet" href="leaders.css?v=202610291350">
+<link rel="stylesheet" href="links.css?v=202610291350">
+<link rel="stylesheet" href="reports.css?v=202610291350">
+<link rel="stylesheet" href="edu.css?v=202610291350">
+<link rel="stylesheet" href="qna.css?v=202610291350">
+<link rel="stylesheet" href="jo-guide.css?v=202610291350">
+<link rel="stylesheet" href="jc.css?v=202610291350">
+<link rel="stylesheet" href="talkbot.css?v=202610291350">
+<link rel="stylesheet" href="work.css?v=202610291350">
+<link rel="stylesheet" href="wiki.css?v=202610291350">
+<link rel="stylesheet" href="glass.css?v=202610291350">
+<link rel="stylesheet" href="sidebar.css?v=202610291350">
 </head>
 <body>
 
@@ -590,7 +590,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <button class="nav" id="nextW" aria-label="다음주">›</button>
         <span class="range" id="wkRange"></span>
       </div>
-      <p class="wkhint">💡 바로 일을 하지 못할 것 같으면, 바로 여기에 적어 두는 곳이에요.</p>
+      <p class="wkhint">💡 바로 일을 하지 못할 것 같으면, <u>바로 여기에 적어 두는 곳</u>이에요.</p>
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
       <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
           <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
@@ -713,9 +713,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610291348"></script>
-<script src="week.js?v=202610291348"></script>
-<script src="pick.js?v=202610291348"></script>
+<script src="config.js?v=202610291350"></script>
+<script src="week.js?v=202610291350"></script>
+<script src="pick.js?v=202610291350"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -2203,34 +2203,34 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610291348"></script>
-<script src="photo.js?v=202610291348"></script>
-<script src="blog.js?v=202610291348"></script>
-<script src="mk-core.js?v=202610291348"></script>
-<script src="mkc-core.js?v=202610291348"></script>
-<script src="marketing.js?v=202610291348"></script>
-<script src="sns-core.js?v=202610291348"></script>
-<script src="post.js?v=202610291348"></script>
-<script src="someday.js?v=202610291348"></script>
-<script src="contacts.js?v=202610291348"></script>
-<script src="refs.js?v=202610291348"></script>
-<script src="sim-merge.js?v=202610291348"></script>
-<script src="simtb.js?v=202610291348"></script>
-<script src="leaders-core.js?v=202610291348"></script>
-<script src="leaders.js?v=202610291348"></script>
-<script src="links.js?v=202610291348"></script>
-<script src="edu-data.js?v=202610291348"></script>
-<script src="edu.js?v=202610291348"></script>
-<script src="reports.js?v=202610291348"></script>
-<script src="jo-guide-data.js?v=202610291348"></script>
-<script src="jo-guide.js?v=202610291348"></script>
-<script src="jc.js?v=202610291348"></script>
-<script src="talkbot.js?v=202610291348"></script>
-<script src="work-core.js?v=202610291348"></script>
-<script src="work.js?v=202610291348"></script>
-<script src="wiki-data.js?v=202610291348"></script>
-<script src="wiki.js?v=202610291348"></script>
-<script src="qna.js?v=202610291348"></script>
-<script src="sidebar.js?v=202610291348"></script>
+<script src="sales.js?v=202610291350"></script>
+<script src="photo.js?v=202610291350"></script>
+<script src="blog.js?v=202610291350"></script>
+<script src="mk-core.js?v=202610291350"></script>
+<script src="mkc-core.js?v=202610291350"></script>
+<script src="marketing.js?v=202610291350"></script>
+<script src="sns-core.js?v=202610291350"></script>
+<script src="post.js?v=202610291350"></script>
+<script src="someday.js?v=202610291350"></script>
+<script src="contacts.js?v=202610291350"></script>
+<script src="refs.js?v=202610291350"></script>
+<script src="sim-merge.js?v=202610291350"></script>
+<script src="simtb.js?v=202610291350"></script>
+<script src="leaders-core.js?v=202610291350"></script>
+<script src="leaders.js?v=202610291350"></script>
+<script src="links.js?v=202610291350"></script>
+<script src="edu-data.js?v=202610291350"></script>
+<script src="edu.js?v=202610291350"></script>
+<script src="reports.js?v=202610291350"></script>
+<script src="jo-guide-data.js?v=202610291350"></script>
+<script src="jo-guide.js?v=202610291350"></script>
+<script src="jc.js?v=202610291350"></script>
+<script src="talkbot.js?v=202610291350"></script>
+<script src="work-core.js?v=202610291350"></script>
+<script src="work.js?v=202610291350"></script>
+<script src="wiki-data.js?v=202610291350"></script>
+<script src="wiki.js?v=202610291350"></script>
+<script src="qna.js?v=202610291350"></script>
+<script src="sidebar.js?v=202610291350"></script>
 </body>
 </html>
