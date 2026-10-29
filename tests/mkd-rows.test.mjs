@@ -1,0 +1,197 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { cleanMetrics, toRowsPure, looksPersonal } from "../scripts/mkd/rows.mjs";
+
+const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
+const D = "2026-10-28";
+const rows = (channel, input) => toRowsPure(channel, D, input, TEAMS);
+// 에러 메시지 얻기 (던지지 않으면 테스트 실패)
+const errOf = (fn) => { try { fn(); } catch (e) { return String(e.message); } assert.fail("던져야 하는데 통과했어요"); };
+
+// ── 숫자 ──
+test("cleanMetrics: 천 단위 쉼표·₩·$·US$ 를 받아 숫자로", () => {
+  const m = cleanMetrics({ impressions: "1,204", spend: "₩18,200", spend_usd: "$12.50", fx: "US$1,380.5", clicks: 31, ctr: "0.0123", cpc: " 590 " });
+  assert.deepEqual(m, { impressions: 1204, spend: 18200, spend_usd: 12.5, fx: 1380.5, clicks: 31, ctr: 0.0123, cpc: 590 });
+});
+test("cleanMetrics: '--' '-' '–' '—' 와 빈 값은 null", () => {
+  for (const v of ["--", "-", "–", "—", "", null, undefined, " -- "]) assert.equal(cleanMetrics({ clicks: v }).clicks, null, JSON.stringify(v));
+});
+test("cleanMetrics: 쉼표는 천 단위일 때만 — '12,3,4' 는 거부, 원문은 안 찍음", () => {
+  const msg = errOf(() => cleanMetrics({ clicks: "12,3,4" }));
+  assert.match(msg, /^clicks 는 숫자여야 해요 \(길이 6\)$/);
+  assert.doesNotMatch(msg, /12,3,4/);
+  assert.throws(() => cleanMetrics({ clicks: "1,23" }), /숫자여야 해요/);
+  assert.throws(() => cleanMetrics({ clicks: "1234,567" }), /숫자여야 해요/);
+});
+test("cleanMetrics: 원·% 같은 글자가 붙은 값은 거부", () => {
+  for (const v of ["18,200원", "5%", "12개", "1e5", "0x10", "1.2.3", "abc"]) assert.throws(() => cleanMetrics({ spend: v }), /spend 는 숫자여야 해요/, v);
+});
+test("cleanMetrics: 배열·불리언·객체·NaN 은 숫자가 아니다", () => {
+  for (const v of [[7], true, { a: 1 }, NaN, Infinity]) assert.throws(() => cleanMetrics({ clicks: v }), /clicks 는 숫자여야 해요/, JSON.stringify(v));
+});
+test("cleanMetrics: 음수는 rank/avg_rank 만", () => {
+  assert.throws(() => cleanMetrics({ clicks: -3 }), /clicks/);
+  assert.throws(() => cleanMetrics({ spend: "-3" }), /spend/);
+  assert.throws(() => cleanMetrics({ impressions: "$-3" }), /impressions/);
+  assert.deepEqual(cleanMetrics({ rank: -3, avg_rank: "-1.5" }), { rank: -3, avg_rank: -1.5 });
+});
+
+// ── 키·문자열·배열 ──
+test("cleanMetrics: 모르는 키는 거부", () => {
+  assert.throws(() => cleanMetrics({ name: "홍길동" }), /^Error: 모르는 지표 키: name$/);
+});
+test("cleanMetrics: metrics 는 객체여야 (없으면 {})", () => {
+  assert.deepEqual(cleanMetrics(undefined), {});
+  assert.deepEqual(cleanMetrics(null), {});
+  for (const v of [[1], "abc", 5]) assert.throws(() => cleanMetrics(v), /입력 형식 오류: metrics/, JSON.stringify(v));
+});
+test("cleanMetrics: 문자열 지표 길이 자르기·타입 검사, flags 는 문자열 목록", () => {
+  const m = cleanMetrics({ note: "가".repeat(300), status: "운영 가능", flags: ["a", "", "b".repeat(200)] });
+  assert.equal(m.note.length, 200); assert.equal(m.status, "운영 가능"); assert.deepEqual(m.flags, ["a", "b".repeat(120)]);
+  assert.deepEqual(cleanMetrics({ flags: "한 개" }).flags, ["한 개"]);
+  assert.throws(() => cleanMetrics({ status: 5 }), /status 는 문자열/);
+  assert.throws(() => cleanMetrics({ flags: [{ a: 1 }] }), /flags/);
+});
+
+// ── 개인정보 ──
+test("looksPersonal: 전화번호 모양은 true, 날짜·금액·이름은 false", () => {
+  for (const s of ["01012345678", "010 1234 5678", "010-1234-5678", "010.1234.5678", "(053) 123-4567", "(053)123-4567", "053-123-4567", "연락처 053 123 4567 입니다"]) assert.equal(looksPersonal(s), true, s);
+  for (const s of ["대구_영어(검색광고)", "gads_daegu_en_search", "2026-10-28", "2026.10.28 ~ 2026.11.03", "1,204", "12,345,678", "홍길동", "", null]) assert.equal(looksPersonal(s), false, String(s));
+});
+test("cleanMetrics: note·status·flags 의 전화번호 거부, 메시지에 숫자 안 찍음", () => {
+  for (const m of [{ note: "문의 010-1234-5678" }, { status: "01012345678" }, { flags: ["ok", "010 1234 5678"] }]) {
+    const msg = errOf(() => cleanMetrics(m));
+    assert.match(msg, /^개인정보\(전화번호\)처럼 보이는 값이 있어 저장하지 않아요: (note|status|flags)$/);
+    assert.doesNotMatch(msg, /\d{4}/);
+  }
+});
+test("cleanMetrics: top_url·our_url·campaign_id 는 전화번호 검사에서 제외", () => {
+  const m = cleanMetrics({ top_url: "https://blog.naver.com/x/222012345678901", our_url: "https://blog.naver.com/y/010-1234-5678", campaign_id: "cmp-a001-01-000000012345678" });
+  assert.equal(m.campaign_id, "cmp-a001-01-000000012345678");
+});
+
+// ── 봉투 ──
+test("봉투: 입력은 객체, rows 는 객체 배열", () => {
+  for (const bad of [[], [{ unit: "x" }], "rows", 5, null, undefined]) assert.throws(() => rows("google_ad", bad), /^Error: 입력 형식 오류: /, JSON.stringify(bad));
+  assert.throws(() => rows("google_ad", { rows: "abc" }), /입력 형식 오류: rows/);
+  assert.throws(() => rows("google_ad", { rows: { unit: "x" } }), /입력 형식 오류: rows/);
+  assert.throws(() => rows("google_ad", { rows: [1] }), /입력 형식 오류: rows\[0\]/);
+  assert.throws(() => rows("google_ad", { rows: [[]] }), /입력 형식 오류: rows\[0\]/);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x" }, null] }), /입력 형식 오류: rows\[1\]/);
+});
+test("봉투: 채널 검사", () => {
+  assert.throws(() => rows("tiktok", { rows: [] }), /채널은 naver_ad/);
+});
+test("봉투: rows 가 없거나 비면 failed|login_required 가 있어야 — 오타 키·ok 도 거부", () => {
+  const MSG = /rows 가 비었는데 status\(failed\/login_required\)가 없어요/;
+  assert.throws(() => rows("google_ad", {}), MSG);
+  assert.throws(() => rows("google_ad", { rows: [] }), MSG);
+  assert.throws(() => rows("google_ad", { row: [] }), MSG);
+  assert.throws(() => rows("google_ad", { rows: [], status: "ok" }), MSG);
+  assert.throws(() => rows("google_ad", { rows: [], status: "partial" }), MSG);
+  assert.throws(() => rows("google_ad", { rows: [], status: "weird" }), /status 는 ok\/partial\/failed\/login_required/);
+});
+test("봉투: 빈 rows + failed/login_required → 모든 팀에 '전체' 행 {note}", () => {
+  const out = rows("meta_ad", { rows: [], status: "login_required", note: "광고관리자 로그인 풀림" });
+  assert.equal(out.length, 4);
+  assert.deepEqual(out.map((r) => r.team_id), [1, 2, 3, 4]);
+  for (const r of out) assert.deepEqual(r, { team_id: r.team_id, date: D, channel: "meta_ad", unit: "전체", metrics: { note: "광고관리자 로그인 풀림" }, status: "login_required" });
+  assert.equal(rows("meta_ad", { status: "failed" })[0].metrics.note, "행 없음");
+  assert.equal(rows("meta_ad", { status: "failed", note: "x".repeat(300) })[0].metrics.note.length, 200);
+  assert.throws(() => rows("meta_ad", { status: "failed", note: "010-1234-5678" }), /개인정보.*: note$/);
+  assert.throws(() => rows("meta_ad", { status: "failed", note: 5 }), /note/);
+});
+test("봉투: 모르는 최상위 키·행 키는 거부 (오타로 조용히 버려지지 않게)", () => {
+  assert.throws(() => rows("google_ad", { row: [{ unit: "대구 x", metrics: { clicks: 1 } }], status: "failed" }), /모르는 키: row/);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x", metrics: { clicks: 1 } }], team_key: "dsr" }), /모르는 키: team_key/);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "대구 x", metric: { clicks: 1 } }] }), /모르는 키: rows\[0\]\.metric/);
+});
+test("최상위 status(ok|partial)는 자기 status 없는 행의 기본값", () => {
+  const out = rows("google_ad", { status: "partial", rows: [{ team_key: "dsr", unit: "a" }, { team_key: "dsr", unit: "b", status: "ok" }, { team_key: "dsr", unit: "c", status: "failed", metrics: { note: "x" } }] });
+  assert.deepEqual(out.map((r) => r.status), ["partial", "ok", "failed"]);
+  assert.equal(rows("google_ad", { rows: [{ team_key: "dsr", unit: "a" }] })[0].status, "ok");
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a", status: "bad" }] }), /status 는 ok\/partial/);
+  assert.throws(() => rows("google_ad", { status: "failed", rows: [{ team_key: "dsr", unit: "a" }] }), /rows 가 있는데/);
+});
+
+// ── 지점 ──
+test("team_key: 모르는 값은 거부, team_id 는 팀 목록에 있어야", () => {
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "daegu", unit: "a" }] }), /^Error: team_key 는 dsr\|jpcn\|ulsan\|gumi: daegu$/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "", unit: "a" }] }), /team_key 는 dsr\|jpcn\|ulsan\|gumi/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_id: 99, unit: "a" }] }), /team_id/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_id: 1, team_key: "ulsan", unit: "a" }] }), /team_id.*team_key/);
+  assert.equal(rows("google_ad", { rows: [{ team_id: 3, unit: "a" }] })[0].team_id, 3);
+  assert.equal(rows("google_ad", { rows: [{ team_id: 3, team_key: "ulsan", unit: "a" }] })[0].team_id, 3);
+  for (const [k, id] of [["dsr", 1], ["jpcn", 2], ["ulsan", 3], ["gumi", 4]]) assert.equal(rows("blog", { rows: [{ team_key: k, unit: "a" }] })[0].team_id, id);
+});
+test("blog·daangn·jeonsan 은 team 필수, 광고 채널도 unit '전체' 는 team 필수", () => {
+  for (const ch of ["blog", "daangn", "jeonsan"]) {
+    assert.throws(() => rows(ch, { rows: [{ unit: "대구 영어", metrics: { views: 1 } }] }), /team_key 가 필요해요/, ch);
+    assert.throws(() => rows(ch, { rows: [{ unit: "울산", metrics: { views: 1 } }] }), /team_key 가 필요해요/, ch);
+    assert.equal(rows(ch, { rows: [{ team_key: "ulsan", unit: "전체", metrics: { views: 1 } }] })[0].team_id, 3, ch);
+  }
+  for (const ch of ["naver_ad", "google_ad", "meta_ad"]) {
+    assert.throws(() => rows(ch, { rows: [{ metrics: { clicks: 1 } }] }), /team_key 가 필요해요/, ch);
+    assert.throws(() => rows(ch, { rows: [{ unit: "전체", metrics: { clicks: 1 } }] }), /team_key 가 필요해요/, ch);
+    assert.throws(() => rows(ch, { rows: [{ unit: " 전체 ", metrics: { clicks: 1 } }] }), /team_key 가 필요해요/, ch);
+    assert.deepEqual(rows(ch, { rows: [{ team_key: "gumi", unit: "전체", metrics: { clicks: 1 } }] }).map((r) => [r.team_id, r.unit]), [[4, "전체"]]);
+  }
+});
+test("광고 채널만 unit 이름으로 지점 추정, 못 하면 dsr + [미분류]", () => {
+  const out = rows("google_ad", { rows: [{ unit: "울산_영어(검색광고)_원근" }, { unit: "구미 일본어" }, { unit: "대구 일본어 캠페인" }, { unit: "이름없는캠페인" }, { team_key: "jpcn", unit: "울산 x" }] });
+  assert.deepEqual(out.map((r) => [r.team_id, r.unit]), [[3, "울산_영어(검색광고)_원근"], [4, "구미 일본어"], [2, "대구 일본어 캠페인"], [1, "[미분류] 이름없는캠페인"], [2, "울산 x"]]);
+});
+test("unit: 문자열만(없으면 '전체'), 앞뒤 공백 제거, 접두어를 붙인 뒤 120자로 자름", () => {
+  for (const u of [5, true, ["a"], { a: 1 }]) assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: u }] }), /unit 은 문자열/, JSON.stringify(u));
+  assert.equal(rows("blog", { rows: [{ team_key: "dsr" }] })[0].unit, "전체");
+  assert.equal(rows("blog", { rows: [{ team_key: "dsr", unit: "   " }] })[0].unit, "전체");
+  assert.equal(rows("google_ad", { rows: [{ team_key: "dsr", unit: "  대구 a  " }] })[0].unit, "대구 a");
+  const u = rows("google_ad", { rows: [{ unit: "가".repeat(200) }] })[0].unit;
+  assert.equal(u.length, 120); assert.ok(u.startsWith("[미분류] 가"));
+  assert.equal(rows("google_ad", { rows: [{ unit: "대구" + "가".repeat(200) }] })[0].unit.length, 120);
+});
+test("행 결과 모양 {team_id,date,channel,unit,metrics,status}", () => {
+  const out = rows("google_ad", { rows: [{ team_key: "dsr", unit: "대구_영어(검색광고)", metrics: { impressions: "1,204", clicks: 31, spend: "₩18,200", conversions: 1, status: "운영 가능", flags: [] } }] });
+  assert.deepEqual(out, [{ team_id: 1, date: D, channel: "google_ad", unit: "대구_영어(검색광고)", metrics: { impressions: 1204, clicks: 31, spend: 18200, conversions: 1, status: "운영 가능", flags: [] }, status: "ok" }]);
+});
+test("팀 목록이 비었거나 dsr 가 없으면 조용히 0행이 되지 않고 오류", () => {
+  assert.throws(() => toRowsPure("meta_ad", D, { status: "failed" }, []), /지점 목록/);
+  assert.throws(() => toRowsPure("google_ad", D, { rows: [{ unit: "이름없음" }] }, TEAMS.slice(1)), /지점을 못 정했어요/);
+});
+
+// ── 중복 ──
+test("같은 (지점, unit) 이 두 번 나오면 전부 모아 거부 — 조용히 합치지 않음", () => {
+  const msg = errOf(() => rows("google_ad", { rows: [
+    { team_key: "dsr", unit: "대구 a", metrics: { clicks: 1 } }, { team_key: "dsr", unit: "대구 a", metrics: { clicks: 2 } }, { team_key: "dsr", unit: "대구 a" },
+    { team_key: "ulsan", unit: "울산 b" }, { team_key: "ulsan", unit: "울산 b" }, { team_key: "gumi", unit: "구미 c" }] }));
+  assert.equal(msg, "같은 지점·unit 이 여러 번 나왔어요: 1:대구 a ×3, 3:울산 b ×2 — 같은 이름이면 숫자를 더해 한 행으로 보내 주세요");
+});
+test("중복은 최종 unit 기준 — 같은 이름이라도 다른 지점이면 통과, 추정으로 같아지면 거부", () => {
+  assert.equal(rows("google_ad", { rows: [{ team_key: "dsr", unit: "a" }, { team_key: "gumi", unit: "a" }] }).length, 2);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "울산 a" }, { team_key: "ulsan", unit: "울산 a" }] }), /같은 지점·unit 이 여러 번 나왔어요: 3:울산 a ×2/);
+  assert.throws(() => rows("google_ad", { rows: [{ unit: "가나" }, { unit: "가나" }] }), /1:\[미분류\] 가나 ×2/);
+});
+
+// ── 행의 개인정보 ──
+test("unit 에 전화번호가 있으면 거부, 메시지에 숫자 안 찍음", () => {
+  for (const u of ["대구 010-1234-5678", "01012345678", "010 1234 5678", "(053) 123-4567"]) {
+    const msg = errOf(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: u }] }));
+    assert.equal(msg, "개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit", u);
+  }
+});
+test("note·flags 의 전화번호도 행 단위로 거부", () => {
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { note: "010-1234-5678" } }] }), /개인정보.*: note$/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { flags: ["(053) 123-4567"] } }] }), /개인정보.*: flags$/);
+});
+test("jeonsan unit 허용 목록: 전체|meta|homepage|기타|gads_*|nad_* 이거나 20자 이하·숫자 3연속 없음", () => {
+  const j = (unit) => rows("jeonsan", { rows: [{ team_key: "dsr", unit, metrics: { inquiries: 2 } }] });
+  for (const u of ["전체", "meta", "homepage", "기타", "gads_daegu_en_search", "nad_daegu_en_1", "네이버 예약", "인스타그램", "당근", "블로그 A12", "가".repeat(20)]) assert.equal(j(u)[0].unit, u, u);
+  // 허용 목록 밖이면서 길거나(21자+) 숫자가 3개 이상 이어진 값만 막는다 — 짧은 이름 정도는 길이·숫자로는 못 막으니 허용
+  for (const u of ["홍길동 0101234", "가".repeat(21), "메모 123", "홍길동님 문의 전화 요청 드립니다 감사합니다", "gads_" + "A".repeat(20)]) assert.throws(() => j(u), /jeonsan unit/, u);
+  assert.equal(j("홍길동")[0].unit, "홍길동");
+  const msg = errOf(() => j("홍길동 0101234"));
+  assert.doesNotMatch(msg, /0101234|홍길동/);
+});
+test("jeonsan 이 아닌 채널은 unit 허용 목록 검사 없음", () => {
+  assert.equal(rows("blog", { rows: [{ team_key: "dsr", unit: "대구 영어회화 블로그 글 제목이 아주 길어도 되고 숫자 2026 도 됨" }] }).length, 1);
+});

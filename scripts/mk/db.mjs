@@ -47,6 +47,12 @@ export async function patch(table, query, body) {
   const r = await fetch(`${URL_}/rest/v1/${table}?${query}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`${table} 고치기 실패 ${r.status}: ${await r.text()}`);
 }
+// 행 지우기 (DELETE). query 는 PostgREST 필터(필수 — 필터 없는 전체 삭제는 막는다)
+export async function del(table, query) {
+  if (!/=/.test(query ?? "")) throw new Error(`${table} 지우기: 필터(query)가 필요해요`);
+  const r = await fetch(`${URL_}/rest/v1/${table}?${query}`, { method: "DELETE", headers: { ...H, Prefer: "return=minimal" } });
+  if (!r.ok) throw new Error(`${table} 지우기 실패 ${r.status}: ${await r.text()}`);
+}
 export async function insert(table, rows) {
   const r = await fetch(`${URL_}/rest/v1/${table}`, { method: "POST", headers: { ...H, Prefer: "return=representation" }, body: JSON.stringify(rows) });
   if (!r.ok) throw new Error(`${table} 넣기 실패 ${r.status}: ${await r.text()}`);

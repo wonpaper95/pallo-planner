@@ -1,5 +1,5 @@
 // 사용: node scripts/mkd/save-daily.mjs <channel> <YYYY-MM-DD> <input.json>
-// Claude(크롬 채널)나 다른 스크립트가 만든 JSON(규격은 lib.mjs 위 주석)을 검증해 mkd_daily 에 저장한다. rows 가 비면 채널 통째 상태(failed/login_required)로 모든 팀에 '전체' 행.
+// Claude(크롬 채널)나 다른 스크립트가 만든 JSON을 검증해 mkd_daily 에 저장한다. 규격·검증 규칙은 rows.mjs 맨 위 주석. rows 가 비면 status(failed/login_required)가 꼭 있어야 하고, 모든 팀에 '전체' 행.
 import { readFileSync } from "node:fs";
 import { arg, dateArg, run } from "../mk/db.mjs";
 import { toRows, saveRows } from "./lib.mjs";
