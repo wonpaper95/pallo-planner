@@ -218,7 +218,7 @@ LD.render = function () {
       <span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>
-      <span class="ldfind"><input id="ldFind" type="search" list="ldNames" placeholder="🔍 리더 찾기" value="${esc(LD.findQ ?? "")}" title="이름(일부)·전화 뒷자리 → Enter, 또 누르면 다음 사람"><datalist id="ldNames">${[...new Set(LD.rows.map((r) => r.name).filter((n) => n && n !== VACANT))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist></span>
+      <span class="ldfind"><input id="ldFind" type="search" enterkeyhint="search" autocomplete="off" list="ldNames" placeholder="🔍 리더 찾기" value="${esc(LD.findQ ?? "")}" title="이름(일부)·전화 뒷자리 → Enter, 또 누르면 다음 사람"><datalist id="ldNames">${[...new Set(LD.rows.map((r) => r.name).filter((n) => n && n !== VACANT))].map((n) => `<option value="${esc(n)}">`).join("")}</datalist></span>
       <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(sm)} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>
     ${needTable()}
     ${certTable()}
@@ -602,6 +602,7 @@ function findLeader(q) {
   if (trs.length > 1) toast(`${LD.findI + 1}/${trs.length}번째 — Enter 누르면 다음`);
 }
 document.addEventListener("keydown", (e) => { if (e.target.id === "ldFind" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); findLeader(e.target.value.trim()); } });
+document.addEventListener("search", (e) => { if (e.target.id === "ldFind") findLeader(e.target.value.trim()); }, true); // 폰 키보드 [검색]: 한글 조합 중 Enter 는 위에서 걸러지므로 여기서 (keydown 이 막은 경우엔 안 옴)
 document.addEventListener("toggle", (e) => { if (e.target.classList?.contains("ldneedtb")) LD.needOpen = e.target.open; }, true); // 🔴 구해야 함 현황 접힘 기억 (toggle 은 안 퍼져서 capture)
 document.addEventListener("change", (e) => { if (e.target.id === "ldFind" && LD.rows.some((r) => r.name === e.target.value)) findLeader(e.target.value); }); // 자동완성 목록에서 고르면 바로
 document.addEventListener("toggle", (e) => { if (e.target.id !== "ldCert") return; LD.certOpen = e.target.open; const t = e.target.querySelector("summary .mut"); if (t) t.textContent = t.textContent.replace(/눌러서 \S+$/, `눌러서 ${LD.certOpen ? "접기" : "펼치기"}`); }, true); // toggle 은 버블 안 됨 → capture
