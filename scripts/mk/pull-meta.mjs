@@ -63,7 +63,7 @@ await run(async () => {
     if (daily.length) await upsert("mk_ad_daily", daily, "team_id,date,ad_name");
     if (demo.length) await upsert("mk_ad_demo", demo, "team_id,period_from,period_to,ad_name,age,gender");
     // 화면 '최근 올린 파일' 에 자동 적재도 보이게. uploaded_by 는 대표 계정(서비스 키에는 auth.uid() 가 없다).
-    const admin = (await select("profiles", "select=id&role=eq.admin", "id"))[0]?.id;
+    const admin = (await select("profiles", "select=user_id&role=eq.admin", "created_at"))[0]?.user_id;
     const log = [];
     for (const [kind, rows, day] of [["ads_daily", daily, (r) => r.date], ["ads_demo", demo, (r) => r.period_from]]) {
       const by = {}; for (const r of rows) (by[r.team_id] ??= []).push(day(r));
