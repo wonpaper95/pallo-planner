@@ -24,7 +24,7 @@ WR.load = async function () {
   if (admin()) { if (!WR.team) { try { WR.team = +localStorage.getItem("wr-team") || null; } catch {} } if (!teams.some((t) => t.id === WR.team)) WR.team = teams[0]?.id ?? null; }
   else WR.team = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data ?? null; // 매니저·미리보기: 우리 지점 · 조교: 링크 지점
   if (!WR.ym) WR.ym = ymOf(today());
-  if (!WR.team) { WR.shell = ""; V().innerHTML = `<div class="wrbar"><h2>🕒 근무기록</h2></div><div class="wrpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
+  if (!WR.team) { WR.shell = ""; V().innerHTML = `<div class="wrbar"><h2>🕒 조교 근무기록</h2></div><div class="wrpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = WR.team, ym = WR.ym;
   const [m, r, p] = await Promise.all([
     sb.from("work_months").select("*").eq("team_id", t).eq("ym", ym).maybeSingle(),
@@ -68,7 +68,7 @@ function render() {
   renderGrid(); renderPeople();
 }
 function shell() {
-  return `<div class="wrbar"><h2>🕒 근무기록 <small class="mut">지점 공용 · 실시간</small></h2>
+  return `<div class="wrbar"><h2>🕒 조교 근무기록 <small class="mut">지점 공용 · 실시간</small></h2>
     <div class="wrrow">${admin() ? `<select id="wrTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === WR.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <button class="btn ghost" data-act="prev">‹</button><b class="wrym">${ymLabel(WR.ym)}</b><button class="btn ghost" data-act="next">›</button>
       ${WR.ym !== ymOf(today()) ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
