@@ -44,3 +44,23 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxlc > div:last-child { min-width: 0; display: grid; gap: 4px; justify-items: start; }
 #gxView .gxlc code { font-size: 11px; color: var(--sub); word-break: break-all; }
 #gxView .gxqr { flex: none; background: #fff; padding: 6px; border-radius: 8px; width: 122px; height: 122px; }
+/* 📊 현황 */
+#gxView .gxnums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 700px) { #gxView .gxnums { grid-template-columns: 1fr 1fr; } }
+#gxView .gxnum { display: grid; gap: 2px; text-align: left; font: inherit; color: var(--text); cursor: pointer; margin: 0; }
+#gxView .gxnum b { font-size: 26px; } #gxView .gxnum span { font-weight: 600; }
+#gxView .gxnum:hover { border-color: var(--accent); }
+#gxView .gxdash { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+#gxView .gxdash .card { margin: 0; padding: 12px 14px; }
+#gxView .gxdash .gxwide { grid-column: 1 / -1; }
+@media (max-width: 1000px) { #gxView .gxdash { grid-template-columns: 1fr; } }
+#gxView .gxdash h3 { font-size: 15px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#gxView .gxdash h3 small { font-weight: 400; font-size: 12px; }
+#gxView .gxdash tr[data-p], #gxView .gxdash tr[data-m] { cursor: pointer; }
+#gxView .gxdash .gxmrow { padding: 8px 0; border-bottom: 1px solid var(--line); }
+#gxView .gxdash .gxmrow:last-child { border-bottom: 0; }
+#gxView .gxdash a, #gxView .gxt a { color: var(--accent); text-decoration: none; }
+#gxView .gxscroll { max-height: 520px; overflow: auto; }
+#gxView .gxev { padding: 8px 0; border-bottom: 1px solid var(--line); display: grid; gap: 4px; justify-items: start; }
+#gxView .gxev:last-child { border-bottom: 0; }
+#gxView .gxhelp { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }

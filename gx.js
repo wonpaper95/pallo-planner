@@ -3,15 +3,17 @@
 // 공개 신청폼 = site/gx/ (로그인 없음). 지우기는 조교 빼고(서버도 막음)
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail 을 씀 → window.GX
 (() => {
-const GX = (window.GX = { sub: "fm", br: null, q: "", kq: "", members: [], koreans: [], events: [], sel: null, ksel: null });
+const GX = (window.GX = { sub: "db", fp: "", fs: "", br: null, q: "", kq: "", members: [], koreans: [], events: [], sel: null, ksel: null });
 const V = () => document.getElementById("gxView");
 const BR = { "daegu-en": "대구영어점", "daegu-jpcn": "대구일중점", ulsan: "울산점" }; // 공개폼 지점 id ↔ 플래너 지점 이름 (gx/config.js BRANCHES)
 const PROG = { korean_class: "한국어 수업", language_exchange: "1:1 언어교환", socializing: "소셜(스터디)", event: "이벤트" };
 const APP_ST = { applied: "신청", confirmed: "확정", matched: "매칭됨", attended: "참석", cancelled: "취소" };
 const M_ST = { new: "새 회원", active: "활동 중", inactive: "쉬는 중" };
 const K_ST = { new: "대기", matched: "매칭됨", inactive: "쉬는 중" };
+const KEY = { available_days: "요일", available_times: "시간", days: "요일", times: "시간", mode: "방식", frequency: "횟수", exchange_style: "교환 스타일", other_language_level: "언어 레벨", preferred_partner: "원하는 상대", level: "반", message: "메시지", note: "메모" }; // 신청폼 답 이름 → 한국어
+const answers = (a, sep) => Object.entries(a.data || {}).filter(([, v]) => v && v.length).map(([k, v]) => `${KEY[k] || k}: ${Array.isArray(v) ? v.join("/") : v}`).join(sep);
 const TIER = { "VVIP+": 0, VVIP: 1, Basic: 2, Lite: 3 };
-const SUBS = [["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"]];
+const SUBS = [["db", "📊 현황"], ["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"]];
 const jo = () => myRole === "assistant";
 const day = (s) => (s ? new Date(s).toLocaleDateString("sv-SE") : ""); // 한국 시간 YYYY-MM-DD
 const when = (s) => (s ? new Date(s).toLocaleString("sv-SE").slice(0, 16) : "");
@@ -20,7 +22,7 @@ const brOpts = (sel) => `<option value="">전 지점</option>${opts(BR, sel)}`;
 const active = (k) => (k.gx_matches || []).filter((x) => !x.ended_at);
 const since = (d) => { const n = Math.floor((Date.now() - new Date(d)) / 864e5); return n < 7 ? `${n}일째` : `${Math.floor(n / 7)}주째`; };
 const dash = (v) => (v == null || v === "" ? `<span class="mut">—</span>` : esc(v));
-try { GX.sub = localStorage.getItem("gx-sub") || "fm"; } catch {}
+try { GX.sub = localStorage.getItem("gx-sub") || "db"; } catch {}
 
 GX.load = async function () {
   if (GX.br === null) { // 처음 한 번: 우리 지점 기본 (대표는 지난번 고른 것, 없으면 전 지점)
@@ -88,10 +90,63 @@ function render() {
   v.querySelector("#gxBr").onchange = (e) => { GX.br = e.target.value; try { if (myRole === "admin") localStorage.setItem("gx-br", GX.br); } catch {} render(); };
   v.querySelectorAll(".gxsub button").forEach((b) => (b.onclick = () => { GX.sub = b.dataset.s; try { localStorage.setItem("gx-sub", GX.sub); } catch {} render(); }));
   v.querySelector("#gxCsv").onclick = csv;
-  ({ fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
+  ({ db: renderDash, fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
 }
 const inBr = (x) => !GX.br || x.branch === GX.br;
 const body = () => V().querySelector("#gxBody");
+const openMember = (id) => { GX.sel = GX.members.find((m) => m.id === id) || null; GX.sub = "fm"; render(); showPanel(); };
+const openKorean = (id) => { GX.ksel = GX.koreans.find((k) => k.id === id) || null; GX.sub = "kr"; render(); showPanel(); };
+const apps = () => GX.members.filter(inBr).flatMap((m) => m.gx_applications.map((a) => ({ a, m }))).sort((x, y) => y.a.created_at.localeCompare(x.a.created_at));
+const appTag = (a) => `<span class="gxtag ${a.status}">${esc(APP_ST[a.status] || a.status)}</span>`;
+const evApps = (e) => GX.members.flatMap((m) => m.gx_applications.filter((a) => a.event_id === e.id).map((a) => ({ a, m }))); // 이벤트는 전 지점 공용
+
+// ---- 📊 현황: 숫자 · 프로그램별 신청 · 매칭 대기(+1순위 추천) · 최근 신청 · 다가오는 이벤트 · 어디서 뭘 보나
+function renderDash() {
+  const ms = GX.members.filter(inBr), ks = GX.koreans.filter(inBr), all = apps(), ym = new Date().toLocaleDateString("sv-SE").slice(0, 7);
+  const nowMatch = all.reduce((n, { a }) => n + active(a).length, 0);
+  const waiting = all.filter(({ a }) => a.program === "language_exchange" && !active(a).length && a.status !== "cancelled");
+  const todo = all.filter(({ a }) => a.status === "applied").length;
+  const card = (n, l, sub, go) => `<button class="card gxnum" data-go="${go}"><b>${n}</b><span>${l}</span><small class="mut">${sub}</small></button>`;
+  const prow = (p) => { const xs = all.filter(({ a }) => a.program === p); return `<tr data-p="${p}"><td><b>${PROG[p]}</b></td><td><b>${xs.length}</b></td>${Object.keys(APP_ST).map((st) => `<td>${xs.filter(({ a }) => a.status === st).length || `<span class="mut">0</span>`}</td>`).join("")}</tr>`; };
+  const list = all.filter(({ a }) => (!GX.fp || a.program === GX.fp) && (!GX.fs || a.status === GX.fs));
+  const today = new Date().toLocaleDateString("sv-SE"), evs = GX.events.filter((e) => e.is_active && (!e.event_date || e.event_date >= today)).sort((x, y) => (x.event_date || "9").localeCompare(y.event_date || "9"));
+  body().innerHTML = `<div class="gxnums">
+      ${card(ms.length, "외국인 회원", `이번 달 +${ms.filter((m) => day(m.created_at).startsWith(ym)).length}`, "fm")}
+      ${card(ks.length, "한국인 회원", `매칭 기다림 ${free().filter(inBr).length}`, "kr")}
+      ${card(all.length, "신청", `처리 안 됨 ${todo}`, "list")}
+      ${card(nowMatch, "진행 중 매칭", `매칭 기다리는 외국인 ${waiting.length}`, "wait")}
+    </div>
+    <div class="gxdash">
+      <section class="card"><h3>📋 프로그램별 신청 <small class="mut">줄을 누르면 아래 목록이 그 프로그램만</small></h3>
+        <table class="gxt"><thead><tr><th>프로그램</th><th>전체</th>${Object.values(APP_ST).map((l) => `<th>${l}</th>`).join("")}</tr></thead><tbody>${Object.keys(PROG).map(prow).join("")}</tbody></table></section>
+      <section class="card" id="gxWait"><h3>🤝 매칭 기다리는 외국인 <small class="mut">1:1 언어교환 신청 · 1순위 추천</small></h3>
+        ${waiting.map(({ a, m }) => { const r = recommend(m, a)[0]; return `<div class="gxmrow"><span><a href="#" data-m="${m.id}"><b>${esc(m.name)}</b></a> <small class="mut">${esc(BR[m.branch] || "")} · ${day(a.created_at)} · ${((a.data || {}).available_days || []).join("/")} ${((a.data || {}).available_times || []).join("/")}</small><br>
+          ${r ? `<small>추천 → <b>${esc(r.k.name)}</b> <span class="gxtag ${r.s >= 4 ? "confirmed" : ""}">${r.s}점</span> <span class="mut">${esc(r.why.join(" · "))}</span></small>` : `<small class="mut">비어 있는 한국인 회원이 없어요</small>`}</span>
+          ${r ? `<button class="btn d-match" data-a="${a.id}" data-k="${r.k.id}">매칭</button>` : ""}<button class="btn ghost" data-m="${m.id}">추천 더 보기</button></div>`; }).join("") || `<div class="mut">기다리는 사람 없어요</div>`}</section>
+      <section class="card gxwide"><h3>📝 신청 목록 <select id="gxFp"><option value="">모든 프로그램</option>${opts(PROG, GX.fp)}</select><select id="gxFs"><option value="">모든 상태</option>${opts(APP_ST, GX.fs)}</select> <small class="mut">${list.length}건 · 이름을 누르면 회원 상세(상태·메모 저장)</small></h3>
+        <div class="gxscroll"><table class="gxt"><thead><tr><th>신청일</th><th>이름</th><th>지점</th><th>프로그램</th><th>상태</th><th>내용</th></tr></thead><tbody>
+        ${list.slice(0, 200).map(({ a, m }) => `<tr data-m="${m.id}"><td>${day(a.created_at)}</td><td><b>${esc(m.name)}</b><br><small class="mut">${esc(m.phone)}</small></td><td>${esc(BR[m.branch] || "")}</td><td>${PROG[a.program]}${a.gx_events ? ": " + esc(a.gx_events.title) : ""}</td><td>${appTag(a)}${active(a).map((x) => `<br><small>↔ ${esc(x.gx_koreans?.name)}</small>`).join("")}</td>
+          <td><small class="mut">${esc(answers(a, " · ").slice(0, 140))}</small></td></tr>`).join("") || `<tr><td colspan="6" class="mut">신청 없음 — [🔗 신청 링크·QR] 의 링크·QR 을 외국인에게 보내면 여기에 쌓여요</td></tr>`}
+        </tbody></table></div></section>
+      <section class="card"><h3>🎉 다가오는 이벤트 <small class="mut">공개 중 · 전 지점</small></h3>
+        ${evs.map((e) => { const xs = evApps(e); return `<div class="gxev"><b>${esc(e.title)}</b> <small class="mut">${esc(e.event_date ?? "날짜 미정")} ${esc(e.event_time ?? "")} · ${esc(e.location)}</small> <span class="gxtag">${xs.length}명</span>
+          <div>${xs.map(({ a, m }) => `<a href="#" data-m="${m.id}">${esc(m.name)}</a>${appTag(a)}`).join(" ") || `<small class="mut">아직 신청 없음</small>`}</div></div>`; }).join("") || `<div class="mut">공개 중인 이벤트 없음 — [🎉 이벤트] 에서 추가</div>`}</section>
+      <section class="card"><h3>📍 어디서 뭘 보나요</h3><ul class="gxhelp">
+        <li><b>📊 현황</b> — 숫자·신청 목록·매칭 대기·이벤트 한눈에 (지금 화면)</li>
+        <li><b>🌍 외국인</b> — 외국인 회원 전체 정보 · 신청별 상태·메모 · <b>매칭 추천 5명</b>·매칭 끝내기 · 지우기</li>
+        <li><b>🇰🇷 한국인</b> — 한국인 언어교환 회원 · 멤버십(VVIP+·VVIP·Basic·Lite) · 지금 누구랑 매칭됐는지</li>
+        <li><b>🎉 이벤트</b> — 이벤트 만들기 · [공개] 켜면 외국인 신청폼에 보임 · 이벤트별 신청자</li>
+        <li><b>🔗 신청 링크·QR</b> — 외국인·한국인에게 보낼 링크 (지점 미리 골라진 것 포함)</li>
+        <li><b>⬇️ CSV</b> — 외국인 + 신청 엑셀로 내려받기 · 위 지점 고르기가 모든 화면에 적용</li></ul></section>
+    </div>`;
+  const B = body();
+  B.querySelectorAll(".gxnum").forEach((b) => (b.onclick = () => { const g = b.dataset.go; if (g === "list") B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); else if (g === "wait") B.querySelector("#gxWait").scrollIntoView({ behavior: "smooth" }); else { GX.sub = g; render(); } }));
+  B.querySelectorAll("tr[data-p]").forEach((tr) => (tr.onclick = () => { GX.fp = GX.fp === tr.dataset.p ? "" : tr.dataset.p; renderDash(); B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); }));
+  B.querySelector("#gxFp").onchange = (e) => { GX.fp = e.target.value; renderDash(); };
+  B.querySelector("#gxFs").onchange = (e) => { GX.fs = e.target.value; renderDash(); };
+  B.querySelectorAll("[data-m]").forEach((el) => (el.onclick = (ev) => { ev.preventDefault(); openMember(el.dataset.m); }));
+  B.querySelectorAll(".d-match").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); const { a, m } = all.find((x) => x.a.id === b.dataset.a); match(a, m, GX.koreans.find((k) => k.id === b.dataset.k)); }));
+}
 const showPanel = () => { if (innerWidth < 1300) body().querySelector("#gxPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; // 한 줄 화면이면 밑의 상세로
 
 function renderMembers() {
@@ -131,7 +186,7 @@ function memberPanel() {
     <h3>신청 (${apps.length})</h3>
     ${apps.map((a) => `<div class="gxapp" data-id="${a.id}"><b>${PROG[a.program]}${a.gx_events ? " · " + esc(a.gx_events.title) : ""}</b> <small class="mut">${day(a.created_at)}</small>
       ${a.program === "language_exchange" ? matchBlock(m, a) : ""}
-      <pre>${esc(Object.entries(a.data || {}).filter(([, v]) => v && v.length).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("\n")) || "(자세한 내용 없음)"}</pre>
+      <pre>${esc(answers(a, "\n")) || "(자세한 내용 없음)"}</pre>
       <div class="gxctl"><select class="aSt">${opts(APP_ST, a.status)}</select><textarea class="aNote" placeholder="메모 (예: 김민수와 매칭)">${esc(a.admin_note)}</textarea><button class="btn ghost aSave">저장</button></div></div>`).join("") || `<div class="mut">신청 없음</div>`}
     ${jo() ? "" : `<button class="btn ghost gxdel" id="mDel">🗑 회원 지우기</button>`}</div>`;
   p.querySelector("#gxClose").onclick = () => { GX.sel = null; renderMembers(); };
@@ -185,8 +240,8 @@ function renderEvents() {
   body().innerHTML = `<form id="gxEv" class="card gxevf">
       <input name="title" placeholder="이벤트 이름 (영어로 — 외국인에게 보여요)" required maxlength="80"><input name="event_date" type="date"><input name="event_time" placeholder="시간 (예: 19:00)">
       <input name="location" placeholder="장소"><input name="fee" placeholder="참가비"><input name="description" placeholder="설명"><button class="btn">추가</button></form>
-    <div class="card"><table class="gxt"><thead><tr><th>이벤트</th><th>날짜</th><th>장소</th><th>참가비</th><th>신청</th><th>공개</th></tr></thead><tbody>
-    ${GX.events.map((e) => `<tr><td><b>${esc(e.title)}</b><br><small class="mut">${esc(e.description)}</small></td><td>${esc(e.event_date ?? "")} ${esc(e.event_time ?? "")}</td><td>${esc(e.location)}</td><td>${esc(e.fee)}</td><td>${e.gx_applications.length}</td>
+    <div class="card"><table class="gxt"><thead><tr><th>이벤트</th><th>날짜</th><th>장소</th><th>참가비</th><th>신청자</th><th>공개</th></tr></thead><tbody>
+    ${GX.events.map((e) => `<tr><td><b>${esc(e.title)}</b><br><small class="mut">${esc(e.description)}</small></td><td>${esc(e.event_date ?? "")} ${esc(e.event_time ?? "")}</td><td>${esc(e.location)}</td><td>${esc(e.fee)}</td><td>${evApps(e).map(({ a, m }) => `<a href="#" data-m="${m.id}">${esc(m.name)}</a>${appTag(a)}`).join(" ") || `<span class="mut">0</span>`}</td>
       <td><input type="checkbox" data-id="${e.id}" ${e.is_active ? "checked" : ""} title="켜면 외국인 신청폼에 보여요"></td></tr>`).join("") || `<tr><td colspan="6" class="mut">이벤트 없음</td></tr>`}
     </tbody></table></div>`;
   const f = body().querySelector("#gxEv");
@@ -194,6 +249,7 @@ function renderEvents() {
     ev.preventDefault(); const row = Object.fromEntries(new FormData(f)); if (!row.event_date) row.event_date = null;
     const { error } = await sb.from("gx_events").insert(row); if (!fail(error)) { toast("추가했어요"); GX.load(); }
   };
+  body().querySelectorAll("a[data-m]").forEach((el) => (el.onclick = (ev) => { ev.preventDefault(); openMember(el.dataset.m); }));
   body().querySelectorAll("[data-id]").forEach((cb) => (cb.onchange = async () => { const { error } = await sb.from("gx_events").update({ is_active: cb.checked }).eq("id", cb.dataset.id); fail(error); }));
 }
 
