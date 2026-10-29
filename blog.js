@@ -184,7 +184,12 @@ function renderNew() {
   const o = BL.opts, subs = P().subjects ?? [];
   const styles = [...PRESETS, ...BL.styles.map((s) => [`custom:${s.id}`, `⭐ ${s.name}${s.team_id ? "" : " (공용)"}`])];
   if (!styles.some(([k]) => k === o.preset)) o.preset = "auto"; // 기본값에 저장된 스타일이 이 지점에서 안 보이면
-  $b("#blBody").innerHTML = `<div class="blgrid"><div class="blform card">
+  $b("#blBody").innerHTML = `<section class="card blbench">
+    <div class="blbench-h"><h3>🔎 쓰기 전에 벤치마킹</h3><span class="mut">키워드 검색 추이와 네이버 블로그 상위 10개 글을 먼저 보고, 우리 글 각도를 정해요</span></div>
+    <div class="blbench-q"><input data-o="main_keyword" id="blBenchKw" value="${esc(o.main_keyword)}" placeholder="메인 키워드 예) 대구 영어회화" enterkeyhint="search"><button type="button" class="btn" id="blResBtn">📈 추이 · 상위 글 보기</button></div>
+    <div class="mut">아래 키워드 칩에서 서브로 고른 것(최대 4개)도 그래프에 같이 그려요. 여기 키워드가 글의 메인 키워드가 돼요.</div>
+    <div id="blRes"></div></section>
+  <div class="blgrid"><div class="blform card">
     <div class="blseg" id="blMode"><button type="button" data-mode="photo">📷 사진 보고 쓰기</button><button type="button" data-mode="topic">📝 주제 주고 쓰기</button></div>
     <div class="bldrop" id="blDrop">📷 사진을 끌어다 놓거나 눌러서 고르세요<br><small>올린 순서대로 번호가 붙어요 · 끌어서 순서 바꾸기</small></div>
     <div class="blthumbs" id="blThumbs"></div>
@@ -203,7 +208,6 @@ function renderNew() {
     <label>메인 키워드 <small>(비우면 AI가 골라요 · 칩 한 번=서브, 두 번=메인)</small></label><input data-o="main_keyword" value="${esc(o.main_keyword)}" style="width:100%" placeholder="예) 동성로 영어회화">
     <div class="blchips" id="blChips"></div>
     <button type="button" class="btn ghost small" id="blKwBtn" style="margin-top:8px">🔍 네이버 검색량 보기</button><div id="blKw"></div>
-    <button type="button" class="btn ghost small" id="blResBtn" style="margin-top:8px">📈 검색 추이 · 상위 글 보기</button><div id="blRes"></div>
     <button type="button" class="btn blgo" id="blGo">✨ 시안 만들기</button><div class="mut" id="blGoNote" style="margin-top:6px"></div>
   </div><div id="blOut"></div></div>`;
   $b("#blTopic").value = o.topic;
@@ -239,6 +243,7 @@ function renderThumbs() {
   $b("#blFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="blFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서만 처리돼요</small>` : "";
 }
 function renderChips() {
+  V().querySelectorAll("[data-o=main_keyword]").forEach((i) => { if (i !== document.activeElement) i.value = BL.opts.main_keyword; }); // 벤치마킹 칸·폼 칸 같은 값
   const el = $b("#blChips"); if (!el) return;
   const o = BL.opts, re = SUBJ_RE[o.subject];
   const all = [...new Set([...(P().mainKeywords ?? []), ...BL.extraKw, ...(P().subKeywords ?? [])])].filter((k) => !re || re.test(k) || /언어교환/.test(k));
@@ -501,30 +506,33 @@ async function research() {
   if (!kws.length) return toast("메인 키워드를 넣거나 칩을 골라 주세요");
   const btn = $b("#blResBtn"); btn.disabled = true; btn.textContent = "📈 조회 중…";
   const r = await call("research", { keywords: kws });
-  btn.disabled = false; btn.textContent = "📈 검색 추이 · 상위 글 보기";
+  btn.disabled = false; btn.textContent = "📈 추이 · 상위 글 보기";
   if (!r) return;
   BL.res = r; renderRes();
 }
 const LINE = ["var(--accent)", "#e0a020", "#3aa676", "#d0607a", "#4a8fd8"];
 function trendSvg(trend) {
-  const W = 320, H = 110, n = trend[0]?.data.length ?? 0; if (n < 2) return "";
-  const x = (i) => 8 + (i * (W - 16)) / (n - 1), y = (v) => H - 18 - (v / 100) * (H - 28);
-  const lines = trend.map((t, k) => `<polyline fill="none" stroke="${LINE[k]}" stroke-width="${k ? 1.6 : 2.6}" points="${t.data.map((d, i) => `${x(i).toFixed(1)},${y(d.ratio).toFixed(1)}`).join(" ")}"/>`).join("");
-  const labels = trend[0].data.map((d, i) => i % 2 === n % 2 ? "" : `<text x="${x(i).toFixed(1)}" y="${H - 4}" text-anchor="middle">${+d.month.slice(5)}월</text>`).join("");
-  return `<svg class="bltrend" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 12개월 검색 추이">${lines}${labels}</svg>`;
+  const W = 480, H = 200, n = trend[0]?.data.length ?? 0; if (n < 2) return "";
+  const x = (i) => 16 + (i * (W - 32)) / (n - 1), y = (v) => H - 26 - (v / 100) * (H - 40);
+  const grid = [0, 50, 100].map((v) => `<line x1="16" x2="${W - 16}" y1="${y(v)}" y2="${y(v)}" class="g"/>`).join("");
+  const lines = trend.map((t, k) => `<polyline fill="none" stroke="${LINE[k]}" stroke-width="${k ? 2 : 3.5}" stroke-linejoin="round" points="${t.data.map((d, i) => `${x(i).toFixed(1)},${y(d.ratio).toFixed(1)}`).join(" ")}"/>`).join("");
+  const dots = trend[0].data.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.ratio).toFixed(1)}" r="3.5" fill="${LINE[0]}"/>`).join("");
+  const labels = trend[0].data.map((d, i) => `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${+d.month.slice(5)}월</text>`).join("");
+  return `<svg class="bltrend" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 12개월 검색 추이">${grid}${lines}${dots}${labels}</svg>`;
 }
 function renderRes() {
   const el = $b("#blRes"), r = BL.res; if (!el || !r) return;
   const t0 = r.trend[0], d = t0?.data ?? [], peak = d.reduce((a, b) => (b.ratio > a.ratio ? b : a), d[0] ?? { ratio: 0 }), last = d[d.length - 1];
-  const note = t0 && peak?.ratio ? `<b>${esc(t0.keyword)}</b> 가장 많이 찾은 달은 ${+peak.month.slice(5)}월 · 이번 달은 그때의 ${Math.round((last.ratio / peak.ratio) * 100)}% (이번 달은 진행 중)` : "검색 추이 데이터가 없어요 (검색이 너무 적은 키워드)";
+  const note = t0 && peak?.ratio ? `<b>${esc(t0.keyword)}</b> 가장 많이 찾은 달은 <b>${+peak.month.slice(5)}월</b> · 이번 달은 그때의 <b>${Math.round((last.ratio / peak.ratio) * 100)}%</b> (이번 달은 진행 중)` : "검색 추이 데이터가 없어요 (검색이 너무 적은 키워드)";
   el.innerHTML = `<div class="blres">
-    <div class="mut" style="margin-top:8px">최근 12개월 네이버 검색 추이 — 숫자가 아니라 넣은 키워드 중 최고치를 100으로 본 비교값이에요</div>
-    ${trendSvg(r.trend)}
-    <div class="bllegend">${r.trend.map((t, k) => `<span><i style="background:${LINE[k]}"></i>${esc(t.keyword)}</span>`).join("")}</div>
-    <div class="mut">${note}</div>
-    <div style="margin-top:10px"><b>🏆 '${esc(t0?.keyword ?? "")}' 네이버 블로그 상위 ${r.top.items.length}개</b> <span class="mut">· 전체 ${r.top.total.toLocaleString()}개 글</span></div>
-    <ol class="bltop">${r.top.items.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a><div class="mut">${esc(x.blogger)} · ${esc(x.date.replace(/(\d{4})(\d\d)(\d\d)/, "$1.$2.$3"))}</div></li>`).join("") || `<li class="mut">글이 없어요</li>`}</ol>
-    <div class="mut">✨ 시안 만들 때 메인 키워드의 상위 글 제목을 AI가 함께 보고, 겹치지 않는 각도로 써요.</div></div>`;
+    <div class="blres-chart"><h4>📈 최근 12개월 검색 추이</h4>
+      ${trendSvg(r.trend)}
+      <div class="bllegend">${r.trend.map((t, k) => `<span><i style="background:${LINE[k]}"></i>${esc(t.keyword)}</span>`).join("")}</div>
+      <p>${note}</p>
+      <div class="mut">숫자가 아니라 넣은 키워드 중 최고치를 100으로 본 비교값이에요.</div></div>
+    <div class="blres-top"><h4>🏆 '${esc(t0?.keyword ?? "")}' 네이버 블로그 상위 ${r.top.items.length}개 <span class="mut">· 전체 ${r.top.total.toLocaleString()}개 글</span></h4>
+      <ol class="bltop">${r.top.items.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a><div class="mut">${esc(x.blogger)} · ${esc(x.date.replace(/(\d{4})(\d\d)(\d\d)/, "$1.$2.$3"))}</div>${x.desc ? `<div class="desc">${esc(x.desc)}</div>` : ""}</li>`).join("") || `<li class="mut">글이 없어요</li>`}</ol>
+      <div class="mut">제목을 누르면 새 탭으로 열려요. ✨ 시안 만들 때 이 상위 글 제목도 AI가 함께 보고, 겹치지 않는 각도로 써요.</div></div></div>`;
 }
 
 // ── 다른 채널 변환 ──
@@ -614,6 +622,7 @@ function wire() {
     if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
     if (t.id === "blFbSend") return sendFb();
   });
+  v.addEventListener("keydown", (ev) => { if (ev.target.id === "blBenchKw" && ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); research(); } });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset, X = BL.post;
     if (d.o) { BL.opts[d.o] = t.value; if (d.o === "main_keyword") renderChips(); presetWhy(); return; }
