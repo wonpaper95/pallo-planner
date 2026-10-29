@@ -108,7 +108,8 @@ function renderThumbs() {
   const n = PS.photos.length, unchecked = PS.photos.filter((p) => !p.faced).length;
   $p("#psFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="psFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서 처리한 뒤 올려요</small>` : "";
   const ln = langNow();
-  $p("#psLang").innerHTML = n ? `<span class="mut">언어 꾸미기</span><span class="blseg">${[...Object.entries(PHOTO.LANGS).map(([k, v]) => [k, v[0]]), ["none", "없음"]].map(([k, t]) => `<button type="button" data-lang="${k}" class="${k === ln ? "on" : ""}">${t}</button>`).join("")}</span><small class="mut">${PS.photos.some((p) => p.deco === "manual") ? " · [편집]으로 고친 사진은 그대로" : ""}</small>` : "";
+  $p("#psLang").innerHTML = n ? `<span class="mut">🤖 AI 꾸미기 · 글자 언어</span><span class="blseg">${[...Object.entries(PHOTO.LANGS).map(([k, v]) => [k, v.name]), ["none", "꾸미기 없음"]].map(([k, t]) => `<button type="button" data-lang="${k}" class="${k === ln ? "on" : ""}" ${PS.decoBusy ? "disabled" : ""}>${t}</button>`).join("")}</span>
+    ${ln !== "none" ? `<button type="button" class="btn ghost small" data-redeco="1" ${PS.decoBusy ? "disabled" : ""}>🔄 다시 꾸미기</button>` : ""}<small class="mut">${PS.decoBusy ? " 🤖 AI가 사진 꾸미는 중…" : PS.photos.some((p) => p.deco === "manual") ? " · [편집]으로 고친 사진은 그대로" : " · 부족한 건 사진 [편집]에서 고쳐요"}</small>` : "";
   $p("#psRatio").innerHTML = n ? `<span class="mut">한 번에 자르기</span><span class="blseg">${[["4:5", "4:5 세로 (인스타 추천)"], ["1:1", "1:1"], ["orig", "원본"]].map(([r, t]) => `<button type="button" data-ratio="${r}">${t}</button>`).join("")}</span>` : "";
 }
 async function addFiles(files) {
@@ -116,8 +117,26 @@ async function addFiles(files) {
   if (room <= 0) return toast("사진은 10장까지예요");
   if (files.length > room) toast(`10장까지라 ${files.length - room}장은 뺐어요`);
   const got = await PHOTO.fromFiles(files.slice(0, room));
-  PS.lang = langNow(); await PHOTO.applyLang(got, PS.lang); // 언어 꾸미기 자동 (처음 정한 언어로 고정 — 버튼과 사진이 늘 같게)
+  got.forEach((p) => (p.raw = p.ai)); // 꾸미기 전 사본 → AI 는 늘 원본을 보고 고름
+  PS.lang = langNow(); // 처음 정한 언어로 고정 — 버튼과 사진이 늘 같게
   PS.photos.push(...got);
+  renderThumbs(); photosChanged();
+  autoDeco(got);
+}
+// 🤖 AI 자동 꾸미기 (신고 #3): 사진을 보고 필터·테두리·밝기·글자(고른 언어)·이모지를 사진마다 골라 바로 구움 → 매니저는 [편집]에서 부족한 것만.
+// [편집]으로 고친 사진은 안 건드림. AI 가 안 되면 언어별 기본 세트로. 하루 생성 제한에는 안 셈
+async function autoDeco(list) {
+  list = list.filter((p) => p.deco !== "manual"); if (!list.length) return;
+  const lang = PS.lang ?? langNow(), team = PS.team;
+  if (lang === "none") { await PHOTO.applyDeco(list, list.map(() => null)); renderThumbs(); return photosChanged(); }
+  PS.decoBusy = (PS.decoBusy ?? 0) + 1; renderThumbs();
+  const r = await call("deco", { photos: list.map((p) => ({ data: p.raw ?? p.ai, media_type: "image/jpeg", note: p.note })), lang, topic: PS.topic });
+  PS.decoBusy--;
+  if (team !== PS.team || lang !== (PS.lang ?? langNow())) return renderThumbs(); // 그 사이 지점·언어 바꿈 → 새로 부른 쪽이 꾸밈
+  list = list.filter((p) => PS.photos.includes(p));
+  const specs = r?.result?.photos;
+  if (Array.isArray(specs) && specs.length >= list.length) { await PHOTO.applyDeco(list, specs.slice(0, list.length)); toast("🤖 AI가 사진을 꾸몄어요 · 부족한 건 [편집]에서 고쳐 주세요"); }
+  else { await PHOTO.applyLang(list, lang); if (r) toast("AI 꾸미기 결과가 이상해서 기본 꾸미기로 했어요 · [🔄 다시 꾸미기]"); }
   renderThumbs(); photosChanged();
 }
 function photosChanged() { if (PS.post) { renderOut(); saveSoon(); } }
@@ -401,12 +420,8 @@ function wire() {
       if (p) PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); } });
       return;
     }
-    if (d.lang) {
-      PS.lang = d.lang; V().querySelectorAll("[data-lang]").forEach((b) => { b.disabled = true; });
-      await PHOTO.applyLang(PS.photos, d.lang); renderThumbs();
-      toast(d.lang === "none" ? "언어 꾸미기를 뺐어요" : `${PHOTO.LANGS[d.lang][0]} 꾸미기로 바꿨어요 · 사진마다 고치려면 [편집]`);
-      return photosChanged();
-    }
+    if (d.lang) { PS.lang = d.lang; return autoDeco(PS.photos); }
+    if (d.redeco) return autoDeco(PS.photos);
     if (d.mv) { const i = +d.i, j = i + +d.mv; if (j < 0 || j >= PS.photos.length) return; [PS.photos[i], PS.photos[j]] = [PS.photos[j], PS.photos[i]]; renderThumbs(); return photosChanged(); }
     if (d.ratio) {
       V().querySelectorAll("[data-ratio]").forEach((b) => { b.disabled = true; });

@@ -4,10 +4,11 @@
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import {
-  COMMON, CONCEPTS, CONVERT_SCHEMA, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
+  COMMON, CONCEPTS, CONVERT_SCHEMA, DECO_SCHEMA, DECO_SYSTEM, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
 } from "./prompt.ts";
 
 const MODEL = "claude-opus-5-5";
+const DECO_MODEL = "claude-sonnet-5-5"; // 사진 꾸미기는 가볍게 (하루 제한에 안 셈)
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6, cacheRead: 0.2 / 1e6, cacheWrite: 5 / 1e6 }; // USD / token
 const AI_KINDS = ["write", "convert", "style", "sns"]; // 하루 제한에 세는 것 (블로그·게시물 합산)
 const CORS = {
@@ -37,6 +38,7 @@ Deno.serve(async (req) => {
       case "write": return json(await write(who, team, body));
       case "convert": return json(await convert(who, team, body));
       case "sns": return json(await sns(who, team, body));
+      case "deco": return json(await deco(who, team, body));
       case "style": return json(await style(who, team, body));
       case "keywords": return json(await keywords(who, team, body));
       case "research": return json(await research(who, team, body));
@@ -104,9 +106,9 @@ async function record(who: Who, team: number, kind: string, u?: Anthropic.Beta.B
 }
 
 // ── Claude 호출 (구조화 출력 + 거절 시 서버 측 대체 모델) ──
-async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high") {
+async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high", model = MODEL) {
   const msg = await anthropic().beta.messages.stream({
-    model: MODEL,
+    model,
     max_tokens: 32000,
     betas: ["server-side-fallback-2026-07-01"],
     // @ts-ignore 최신 SDK 타입에 없을 수 있음: 거절 카테고리에 맞춰 대체 모델로 다시 돌림
@@ -207,6 +209,21 @@ async function sns(who: Who, team: Team, b: { photos?: Photo[]; topic?: string; 
   });
   const { out, usage } = await ask(sys(SNS_SYSTEM), content, SNS_SCHEMA, "low");
   return { result: out, quota: await record(who, team.id, "sns", usage) };
+}
+
+// ── deco: 게시물 사진 AI 자동 꾸미기 (사진마다 한 줄, 같은 순서). 하루 생성 제한에 안 세고 비용만 기록(kind=deco) ──
+const DECO_LANG: Record<string, string> = { en: "영어", ja: "일본어", zh: "중국어(간체)", es: "스페인어" };
+async function deco(who: Who, team: Team, b: { photos?: Photo[]; lang?: string; topic?: string }) {
+  const photos = (b.photos ?? []).slice(0, 10);
+  if (!photos.length) throw new HttpError(400, "사진이 없어요");
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [{ type: "text", text: [`지점: ${team.name}`, `글자 언어: ${DECO_LANG[b.lang ?? ""] ?? "영어"}`, b.topic ? `게시물 주제: ${String(b.topic).slice(0, 300)}` : "", `사진 ${photos.length}장 — photos 배열도 같은 순서·같은 개수로`].filter(Boolean).join("\n") }];
+  photos.forEach((ph, i) => {
+    content.push({ type: "text", text: `사진 ${i + 1}${ph.note ? ` (매니저 메모: ${ph.note})` : ""}` });
+    content.push({ type: "image", source: { type: "base64", media_type: ph.media_type as "image/jpeg", data: ph.data } });
+  });
+  const { out, usage } = await ask(sys(DECO_SYSTEM), content, DECO_SCHEMA, "low", DECO_MODEL);
+  await record(who, team.id, "deco", usage);
+  return { result: out };
 }
 
 // ── style: 블로그 URL → 스타일 프리셋 저장 ──

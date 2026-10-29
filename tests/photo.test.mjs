@@ -17,17 +17,27 @@ test("toneData: 0~255 밖으로 안 나감", () => assert.deepEqual(px("vivid", 
 test("FILTERS: 필터마다 값이 있다", () => Object.keys(PH.FILTERS).filter((k) => k !== "none").forEach((k) => assert.notDeepEqual(px(k, [120, 90, 60]), [120, 90, 60], k)));
 // 🌏 언어 꾸미기 세트 (게시물 탭)
 const Q = (W, H, ratio, items = []) => ({ img: { naturalWidth: W, naturalHeight: H }, edits: { ratio, ox: 0.5, oy: 0.5, filter: "none", frame: "none", items } });
-test("langEdits: 언어마다 테두리·필터·이모지·글자, 둘 다 자르기 칸 안", () => {
+test("preset: 언어마다 테두리·필터·이모지·글자, 둘 다 자르기 칸 안", () => {
   for (const [k, L] of Object.entries(PH.LANGS)) {
-    const p = Q(4000, 3000, "4:5"), c = PH.cropRect(p); PH.langEdits(p, k);
-    assert.equal(p.edits.frame, L[1]); assert.equal(p.edits.filter, L[2]);
-    assert.deepEqual(p.edits.items.map((it) => it.t), [L[3], L[4]], k);
+    const p = Q(4000, 3000, "4:5"), c = PH.cropRect(p); PH.decoEdits(p, PH.preset(k));
+    assert.equal(p.edits.frame, L.frame); assert.equal(p.edits.filter, L.filter);
+    assert.deepEqual(p.edits.items.map((it) => it.t), [L.emoji, L.text], k);
     for (const it of p.edits.items) assert.ok(it.x > c.x && it.x < c.x + c.w && it.y > c.y && it.y < c.y + c.h, `${k} ${it.t} 칸 밖`);
   }
 });
-test("langEdits: 언어 바꾸면 자동 글자만 바뀌고 직접 넣은 글자는 남음, none = 다 뺌", () => {
+test("decoEdits: AI 한 벌 — 위 글자·왼쪽 아래 이모지, 밝기는 ±40 안, 모르는 값은 기본", () => {
+  const p = Q(3000, 3000, "1:1"); PH.decoEdits(p, { filter: "x", frame: "zzz", bright: 99, contrast: -7, text: "Let's talk!", text_pos: "top", text_color: "#123456", band: true, emoji: "🔥", emoji_pos: "bottom-left" });
+  assert.equal(p.edits.filter, "none"); assert.equal(p.edits.frame, "none"); assert.equal(p.edits.bright, 40); assert.equal(p.edits.contrast, -7);
+  const [em, tx] = p.edits.items;
+  assert.ok(em.x < 1500 && em.y > 1500, "이모지 왼쪽 아래"); assert.ok(tx.y < 1500 && tx.color === "#ffffff" && tx.band, "글자 위·흰색");
+});
+test("decoEdits: 글자 없으면 이모지만, 폴라로이드는 아래 띠에 퍼플", () => {
+  const p = Q(3000, 3000, "1:1"); PH.decoEdits(p, { ...PH.preset("ja"), text: "" }); assert.deepEqual(p.edits.items.map((it) => it.k), ["emoji"]);
+  PH.decoEdits(p, { ...PH.preset("es"), text_pos: "top" }); const tx = p.edits.items.find((it) => it.k === "text"); assert.ok(tx.y > 2600 && tx.color === "#493087" && !tx.band);
+});
+test("decoEdits: 다시 꾸미면 자동 글자만 바뀌고 직접 넣은 글자는 남음, null = 다 뺌", () => {
   const p = Q(3000, 3000, "1:1", [{ k: "text", t: "내 글자", x: 1, y: 1, size: 5 }]);
-  PH.langEdits(p, "en"); PH.langEdits(p, "ja");
+  PH.decoEdits(p, PH.preset("en")); PH.decoEdits(p, PH.preset("ja"));
   assert.deepEqual(p.edits.items.map((it) => it.t), ["내 글자", "🌸", "日本語"]);
-  PH.langEdits(p, "none"); assert.deepEqual(p.edits.items.map((it) => it.t), ["내 글자"]); assert.equal(p.edits.frame, "none");
+  PH.decoEdits(p, null); assert.deepEqual(p.edits.items.map((it) => it.t), ["내 글자"]); assert.equal(p.edits.frame, "none");
 });

@@ -147,20 +147,32 @@ async function bake(p) {
   p.url = URL.createObjectURL(p.blob);
   p.ai = draw(p, 1024).cv.toDataURL("image/jpeg", 0.8).split(",")[1];
 }
-async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; if (LANGS[p.deco]) langEdits(p, p.deco); await bake(p); } } // 언어 꾸미기 글자는 새 자르기 칸에 다시 놓음
+async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; if (p.deco && p.deco !== "manual") decoEdits(p, p.deco === "none" ? null : p.deco); await bake(p); } } // 자동 꾸미기 글자는 새 자르기 칸에 다시 놓음
 
-// ── 언어별 꾸미기 세트 (게시물 탭, 신고 #3): [이름, 테두리, 필터, 이모지, 글자]. 사진 올리면 자동, [편집]에서 고친 사진(deco=manual)은 안 건드림 ──
-const LANGS = { en: ["영어", "purple", "vivid", "💬", "English Talk"], ja: ["일본어", "white", "warm", "🌸", "日本語"], zh: ["중국어", "yellow", "vivid", "🏮", "中文"], es: ["스페인어", "polaroid", "warm", "☀️", "Español"] };
-function langEdits(p, lang) {
-  const e = p.edits, L = LANGS[lang];
+// ── 자동 꾸미기 (게시물 탭, 신고 #3): AI(blog-write deco)가 사진마다 고른 한 벌 → 그대로 굽고, 매니저가 [편집]에서 고침(deco=manual 은 다시 안 건드림) ──
+// 한 벌 = { filter, frame, bright, contrast, text, text_pos, text_color, band, emoji, emoji_pos }. 언어 세트는 AI 가 안 될 때 대신 쓰는 기본값
+const LANGS = { en: { name: "영어", frame: "purple", filter: "vivid", emoji: "💬", text: "English Talk" }, ja: { name: "일본어", frame: "white", filter: "warm", emoji: "🌸", text: "日本語" },
+  zh: { name: "중국어", frame: "yellow", filter: "vivid", emoji: "🏮", text: "中文" }, es: { name: "스페인어", frame: "polaroid", filter: "warm", emoji: "☀️", text: "Español" } };
+const preset = (lang) => LANGS[lang] ? { bright: 0, contrast: 0, text_pos: "bottom", text_color: "#ffffff", band: true, emoji_pos: "top-right", ...LANGS[lang] } : null;
+const clamp40 = (v) => Math.max(-40, Math.min(40, Math.round(+v || 0)));
+function decoEdits(p, d) {
+  const e = p.edits;
   e.items = e.items.filter((it) => !it.auto);
-  if (!L) { e.frame = "none"; e.filter = "none"; return; }
-  e.frame = L[1]; e.filter = L[2];
-  const c = cropRect(p), long = Math.max(p.img.naturalWidth, p.img.naturalHeight), m = Math.min(c.w, c.h), pol = L[1] === "polaroid";
-  e.items.push({ k: "emoji", t: L[3], x: c.x + c.w - m * 0.13, y: c.y + m * 0.13, size: 9 * m / long, color: "#ffffff", band: false, auto: true },
-    { k: "text", t: L[4], x: c.x + c.w / 2, y: pol ? c.y + c.h - m * 0.08 : c.y + c.h - m * 0.11, size: 7 * m / long, color: pol ? "#493087" : "#ffffff", band: !pol, auto: true }); // 폴라로이드는 아래 흰 띠 안에 퍼플 글자
+  if (!d) { e.frame = "none"; e.filter = "none"; e.bright = 0; e.contrast = 0; return; }
+  e.frame = FRAMES[d.frame] ? d.frame : "none"; e.filter = FILTERS[d.filter] ? d.filter : "none"; e.bright = clamp40(d.bright); e.contrast = clamp40(d.contrast);
+  const c = cropRect(p), long = Math.max(p.img.naturalWidth, p.img.naturalHeight), m = Math.min(c.w, c.h), pol = e.frame === "polaroid";
+  if (d.emoji) {
+    const [v, h] = String(d.emoji_pos || "top-right").split("-");
+    e.items.push({ k: "emoji", t: d.emoji, x: h === "left" ? c.x + m * 0.13 : c.x + c.w - m * 0.13, y: v === "bottom" ? c.y + c.h - m * (pol ? 0.26 : 0.13) : c.y + m * 0.13, size: 9 * m / long, color: "#ffffff", band: false, auto: true });
+  }
+  const t = String(d.text ?? "").trim().slice(0, 30);
+  if (t) {
+    const pos = pol ? "bottom" : d.text_pos, y = pos === "top" ? c.y + m * 0.14 : pos === "center" ? c.y + c.h / 2 : c.y + c.h - m * (pol ? 0.08 : 0.12);
+    e.items.push({ k: "text", t, x: c.x + c.w / 2, y, size: (t.length > 12 ? 5.5 : 7) * m / long, color: pol ? "#493087" : COLORS[d.text_color] ? d.text_color : "#ffffff", band: pol ? false : !!d.band, auto: true }); // 폴라로이드는 아래 흰 띠 안에 퍼플 글자
+  }
 }
-async function applyLang(list, lang) { for (const p of list) { if (p.deco === "manual") continue; langEdits(p, lang); p.deco = lang; await bake(p); } }
+async function applyDeco(list, specs) { for (const [i, p] of list.entries()) { if (p.deco === "manual") continue; decoEdits(p, specs[i]); p.deco = specs[i] ?? "none"; await bake(p); } }
+const applyLang = (list, lang) => applyDeco(list, list.map(() => preset(lang)));
 
 // ── 얼굴 찾기: 전체 + 2·3·4·6·8칸 조각으로 확대해서 돌림 (작은·먼 얼굴용) → 겹치는 건 합침 → 헷갈리는 건 다시 확인 ──
 // 10-28 시험(공개 단체사진 6장): 예전(전체+2×2) 식당 6명 중 3명·단체 100명 중 0명 → 지금 5명·91명, 술병·잔 같은 헛것은 다시 확인으로 걸러냄.
@@ -359,5 +371,5 @@ async function share(list, prefix) {
   toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
-return { RATIOS, FILTERS, LANGS, applyLang, langEdits, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
+return { RATIOS, FILTERS, LANGS, preset, decoEdits, applyDeco, applyLang, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
 });
