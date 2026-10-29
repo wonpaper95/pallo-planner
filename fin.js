@@ -40,7 +40,7 @@ FN.load = async function () {
 };
 
 // ⚡ 실시간: 다른 사람·시트가 바꾸면 다시 읽기 — 칸에 적는 중이면 칸을 떠날 때
-let chan = null, dirty = false;
+let chan = null, dirty = false, composing = false, pendingRender = false;
 function listen() {
   if (chan) return;
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => { if (view !== "fn") return; if (V().contains(document.activeElement) && document.activeElement.matches("input")) dirty = true; else FN.load(); }, 400); };
@@ -80,9 +80,15 @@ function render() {
   const gate = jo() && FN.access?.status !== "open";
   V().querySelector("#fnQ")?.classList.toggle("hidden", gate);
   if (gate) { box.innerHTML = joGate(); return renderStatus(); }
-  const keepX = [...V().querySelectorAll(".fnscroll")].map((x) => x.scrollLeft);
+  // 다시 그려도 적던 자리 그대로: 표 스크롤(가로·세로) + 지금 적고 있는 칸(포커스·글자·커서) — 안 하면 몇 자 치다 표가 맨 위로 튐 (신고 세연)
+  const a = document.activeElement, cur = box.contains(a) && a.matches?.("[data-id][data-k]") ? { id: a.dataset.id, k: a.dataset.k, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
+  if (cur && composing) { pendingRender = true; return; } // 한글 조합 중엔 조합 끝나고 그림
+  const keep = [...V().querySelectorAll(".fnscroll")].map((x) => [x.scrollLeft, x.scrollTop]);
   box.innerHTML = summaryHtml() + (admin() ? accessHtml() : "") + saleHtml() + costHtml() + dailyHtml();
-  V().querySelectorAll(".fnscroll").forEach((x, i) => { if (keepX[i]) x.scrollLeft = keepX[i]; });
+  V().querySelectorAll(".fnscroll").forEach((x, i) => { if (keep[i]) [x.scrollLeft, x.scrollTop] = keep[i]; });
+  // pend = 다시 그리기 전에 적던 글자 → 칸 떠날 때 저장 (프로그램으로 넣은 값엔 change 가 안 와서)
+  const el = cur && box.querySelector(`[data-id="${cur.id}"][data-k="${cur.k}"]`);
+  if (el) { if (el.value !== cur.v) { el.value = cur.v; el.dataset.pend = 1; } el.focus({ preventScroll: true }); try { if (cur.s != null) el.setSelectionRange(cur.s, cur.e); } catch {} }
   renderStatus();
 }
 function renderStatus() {
@@ -283,6 +289,9 @@ document.addEventListener("change", (e) => {
   if (e.target.id === "fnTeam") { FN.team = +e.target.value; try { localStorage.setItem("fn-team", FN.team); } catch {} FN.shell = ""; return FN.load(); }
   if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") { e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; if (e.target.dataset.k === "결제수단") e.target.closest("tr")?.classList.toggle("fnstep", e.target.value === "스탭페이"); } }
 });
+document.addEventListener("focusout", (e) => { if (e.target.dataset?.pend && e.target.matches("#fnView input[data-id]")) { delete e.target.dataset.pend; saveCell(e.target); } });
+document.addEventListener("compositionstart", (e) => { if (e.target.matches?.("#fnView input")) composing = true; });
+document.addEventListener("compositionend", (e) => { if (!e.target.matches?.("#fnView input")) return; composing = false; if (pendingRender) { pendingRender = false; setTimeout(render); } });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("#fnView input[data-id]")) e.target.blur(); });
 document.addEventListener("focusout", (e) => { if (dirty && e.target.matches("#fnView input")) setTimeout(() => { if (dirty && !V().contains(document.activeElement)) { dirty = false; FN.load(); } }, 300); });
