@@ -373,7 +373,7 @@ async function send() {
 }
 // ── 📈 트렌드 (mka_items kind=trend: 맥북 ad-agent/trend.py 가 월요일마다 광고 라이브러리에서 모은 업종 밖 광고, 조교 빼고 모두 읽기) ──
 async function renderTrend() {
-  const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(50);
+  const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(200);
   if (fail(error)) return;
   const all = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
   const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key)), tt = all.filter((r) => r.data?.src === "tt" && /^tt:\d+$/.test(r.key));
