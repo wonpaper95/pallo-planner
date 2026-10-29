@@ -21,12 +21,13 @@ MK.load = async function () {
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
     ${admin ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
   if (MK.tab === "compet") return renderCompet(admin);
   if (MK.tab === "agent") return renderAgent(admin);
+  if (MK.tab === "trend") return renderTrend();
   if (!MK.team) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
   if (MK.tab === "upload") return renderUpload();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
@@ -295,6 +296,21 @@ async function send() {
   toast(`올렸어요${excluded ? ` (지점 모르는 ${excluded}줄 제외)` : ""}. Claude에게 \"메타 주간 분석 돌려줘\"라고 하면 리포트가 만들어져요.`);
   renderUpload();
 }
+// ── 📈 트렌드 (mka_items kind=trend: 맥북 ad-agent/trend.py 가 월요일마다 광고 라이브러리에서 모은 업종 밖 광고, 조교 빼고 모두 읽기) ──
+async function renderTrend() {
+  const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(50);
+  if (fail(error)) return;
+  const rows = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
+  const at = rows[0]?.data?.collected;
+  const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
+      <span class="mut">${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개로 돌림` : ""} · ${esc(d.media_type || "?")}${d.cta ? ` · ${esc(d.cta)}` : ""}${(d.keywords ?? []).length ? ` · 검색어 ${esc(d.keywords.join(", "))}` : ""}</span></div>
+      <div>${esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90))}</div></div></div>`; }).join("");
+  $m("#mkBody").innerHTML = `<div class="card"><b>📈 요즘 오래 도는 광고 — 업종 밖 (눌러서 광고 라이브러리 원문)</b>
+    <p class="mut">기준: 자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일 넘게 돌거나 광고 3개 이상으로 돌리는 것 · 광고주당 2개${at ? ` · 수집 ${esc(new Date(at).toLocaleString("ko-KR"))}` : ""}</p>
+    ${list || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
+    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`;
+}
+
 // ── 🤖 에이전트 (mka_items: 대표는 전부+승인·킬스위치, 매니저는 자기 지점 것만 읽기 — 서버 RLS 가 거름) ──
 // 맥북 에이전트(ad-agent/)가 DB 함수 mka_push 로 올린다(push_to_planner.py). 여기서는 보기 + 광고 제안 승인/반려 + 킬스위치만. 광고 설정 변경은 승인 번호를 받은 Claude가 한다.
 const AST = { proposed: "🟡 승인 대기", approved: "✅ 승인", rejected: "⚫ 반려" };

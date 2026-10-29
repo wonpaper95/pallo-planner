@@ -3,7 +3,8 @@ body:not(.mkv) #mkView { display: none; }
 #mkView { max-width: 1100px; margin: 0 auto; padding: 16px 20px 100px; }
 #mkView .mkbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
 #mkView .mkbar h2 { margin: 0 auto 0 0; }
-#mkView .mktabs { display: flex; gap: 4px; }
+#mkView .mktabs { display: flex; gap: 4px; max-width: 100%; overflow-x: auto; }
+#mkView .mktabs button { white-space: nowrap; flex: none; }
 #mkView .mktabs button { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; }
 #mkView .mktabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 #mkView select, #mkView input[type=file] { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; }
