@@ -258,11 +258,37 @@ test("flags: 광고 멈춤 — 가동 중이던 캠페인만, 일시중지는 �
   assert.deepEqual(D.flags(twoDays, END), []);
 });
 
+test("flags: 광고 멈춤 — 삭제·종료된 캠페인(DELETED·REMOVED·ENDED·종료·삭제)도 제외", () => {
+  const withStatus = (st) => days(END, 10, "naver_ad", "대구_영어", (i) => ({ impressions: i < 3 ? 0 : 50, status: i < 3 ? st : "ELIGIBLE" }));
+  for (const st of ["DELETED", "REMOVED", "ENDED", "종료됨", "삭제됨", "removed"]) assert.deepEqual(D.flags(withStatus(st), END), [], st);
+  assert.deepEqual(D.flags(withStatus("ELIGIBLE"), END).map((f) => f.code), ["ad_stopped"]); // 운영 중 상태면 그대로 뜬다
+  assert.deepEqual(D.flags(withStatus("운영 가능"), END).map((f) => f.code), ["ad_stopped"]);
+});
+
 test("flags: 승인/결제 문제는 화면에서 읽은 flags 배열", () => {
   const rows = [row(END, "google_ad", "전체", { flags: ["예비 결제 수단 없음"] }, "partial"), row(END, "google_ad", "울산_영어", { impressions: 10, flags: ["광고 비승인 1건"] })];
   const f = D.flags(rows, END);
   assert.deepEqual(f.map((x) => [x.code, x.level]), [["account_issue", "red"], ["account_issue", "red"]]);
   assert.match(f[1].msg, /울산_영어.*비승인/);
+});
+
+test("flags: [안내] 로 시작하는 계정 알림은 gray(account_notice), 막힌 일은 그대로 red", () => {
+  const rows = [
+    row(END, "google_ad", "대구_영어", { impressions: 10, status: "운영 가능", flags: ["[안내] [계정] 계정 보안 강화 작업 요청", "광고 비승인 1건", "[계정] 결제 거절", "[안내] 검토 중 광고 2건"] }),
+    row(END, "meta_ad", "전체", { flags: ["[안내] 예비 결제 수단 없음", "계정 정지"] }, "partial"),
+  ];
+  const f = D.flags(rows, END).filter((x) => x.code.startsWith("account_"));
+  assert.deepEqual(f.map((x) => [x.channel, x.level, x.code, x.msg]), [
+    ["google_ad", "gray", "account_notice", "구글 검색광고 '대구_영어' [안내] [계정] 계정 보안 강화 작업 요청"],
+    ["google_ad", "red", "account_issue", "구글 검색광고 '대구_영어' 광고 비승인 1건"],
+    ["google_ad", "red", "account_issue", "구글 검색광고 '대구_영어' [계정] 결제 거절"],
+    ["google_ad", "gray", "account_notice", "구글 검색광고 '대구_영어' [안내] 검토 중 광고 2건"],
+    ["meta_ad", "gray", "account_notice", "메타 광고 [안내] 예비 결제 수단 없음"],
+    ["meta_ad", "red", "account_issue", "메타 광고 계정 정지"],
+  ]);
+  // [안내] 가 맨 앞이 아니면(문장 중간) 안내가 아니다 — 막힌 일을 가려서는 안 된다
+  const mid = D.flags([row(END, "google_ad", "x", { impressions: 1, flags: ["광고 비승인 [안내] 아님"] })], END);
+  assert.deepEqual(mid.map((x) => [x.level, x.code]), [["red", "account_issue"]]);
 });
 
 test("flags: 비용 급증인데 문의 안 늘면", () => {

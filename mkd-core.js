@@ -145,16 +145,19 @@ function flags(rows, end) {
   const out = [], push = (level, code, channel, unit, msg) => out.push({ level, code, channel, unit, msg });
   const L = (c) => CHANNEL_LABEL[c], pct = (x) => Math.round(x * 100);
   const chRows = (c) => rows.filter((r) => r.channel === c);
-  // 1 광고 멈춤: 직전 7일(3~9일 전) 안에 노출이 있던 캠페인이 노출 0 으로 3일 연속. 화면 상태가 일시중지면 의도된 것이라 뺀다.
+  // 1 광고 멈춤: 직전 7일(3~9일 전) 안에 노출이 있던 캠페인이 노출 0 으로 3일 연속. 화면 상태가 일시중지·삭제·종료면 의도된 것이라 뺀다.
   for (const c of AD_CHANNELS) for (const u of unitsOf(chRows(c))) {
     const ur = chRows(c).filter((r) => r.unit === u), at = (d) => ur.find((r) => r.date === d);
-    if (/일시\s*중지|paused|중지됨/i.test(String(at(end)?.metrics?.status ?? ""))) continue;
+    if (/일시\s*중지|paused|중지됨|DELETED|REMOVED|ENDED|종료|삭제/i.test(String(at(end)?.metrics?.status ?? ""))) continue;
     const last3 = [0, 1, 2].map((i) => num(at(addDays(end, -i))?.metrics?.impressions));
     const ranBefore = [3, 4, 5, 6, 7, 8, 9].some((i) => num(at(addDays(end, -i))?.metrics?.impressions) > 0);
     if (last3.every((v) => v === 0) && ranBefore) push("red", "ad_stopped", c, u, `${L(c)} '${u}' 노출 0이 3일째예요`);
   }
-  // 2 승인/결제 문제: 구글·메타 화면에서 읽은 경고 문구(metrics.flags)
-  for (const c of ["google_ad", "meta_ad"]) for (const r of chRows(c).filter((r) => r.date === end)) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) push("red", "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
+  // 2 승인/결제 문제: 구글·메타 화면에서 읽은 경고 문구(metrics.flags). 막힌 일만 red — '[안내]' 로 시작하는 것(보안 강화 요청 등 알림)은 gray.
+  for (const c of ["google_ad", "meta_ad"]) for (const r of chRows(c).filter((r) => r.date === end)) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) {
+    const notice = /^\s*\[안내\]/.test(String(f));
+    push(notice ? "gray" : "red", notice ? "account_notice" : "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
+  }
   // 3 비용 급증: 채널 3일 비용 ▲30%↑ 인데 전체 문의 3일은 ▼ 또는 0. 문의 판단은 쓸 수 있는 전산 날이 3일 중 2일 이상일 때만 — 0건도 감소도 1일 값으로는 안 본다. 전산 결측·실패는 0건이 아니다.
   const inq3 = summary(rows, end)[0].cells.find((c) => c.key === "d3");
   for (const c of AD_CHANNELS) {
