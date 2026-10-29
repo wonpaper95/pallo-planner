@@ -21,7 +21,7 @@ MK.load = async function () {
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
     ${admin ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ...(admin ? [["upload", "데이터 올리기"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    <div class="mktabs">${[["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
@@ -36,7 +36,7 @@ MK.load = async function () {
 async function renderReport(kind) {
   const { data: list, error } = await sb.from("mk_reports").select("week, data, updated_at").eq("team_id", MK.team).eq("kind", kind).order("week", { ascending: false }).limit(12);
   if (fail(error)) return;
-  if (!list?.length) { $m("#mkBody").innerHTML = `<div class="card">아직 ${kind === "weekly" ? "주간 리포트" : "페르소나"}가 없어요. 대표님이 데이터를 올리고 Claude에게 "메타 주간 분석 돌려줘"라고 하면 생겨요.</div>`; return; }
+  if (!list?.length) { $m("#mkBody").innerHTML = `<div class="card">아직 ${kind === "weekly" ? "주간 리포트" : "페르소나"}가 없어요. 매주 월요일 아침 자동으로 생겨요(급하면 Claude에게 "메타 주간 분석 돌려줘").</div>`; return; }
   const cur = list.find((r) => r.week === MK.week) ?? list[0]; MK.week = cur.week;
   const pick = `<select id="mkWeek">${list.map((r) => `<option value="${r.week}" ${r.week === cur.week ? "selected" : ""}>${esc(r.week)}${kind === "weekly" ? " 주" : " 월"}</option>`).join("")}</select>
     <span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span>`;
@@ -240,7 +240,9 @@ const usable = (p) => p.kind && !p.missing.length && p.currency !== "KRW";
 
 async function renderUpload() {
   const { data: ups } = await sb.from("mk_uploads").select("team_id, kind, filename, rows, date_from, date_to, created_at").order("created_at", { ascending: false }).limit(12);
-  $m("#mkBody").innerHTML = `<div class="card"><b>CSV 올리기</b>
+  $m("#mkBody").innerHTML = `<div class="card"><b>광고 데이터는 자동이에요</b>
+      <p class="mut">매주 월요일 아침 메타 API로 광고 일별·연령+성별 데이터를 자동으로 받아 와요. 아래 CSV 올리기는 필요할 때만 쓰세요.</p></div>
+    <div class="card"><b>CSV 올리기 (선택)</b>
       <p class="mut">광고관리자 CSV(광고 일별 · 연령+성별, <b>캠페인 이름 열 포함</b>)는 캠페인 이름으로 지점을 자동으로 나눠요. 게시물(인사이트) CSV는 위에서 고른 <b>${esc(teamName(MK.team))}</b>으로 올라가요. 같은 줄은 덮어써서 여러 번 올려도 안전해요.</p>
       <input type="file" id="mkFiles" accept=".csv,text/csv" multiple><div id="mkPrev"></div></div>
     <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(teamName(u.team_id))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${esc(u.rows)}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
@@ -325,6 +327,7 @@ async function renderAgent(admin) {
   const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agprop")}<div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${AST[r.status] ?? esc(r.status)}</span> <span class="mut">#${esc(r.key)}</span></div>
       <div><b>${esc(d.angle ?? "")}</b></div><div>${esc(d.hook ?? "")}</div><div class="mut">제목: ${esc(d.headline ?? "")}${d.replaces_ad_name ? ` · 교체 대상: ${esc(d.replaces_ad_name)}` : ""}</div>
       <div class="mut">${esc(d.experiment ?? "")}</div>
+      ${(d.trend_refs ?? []).length ? `<div class="mut">📈 참고한 트렌드 광고(업종 밖): ${d.trend_refs.map((t) => `${link(MKCCORE.libraryUrl(t.library_id), t.page_name || "광고")}${t.why ? ` — ${esc(t.why)}` : ""}`).join(" · ")}</div>` : ""}
       ${admin && r.status === "proposed" ? `<div class="mkbar"><button class="btn" data-ap="${esc(r.key)}" data-st="approved">승인</button><button class="btn" data-ap="${esc(r.key)}" data-st="rejected" style="background:var(--sub)">반려</button></div>` : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
 
   const compHtml = comp.length ? comp.map((a) => `<div class="cmp"><div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>

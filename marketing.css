@@ -44,7 +44,7 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .warnline { color: #7a4b00; }
 /* 🤖 에이전트 썸네일 */
 #mkView .agrow { display: flex; align-items: center; gap: 10px; }
-#mkView .agthumb { width: 48px; height: 60px; object-fit: cover; border-radius: 6px; background: var(--bg); flex: none; }
-#mkView .agprop { width: 120px; height: 150px; object-fit: cover; border-radius: 8px; background: var(--bg); flex: none; }
+#mkView .agthumb { width: 120px; height: auto; border-radius: 8px; background: var(--bg); flex: none; } /* 잘리지 않게 원본 비율 그대로 */
+#mkView .agprop { width: 220px; height: auto; border-radius: 10px; background: var(--bg); flex: none; }
 #mkView .agimg-no { display: inline-block; }
-@media (max-width: 640px) { #mkView .agprop { width: 84px; height: 105px; } }
+@media (max-width: 640px) { #mkView .agthumb { width: 80px; } #mkView .agprop { width: 130px; } }
