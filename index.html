@@ -613,7 +613,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
       <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
           <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
         <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
-      <details id="simbox" class="hidden" open><summary>🧠 다음날 시뮬레이션 <small class="tbsub">타임박스</small> <select id="simTeamSel" class="hidden" onclick="event.stopPropagation()"></select> <button id="simDay" class="rtnav" type="button" title="눌러서 오늘 / 내일 바꿔 보기"></button> <button id="simRec" class="rtnav" type="button" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button> <small id="simWho"></small></summary>
+      <details id="simbox" class="hidden" open><summary>🧠 다음날 시뮬레이션 <small class="tbsub">타임박스</small> <select id="simTeamSel" class="hidden" onclick="event.stopPropagation()"></select> <button id="simPrev" class="rtnav" type="button" title="하루 전">‹</button><button id="simDay" class="rtnav" type="button" title="눌러서 오늘로"></button><button id="simNext" class="rtnav" type="button" title="하루 뒤 (2주까지 미리)">›</button> <button id="simRec" class="rtnav" type="button" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button> <small id="simWho"></small></summary>
         <div id="simTB"></div></details>
       <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
         <textarea id="asgText" rows="2" placeholder="예) 김예원 매니저님 금요일 6시까지 환불 리스트 정리해 주세요"></textarea>
@@ -1000,7 +1000,7 @@ function simChannel(tid, onText, key = "tb") {
   simChs.set(topic, ent); return ent.ch;
 }
 let simP = null; // 대표: 고른 지점 · 매니저·미리보기: 우리 지점(null = 서버가 앎)
-let simOff = 0, simPicked = false; // 0 = 오늘 · 1 = 내일 (날짜 버튼으로 바꿈). 안 골랐으면 내일 적은 게 있으면 내일 — 현황 카드와 같은 규칙
+let simOff = 0, simPicked = false; // 0 = 오늘 · 1 = 내일 · … 14 (‹ › 로 2주 뒤까지 미리 — 10-29 준석 요청: 토요일 미리 시뮬레이션). 안 골랐으면 내일 적은 게 있으면 내일 — 현황 카드와 같은 규칙
 const simFilled = (n) => n && ((n.body ?? "").trim() || (n.plan?.p ?? []).some((x) => x?.trim()) || Object.values(n.plan?.t ?? {}).some((x) => x?.trim()));
 async function loadSim() {
   const box = $("#simbox"), admin = myRole === "admin";
@@ -1014,7 +1014,7 @@ async function loadSim() {
   $("#simTeamSel").classList.toggle("hidden", !admin);
   if (!simPicked) simOff = simFilled((await sb.rpc("team_note_get", { p_day: W.add(today(), 1), p_team: simP })).data?.[0]) ? 1 : 0;
   const day = W.add(today(), simOff);
-  $("#simDay").textContent = `📅 ${md(day)}(${simOff ? "내일" : "오늘"})`;
+  $("#simDay").textContent = `📅 ${simDayLabel(day, simOff)}`; $("#simPrev").disabled = simOff <= 0; $("#simNext").disabled = simOff >= SIM_MAX;
   const { data, error } = await sb.rpc("team_note_get", { p_day: day, p_team: simP }); const n = data?.[0];
   if (error || !n?.enabled) return box.classList.add("hidden");
   box.classList.remove("hidden");
@@ -1026,10 +1026,15 @@ async function loadSim() {
   $("#simWho").textContent = n.at ? `${n.who ?? ""} ${pad(new Date(n.at).getHours())}:${pad(new Date(n.at).getMinutes())} 저장` : "아직 없음";
 }
 $("#simRec").onclick = (e) => { e.preventDefault(); TB.history(simP ?? null); }; // 📜 지난 날들
-$("#simDay").onclick = (e) => { e.preventDefault(); simOff = simOff ? 0 : 1; simPicked = true; loadSim(); };
+const SIM_MAX = 14, simDiff = (day) => Math.round((W.parse(day) - W.parse(today())) / 864e5); // 오늘에서 며칠 뒤
+const simDayLabel = (day, off) => `${md(day)}(${"일월화수목금토"[W.parse(day).getDay()]}) · ${["오늘", "내일", "모레"][off] ?? `${off}일 뒤`}`;
+const simGo = (e, off) => { e.preventDefault(); e.stopPropagation(); simOff = Math.max(0, Math.min(SIM_MAX, off)); simPicked = true; loadSim(); };
+$("#simDay").onclick = (e) => simGo(e, simOff === 0 ? 1 : 0); // 오늘 ↔ 내일 (멀리 가 있으면 오늘로)
+$("#simPrev").onclick = (e) => simGo(e, simOff - 1);
+$("#simNext").onclick = (e) => simGo(e, simOff + 1);
 // 🧠 남이 다른 날(오늘↔내일) 칸에 적기 시작하면 그 날로 따라감 (내가 적는 중이면 안 바꿈)
 window.simOnOtherDay = (tid, day, root) => {
-  const off = day === today() ? 0 : 1;
+  const off = simDiff(day); if (off < 0 || off > SIM_MAX) return;
   if (root.closest("#simTB")) { if (simOff !== off) { simOff = off; simPicked = true; loadSim(); } }
   else if (root.closest("#boardView") && boardSimDay[tid] !== off) { boardSimDay[tid] = off; loadBoard(); }
 }; // summary 안 버튼: 접히지 않게
@@ -1261,10 +1266,10 @@ $("#updSend").onclick = async () => {
 
 // ── 📊 지점 현황판 (대표): 4개 지점 오늘 고정업무·넘어온 일·팀 업무·배정한 일을 실시간으로 ──
 let boardT, boardWeek = false, boardMon = null; // 📊 현황: 오늘 카드 / 주간 표
-const boardSimDay = {}; // 🧠 현황 카드 시뮬레이션: 지점별 0 오늘 · 1 내일 (안 고르면 내일 적은 게 있으면 내일)
+const boardSimDay = {}; // 🧠 현황 카드 시뮬레이션: 지점별 며칠 뒤(0 오늘 · 1 내일 · … 14, ‹ ›) (안 고르면 내일 적은 게 있으면 내일)
 try { boardWeek = localStorage.getItem("board-week") === "1"; } catch {}
 $("#boardView").addEventListener("click", async (e) => {
-  const sbd = e.target.closest("[data-simbday]"); if (sbd) { e.preventDefault(); const id = +sbd.dataset.simbday; boardSimDay[id] = sbd.textContent.includes("내일") ? 0 : 1; return loadBoard(); } // 🧠 오늘/내일
+  const sbd = e.target.closest("[data-simbday]"); if (sbd) { e.preventDefault(); const id = +sbd.dataset.simbday, cur = +sbd.dataset.cur || 0; boardSimDay[id] = Math.max(0, Math.min(SIM_MAX, sbd.dataset.step ? cur + +sbd.dataset.step : cur === 0 ? 1 : 0)); return loadBoard(); } // 🧠 오늘/내일
   const sr = e.target.closest("[data-simrec]"); if (sr) { e.preventDefault(); return TB.history(+sr.dataset.simrec, sr.dataset.simrecname); } // 📜 지점 시뮬레이션 기록
   const jb = e.target.closest("[data-jo]"); // 🧑‍🎓 조교 링크 새로 만들기 (예전 링크는 바로 막힘)
   if (jb) return joLinkDlg(+jb.dataset.jo, jb.dataset.joname);
@@ -1286,11 +1291,11 @@ async function loadBoard() {
     sb.from("tasks").select("id, user_id, title, done").eq("assigned_by", me.id).eq("day", day).order("id"),
     sb.from("routine_items").select("*").order("sort").order("id")]);
   if (fail(t.error || p.error || k.error || a.error || r.error)) return;
-  const nday = W.add(day, 1), nrows = (await sb.from("team_notes").select("team_id, day, body, plan, updated_at").in("day", [day, nday])).data ?? [];
+  const nday = W.add(day, 1), nrows = (await sb.from("team_notes").select("team_id, day, body, plan, updated_at").gte("day", day).lte("day", W.add(day, SIM_MAX))).data ?? [];
   const noteOk = (x) => x && (x.body || Object.values(x.plan?.t ?? {}).some((v) => v?.trim()) || (x.plan?.p ?? []).some(Boolean));
   const notes = new Map(t.data.map((tm) => { // 🧠 시뮬레이션: 고른 날(오늘/내일) — 안 골랐으면 내일 적은 게 있으면 내일
-    const td = nrows.find((x) => x.team_id === tm.id && x.day === day), tm2 = nrows.find((x) => x.team_id === tm.id && x.day === nday);
-    const pick = boardSimDay[tm.id] ?? (noteOk(tm2) ? 1 : 0); return [tm.id, { ...(pick ? tm2 : td), sday: pick ? nday : day, soff: pick }];
+    const tm2 = nrows.find((x) => x.team_id === tm.id && x.day === nday);
+    const pick = boardSimDay[tm.id] ?? (noteOk(tm2) ? 1 : 0), sday = W.add(day, pick); return [tm.id, { ...nrows.find((x) => x.team_id === tm.id && x.day === sday), sday, soff: pick }];
   }));
   const items = r.data, name = (id) => items.find((i) => i.id === id);
   const mode = `<span class="bmode"><button data-bmode="today" class="${boardWeek ? "" : "on"}">오늘</button><button data-bmode="week" class="${boardWeek ? "on" : ""}">이번 주</button></span>`;
@@ -1325,7 +1330,7 @@ async function loadBoard() {
       ${photos.length ? `<div class="bphotos">📷 인증샷 ${photos.map((ck) => `<a href="${esc(ck.link)}" target="_blank" rel="noopener" title="${esc(name(ck.item_id)?.title ?? "")} · ${esc(ck.done_name ?? "")} ${hhmm(ck.done_at)}"><img src="${esc(ck.link)}" alt=""></a>`).join("")}</div>` : ""}
       ${left.length ? `<h5>📌 남은 고정업무 ${left.length}</h5><ul>${left.map((it) => `<li class="no">${esc(it.title)}${it.need_link ? " 🔗" : ""}${it.need_photo ? " 📷" : ""}</li>`).join("")}</ul>` : ""}
       ${tm.sim_note ? (() => { const nt = notes.get(tm.id), has = noteOk(nt);
-        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 <button type="button" class="rtnav" data-simbday="${tm.id}" title="눌러서 오늘 / 내일 바꿔 보기">📅 ${md(nt.sday)}(${nt.soff ? "내일" : "오늘"})</button> ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"} <button type="button" class="rtnav" data-simrec="${tm.id}" data-simrecname="${esc(tm.name)}" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button></summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id, nt.sday)}</details>`; })() : ""}
+        return `<details class="bsim" data-simteam="${tm.id}" ${has ? "open" : ""}><summary>🧠 다음날 시뮬레이션 <button type="button" class="rtnav" data-simbday="${tm.id}" data-cur="${nt.soff}" data-step="-1" title="하루 전" ${nt.soff <= 0 ? "disabled" : ""}>‹</button><button type="button" class="rtnav" data-simbday="${tm.id}" data-cur="${nt.soff}" title="눌러서 오늘 / 내일">📅 ${simDayLabel(nt.sday, nt.soff)}</button><button type="button" class="rtnav" data-simbday="${tm.id}" data-cur="${nt.soff}" data-step="1" title="하루 뒤 (2주까지 미리)" ${nt.soff >= SIM_MAX ? "disabled" : ""}>›</button> ${has ? `<small>${hhmm(nt.updated_at)}</small>` : "<small>아직 없음</small>"} <button type="button" class="rtnav" data-simrec="${tm.id}" data-simrecname="${esc(tm.name)}" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button></summary>${TB.html({ body: nt?.body, plan: nt?.plan }, tm.id, nt.sday)}</details>`; })() : ""}
       ${carry.length ? `<h5>↪ 넘어온 일 ${carry.length}</h5><ul>${carry.map((x) => `<li class="carry">↪ ${md(x.from_day)} ${esc(name(x.item_id)?.title ?? "")}</li>`).join("")}</ul>` : ""}
       ${tt.length ? `<h5>👥 팀 업무 ${tt.filter((x) => x.done_by).length}/${tt.length}</h5><ul>${tt.map((x) => `<li class="${x.done_by ? "yes" : "no"}">${x.done_by ? `<span class="w">✓ ${esc(x.done_name ?? "")}</span>` : ""}${esc(x.title)}</li>`).join("")}</ul>` : ""}
       ${asg.length ? `<h5>📨 배정한 일 ${asg.filter((x) => x.done).length}/${asg.length}</h5><ul>${asg.map((x) => `<li class="${x.done ? "yes" : "no"}"><span class="w">${x.done ? "✓ " : ""}${esc(who(x.user_id))}</span>${esc(x.title)}</li>`).join("")}</ul>` : ""}
