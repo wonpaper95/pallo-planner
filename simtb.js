@@ -144,6 +144,7 @@ document.addEventListener("input", (e) => {
   const who = mine ? document.getElementById("mySimWho") : root.closest("details")?.querySelector("summary small:last-of-type");
   if (el.matches(".tbDump, .tbc")) fit(el);
   if (!mine) { const w = wOf(root), k = el.dataset.k; w[k] = el.tagName === "TEXTAREA" ? SIMMERGE.rechars(el.previousElementSibling?.textContent.replace(/\n$/, "") ?? "", el.value, w[k], myName) : myName; paint(root); } // 직전 글 = 뒤에 그려 둔 글 // ✍️ 내가 쓴 글자만 내 색, 원래 있던 문장은 그 색 그대로
+  else paint(root); // 🐞 내 타임박스(개인)도 글을 칠 때마다 뒤 글자(.tbbk)를 다시 그림 — 안 그리면 투명 칸이라 친 글이 안 보임(준석 신고 10-29)
   if (who) who.textContent = "적는 중…";
   root._dirty = true; // 저장 전엔 서버 글로 안 덮음 (TB.sync)
   if (!mine) { (root._chg ??= new Set()).add(el.dataset.k); (root._send ??= new Set()).add(el.dataset.k); } // 💾 바뀐 칸만 저장·전송
