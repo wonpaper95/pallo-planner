@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>팔로 인턴교육 과정</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
+<link rel="icon" href="icon-192.png">
+<!-- 📚 로그인 없이 여는 인턴교육 공유 링크(읽기 전용) — 내용은 edu-data.js (플래너 [인턴교육] 탭과 같음).
+     진행·제출·평가·확인 질문·주차 자료(DB)는 안 보여 준다. 대표가 탭에서 추가·숨긴 항목(edu_items)은 반영 안 됨. -->
+<script src="theme.js?v=202610291332"></script>
+<style>
+html, body { margin: 0; color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", sans-serif; -webkit-text-size-adjust: 100%; }
+#eduView summary { cursor: pointer; list-style: none; }
+#eduView summary::-webkit-details-marker { display: none; }
+#eduView summary::before { content: "▸ "; color: var(--sub); }
+#eduView details[open] > summary::before { content: "▾ "; }
+#eduView .eduweek[open] { border-color: var(--accent); }
+#eduView .eduitem > summary { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#eduView .eduitem[open] > summary { font-weight: 600; }
+</style>
+<link rel="stylesheet" href="glass.css?v=202610291332">
+<link rel="stylesheet" href="edu.css?v=202610291332">
+</head>
+<body class="eduv">
+<main id="eduView"></main>
+<script src="edu-data.js?v=202610291332"></script>
+<script>
+(() => {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const W = globalThis.EDU_WEEKS || [], I = globalThis.EDU_ITEMS || [];
+  const item = (i) => `<details class="eduitem">
+    <summary><span class="edutitle">${esc(i.title)}</span>${i.required ? `<span class="tag req">필수</span>` : ""}${i.report ? `<span class="tag rep">보고</span>` : ""}</summary>
+    <div class="edudetail">
+      ${i.goal ? `<div><b>목표</b><br>${esc(i.goal)}</div>` : ""}
+      ${i.steps?.length ? `<div><b>진행법</b><ol>${i.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></div>` : ""}
+      ${i.output ? `<div><b>산출물</b><br>${esc(i.output)}</div>` : ""}
+      ${i.criteria ? `<div class="educrit"><b>합격기준</b>
+        <div><span class="tag lv0">미달</span> ${esc(i.criteria.fail)}</div>
+        <div><span class="tag lv1">기본</span> ${esc(i.criteria.base)}</div>
+        <div><span class="tag lv2">우수</span> ${esc(i.criteria.good)}</div></div>` : ""}
+    </div>
+  </details>`;
+  const week = (w) => { const its = I.filter((i) => i.week === w.week); return `<details class="card eduweek">
+    <summary class="eduwk"><span class="grow"><b>${esc(w.label)}</b> <span class="mut">${esc(w.theme)}</span></span><span class="mut">${its.length}개</span></summary>
+    <ul class="edugoals">${w.goals.map((g) => `<li>${esc(g)}</li>`).join("")}</ul>
+    <div class="mut edureport">📋 보고: ${esc(w.report)}</div>
+    <div class="eduitems">${its.map(item).join("")}</div>
+  </details>`; };
+  document.getElementById("eduView").innerHTML = `<section class="card edutop">
+      <div class="eduwho">📚 팔로 인턴교육 과정</div>
+      <div class="mut">신입 매니저 12주(INTRO~12주차) · 항목 ${I.length}개 · 주차를 누르면 항목, 항목을 누르면 목표·진행법·합격기준이 보여요. 읽기 전용입니다.</div>
+    </section>` + W.map(week).join("");
+})();
+</script>
+</body>
+</html>

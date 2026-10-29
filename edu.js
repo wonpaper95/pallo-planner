@@ -115,7 +115,7 @@ function head(d) {
       <label class="mut edustart">시작일 <input type="date" id="eduStart" value="${start || ""}" ${d.admin ? "disabled" : ""}></label>
       ${dday === null ? "" : `<span class="mut">D+${dday} / 56일</span>`}
       <span class="grow"></span>
-      ${d.admin ? `<button class="btn ghost" id="eduRepBtn">🧾 평가서</button>` : ""}
+      ${d.admin ? `<button class="btn ghost" id="eduShareBtn" title="로그인 없이 과정 내용만 보는 링크 (진행·평가·자료는 안 보임)">🔗 공유 링크</button><button class="btn ghost" id="eduRepBtn">🧾 평가서</button>` : ""}
     </div>
     <div class="edubarline"><div style="width:${Math.round((done / all) * 100)}%"></div></div>
     <div class="mut">전체 ${done} / ${all} 항목 완료${d.admin ? " · 평가는 대표만 보여요" : " · 합격기준은 항목을 펼치면 볼 수 있어요"}</div>
@@ -423,6 +423,12 @@ function bind(d) {
     const { data, error } = await sb.storage.from("edu-submits").createSignedUrl(path, 600);
     if (fail(error)) return; window.open(data.signedUrl, "_blank", "noopener");
   }));
+
+  // 공유 링크 (대표) — edu-share.html = 과정 내용만, 로그인 없음
+  V0.querySelector("#eduShareBtn")?.addEventListener("click", async () => {
+    const url = new URL("edu-share.html", location.href.split("?")[0]).href;
+    try { await navigator.clipboard.writeText(url); toast("🔗 인턴교육 공유 링크를 복사했어요 — 카톡에 붙여 보내세요"); } catch { prompt("이 링크를 복사해 보내세요", url); }
+  });
 
   // 평가서
   V0.querySelector("#eduRepBtn")?.addEventListener("click", async () => {
