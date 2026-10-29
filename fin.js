@@ -15,7 +15,7 @@ const ymNow = () => today().slice(0, 7);
 const ymAdd = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const ymLabel = (m) => `${+m.slice(0, 4)}년 ${+m.slice(5, 7)}월`;
 const NUMK = new Set(["매출", "금액", "근무시간"]);
-const W_ = { 날짜: 92, 멤버쉽: 120, 매출: 100, 이름: 70, 언어: 56, 거래형태: 112, 결제수단: 88, 카드사: 68, 할부개월: 58, 결제상세: 140, 코멘트: 180, 가입경로: 70, Lv: 40, 전화번호: 110, 상담자: 60, 스포입력: 60, 성별: 40, 나이: 40, 사용처: 200, 금액: 110, 비고: 160, 근무시간: 70 };
+const W_ = { 날짜: 104, 멤버쉽: 120, 매출: 100, 이름: 70, 언어: 56, 거래형태: 112, 결제수단: 88, 카드사: 68, 할부개월: 58, 결제상세: 140, 코멘트: 180, 가입경로: 70, Lv: 40, 전화번호: 110, 상담자: 60, 스포입력: 60, 성별: 40, 나이: 40, 사용처: 200, 금액: 110, 비고: 160, 근무시간: 70 };
 const safeKey = (name) => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || ""); const ext = m ? "." + m[1].toLowerCase() : ""; const base = (name || "file").slice(0, 40).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""); return `${Date.now()}_${base || "file"}${ext}`; }; // Storage 키는 ASCII 만
 
 FN.load = async function () {
