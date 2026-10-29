@@ -376,12 +376,15 @@ async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(200);
   if (fail(error)) return;
   const all = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
-  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key)), tt = all.filter((r) => r.data?.src === "tt" && /^tt:\d+$/.test(r.key));
+  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key)), tt = all.filter((r) => r.data?.src === "tt" && /^tt:\d+$/.test(r.key)), ig = all.filter((r) => r.data?.src === "ig" && /^ig:[\w-]{5,40}$/.test(r.key));
   const at = rows[0]?.data?.collected, ytAt = yt[0]?.data?.collected;
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : "");
   // 쇼츠는 썸네일을 누르면 그 자리에서 재생(youtube-nocookie 임베드), 제목은 유튜브로 이동
   const ytList = yt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<button class="agplay" data-yt="${esc(r.key.slice(3))}" title="여기서 재생">${img(d.image, "agthumb")}<span>▶</span></button>` : ""}<div class="cmp-b"><div><a href="https://www.youtube.com/shorts/${esc(r.key.slice(3))}" target="_blank" rel="noopener">${esc(d.title || "(제목 없음)")}</a></div>
       <div class="mut">${esc(d.channel ?? "")} · 조회 ${n(d.views).toLocaleString("ko-KR")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · ${n(d.duration_s)}초 · ${esc(d.published ?? "")}</div></div></div>`; }).join("");
+  // 릴스: 장면을 누르면 인스타 공식 임베드로 그 자리 재생, 링크는 인스타로 이동
+  const igList = ig.map((r) => { const code = r.key.slice(3), d = r.data ?? {}; return `<div class="cmp"><button class="agplay" data-ig="${esc(code)}" title="여기서 재생">${MKACORE.safeImg(d.image) ? img(d.image, "agthumb") : `<span class="agthumb agig-no"></span>`}<span>▶</span></button><div class="cmp-b"><div><a href="https://www.instagram.com/reel/${esc(code)}/" target="_blank" rel="noopener">${esc(d.caption || "(캡션 없음)")}</a></div>
+      <div class="mut">${esc(d.tag ?? "")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · 댓글 ${n(d.comments).toLocaleString("ko-KR")} · ${esc(String(d.timestamp ?? "").replace("T", " "))}</div></div></div>`; }).join("");
   const ttUrl = (tag) => `https://www.tiktok.com/tag/${encodeURIComponent(String(tag ?? "").replace(/^#/, ""))}`;
   const ttList = tt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${img(d.image, "agthumb")}</a>` : ""}<div class="cmp-b"><div><b>${n(d.rank)}위</b> <a href="${esc(ttUrl(d.tag))}" target="_blank" rel="noopener">${esc(d.tag ?? "")}</a></div>
       <div class="mut">게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}</div></div></div>`; }).join("");
@@ -398,7 +401,15 @@ async function renderTrend() {
     <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요. 썸네일을 누르면 여기서 바로 재생돼요.</p></div>`
     + `<div class="card"><b>🎵 틱톡 인기 해시태그 — 한국</b>
     <p class="mut">틱톡 크리에이티브 센터 '최근 7일' 순위(틱톡 집계라 며칠 늦을 수 있어요) · 표지는 그 해시태그 인기 영상 · 누르면 틱톡 해시태그 페이지${tt[0]?.data?.collected ? ` · 수집 ${esc(new Date(tt[0].data.collected).toLocaleString("ko-KR"))}` : ""}</p>
-    ${ttList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`;
+    ${ttList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`
+    + `<div class="card"><b>📸 인스타 릴스 — 해시태그 최근 24시간 반응 좋은 것</b>
+    <p class="mut">#챌린지·#릴스·#밈·#갓생·#공부자극·#영어공부 최근 24시간 게시물 중 릴스를 좋아요+댓글순 · 해시태그당 4개${ig[0]?.data?.collected ? ` · 수집 ${esc(new Date(ig[0].data.collected).toLocaleString("ko-KR"))}` : ""}</p>
+    ${igList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
+    <p class="mut">인스타는 '인기순' 전체 목록을 공개하지 않아서, 해시태그 최근 24시간에서 반응이 빨리 붙는 릴스를 골라요. 장면을 누르면 여기서 재생돼요.</p></div>`;
+  V().querySelectorAll("[data-ig]").forEach((b) => b.addEventListener("click", () => {
+    if (!/^[\w-]{5,40}$/.test(b.dataset.ig)) return;
+    b.outerHTML = `<iframe class="agyt agig" src="https://www.instagram.com/reel/${b.dataset.ig}/embed/" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }));
   V().querySelectorAll("[data-yt]").forEach((b) => b.addEventListener("click", () => {
     if (!/^[\w-]{11}$/.test(b.dataset.yt)) return;
     b.outerHTML = `<iframe class="agyt" src="https://www.youtube-nocookie.com/embed/${b.dataset.yt}?autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
