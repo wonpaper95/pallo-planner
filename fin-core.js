@@ -28,16 +28,23 @@ function normDate(s, month) {
   if (y < 100) y += 2000;
   return m >= 1 && m <= 12 && d >= 1 && d <= 31 ? `${y}-${p2(m)}-${p2(d)}` : t;
 }
-// ⚠️ 덜 쓴 줄 (울산 마야 제안 10-29): 꼭 있어야 할 칸이 비면 그 칸 이름들
+// ⚠️ 덜 쓴·확인할 줄 (울산 마야 제안 10-29): 꼭 있어야 할 칸이 비었거나, 금액이 숫자가 아니거나, 환불인데 + 금액이면 [칸, 이유]
 const empty = (v) => String(v ?? "").trim() === "";
-function missing(r) {
+const REFUND = new Set(["환불", "시작전환불"]);
+const isRefund = (r) => r.kind === "sale" && REFUND.has(String(r.vals.거래형태 ?? "").trim());
+function problems(r) {
   const v = r.vals, need = r.kind === "sale" ? ["날짜", "멤버쉽", "매출", "이름", "거래형태", "결제수단", "상담자"] : ["사용처", "금액"];
   if (r.kind === "sale" && String(v.결제수단 ?? "").trim() === "카드") need.push("카드사", "할부개월");
   if (r.kind === "sale" && String(v.거래형태 ?? "").trim() === "가입") need.push("전화번호", "가입경로");
   if (r.kind === "cost" && ["본사지출", "지점기타지출"].includes(String(v.구분 ?? "").trim())) need.push("날짜");
-  return need.filter((k) => empty(v[k]));
+  const out = need.filter((k) => empty(v[k])).map((k) => [k, "비었어요"]), ak = r.kind === "sale" ? "매출" : "금액";
+  if (!empty(v[ak]) && toNum(v[ak]) === null) out.push([ak, "숫자만 적어요 (글자가 섞이면 합계에서 빠져요)"]); // 예: '228000(1/5)'
+  else if (isRefund(r) && toNum(v[ak]) > 0) out.push([ak, "환불은 − 금액으로 (합계는 −로 셌어요)"]);
+  return out;
 }
-const amt = (r) => toNum(r.vals[r.kind === "sale" ? "매출" : "금액"]) ?? 0;
+const missing = (r) => problems(r).map((x) => x[0]);
+// 금액: 환불·시작전환불인데 + 로 적었으면 − 로 셈 (+ 로 세면 순매출이 두 배로 틀림)
+const amt = (r) => { const a = toNum(r.vals[r.kind === "sale" ? "매출" : "금액"]) ?? 0; return isRefund(r) && a > 0 ? -a : a; };
 // 매출(+)·환불(−)·순매출·구분별 비용·결제수수료(순매출 × %)·수익
 function summary(rows, feePct) {
   const s = { plus: 0, minus: 0, net: 0, cost: 0, fee: 0, profit: 0, bySec: {} };
@@ -62,5 +69,5 @@ function daily(rows) {
   let acc = 0;
   return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => ({ ...x, profit: x.sale - x.cost, acc: (acc += x.sale - x.cost) }));
 }
-window.FNC = { OPTS, chip, missing, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily, amt };
+window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily, amt };
 })();

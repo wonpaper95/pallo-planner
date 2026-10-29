@@ -5,7 +5,7 @@
 (() => {
 const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, shell: "" });
 const V = () => document.getElementById("fnView");
-const { OPTS, chip, missing, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
+const { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
 const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 const canEdit = () => !jo();
@@ -40,12 +40,16 @@ FN.load = async function () {
 };
 
 // ⚡ 실시간: 다른 사람·시트가 바꾸면 다시 읽기 — 칸에 적는 중이면 칸을 떠날 때
-let chan = null, dirty = false, composing = false, pendingRender = false;
+// 지금 보는 지점만 받음(다른 지점 고친 것까지 받아 다시 그리던 것), 내용(vals)이 내 화면과 같은 줄 소식(내가 저장한 것·시트 맞춤 표시)은 건너뜀
+let chan = null, chanTeam = null, dirty = false, composing = false, pendingRender = false;
 function listen() {
-  if (chan) return;
+  if (chan && chanTeam === FN.team) return;
+  if (chan) sb.removeChannel(chan);
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => { if (view !== "fn") return; if (V().contains(document.activeElement) && document.activeElement.matches("input")) dirty = true; else FN.load(); }, 400); };
-  chan = sb.channel("fn");
-  for (const tb of ["fin_rows", "fin_config", "fin_access"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
+  const same = (p) => { const n = p.new, r = n?.id && FN.rows.find((x) => x.id === n.id); return p.eventType === "UPDATE" && r && !n.deleted_at && n.month === FN.month && sameVals(n.vals, r.vals); };
+  const sameVals = (a = {}, b = {}) => { const ka = Object.keys(a).filter((k) => a[k] !== ""), kb = Object.keys(b).filter((k) => b[k] !== ""); return ka.length === kb.length && ka.every((k) => String(a[k]) === String(b[k] ?? "")); }; // DB(jsonb)는 칸 순서가 달라서 칸별로 비교
+  chanTeam = FN.team; chan = sb.channel(`fn:${FN.team}`);
+  for (const tb of ["fin_rows", "fin_config", "fin_access"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb, filter: `team_id=eq.${FN.team}` }, (p) => { if (tb === "fin_rows" && same(p)) return; soon(); });
   chan.subscribe();
 }
 
@@ -126,11 +130,11 @@ function accessHtml() {
 }
 // 줄 표시: ⚠️ 덜 쓴 줄(주황 띠) + 💚 스탭페이 줄(연두 — 울산 시트에서 손으로 칠하던 색)
 const trOf = (r) => {
-  const m = missing(r), step = r.kind === "sale" && String(r.vals.결제수단 ?? "").trim() === "스탭페이";
+  const p = problems(r), m = p.map((x) => x[0]), step = r.kind === "sale" && String(r.vals.결제수단 ?? "").trim() === "스탭페이";
   const cls = [m.length && "fnmiss", step && "fnstep"].filter(Boolean).join(" ");
-  return [m, `<tr data-row="${r.id}" class="${cls}"${m.length ? ` title="⚠️ 덜 쓴 칸: ${esc(m.join(", "))}"` : ""}>`];
+  return [m, `<tr data-row="${r.id}" class="${cls}"${m.length ? ` title="⚠️ 확인할 칸: ${esc(p.map(([k, w]) => `${k}(${w})`).join(", "))}"` : ""}>`];
 };
-const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴 줄 <b>${n}</b>`}</button>`;
+const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄 + 금액이 숫자가 아니거나 환불인데 + 금액인 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴·확인할 줄 <b>${n}</b>`}</button>`;
 const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" data-id="${r.id}" title="${admin() ? "📎 첨부 보기·올리기" : "📎 올리기 (열람은 대표님만)"}">📎${r.files ? `<i>${r.files}</i>` : ""}</button></td>`;
 const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
 const shortDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v.slice(0, 4) === FN.month.slice(0, 4) ? v.slice(5).replace("-", "/") : v;
@@ -202,7 +206,7 @@ async function addRow(kind, sec) {
   (FN.lastSort ??= {})[kind] = sort;
   const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select("id, kind, vals, sort, files, updated_by, updated_at").single();
   if (fail(error)) return;
-  FN.rows.push(data); FN.q = ""; render();
+  FN.rows.push(data); FN.q = ""; const q = V().querySelector("#fnQ"); if (q) q.value = ""; render(); // 검색칸 글자도 지움 (검색만 풀리고 글자는 남던 것)
   V().querySelector(`input[data-id="${data.id}"][data-k="${kind === "sale" ? "멤버쉽" : "사용처"}"]`)?.focus();
   queueSync();
 }
@@ -294,6 +298,6 @@ document.addEventListener("focusout", (e) => { if (e.target.dataset?.pend && e.t
 document.addEventListener("compositionstart", (e) => { if (e.target.matches?.("#fnView input")) composing = true; });
 document.addEventListener("compositionend", (e) => { if (!e.target.matches?.("#fnView input")) return; composing = false; if (pendingRender) { pendingRender = false; setTimeout(render); } });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
-document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("#fnView input[data-id]")) e.target.blur(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.target.matches("#fnView input[data-id]")) e.target.blur(); }); // 한글 조합 중 Enter 는 글자 확정용 — 그때 나가면 마지막 글자가 사라지거나 두 번 들어감
 document.addEventListener("focusout", (e) => { if (dirty && e.target.matches("#fnView input")) setTimeout(() => { if (dirty && !V().contains(document.activeElement)) { dirty = false; FN.load(); } }, 300); });
 })();
