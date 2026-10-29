@@ -110,8 +110,9 @@ async function renderDaily(admin) {
   if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
   const rep = rp.data?.data;
   const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end), st = MKDCORE.status(rows, end);
-  // 마지막 수집일이 한국 시각 어제보다 오래됐으면 맥미니 수집이 멈춘 것 → 알려 준다
-  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10), behind = end < MKDCORE.addDays(today, -1), ago = Math.round((Date.parse(today) - Date.parse(end)) / 864e5);
+  // 맥미니는 매일 06:00 에 어제 숫자를 모은다. 한국 시각 07시부터는 마지막 수집일이 어제보다 오래됐으면 수집이 멈춘 것 → 알려 준다. 07시 전엔 수집이 아직 돌고 있을 수 있어 그저께까지는 정상으로 본다.
+  const kst = new Date(Date.now() + 9 * 3600e3), today = kst.toISOString().slice(0, 10), yest = MKDCORE.addDays(today, -1);
+  const behind = end < MKDCORE.addDays(today, kst.getUTCHours() < 7 ? -2 : -1), ago = Math.round((Date.parse(today) - Date.parse(end)) / 864e5);
   // 이상 징후는 선택한 지점 것만, 대표 "전체 합계" 는 전부(지점 이름표 붙여서). 리포트 JSON 은 스킬이 쓴 값이라 모양이 틀려도 죽지 않게 거른다
   const flags = (Array.isArray(rep?.flags) ? rep.flags : []).filter((f) => f && typeof f === "object").filter((f) => !team || Number(f.team_id) === team);
   const chips = MKDCORE.CHANNELS.map((c) => { const [i, t] = STCHIP[st[c]] ?? STCHIP.missing; return `<span class="mkchip st-${esc(st[c])}" title="${t}">${i} ${esc(MKDCORE.CHANNEL_LABEL[c])}</span>`; }).join("");
@@ -119,7 +120,7 @@ async function renderDaily(admin) {
   const repHtml = !rep ? `<div class="card"><span class="mut">${rp.error ? "코멘트·이상 징후를 못 읽었어요" : "이 날짜의 코멘트·이상 징후 리포트가 아직 없어요"}</span></div>`
     : (rep.comment ? `<div class="card"><b>오늘 한 줄</b><p style="white-space:pre-line">${esc(rep.comment)}</p></div>` : "")
       + (flags.length ? `<div class="card warn"><b>이상 징후 ${flags.length}건</b><ul>${flags.map((f) => `<li>${Object.hasOwn(FLAGICON, f.level) ? FLAGICON[f.level] : ""} ${!team && f.team ? `<span class="tag">${esc(f.team)}</span> ` : ""}${esc(f.msg)}</li>`).join("")}</ul></div>` : `<div class="card"><span class="mut">이상 징후 없음</span></div>`);
-  body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(${behind ? "마지막 수집일" : "어제까지"})</span></span><div class="mkchips">${chips}</div></div>`
+  body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(${end < yest ? "마지막 수집일" : "어제까지"})</span></span><div class="mkchips">${chips}</div></div>`
     + (behind ? `<div class="card warn">⚠️ 마지막 수집이 ${n(ago)}일 전(${esc(end)})이에요 — 맥미니 예약 작업을 확인해 주세요</div>` : "")
     + repHtml
     + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
