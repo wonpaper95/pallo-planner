@@ -172,19 +172,23 @@ function flags(rows, end) {
     if (cur === null) { if (last === prevR) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`); }
     else if (cur - prev >= 3) push("yellow", "rank_drop", "blog", u, `'${u}' ${prev}위 → ${cur}위`);
   }
-  // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (이번 주에 쓸 수 있는 전산 날이 4일 이상일 때만)
+  // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (이번 주에 쓸 수 있는 전산 날이 4일 이상일 때만).
+  //   그 채널 유입이 전산에서 이번 주 전에 문의 > 0 으로 잡힌 적 있는 채널만 본다 — 추적이 되던 채널이 끊긴 것만 이상. 이력이 없으면(지금 네이버: 전산에 nad_ 태그가 없음) 판단 안 함.
+  const thisWeekFrom = windowRange(end, 7).from;
   if (cell(jt, "inquiries", end, 7).days >= 4) for (const c of AD_CHANNELS) {
+    if (!chRows("jeonsan").some((r) => usable(r) && r.date < thisWeekFrom && channelOfSource(r.unit) === c && num(r.metrics?.inquiries) > 0)) continue;
     const ck = cell(totalRows(chRows(c)), "clicks", end, 7); if ((ck.value ?? 0) < 50) continue;
     const q = cell(chRows("jeonsan").filter((r) => channelOfSource(r.unit) === c), "inquiries", end, 7);
     if (!q.value) push("yellow", "clicks_no_inquiry", c, ALL, `${L(c)} 주간 클릭 ${ck.value}인데 전산 문의 0건 — 추적·폼 확인`);
   }
-  // 7 결측: 기준일·전날 모두 ok/partial 이 아닌 채널 (데이터가 한 번이라도 있던 채널만). 며칠째인지는 기준일부터 거꾸로 세어 최대 28일, 단 채널의 첫 행 날짜 전은 세지 않는다.
+  // 7 결측: 기준일·전날 모두 ok/partial 이 아닌 채널 (데이터가 한 번이라도 있던 채널만, 2일 이상일 때만). 며칠째인지는 기준일부터 거꾸로 세어 최대 28일, 단 채널의 첫 행 날짜 전은 세지 않는다.
   for (const c of CHANNELS) {
     if (!chRows(c).length) continue;
     const st = [status(rows, end)[c], status(rows, addDays(end, -1))[c]];
     if (!st.every((s) => s !== "ok" && s !== "partial")) continue;
     const first = chRows(c).map((r) => r.date).sort()[0], okDays = new Set(chRows(c).filter(usable).map((r) => r.date));
     let n = 0; while (n < 28 && addDays(end, -n) >= first && !okDays.has(addDays(end, -n))) n++;
+    if (n < 2) continue; // 1일째(채널의 첫 행이 오늘 실패/로그인 필요)는 아직 결측이 아니다
     push("gray", "missing", c, ALL, `${L(c)} ${st.includes("login_required") ? "로그인 필요" : "수집 안 됨"} ${n}일째`);
   }
   return out;

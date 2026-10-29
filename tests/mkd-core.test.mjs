@@ -10,6 +10,8 @@ const trow = (team, ...a) => ({ ...row(...a), team_id: team });
 // 날짜 end 부터 거꾸로 n 일, 날마다 같은 metrics
 const days = (end, n, channel, unit, metrics, status) => Array.from({ length: n }, (_, i) => row(D.addDays(end, -i), channel, unit, typeof metrics === "function" ? metrics(i) : metrics, status));
 const END = "2026-10-28";
+// 추적 이력: 그 유입경로(unit)가 전산에 이번 주 밖(10일 전)에 문의 1건으로 잡힌 적 있음 — '클릭-문의0' 은 이런 채널만 판단한다
+const trackedBefore = (unit) => row(D.addDays(END, -10), "jeonsan", unit, { inquiries: 1 });
 
 test("windowRange: 끝 날짜 포함 days 일과 직전 같은 길이", () => {
   assert.deepEqual(D.windowRange(END, 3), { from: "2026-10-26", to: END, pfrom: "2026-10-23", pto: "2026-10-25" });
@@ -295,7 +297,7 @@ test("flags: 순위 하락 3계단 또는 1페이지 이탈", () => {
 
 test("flags: 클릭 있는데 전산 문의 0", () => {
   const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });
-  const noSrc = [...days(END, 7, "jeonsan", "전체", { inquiries: 2 }), ...days(END, 7, "jeonsan", "meta", { inquiries: 2 })];
+  const noSrc = [...days(END, 7, "jeonsan", "전체", { inquiries: 2 }), ...days(END, 7, "jeonsan", "meta", { inquiries: 2 }), trackedBefore("gads_daegu_en_search")];
   assert.deepEqual(D.flags([...clicks, ...noSrc], END).map((f) => f.code), ["clicks_no_inquiry"]);
   const withSrc = [...noSrc, row(END, "jeonsan", "gads_daegu_en_search", { inquiries: 1 })];
   assert.deepEqual(D.flags([...clicks, ...withSrc], END), []);
@@ -376,7 +378,7 @@ test("flags: 메시지 띄어쓰기 (이/인데 앞에 공백 없음)", () => {
   const stopped = days(END, 10, "google_ad", "대구_영어", (i) => ({ impressions: i < 3 ? 0 : 50 }));
   assert.match(D.flags(stopped, END)[0].msg, /노출 0이 3일째예요/);
   const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });
-  const noSrc = days(END, 7, "jeonsan", "전체", { inquiries: 2 });
+  const noSrc = [...days(END, 7, "jeonsan", "전체", { inquiries: 2 }), trackedBefore("gads_daegu_en_search")];
   assert.match(D.flags([...clicks, ...noSrc], END)[0].msg, /주간 클릭 70인데/);
   const zero = days(END, 6, "jeonsan", "전체", { inquiries: 0 });
   assert.match(D.flags([...naverSpike, ...zero], END)[0].msg, /▲100%인데 문의는/);
@@ -395,8 +397,9 @@ test("flags: 클릭 있는데 문의 0 — 이번 주 쓸 수 있는 전산 날�
   const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 }); // 주간 클릭 70
   assert.ok(!codes([...clicks, row(END, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));           // 쓸 수 있는 전산 1일(0건)
   assert.ok(!codes([...clicks, ...days(END, 3, "jeonsan", "전체", { inquiries: 0 })]).includes("clicks_no_inquiry"));    // 3일(0건)
-  assert.deepEqual(codes([...clicks, ...days(END, 4, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 4일(0건)이면 판단
-  assert.deepEqual(codes([...clicks, ...days(END, 7, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 7일(0건)
+  const hist = trackedBefore("gads_daegu_en_search");
+  assert.deepEqual(codes([...clicks, hist, ...days(END, 4, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 4일(0건)이면 판단
+  assert.deepEqual(codes([...clicks, hist, ...days(END, 7, "jeonsan", "전체", { inquiries: 0 })]), ["clicks_no_inquiry"]);     // 7일(0건)
 });
 
 test("flags: 결측 연속 일수는 채널 첫 행부터만 센다 (3일치뿐이면 3일째, 28일째 아님)", () => {
@@ -404,4 +407,34 @@ test("flags: 결측 연속 일수는 채널 첫 행부터만 센다 (3일치뿐�
   const f = D.flags(login3, END);
   assert.deepEqual(f.map((x) => [x.code, x.channel]), [["missing", "daangn"]]);
   assert.match(f[0].msg, /로그인 필요 3일째/);
+});
+
+// ── 실데이터 점검 수정 (2026-10-29): 결측은 2일부터, 클릭-문의0 은 추적 이력 있는 채널만 ──
+test("flags: 결측 — 첫 행이 오늘 로그인 필요뿐이면 1일째라 안 띄운다, 어제도 그랬으면 2일째", () => {
+  assert.ok(!codes([row(END, "daangn", "전체", { note: "x" }, "login_required")]).includes("missing"));            // 채널 첫 행 = 오늘 → 1일째
+  assert.ok(!codes([row(END, "daangn", "전체", {}, "failed")]).includes("missing"));
+  const two = [row(D.addDays(END, -1), "daangn", "전체", { note: "x" }, "login_required"), row(END, "daangn", "전체", { note: "x" }, "login_required")];
+  const f = D.flags(two, END).filter((x) => x.code === "missing");
+  assert.equal(f.length, 1); assert.match(f[0].msg, /로그인 필요 2일째/);
+});
+
+test("flags: 클릭 있는데 문의 0 — 네이버: 전산에 nad_ 태그가 없으면(예약·카카오채널뿐) 판단 안 하고, 전에 잡힌 적 있으면 판단", () => {
+  const clicks = days(END, 7, "naver_ad", "a", { impressions: 100, clicks: 10 });                                     // 주간 클릭 70
+  const real = ["전체", "meta", "네이버 예약", "카카오채널"].flatMap((u) => days(END, 7, "jeonsan", u, { inquiries: 2 })); // 실제 전산 모양: nad_ 없음
+  assert.ok(!codes([...clicks, ...real]).includes("clicks_no_inquiry"));
+  // 10일 전 nad_ 문의가 있었는데 이번 주엔 없다 → 추적이 끊긴 것
+  assert.deepEqual(codes([...clicks, ...real, trackedBefore("nad_x")]), ["clicks_no_inquiry"]);
+  // 이번 주에 nad_ 문의가 있으면 정상
+  assert.ok(!codes([...clicks, ...real, trackedBefore("nad_x"), row(END, "jeonsan", "nad_x", { inquiries: 1 })]).includes("clicks_no_inquiry"));
+});
+
+test("flags: 클릭 있는데 문의 0 — 구글도 gads_ 이력이 있어야 판단, 다른 채널 이력은 안 센다", () => {
+  const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });
+  const base = days(END, 7, "jeonsan", "전체", { inquiries: 2 });
+  assert.ok(!codes([...clicks, ...base]).includes("clicks_no_inquiry"));                                   // 이력 없음
+  assert.ok(!codes([...clicks, ...base, trackedBefore("meta"), trackedBefore("nad_x")]).includes("clicks_no_inquiry")); // 다른 채널 이력
+  assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -10), "jeonsan", "gads_x", { inquiries: 0 })]).includes("clicks_no_inquiry")); // 문의 0 이력은 이력 아님
+  assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -10), "jeonsan", "gads_x", { inquiries: 1 }, "failed")]).includes("clicks_no_inquiry")); // 실패 행은 이력 아님
+  assert.ok(!codes([...clicks, ...base, row(D.addDays(END, -6), "jeonsan", "gads_x", { inquiries: 1 })]).includes("clicks_no_inquiry")); // 이번 주 안(이번 주 문의가 있는 경우)
+  assert.deepEqual(codes([...clicks, ...base, trackedBefore("gads_x")]), ["clicks_no_inquiry"]);           // 이력 있고 이번 주 없음 → 판단
 });
