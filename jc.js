@@ -1,10 +1,10 @@
 // ✅ [조교체크리스트] 탭 (옛 이름 조체) — claude.ai 아티팩트 '조교 체크리스트'를 플래너로 옮김. 지점 공용(매니저·조교 링크·대표), 다른 기기 실시간 (DB 0060_jc)
-// 평일오전·평일오후·주말 페이지마다: 할일 × 이번 주(월~일) 칸에 담당 조교 이름표 + 메모장 2개. 지점 공용: 조교 이름(색)·대타 명단·링크 모음
+// 평일오전·평일오후·주말 페이지마다: 할일 × 이번 주(월~일) 칸에 담당 조교 이름표 + 메모장 2개. 지점 공용: 조교 이름(색)·대타 명단·링크 모음·사진 모음(0067, 비공개 버킷 jc-photos)
 // index.html 의 sb·me·myRole·isBoss·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.JC
 (() => {
-const JC = (window.JC = { team: null, page: "am", names: [], tasks: [], cells: new Map(), memos: [], subs: [], links: [], shell: "", editSub: null });
+const JC = (window.JC = { team: null, page: "am", names: [], tasks: [], cells: new Map(), memos: [], subs: [], links: [], photos: [], shell: "", editSub: null });
 const V = () => document.getElementById("jcView");
-const PAGES = [["am", "평일오전"], ["pm", "평일오후"], ["we", "주말"], ["links", "링크 모음"]];
+const PAGES = [["am", "평일오전"], ["pm", "평일오후"], ["we", "주말"], ["links", "링크 모음"], ["photos", "사진 모음"]];
 const COLORS = ["#ffb3ba", "#ffdfba", "#ffffba", "#d9ffb3", "#baffc9", "#baffe0", "#baf4ff", "#bad7ff", "#c2baff", "#e0baff", "#ffbaf2", "#ffbad4"];
 const LANGS = ["일본어", "중국어"];
 const SLOTS = ["10:40~13:10", "10:40~16:10(휴게1시간)", "17:40~20:10", "18:40~22:10", "19:40~22:10"];
@@ -37,17 +37,19 @@ JC.load = async function () {
   else JC.team = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data ?? null; // 매니저·미리보기: 우리 지점 · 조교: 링크 지점
   if (!JC.team) { JC.shell = ""; V().innerHTML = `<div class="jcbar"><h2>✅ 조교체크리스트</h2></div><div class="jcpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = JC.team, mon = W.monday(today());
-  const [n, tk, me2, s, l] = await Promise.all([
+  const [n, tk, me2, s, l, ph] = await Promise.all([
     sb.from("jc_names").select("*").eq("team_id", t).order("sort").order("id"),
     sb.from("jc_tasks").select("*").eq("team_id", t).order("sort").order("id"),
     sb.from("jc_memos").select("*").eq("team_id", t).order("created_at", { ascending: false }).limit(900),
     sb.from("jc_subs").select("*").eq("team_id", t).order("created_at", { ascending: false }),
-    sb.from("jc_links").select("*").eq("team_id", t).order("sort").order("id")]);
-  if ([n, tk, me2, s, l].some((r) => fail(r.error))) return;
+    sb.from("jc_links").select("*").eq("team_id", t).order("sort").order("id"),
+    sb.from("jc_photos").select("*").eq("team_id", t).order("created_at", { ascending: false }).limit(300)]);
+  if ([n, tk, me2, s, l, ph].some((r) => fail(r.error))) return;
+  await signPhotos(ph.data);
   const c = tk.data.length ? await sb.from("jc_cells").select("*").in("task_id", tk.data.map((x) => x.id)).gte("day", mon).lte("day", W.add(mon, 6)) : { data: [] };
   if (fail(c.error)) return;
   if (t !== JC.team) return; // 그 사이 지점 바꿈
-  Object.assign(JC, { names: n.data, tasks: tk.data, memos: me2.data, subs: s.data, links: l.data, cells: new Map(c.data.map((x) => [`${x.task_id}|${x.day}`, x.names])) });
+  Object.assign(JC, { names: n.data, tasks: tk.data, memos: me2.data, subs: s.data, links: l.data, photos: ph.data, cells: new Map(c.data.map((x) => [`${x.task_id}|${x.day}`, x.names])) });
   render();
   listen();
 };
@@ -58,7 +60,7 @@ function listen() {
   if (chan) return;
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "jc" && JC.load(), 300); };
   chan = sb.channel("jc");
-  for (const tb of ["jc_names", "jc_tasks", "jc_cells", "jc_memos", "jc_subs", "jc_links"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
+  for (const tb of ["jc_names", "jc_tasks", "jc_cells", "jc_memos", "jc_subs", "jc_links", "jc_photos"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
   chan.subscribe();
 }
 
@@ -68,6 +70,7 @@ function render() {
   if (JC.shell !== key) { JC.shell = key; V().innerHTML = shell(); }
   V().querySelectorAll("[data-pg]").forEach((b) => b.classList.toggle("on", b.dataset.pg === JC.page));
   if (JC.page === "links") return renderLinks();
+  if (JC.page === "photos") return renderPhotos();
   renderSubOpts(); renderSubs(); renderMemos(); renderNames(); renderGrid();
 }
 function shell() {
@@ -77,6 +80,9 @@ function shell() {
   if (JC.page === "links") return top + tabs + `<section class="jcpanel"><h3>링크 모음</h3>
     <form class="jcform" data-f="link"><input name="label" maxlength="40" placeholder="제목 (예: 네이버 예약 관리)"><input name="url" maxlength="500" inputmode="url" placeholder="https://..."><button class="btn">추가</button></form>
     <div id="jcLinks" class="jclist"></div></section>`;
+  if (JC.page === "photos") return top + tabs + `<section class="jcpanel"><h3>사진 모음 <span class="mut">세팅·정리 기준 사진 등 · 지우기는 매니저만</span></h3>
+    <form class="jcform" data-f="photo"><input name="label" maxlength="60" placeholder="설명 (선택, 예: 강의실 세팅 완성 모습)"><label class="btn jcfile">📷 사진 올리기<input type="file" name="file" accept="image/*" multiple hidden></label></form>
+    <div id="jcPhotos" class="jcphotos"></div></section>`;
   const now = today();
   return top + tabs + `<section class="jcpanel"><h3>조교 대타 명단 <span class="mut">순서: 매니저에게 보고 → 대타 명단 작성 → 단톡에서 대타 부탁 → 대타 가능한 사람 이름 넣기</span></h3>
     <form class="jcform jcsubf" data-f="sub"><select name="out"></select><select name="lang">${opts(LANGS)}</select>
@@ -159,6 +165,45 @@ function renderLinks() {
     : `<div class="mut jcempty">저장된 링크가 없어요. 위에서 추가해주세요.</div>`;
 }
 
+// 📷 사진: 비공개 버킷이라 서명 주소(1시간)로 봄. 다시 읽을 때마다 새로 받으면 사진이 깜빡여서 50분 동안 재사용
+const signed = new Map();
+async function signPhotos(list) {
+  const need = list.map((p) => p.path).filter((k) => !(signed.get(k)?.at > Date.now() - 50 * 60e3));
+  if (!need.length) return;
+  const { data, error } = await sb.storage.from("jc-photos").createSignedUrls(need, 3600);
+  if (error) return console.warn("사진 주소", error);
+  for (const d of data) if (d.signedUrl) signed.set(d.path, { url: d.signedUrl, at: Date.now() });
+}
+function renderPhotos() {
+  const box = V().querySelector("#jcPhotos");
+  box.innerHTML = JC.photos.length ? pinFirst(JC.photos).map((p) => { const u = signed.get(p.path)?.url ?? "";
+    return `<figure class="jcph ${p.pinned ? "pinned" : ""}" data-id="${p.id}"><a href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="${esc(p.label)}" loading="lazy"></a>
+      <figcaption><span class="jcgrow">${p.label ? `<span class="jcmt">${esc(p.label)}</span>` : ""}<span class="jcts">${ts(p.created_at)}${p.by_name ? ` · ${esc(p.by_name)}` : ""}</span></span>
+      <button class="jcicon jcpin ${p.pinned ? "on" : ""}" data-act="photopin" title="${p.pinned ? "고정 해제" : "고정"}">📌</button>${jo() ? "" : `<button class="jcicon" data-del="photo" title="삭제 (매니저만)">✕</button>`}</figcaption></figure>`; }).join("")
+    : `<div class="mut jcempty">아직 사진이 없어요. 위에서 올려주세요.</div>`;
+}
+// 올리기 전에 긴 변 1600px JPG 로 줄임 (아이폰 HEIC 도 PHOTO 가 읽어 줌)
+async function shrink(img) {
+  const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement("canvas");
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+}
+async function uploadPhotos(f) {
+  const files = [...f.file.files], label = f.label.value.trim(), t = JC.team; f.file.value = ""; if (!files.length) return;
+  toast(`사진 ${files.length}장 올리는 중…`);
+  let ok = 0;
+  for (const p of await PHOTO.fromFiles(files)) {
+    const path = `${t}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const up = await sb.storage.from("jc-photos").upload(path, await shrink(p.img), { contentType: "image/jpeg" });
+    if (fail(up.error)) break;
+    const r = await sb.from("jc_photos").insert({ team_id: t, path, label, by_name: myName ?? "" });
+    if (fail(r.error)) { await sb.storage.from("jc-photos").remove([path]); break; }
+    ok++;
+  }
+  if (ok) { f.label.value = ""; toast(`사진 ${ok}장 올렸어요`); JC.load(); }
+}
+
 // ── 담당자 고르기·색 고르기 작은 창 (body 에 하나씩, 다시 그려도 안 닫힘) ──
 const pop = (id) => document.getElementById(id) ?? document.body.appendChild(Object.assign(document.createElement("div"), { id, className: "jcpop", hidden: true }));
 const place = (el, btn, w, h) => { const r = btn.getBoundingClientRect(); el.style.left = Math.max(16, Math.min(r.left, innerWidth - w - 16)) + "px"; el.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(16, r.top - h - 6) : r.bottom + 6) + "px"; };
@@ -191,12 +236,13 @@ document.addEventListener("click", async (e) => {
 
 // ── 지우기: 한 번 누르면 '확인?' 3초, 한 번 더 = 지움 ──
 const armed = {};
-const DEL = { task: "jc_tasks", name: "jc_names", memo: "jc_memos", link: "jc_links", sub: "jc_subs" };
+const DEL = { task: "jc_tasks", name: "jc_names", memo: "jc_memos", link: "jc_links", sub: "jc_subs", photo: "jc_photos" };
 async function del(btn) {
   const row = btn.closest("[data-id],[data-task],[data-link]"), kind = btn.dataset.del, id = +(row.dataset.id ?? row.dataset.task ?? row.dataset.link), k = kind + id;
   if (!armed[k]) { const t = btn.textContent; btn.textContent = "확인?"; btn.classList.add("arm"); armed[k] = setTimeout(() => { delete armed[k]; btn.textContent = t; btn.classList.remove("arm"); }, 3000); return; }
   clearTimeout(armed[k]); delete armed[k];
   if (fail((await sb.from(DEL[kind]).delete().eq("id", id)).error)) return;
+  if (kind === "photo") { const p = JC.photos.find((x) => x.id === id); if (p) fail((await sb.storage.from("jc-photos").remove([p.path])).error); }
   JC.load();
 }
 const nextSort = (list) => list.reduce((m, x) => Math.max(m, x.sort ?? 0), 0) + 1;
@@ -212,6 +258,7 @@ function bind() {
   const v = V(); if (v.dataset.bound) return; v.dataset.bound = 1;
   v.addEventListener("change", (e) => {
     if (e.target.id === "jcTeam") { JC.team = +e.target.value; try { localStorage.setItem("jc-team", JC.team); } catch {} closePops(); JC.load(); }
+    if (e.target.name === "file" && e.target.form?.dataset.f === "photo") return uploadPhotos(e.target.form);
     const f = e.target.closest(".jcsubf"); if (f && e.target.name === "start" && (!f.end.value || f.end.value < f.start.value)) f.end.value = f.start.value;
   });
   v.addEventListener("submit", async (e) => {
@@ -233,7 +280,7 @@ function bind() {
   v.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.target.matches(".jcform textarea")) { e.preventDefault(); e.target.form.requestSubmit(); } }); // 메모: Enter = 추가, Shift+Enter = 줄바꿈
   v.addEventListener("click", async (e) => {
     const pg = e.target.closest("[data-pg]");
-    if (pg) { JC.page = pg.dataset.pg; try { localStorage.setItem("jc-page", JC.page); } catch {} closePops(); render(); if (JC.page !== "links") renderGrid(true); return; }
+    if (pg) { JC.page = pg.dataset.pg; try { localStorage.setItem("jc-page", JC.page); } catch {} closePops(); render(); if (!["links", "photos"].includes(JC.page)) renderGrid(true); return; }
     const d = e.target.closest("[data-del]"); if (d) return del(d);
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act, id = +b.closest("[data-id]")?.dataset.id;
@@ -241,8 +288,8 @@ function bind() {
     if (act === "cell") return openCell(b);
     if (act === "color") return openColor(b, id);
     if (act === "memodone") { const m = JC.memos.find((x) => x.id === id); m.done = b.checked; renderMemos(); return fail((await sb.from("jc_memos").update({ done: b.checked }).eq("id", id)).error); }
-    if (act === "memopin" || act === "linkpin") {
-      const lid = act === "linkpin" ? +b.closest("[data-link]").dataset.link : id, table = act === "linkpin" ? "jc_links" : "jc_memos", x = (act === "linkpin" ? JC.links : JC.memos).find((y) => y.id === lid);
+    if (act === "memopin" || act === "linkpin" || act === "photopin") {
+      const lid = act === "linkpin" ? +b.closest("[data-link]").dataset.link : id, table = { linkpin: "jc_links", memopin: "jc_memos", photopin: "jc_photos" }[act], x = { linkpin: JC.links, memopin: JC.memos, photopin: JC.photos }[act].find((y) => y.id === lid);
       x.pinned = !x.pinned; render(); return fail((await sb.from(table).update({ pinned: x.pinned }).eq("id", lid)).error);
     }
     if (act === "subedit") { JC.editSub = id; v.querySelector(".jcsub.editing")?.classList.remove("editing"); renderSubs(); return; }

@@ -74,3 +74,11 @@ body:not(.jcv) #jcView { display: none; }
 .jcpop .jcclose { width: 100%; }
 .jcpop .jcsw { display: grid; grid-template-columns: repeat(4, 26px); gap: 8px; }
 .jcpop .jcsw button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; } .jcpop .jcsw button.on { border-color: var(--text); }
+#jcView .jcfile { cursor: pointer; white-space: nowrap; }
+#jcView .jcphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+#jcView .jcph { margin: 0; background: var(--fill); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+#jcView .jcph.pinned { box-shadow: 0 0 0 2px var(--accent); }
+#jcView .jcph img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--line); }
+#jcView .jcph figcaption { display: flex; align-items: flex-start; gap: 4px; padding: 8px 8px 8px 10px; }
+#jcView .jcph .jcmt { display: block; }
+@media (max-width: 680px) { #jcView .jcphotos { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
