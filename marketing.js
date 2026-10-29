@@ -298,11 +298,12 @@ async function send() {
 const AST = { proposed: "🟡 승인 대기", approved: "✅ 승인", rejected: "⚫ 반려" };
 const BR = MKACORE.BRANCH;
 async function renderAgent(admin) {
-  const [ir, cr] = await Promise.all([
+  const [ir, cr, onr] = await Promise.all([
     sb.from("mka_items").select("kind, key, data, status, updated_at").order("updated_at", { ascending: false }).limit(300),
-    sb.from("mkc_ads").select("library_id, grp, page_name, headline, body, start_date, media_type, n_ads").eq("active", true).not("start_date", "is", null).order("start_date", { ascending: true }).limit(60),
+    sb.from("mkc_ads").select("library_id, grp, page_name, competitor_id, headline, body, start_date, media_type, n_ads").eq("active", true).not("start_date", "is", null).lte("start_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).order("start_date", { ascending: true }).limit(1000),
+    sb.from("mkc_competitors").select("id").eq("status", "on"),
   ]);
-  if (fail(ir.error) || fail(cr.error)) return;
+  if (fail(ir.error) || fail(cr.error) || fail(onr.error)) return;
   const rows = ir.data ?? [], today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const kill = rows.some((r) => r.kind === "control" && r.key === "kill" && r.status === "on");
   const top = MKACORE.freshTop(rows);
@@ -313,8 +314,7 @@ async function renderAgent(admin) {
   const link = (u, t) => (MKACORE.safeUrl(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t));
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : `<div class="${cls} agimg-no"></div>`);
   const age = rows.length ? Math.max(...rows.filter((r) => r.kind !== "control").map((r) => new Date(r.updated_at).getTime()), 0) : 0;
-  const seen = new Set(); // 같은 페이지·같은 문구(광고 여러 개로 도는 같은 소재)는 한 번만
-  const comp = (cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name) && !seen.has(a.page_name + "|" + (a.headline || a.body)) && seen.add(a.page_name + "|" + (a.headline || a.body))).slice(0, 12);
+  const comp = MKACORE.pickCompetitorAds((cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name)), (onr.data ?? []).map((c) => c.id), today);
 
   const killCard = `<div class="card ${kill ? "warn" : ""}"><div class="mkbar"><b>${kill ? "🛑 에이전트 멈춤 (스레드 자동 게시 중단)" : "🟢 에이전트 켜짐"}</b>
     ${admin ? `<button class="btn" id="agKill" style="${kill ? "" : "background:#a3201a"}">${kill ? "다시 켜기" : "🛑 전부 멈추기"}</button>` : ""}</div>
@@ -327,8 +327,8 @@ async function renderAgent(admin) {
       <div class="mut">${esc(d.experiment ?? "")}</div>
       ${admin && r.status === "proposed" ? `<div class="mkbar"><button class="btn" data-ap="${esc(r.key)}" data-st="approved">승인</button><button class="btn" data-ap="${esc(r.key)}" data-st="rejected" style="background:var(--sub)">반려</button></div>` : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
 
-  const compHtml = comp.length ? comp.map((a) => `<div class="cmp"><div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} <span class="mut">${MKCCORE.daysBetween(a.start_date, today)}일째 · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
-      <div>${esc(a.headline || String(a.body ?? "").slice(0, 80) || "(문구 없음)")}</div></div></div>`).join("") : `<div class="mut">수집된 경쟁사 광고가 아직 없어요.</div>`;
+  const compHtml = comp.length ? comp.map((a) => `<div class="cmp"><div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
+      <div>${esc(MKACORE.adText(a).slice(0, 90))}</div></div></div>`).join("") : `<div class="mut">조건에 맞는 경쟁사 광고가 아직 없어요.</div>`;
 
   const postedHtml = posted.length ? posted.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div>${link(d.permalink, String(d.text ?? "").split("\n")[0].slice(0, 60))} <span class="mut">${esc(BR[d.branch] ?? d.branch ?? "")} · ${esc(String(d.posted_at ?? "").slice(0, 16).replace("T", " "))}</span></div></div></div>`; }).join("") : `<div class="mut">아직 올라간 글이 없어요.</div>`;
   const readyHtml = ready.length ? ready.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div class="mut">${esc(BR[d.branch] ?? d.branch ?? "")} · ${esc(d.angle ?? "")}</div><div>${esc(String(d.text ?? "").slice(0, 120))}…</div></div></div>`; }).join("") : `<div class="mut">대기 중인 글이 없어요.</div>`;
@@ -336,7 +336,7 @@ async function renderAgent(admin) {
   $m("#mkBody").innerHTML = killCard
     + `<div class="card"><b>🔥 조회·반응 좋은 우리 광고 TOP</b>${topHtml}</div>`
     + `<div class="card"><b>📣 추천 광고 — 에이전트 제안${admin ? " (승인하면 Claude가 광고관리자에 만들어요)" : ""}</b>${propHtml}</div>`
-    + `<div class="card"><b>🔭 추천 광고 — 경쟁사에서 오래 도는 소재 (눌러서 광고 라이브러리 원문)</b>${compHtml}<p class="mut">오래 돌수록 성과가 났을 가능성이 높아요. 문구는 베끼지 말고 구조만 참고해요.</p></div>`
+    + `<div class="card"><b>🔭 추천 광고 — 경쟁사에서 오래 도는 소재 (눌러서 광고 라이브러리 원문)</b><p class="mut">기준: 한국어 문구가 있는 광고 · 30일 넘게 도는 것만 · 페이지당 1개 · 켜 둔 경쟁사 → 여러 광고로 돌리는 소재 → 오래 도는 순</p>${compHtml}<p class="mut">오래 돌수록 성과가 났을 가능성이 높아요. 문구는 베끼지 말고 구조만 참고해요.</p></div>`
     + `<div class="card"><b>🧵 스레드 — 올라간 글</b>${postedHtml}</div><div class="card"><b>🧵 스레드 — 대기 ${ready.length}</b>${readyHtml}</div>`;
   $m("#agKill")?.addEventListener("click", async () => {
     const { error } = await sb.from("mka_items").update({ status: kill ? "off" : "on", updated_at: new Date().toISOString() }).eq("kind", "control").eq("key", "kill");
