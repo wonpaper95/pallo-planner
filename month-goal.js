@@ -1,5 +1,6 @@
-// 📮 월말 보고 (매출 탭 맨 위): 매니저는 다음 달 목표 2개(지점 매출 목표·내 목표) + 전략(직접 한 칸)을 적고, 그달 매출 계획 [1]·[2]·[5]를 다 채워야 [제출] → 대표에게 푸시+카톡(planner-push).
-// 대표는 그달 지점별 제출 현황을 보고 [이 금액을 지점 목표로] = 그달 sales_plans 의 월 목표 순매출로 넣음. DB = month_goals (0068).
+// 📮 월말 보고 (매출 탭 맨 위 막대 → 창): 팀 목표 = 그달 매출 계획 [1] 월 목표(지점에 하나, 자동), 매니저는 내 목표 + 전략(직접 한 칸).
+// 같은 지점 매니저 내 목표 합 vs 팀 목표 → ✅ 일치 / ⚠ 부족·초과 (제출은 막지 않음, B안). 그달 [1]·[2]·[5] 칸별 [저장] 다 ✅ 여야 [제출] → 대표 푸시+카톡.
+// DB = month_goals (0068), 동료 합계 = team_goal_sum (0071).
 (() => {
 const MG = window.MG = { month: null, row: null, subscribed: false };
 const mgEl = () => document.getElementById("mgCard"); // 매출 탭 맨 위 막대
@@ -35,9 +36,10 @@ MG.loadMine = async function () {
   const r = MG.row, ro = !!(previewTeam || previewUser), dis = ro ? "readonly" : "", mon = mgMon(MG.month);
   const now = (() => { try { const x = SL.now(); return x.month === todayIso().slice(0, 7) ? x : null; } catch { return null; } })();
   mgBody().innerHTML = `<section class="mg"><div class="mghead"><h3>📮 월말 보고 — ${mon} 목표</h3><input type="month" id="mgMonth" value="${MG.month}" aria-label="목표 달"><button class="btn ghost" type="button" id="mgClose">닫기</button><span id="mgState" class="mgstate"></span></div>
-    <p class="slhint">다음 달 목표 2개와 달성 전략을 적고, 매출 계획 [1]·[2]·[5]를 채워 칸마다 [저장]을 누르면 체크가 ✅ — 모두 ✅ 이면 대표님께 제출해요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)}` : ""}</p>
-    <div class="mggrid"><label>🏢 지점(팀) 매출 목표<span class="u"><input data-mg="team_goal" inputmode="numeric" placeholder="예) 60,000,000" value="${r.team_goal != null ? won(r.team_goal) : ""}" ${dis}><i>원</i></span></label>
+    <p class="slhint">내 목표와 달성 전략을 적고, 매출 계획 [1]·[2]·[5]를 채워 칸마다 [저장]을 누르면 체크가 ✅ — 모두 ✅ 이면 대표님께 제출해요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)}` : ""}</p>
+    <div class="mggrid"><div class="mgtg"><small>🏢 팀(지점) 목표 — 매출 계획 [1] 월 목표</small><b id="mgTeamGoal">-</b></div>
       <label>🙋 내 목표<span class="u"><input data-mg="my_goal" inputmode="numeric" placeholder="예) 20,000,000" value="${r.my_goal != null ? won(r.my_goal) : ""}" ${dis}><i>원</i></span></label></div>
+    <div id="mgSum" class="mgsum"></div>
     <label class="mglab">🧭 달성 전략 — 스스로 어떻게 할지</label>
     <textarea data-mg="strategy" class="grow mgstrat" maxlength="5000" ${dis} placeholder="${GUIDE}">${esc(r.strategy)}</textarea>
     <div id="mgChk" class="mgchk"></div>
@@ -50,8 +52,18 @@ MG.recheck = async function () {
   const team = SL.team, mon = mgMon(MG.month);
   const { data } = team ? await sb.from("sales_plans").select("data").eq("team_id", team).eq("month", MG.month).maybeSingle() : { data: null };
   const pc = data ? SL.planCheck(data.data, MG.month) : null, r = MG.row;
+  MG.planGoal = pc?.goal > 0 ? pc.goal : null;
+  // 팀 목표 = 내 목표들의 합? (내 것은 지금 입력값으로)
+  const { data: ppl } = await sb.rpc("team_goal_sum", { p_month: MG.month });
+  const rows = (ppl ?? []).map((x) => x.user_id === me.id ? { ...x, my_goal: r.my_goal } : x), sum = rows.reduce((a, x) => a + (x.my_goal || 0), 0);
+  const left = rows.filter((x) => x.my_goal == null).length, diff = (MG.planGoal ?? 0) - sum;
+  document.getElementById("mgTeamGoal").textContent = MG.planGoal ? mgWon(MG.planGoal) : "아직 없음";
+  document.getElementById("mgSum").innerHTML = !MG.planGoal ? `<span class="no">⚠ 팀 목표가 아직 없어요 — 매출 계획 ${mon} [1] 월 목표를 정하고 [저장]해 주세요</span>`
+    : `🏢 팀 목표 ${mgWon(MG.planGoal)} = ${rows.map((x) => `${esc(x.name)} ${x.my_goal != null ? won(x.my_goal) : "(아직)"}`).join(" + ")} → `
+      + (diff === 0 ? `<span class="ok">✅ 팀 목표와 일치</span>` : diff < 0 ? `<span class="no">⚠ ${mgWon(-diff)} 초과 — 팀원과 맞춰 주세요</span>`
+        : left ? `<span class="no">${mgWon(diff)} 남음 (아직 ${left}명 안 적음)</span>` : `<span class="no">⚠ ${mgWon(diff)} 부족 — 팀원과 나눠 맞춰 주세요</span>`);
   const items = [
-    [r.team_goal > 0 && r.my_goal > 0, "목표 2개"],
+    [r.my_goal > 0, "내 목표"],
     [(r.strategy || "").trim().length >= 10, "달성 전략"],
     [pc && !pc.s1.length && !!pc.done.s1, `${mon} [1] 월별 목표`],
     [pc && !pc.s2.length && !!pc.done.s2, `${mon} [2] 목표 객단가 비율`],
@@ -72,7 +84,7 @@ MG.state = function (msg) {
 };
 let mgT, chkT;
 MG.save = async function (extra = {}) {
-  const r = MG.row, { data, error } = await sb.from("month_goals").upsert({ month: MG.month, team_goal: r.team_goal, my_goal: r.my_goal, strategy: r.strategy, updated_at: new Date().toISOString(), ...extra }, { onConflict: "user_id,month" }).select().single();
+  const r = MG.row, { data, error } = await sb.from("month_goals").upsert({ month: MG.month, team_goal: MG.planGoal ?? r.team_goal, my_goal: r.my_goal, strategy: r.strategy, updated_at: new Date().toISOString(), ...extra }, { onConflict: "user_id,month" }).select().single();
   if (fail(error)) return false;
   MG.row = data; MG.state(); return true;
 };
@@ -104,19 +116,9 @@ document.addEventListener("click", async (e) => {
     if (!MG.ok) { document.getElementById("mgChk")?.scrollIntoView({ behavior: "smooth", block: "center" }); return toast("⬜ 남은 칸을 채워야 제출할 수 있어요"); }
     clearTimeout(mgT);
     const ts = new Date().toISOString();
-    if (await MG.save({ submitted_at: ts, updated_at: ts })) toast("📮 제출했어요. 대표님께 알림이 가요");
+    if (await MG.save({ submitted_at: ts, updated_at: ts })) { toast("📮 제출했어요. 대표님께 알림이 가요"); MG.recheck(); } // 막대 글자도 '제출함'으로
     return;
   }
-  const ap = e.target.closest?.("[data-mgapply]"); if (!ap) return; // 대표: 이 금액을 그달 지점 목표로
-  const team = +ap.dataset.mgapply, goal = +ap.dataset.goal, tn = ap.dataset.tname;
-  if (!confirm(`${tn} ${mgMon(MG.month)} 월 목표 순매출을 ${mgWon(goal)}으로 정할까요?\n(매출 탭 ${mgMon(MG.month)} [1] 월 목표에 들어가요)`)) return;
-  const [p, prev] = await Promise.all([sb.from("sales_plans").select("data").eq("team_id", team).eq("month", MG.month).maybeSingle(),
-    sb.from("sales_plans").select("data").eq("team_id", team).lt("month", MG.month).order("month", { ascending: false }).limit(1).maybeSingle()]);
-  if (fail(p.error || prev.error)) return;
-  const base = p.data ? p.data.data : (() => { const x = SL.newPlan(MG.month, prev.data?.data); delete x.month; return x; })();
-  const { error } = await sb.from("sales_plans").upsert({ team_id: team, month: MG.month, data: { ...base, goal } });
-  if (fail(error)) return;
-  toast(`✅ ${tn} ${mgMon(MG.month)} 목표 ${mgWon(goal)}`); MG.load();
 });
 
 // ── 대표: 그달 지점별 제출 현황 ──
@@ -129,16 +131,17 @@ MG.loadBoss = async function () {
   const mgrs = p.data.filter((x) => x.role === "manager" && x.team_id), done = mgrs.filter((m) => by.get(m.user_id)?.submitted_at).length;
   const teamHtml = t.data.map((tm) => {
     const ms = mgrs.filter((m) => m.team_id === tm.id); if (!ms.length) return "";
-    const sub = ms.map((m) => by.get(m.user_id)).filter((x) => x?.submitted_at), sumMy = sub.reduce((a, x) => a + (x.my_goal || 0), 0);
-    return `<div class="mgteam"><div class="mgth"><b>${esc(tm.name)}</b><small>제출 ${sub.length}/${ms.length} · 내 목표 합 ${mgWon(sumMy)} · 지금 정해진 ${mgMon(MG.month)} 목표 <b>${set.has(tm.id) ? mgWon(set.get(tm.id)) : "없음"}</b></small><span class="mgplan" title="${mgMon(MG.month)} 매출 계획 (매출 탭)">${(() => { const c = chk.get(tm.id); return `[1] 월별 목표 ${mark(c, "s1")} · [2] 객단가 비율 ${mark(c, "s2")} · [5] 일일 실행 ${mark(c, "s5")}`; })()}</span></div>`
+    const sub = ms.map((m) => by.get(m.user_id)).filter((x) => x?.submitted_at), sumMy = ms.reduce((a, m) => a + (by.get(m.user_id)?.my_goal || 0), 0);
+    const tg = set.get(tm.id) > 0 ? set.get(tm.id) : null, d = (tg ?? 0) - sumMy, left = ms.filter((m) => by.get(m.user_id)?.my_goal == null).length;
+    const st = !tg ? `<span class="no">팀 목표 없음</span>` : d === 0 ? `<span class="ok">✅ 일치</span>` : d < 0 ? `<span class="no">⚠ ${mgWon(-d)} 초과</span>` : `<span class="no">${left ? `${mgWon(d)} 남음 (${left}명 안 적음)` : `⚠ ${mgWon(d)} 부족`}</span>`;
+    return `<div class="mgteam"><div class="mgth"><b>${esc(tm.name)}</b><small>제출 ${sub.length}/${ms.length} · 팀 목표 <b>${tg ? mgWon(tg) : "-"}</b> · 내 목표 합 ${mgWon(sumMy)}</small>${st}<span class="mgplan" title="${mgMon(MG.month)} 매출 계획 (매출 탭)">${(() => { const c = chk.get(tm.id); return `[1] 월별 목표 ${mark(c, "s1")} · [2] 객단가 비율 ${mark(c, "s2")} · [5] 일일 실행 ${mark(c, "s5")}`; })()}</span></div>`
       + ms.map((m) => { const x = by.get(m.user_id);
-        if (!x?.submitted_at) return `<div class="mgp none"><span class="who">${esc(m.name)}</span><span class="mut">${x?.updated_at ? "쓰는 중 (아직 제출 안 함)" : "아직 안 냄"}</span></div>`;
-        return `<details class="mgp"><summary><span class="who">${esc(m.name)}</span><span>🏢 ${mgWon(x.team_goal)}</span><span>🙋 ${mgWon(x.my_goal)}</span><small class="mut">${mgHm(x.submitted_at)}${x.updated_at > x.submitted_at ? " · 이후 고치는 중" : ""}</small>
-          ${set.get(tm.id) === x.team_goal ? `<span class="mgset">✓ 지점 목표</span>` : `<button class="btn ghost" type="button" data-mgapply="${tm.id}" data-goal="${x.team_goal}" data-tname="${esc(tm.name)}">이 금액을 지점 목표로</button>`}</summary>
+        if (!x?.submitted_at) return `<div class="mgp none"><span class="who">${esc(m.name)}</span>${x?.my_goal != null ? `<span>🙋 ${mgWon(x.my_goal)}</span>` : ""}<span class="mut">${x?.updated_at ? "쓰는 중 (아직 제출 안 함)" : "아직 안 냄"}</span></div>`;
+        return `<details class="mgp"><summary><span class="who">${esc(m.name)}</span><span>🙋 ${mgWon(x.my_goal)}</span><small class="mut">제출 ${mgHm(x.submitted_at)}${x.updated_at > x.submitted_at ? " · 이후 고치는 중" : ""}</small></summary>
           <div class="mgstr">${esc(x.strategy) || "<span class='mut'>(전략 없음)</span>"}</div></details>`; }).join("") + `</div>`;
   }).join("");
   MG.barTxt = `제출 ${done}/${mgrs.length}명`; MG.bar();
   mgBody().innerHTML = `<section class="mg"><div class="mghead"><h3>📮 월말 보고 — ${mgMon(MG.month)} 목표 (제출 ${done}/${mgrs.length})</h3><input type="month" id="mgMonth" value="${MG.month}" aria-label="목표 달"><button class="btn ghost" type="button" id="mgClose">닫기</button></div>
-    <p class="slhint">매니저들이 낸 지점 목표·내 목표·전략이에요. 줄을 누르면 전략 전문, [이 금액을 지점 목표로] 누르면 ${mgMon(MG.month)} 매출 목표에 바로 들어가요.</p>${teamHtml || `<p class="mut">매니저가 없어요</p>`}</section>`;
+    <p class="slhint">팀 목표 = 지점 매출 계획 ${mgMon(MG.month)} [1] 월 목표. 매니저 내 목표 합이 팀 목표와 맞는지(✅/⚠)와 [1]·[2]·[5] 저장 여부를 지점마다 봐요. 제출한 사람 줄을 누르면 전략 전문.</p>${teamHtml || `<p class="mut">매니저가 없어요</p>`}</section>`;
 };
 })();
