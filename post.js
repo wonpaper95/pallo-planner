@@ -422,6 +422,7 @@ function wire() {
     }
     if (d.lang) { PS.lang = d.lang; return autoDeco(PS.photos); }
     if (d.redeco) return autoDeco(PS.photos);
+    const th = t.closest("#psThumbs .blthumb"); if (th && !t.closest("button")) { const i = [...th.parentNode.children].indexOf(th); return PHOTO.view(PS.photos, i, { onEdit: (p) => PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); } }) }); } // 🔍 크게 보기
     if (d.mv) { const i = +d.i, j = i + +d.mv; if (j < 0 || j >= PS.photos.length) return; [PS.photos[i], PS.photos[j]] = [PS.photos[j], PS.photos[i]]; renderThumbs(); return photosChanged(); }
     if (d.ratio) {
       V().querySelectorAll("[data-ratio]").forEach((b) => { b.disabled = true; });

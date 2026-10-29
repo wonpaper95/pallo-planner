@@ -146,6 +146,7 @@ async function bake(p) {
   if (p.url) URL.revokeObjectURL(p.url);
   p.url = URL.createObjectURL(p.blob);
   p.ai = draw(p, 1024).cv.toDataURL("image/jpeg", 0.8).split(",")[1];
+  if (vdlg?.open && VW.list[VW.i] === p) vShow(VW.i); // 크게 보는 중에 다시 구워지면(AI 꾸미기 등) 바로 바뀐 사진으로
 }
 async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; if (p.deco && p.deco !== "manual") decoEdits(p, p.deco === "none" ? null : p.deco); await bake(p); } } // 자동 꾸미기 글자는 새 자르기 칸에 다시 놓음
 
@@ -218,6 +219,32 @@ async function faceAll(list, again = false, onStep) {
     n += addFaces(p.edits, await findFaces(p)); await bake(p); p.faced = true; /* 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감 */
   }
   return n;
+}
+
+// ── 🔍 크게 보기 (블로그·게시물 썸네일 누르기): 꾸미기·블러가 다 보이게 원본 비율 그대로, ◀ ▶·키보드로 넘기고 ✏️ 편집으로 바로 ──
+let vdlg = null;
+const VW = { list: [], i: 0, onEdit: null };
+function view(list, i, { onEdit } = {}) {
+  if (!vdlg) {
+    vdlg = document.createElement("dialog"); vdlg.id = "phViewDlg";
+    vdlg.innerHTML = `<div class="vbar"><b id="phVwNo"></b><span class="mut" id="phVwInfo"></span><span style="flex:1"></span><button type="button" class="btn" id="phVwEdit">✏️ 편집</button><button type="button" class="btn ghost" id="phVwClose">닫기</button></div>
+      <div class="vimg"><button type="button" class="vnav" data-vw="-1" aria-label="앞 사진">◀</button><img id="phVwImg" alt=""><button type="button" class="vnav" data-vw="1" aria-label="다음 사진">▶</button></div>`;
+    document.body.append(vdlg);
+    vdlg.addEventListener("click", (e) => {
+      const nv = e.target.closest("[data-vw]"); if (nv) return vShow(VW.i + +nv.dataset.vw);
+      if (e.target.id === "phVwClose" || e.target === vdlg) return vdlg.close(); // 바깥 눌러도 닫힘
+      if (e.target.id === "phVwEdit") { const p = VW.list[VW.i]; vdlg.close(); VW.onEdit?.(p); }
+    });
+    vdlg.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") vShow(VW.i - 1); if (e.key === "ArrowRight") vShow(VW.i + 1); });
+  }
+  Object.assign(VW, { list, onEdit }); vShow(i); vdlg.showModal();
+}
+function vShow(i) {
+  const n = VW.list.length; if (!n) return; VW.i = (i + n) % n; const p = VW.list[VW.i], e = p.edits;
+  vdlg.querySelector("#phVwImg").src = p.url; vdlg.querySelector("#phVwNo").textContent = `사진 ${pad(VW.i + 1)} / ${pad(n)}`;
+  vdlg.querySelector("#phVwInfo").textContent = [FILTERS[e.filter] && e.filter !== "none" ? `필터 ${FILTERS[e.filter]}` : "", FRAMES[e.frame] && e.frame !== "none" ? `테두리 ${FRAMES[e.frame][0]}` : "",
+    e.items.length ? `글자·이모지 ${e.items.length}` : "", e.blurs.length ? `블러 ${e.blurs.length}` : "", e.ratio !== "orig" ? e.ratio : ""].filter(Boolean).join(" · ");
+  vdlg.querySelectorAll(".vnav").forEach((b) => (b.hidden = n < 2));
 }
 
 // ── 편집 창 (처음 열 때 body 에 붙임) ──
@@ -371,5 +398,5 @@ async function share(list, prefix) {
   toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
-return { RATIOS, FILTERS, LANGS, preset, decoEdits, applyDeco, applyLang, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
+return { RATIOS, FILTERS, LANGS, preset, decoEdits, applyDeco, applyLang, view, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
 });

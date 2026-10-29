@@ -567,6 +567,7 @@ function wire() {
     if (t.closest("#blDrop")) return $b("#blFile").click();
     if (d.rm) { BL.photos = BL.photos.filter((p) => p.id !== +d.rm); renderThumbs(); presetWhy(); if (X) renderOut(); return; }
     if (d.ed) return openEditor(+d.ed);
+    const th = t.closest("#blThumbs .blthumb"); if (th && !t.closest("button, input")) return PHOTO.view(BL.photos, +th.dataset.thumb, { onEdit: (p) => openEditor(p.id) }); // 🔍 크게 보기
     if (t.id === "blFaceAll") return faceAll();
     const chip = t.closest("[data-chip]");
     if (chip) {

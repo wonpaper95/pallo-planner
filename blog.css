@@ -22,9 +22,10 @@ body:not(.blv) #blogView { display: none; }
 /* 사진 올리기 */
 .bldrop { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; text-align: center; color: var(--sub); cursor: pointer; margin-top: 10px; }
 .bldrop.over { border-color: var(--accent); background: var(--hover); }
-.blthumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 10px; }
+.blthumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 10px; }
 .blthumb { position: relative; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); cursor: grab; }
-.blthumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; pointer-events: none; }
+.blthumb img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: contain; background: var(--fill); pointer-events: none; } /* 잘리지 않게 = 테두리·글자 다 보임, 누르면 크게 */
+.blthumbs .blthumb { cursor: zoom-in; }
 .blthumb .no { position: absolute; left: 4px; top: 4px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 5px; }
 .blthumb .x { position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; line-height: 20px; }
 .blthumb .ed { position: absolute; right: 3px; bottom: 3px; padding: 1px 6px; border-radius: 6px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; }
