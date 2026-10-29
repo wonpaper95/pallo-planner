@@ -393,6 +393,13 @@ Expected: `# pass 8`, `# fail 0`. (기존 테스트도 깨지지 않았는지 `n
 cd ~/pallo-planner-daily && git add mkd-core.js tests/mkd-core.test.mjs && git commit -m "📊 mkd-core: 5칸 기간·합계·증감·표 계산 + 테스트"
 ```
 
+> **구현 후 수정 (리뷰, 2026-10-29):**
+> - 여러 지점 합계: `totalRows` 는 (team_id, 날짜)마다 '전체' 행을 고르고, 단골 같은 `last` 지표는 지점마다 마지막 값을 구해 더한다. 같은 이름의 unit 은 지점이 달라도 한 줄로 합쳐진다.
+> - `cell` 결과에 `prevDays`(직전 기간에 데이터가 있는 날 수) 추가. 증감은 `prevDays×2 ≥ 기간 일수`일 때만, 아니면 `change: null`("데이터 n일"). 합계 지표는 하루 평균끼리 비교해 덜 찬 기간에 휘둘리지 않는다.
+> - 실패·로그인 필요 행 제외와 partial 포함을 `cell`·`buildTable` 테스트로 고정했다.
+> - 비율 지표: `hold` 는 값이 있고 이번 분모 < `MIN_SAMPLE` 일 때만, 직전 분모가 적으면 `change: null`. 분자·분모가 둘 다 있는 행만 합친다(비용만 있는 partial 행이 CPC 를 부풀리지 않게).
+> - `unitsOf` 는 `localeCompare("ko")` 순으로 정렬하고, `buildTable` 은 지표가 하나도 없는 unit(전부 실패)을 뺀다. '전체' 행만 실패한 채널은 머리줄로 남긴다.
+
 ---
 
 ### Task 3: `mkd-core.js` — 핵심 4개·채널 상태·이상 징후
