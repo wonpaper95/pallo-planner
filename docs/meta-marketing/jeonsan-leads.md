@@ -90,5 +90,5 @@ API(`api.pallo.co.kr/backoffice/api/v1/{코드}/admin/candidates`)는 로그인 
 | `lastPageRows` | 마지막으로 훑은 쪽의 행 수. `lastPage` 인데 `pages` 가 1이고 이 값이 20 이상이면 꽉 찬 쪽에서 다음 버튼을 못 찾은 것 |
 
 - 오류 반환: 지원 시간 날짜를 하나도 못 읽으면(행은 있는데 `scanned` 0) `{ error: "지원 시간 형식을 못 읽었어요", … }`. 표에 "데이터 없음" 같은 안내 한 줄짜리 행만 있어도 이 오류가 나온다 — 빈 보드는 0건이 아니라 실패로 알린다. 상태·지원 시간 열이 없으면 `{ error: "열 없음: …", headers }`(NAME·전화 열 이름은 뺀다).
-- **호출한 쪽의 합격 검사**(스킬): `error` 없음 · `filterSet === true` · `scanned > 0` · `unparsed === 0` · `stoppedBy` 가 `"cutoff"` 또는 `"lastPage"` (단 `stoppedBy === "lastPage" && pages === 1 && lastPageRows >= 20` 이면 꽉 찬 쪽인데 페이지 버튼을 못 찾은 것 — partial) · `newest >= D-14일` (표가 D 가 든 달의 1쪽에서 시작) · `stoppedBy === "lastPage"` 이면 `oldest <= D`. 하나라도 어긋나면 그 지점은 partial/failed.
-- 어긋났을 때: `error` 거나 읽은 행이 없으면 `failed`, 그 밖에는 `partial`(숫자를 "적어도 이만큼"으로만 쓴다). `missingCols` 에 코멘트·광고명·유입경로가 있으면 소스 구분이 뭉개지니 `partial`.
+- **호출한 쪽의 합격 검사**(스킬): `error` 없음 · `filterSet === true` · `scanned > 0` 이고 `unparsed === 0` · `stoppedBy` 가 `"cutoff"` 또는 `"lastPage"` (단 `stoppedBy === "lastPage" && pages === 1 && lastPageRows >= 20` 이면 꽉 찬 쪽인데 다음 쪽 버튼을 못 찾은 것 — 불합격) · `newest.slice(0,7) === D.slice(0,7)` (표가 D 가 든 달의 맨 앞에서 시작) · `stoppedBy === "lastPage"` 이면 `oldest <= D` · `bySource` 의 `inquiries` 합 = `total`. 하나라도 어긋나면 같은 지점을 처음부터 딱 한 번 다시 돌리고, 그래도 어긋나면 그 지점은 `failed` 로 저장한다(숫자를 대충 고쳐 쓰지 않는다).
+- 어긋난 채로 저장하는 길은 둘뿐: 실패(`{unit:"전체", note:<짧은 이유>}` 한 행, status `failed`)와, `missingCols` 에 코멘트·광고명·유입경로가 있어 소스 구분이 뭉개질 때의 `partial`(`전체` 합계 한 행만, note `열 없음: …`).

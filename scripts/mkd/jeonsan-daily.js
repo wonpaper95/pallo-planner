@@ -1,7 +1,7 @@
 // 전산 "신규 회신"(branch.pallo.co.kr/{지점코드}/admin/call) › 데이터 보드 표에서 날짜 D 의 유입경로별 문의 **건수만** 센다(등록은 이 표에 없어 세지 않는다). 스킬이 Claude in Chrome javascript_tool 로 그 페이지에 넣어 실행한다.
 // NAME·전화번호 열은 읽지 않는다. 코멘트 열은 gads_/nad_/homepage 토큰만 정규식으로 뽑고 전문은 버린다. 행을 누르거나 저장하는 일은 하지 않는다(필터·페이지 이동만).
 // 표는 지원 시간 최신순, 페이지당 20명. 페이지 넘김은 표 밖 숫자 버튼(위쪽 ‹ › 는 이전/다음 달이라 쓰지 않는다). 표는 1페이지, D 가 든 달이어야 한다 — D 가 지난달이면 스킬이 먼저 ‹ 를 한 번 눌러 달을 바꾼다. 같은 탭에서 다시 돌리기 전엔 새로고침(또는 1 클릭) — 스니펫은 마지막으로 본 쪽에 멈춰 있다.
-// 결과가 맞는지는 호출한 쪽이 반드시 본다: `error` 없음 · `filterSet === true` · `scanned > 0` · `unparsed === 0` · `stoppedBy` 가 `"cutoff"` 또는 `"lastPage"` (단 `stoppedBy === "lastPage" && pages === 1 && lastPageRows >= 20` 이면 꽉 찬 쪽인데 페이지 버튼을 못 찾은 것 — partial) · `newest >= D-14일` (표가 D 가 든 달의 1쪽에서 시작) · `stoppedBy === "lastPage"` 이면 `oldest <= D`. 하나라도 어긋나면 그 지점은 partial/failed. (docs/meta-marketing/jeonsan-leads.md)
+// 결과가 맞는지는 호출한 쪽이 반드시 본다(합격 검사): `error` 없음 · `filterSet === true` · `scanned > 0` 이고 `unparsed === 0` · `stoppedBy` 가 `"cutoff"` 또는 `"lastPage"` (단 `stoppedBy === "lastPage" && pages === 1 && lastPageRows >= 20` 이면 꽉 찬 쪽인데 다음 쪽 버튼을 못 찾은 것 — 불합격) · `newest.slice(0,7) === D.slice(0,7)` (표가 D 가 든 달의 맨 앞에서 시작) · `stoppedBy === "lastPage"` 이면 `oldest <= D` · `bySource` 의 `inquiries` 합 = `total`. 하나라도 어긋나면 같은 지점을 처음부터 딱 한 번 다시 돌리고, 그래도 어긋나면 그 지점은 `failed` 로 저장한다(숫자를 대충 고쳐 쓰지 않는다). (docs/meta-marketing/jeonsan-leads.md)
 // 사용: 내용 + `window.__mkdLast = null; __mkdDaily("2026-10-28").then((r) => (window.__mkdLast = r));` → 5~10초 뒤 `window.__mkdLast`.
 async function __mkdDaily(date, { maxPages = 25, backDays = 1 } = {}) {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
