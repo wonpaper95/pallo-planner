@@ -1,0 +1,28 @@
+/* 🧭 PC 탭 왼쪽 사이드바 (10-28) — 디자인(glass.css 색·유리)은 그대로, 자리만: 탭 세로 + 그 밑 주 목록. 폰(899px 이하)은 지금처럼 위 탭.
+   sidebar.js 가 주 목록(#weeks)을 사이드바로 옮기고 상단 바 높이를 --hh 로 넣음. */
+@media (min-width: 900px) {
+  #app { padding-left: 240px; }
+  header { margin-left: -240px; }
+  body .seg { position: fixed; top: var(--hh, 53px); left: 0; bottom: 0; width: 240px; z-index: 4; display: flex; flex-direction: column; justify-content: flex-start; padding: 12px 10px 0; border-bottom: 0; border-right: 1px solid var(--line); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--line) transparent; } /* 탭이 많아 화면보다 길면 사이드바 통째로 스크롤 (10-29: 탭에 가려 주 목록이 한 줄만 보이던 버그) */
+  body .seg > div { display: flex !important; flex-direction: column; gap: 2px; background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; overflow: visible; max-width: none; flex: none; }
+  body .seg > div > button { flex: none; text-align: left; padding: 7px 12px; border-radius: 12px; white-space: nowrap; }
+  body .seg > div > button::before { content: var(--ic, "•"); display: inline-block; width: 22px; color: var(--sub); }
+  body .seg > div > button.on::before { color: var(--accent); }
+  /* 주 목록: 탭 밑, 여기만 따로 스크롤 */
+  .seg #weeks { position: static; height: auto; flex: 1 0 260px; min-height: 260px; scrollbar-color: var(--line) transparent; border: 0; border-top: 1px solid var(--line); margin-top: 12px; padding: 12px 0 20px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+  .seg #weeks div { background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; display: block; overflow: visible; }
+  .seg #weeks .yr { display: flex; }
+  .seg #weeks .bar { display: block; height: 4px; margin-top: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  body.side-on .layout { grid-template-columns: minmax(0, 1fr); width: 100%; } /* .wm 격자 칸 안에서 margin:auto 가 내용 폭으로 줄이는 것 막기 */
+  body.side-on:not(.mv) #somedayView { padding-left: 24px; }
+  /* ⇤ 접으면 메뉴 숨기고 본문 전체 폭 */
+  body.side-off #app { padding-left: 0; } body.side-off header { margin-left: 0; } body.side-off .seg { display: none !important; }
+}
+#sideBtn { display: none; } body.side-on #sideBtn { display: inline-flex; } /* PC(사이드바 있을 때)만 */
+/* 주 목록은 주간 화면에서만 (다른 탭에선 숨김 — index.html 의 .layout 숨김 규칙과 같은 목록) */
+body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .ldv, .smv, .eduv, .rpv, .jgv, .wkv, .jcv, .tkv, .fnv, .wrv, .gxv) .seg #weeks { display: none; }
+.seg [data-v=week] { --ic: "◫"; } .seg [data-v=month] { --ic: "▦"; } .seg [data-v=team] { --ic: "◎"; } .seg [data-v=sales] { --ic: "₩"; } .seg [data-v=fn] { --ic: "◑"; }
+.seg [data-v=blog] { --ic: "✎"; } .seg [data-v=mk] { --ic: "◆"; } .seg [data-v=post] { --ic: "▤"; } .seg [data-v=qna] { --ic: "?"; }
+.seg [data-v=links] { --ic: "↗"; } .seg [data-v=ct] { --ic: "☎"; } .seg [data-v=ld] { --ic: "☰"; } .seg [data-v=edu] { --ic: "◇"; }
+.seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=tk] { --ic: "✉"; } .seg [data-v=wr] { --ic: "◷"; } .seg [data-v=wiki] { --ic: "≡"; } .seg [data-v=rp] { --ic: "▣"; }
+.seg [data-v=sim] { --ic: "◐"; } .seg [data-v=board] { --ic: "▥"; }

@@ -15,3 +15,10 @@ body:not(.lkv) #lkView { display: none; }
 #lkView .lkrow a:hover b { text-decoration: underline; }
 #lkView .lkrow a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 @media (max-width: 560px) { #lkView .lkrow a span { display: none; } }
+#lkView .lktabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; } /* 📁 대표: 지점 탭 */
+#lkView .lktabs button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+#lkView .lktabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+#lkView .lkup { display: block; text-align: center; padding: 12px; cursor: pointer; }
+#lkView .lkdl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+#lkView .lkdl b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #lkView .lkdl:hover b { text-decoration: underline; }
+#lkView .lkdl .mut { font-size: 12px; white-space: nowrap; } #lkView .lkget { margin-left: auto; font-size: 12.5px; color: var(--accent); font-weight: 700; white-space: nowrap; }

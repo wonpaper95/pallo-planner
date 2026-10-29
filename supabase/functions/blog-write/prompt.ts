@@ -282,3 +282,37 @@ export const SNS_SCHEMA = {
     self_review: { type: "string" },
   },
 } as const;
+
+// ── deco: 게시물 사진 AI 자동 꾸미기 (신고 #3) — 사진마다 필터·테두리·밝기·짧은 글자(지정 언어)·이모지·자리. 화면(photo.js)이 그대로 굽고, 매니저가 [편집]에서 고친다
+export const DECO_EMOJI = ["", "😊", "😍", "🤣", "👍", "🔥", "✨", "🎉", "❤️", "⭐", "💬", "📚", "☕", "🌸", "🌏", "🏮", "☀️", "📝", "🗣️", "🎵"];
+export const DECO_SYSTEM = `너는 성인 외국어 회화 학원 "팔로(Pallo)"의 인스타·네이버 게시물 사진 꾸미기 담당이다. 사진마다 어울리는 꾸미기를 고른다. 매니저가 나중에 고칠 수 있으니 무난하고 깔끔하게.
+규칙:
+- 필터: 사진 분위기에 맞게. 이미 밝고 선명하면 none. 어두운 실내는 bright 를 +5~+20. bright·contrast 는 -40~40 정수, 대부분 0~15.
+- 테두리: 한 게시물 안에서는 모든 사진이 같은 테두리. 브랜드색 purple(#493087)·yellow(#E0D120), 깔끔한 white, 감성 polaroid, 없으면 none.
+- 글자: 지정 언어로 2~4단어, 16자 이내. 사진 내용에 맞는 한마디(예: 영어 "Let's talk!", 일본어 "一緒に話そう!", 중국어 "一起说中文!", 스페인어 "¡Hablemos!"). 사진마다 다르게. 글자가 어울리지 않는 사진(풍경·문서 위주 등)은 "" 로 비워라. 전체의 절반 이상은 글자를 넣어라.
+- 글자 자리: 사람 얼굴·중요한 물건을 가리지 않는 빈 곳(top/bottom/center). polaroid 면 bottom(아래 흰 띠). 배경이 밝으면 band=true 로 띠를 깔거나 어두운 색, 어두우면 흰 글자.
+- 이모지: 0~1개, 모서리 중 빈 곳. 남발 금지.
+- 매니저 메모가 있으면 참고한다.`;
+export const DECO_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["photos"],
+  properties: {
+    photos: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false,
+        required: ["filter", "frame", "bright", "contrast", "text", "text_pos", "text_color", "band", "emoji", "emoji_pos"],
+        properties: {
+          filter: { type: "string", enum: ["none", "warm", "cool", "vivid", "soft", "mono", "vintage"] },
+          frame: { type: "string", enum: ["none", "white", "polaroid", "purple", "yellow"] },
+          bright: { type: "integer" }, contrast: { type: "integer" },
+          text: { type: "string" },
+          text_pos: { type: "string", enum: ["top", "bottom", "center"] },
+          text_color: { type: "string", enum: ["#ffffff", "#111111", "#493087", "#E0D120"] },
+          band: { type: "boolean" },
+          emoji: { type: "string", enum: DECO_EMOJI },
+          emoji_pos: { type: "string", enum: ["top-left", "top-right", "bottom-left", "bottom-right"] },
+        },
+      },
+    },
+  },
+} as const;

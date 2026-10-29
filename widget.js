@@ -7,7 +7,8 @@ const pad = (n) => String(n).padStart(2, "0");
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const today = () => W.ymd(new Date());
 const hm = (iso) => { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const applies = (it, day) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1)); };
+const applies = (it, day, team) => { const d = W.parse(day); return it.days.includes(d.getDay()) && (!it.weeks || it.weeks.includes(Math.floor((d.getDate() - 1) / 7) + 1))
+  && (!it.from_day || day >= it.from_day) && (!it.to_day || day <= it.to_day) && (!team || !it.team_id || it.team_id === team); }; // team: 그 지점 것만(매니저는 서버가 이미 걸러줌)
 const elapsed = (t) => t.spent_sec + (t.started_at ? Math.max(0, (Date.now() - new Date(t.started_at)) / 1000) : 0);
 const hms = (s) => { s = Math.floor(s); return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; };
 let me = null, role = "manager", day = today(), state = { tasks: [], team: [], routine: [], all: [], carried: [], checks: new Map(), status: [], dues: [] };
@@ -128,17 +129,21 @@ document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && clos
 document.addEventListener("change", async (e) => {
   const el = e.target, on = el.checked; let r;
   if (el.dataset.rt) {
-    const it = state.all.find((x) => x.id === +el.dataset.rt); let link = null;
+    const it = state.all.find((x) => x.id === +el.dataset.rt); let link = null, num = null;
     if (on && it?.need_photo) { // 📷 인증샷을 올려야 완료
       el.checked = false;
       const f = await pickPhoto(); if (!f) { $("#foot").textContent = "인증샷을 올려야 완료돼요"; return; }
       $("#foot").textContent = "📷 인증샷 올리는 중…";
       try { link = await uploadRoutinePhoto(sb, f, +el.dataset.rt); } catch (err) { $("#foot").textContent = "업로드 실패: " + err.message; return; }
+    } else if (on && it?.need_count) { // 📅 내일 상담 예약 수 (플래너와 같음)
+      const t = (await sb.rpc("consult_target")).data ?? 8, v = prompt(`📅 내일(다음 근무일) 상담 예약이 몇 명인가요?\n캘린더 보고 숫자만 (목표 ${t}명)`);
+      if (v === null || !/^\s*\d{1,3}\s*$/.test(v)) { el.checked = false; $("#foot").textContent = "숫자를 넣어야 완료돼요"; return; }
+      num = +v; if (num < t) alert(`🔴 내일 상담 ${num}명 — 목표 ${t}명 미달\n퇴근 전에 대표님께 연락해 주세요\n① 회신율 신경 쓰기  ② 광고 더 돌리기`);
     } else if (on && it?.need_link) { // 🔗 링크를 올려야 완료
       link = (prompt("작성한 글의 링크를 붙여넣어 주세요 (https://...)") || "").trim();
       if (!/^https?:\/\/\S+$/i.test(link)) { el.checked = false; $("#foot").textContent = "링크를 올려야 완료돼요"; return; }
     }
-    r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: el.dataset.day || day, p_done: on, p_link: link });
+    r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: el.dataset.day || day, p_done: on, p_link: link, p_num: num });
   }
   else if (el.dataset.task) r = await sb.from("tasks").update({ done: on }).eq("id", +el.dataset.task);
   else if (el.dataset.team) r = await sb.rpc("set_team_task_done", { p_id: +el.dataset.team, p_done: on });

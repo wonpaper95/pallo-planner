@@ -1,0 +1,14 @@
+/* 📖 백과사전 탭 (wiki.js) */
+body:not(.wkv) #wkView { display: none; }
+#wkView { max-width: 820px; margin: 0 auto; padding: 16px 20px 100px; }
+#wkView .wkbar { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 12px; } #wkView .wkbar h2 { margin: 0; }
+#wkView #wkForm { display: flex; gap: 8px; }
+#wkView #wkQ { flex: 1; min-width: 0; padding: 12px 14px; font-size: 16px; background: var(--panel); color: var(--text); border: 1.5px solid var(--accent); border-radius: 12px; }
+#wkView .wkpop { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 6px; }
+#wkView .wkpop button { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+#wkView .wkcount { margin: 10px 0; font-size: 13.5px; }
+#wkView .wklist { display: grid; gap: 10px; }
+#wkView .wkcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+#wkView .wkhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; } #wkView .wkhead b { font-size: 16px; }
+#wkView .wkat { color: var(--accent); font-size: 13px; font-weight: 600; margin: 4px 0; }
+#wkView .wkcard p { margin: 4px 0; line-height: 1.55; } #wkView .wkcard ul { margin: 4px 0 0; padding-left: 18px; color: var(--sub); font-size: 14px; line-height: 1.6; }

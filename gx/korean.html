@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#493087">
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg"><link rel="manifest" href="manifest.json">
+<title>PALLO! · 1:1 언어교환 한국인 신청</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<link rel="stylesheet" href="site.css">
+<style>body{font-family:Pretendard,"Pretendard Variable",-apple-system,"Apple SD Gothic Neo",sans-serif;word-break:keep-all}</style>
+</head>
+<body>
+<header><a class="logo" href="korean.html" aria-label="PALLO!"><img src="brand/sig-h.svg" alt="PALLO!"></a></header>
+<main>
+
+<section class="screen on" id="s-form">
+  <div class="hero">
+    <img class="symbol" src="brand/symbol.svg" alt="">
+    <h1>1:1 언어교환 신청</h1>
+    <img class="slogan" src="brand/slogan-ko.svg" alt="당신을 위한 무대">
+  </div>
+  <p>외국인 회원과 1:1로 언어를 교환하는 프로그램입니다. 내가 배우고 싶은 언어를 쓰는 외국인 친구와 매칭해 드립니다. 무료.</p>
+  <p class="muted">신청하시면 담당자가 확인 후, 조건이 맞는 외국인 회원이 있을 때 연락드립니다.</p>
+  <form id="f">
+    <label>이름 <input type="text" name="name" required></label>
+    <label>전화번호 <input type="tel" name="phone" required placeholder="010-1234-5678"></label>
+    <label>성별
+      <select name="gender"><option value="">선택</option><option>여성</option><option>남성</option><option>기타 / 밝히지 않음</option></select></label>
+    <label>연령대
+      <select name="age_range"><option value="">선택</option><option>10대</option><option>20대</option><option>30대</option><option>40대</option><option>50대 이상</option></select></label>
+    <label>이용 지점 <select name="branch" required></select></label>
+    <label>멤버십
+      <select name="membership"><option>Basic</option><option>Lite</option><option>VVIP</option><option>VVIP+</option></select></label>
+    <label>배우고 싶은 언어
+      <select name="target_language"><option>영어</option><option>일본어</option><option>중국어</option><option>기타</option></select></label>
+    <label>그 언어 현재 수준
+      <select name="target_level"><option>입문</option><option>초급</option><option>중급</option><option>고급</option></select></label>
+    <label>원하는 교환 방식
+      <select name="exchange_style"><option>가벼운 대화 위주</option><option>교재/주제 정해서 공부</option><option>섞어서</option></select></label>
+    <label>선호하는 상대 (선택) <input type="text" name="preferred_partner" placeholder="예: 비슷한 나이, 성별 무관, 여행 좋아하는 분"></label>
+    <label>가능한 요일</label>
+    <div class="chips" data-name="available_days">
+      <label><input type="checkbox" value="Mon"><span>월</span></label><label><input type="checkbox" value="Tue"><span>화</span></label>
+      <label><input type="checkbox" value="Wed"><span>수</span></label><label><input type="checkbox" value="Thu"><span>목</span></label>
+      <label><input type="checkbox" value="Fri"><span>금</span></label><label><input type="checkbox" value="Sat"><span>토</span></label>
+      <label><input type="checkbox" value="Sun"><span>일</span></label>
+    </div>
+    <label>가능한 시간대</label>
+    <div class="chips" data-name="available_times">
+      <label><input type="checkbox" value="Morning"><span>오전</span></label><label><input type="checkbox" value="Afternoon"><span>오후</span></label>
+      <label><input type="checkbox" value="Evening"><span>저녁</span></label>
+    </div>
+    <label>원하는 만남 횟수
+      <select name="frequency"><option>주 1회</option><option>주 2회</option><option>격주</option><option>상관없음</option></select></label>
+    <label>온라인 / 오프라인
+      <select name="mode"><option>오프라인 (지점에서)</option><option>온라인</option><option>둘 다 가능</option></select></label>
+    <label>기타 요청사항 (선택) <textarea name="note"></textarea></label>
+    <label class="consent"><input type="checkbox" name="consent" required>
+      <span>언어교환 매칭 및 연락을 위해 Pallo가 위 개인정보(이름, 연락처, 언어/일정 정보)를 수집·이용하는 것에 동의합니다. 삭제 요청 시까지 보관합니다.</span></label>
+    <div class="err" id="err"></div>
+    <button class="btn yellow" type="submit">신청하기</button>
+  </form>
+</section>
+
+<section class="screen done" id="s-done">
+  <img class="symbol" src="brand/symbol.svg" alt="">
+  <h2>신청 완료!</h2>
+  <p>조건이 맞는 외국인 회원이 있으면 전화로 연락드릴게요.</p>
+  <p class="muted">문의는 지점 데스크 또는 인스타그램 DM으로.</p>
+  <a class="btn ghost" id="ig" target="_blank" rel="noopener">📸 Instagram</a>
+</section>
+
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+const db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } }); // 플래너와 같은 주소라 직원 로그인 세션을 건드리지 않게
+const $ = s => document.querySelector(s);
+$('#ig').href = 'https://www.instagram.com/' + CONFIG.INSTAGRAM_HANDLE + '/';
+$('select[name=branch]').innerHTML = CONFIG.BRANCHES.map(b => `<option value="${b.id}">${b.ko}</option>`).join('');
+const B = new URLSearchParams(location.search).get('b'); if (CONFIG.BRANCHES.some(b => b.id === B)) $('select[name=branch]').value = B;
+$('#f').onsubmit = async e => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button');
+  const p = Object.fromEntries(new FormData(f));
+  p.consent = f.consent.checked ? 'true' : 'false';
+  f.querySelectorAll('.chips[data-name]').forEach(g => p[g.dataset.name] = [...g.querySelectorAll('input:checked')].map(i => i.value));
+  btn.disabled = true; $('#err').textContent = '';
+  const { error } = await db.rpc('gx_register_korean', { p });
+  btn.disabled = false;
+  if (error) { $('#err').textContent = '저장에 실패했어요. 입력 내용을 확인하고 다시 시도해 주세요.'; console.error(error); return; }
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === 's-done'));
+  window.scrollTo(0, 0);
+};
+</script>
+</body>
+</html>

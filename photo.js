@@ -1,4 +1,4 @@
-// 🖼 사진 공용 (블로그·게시물 탭): 읽기 · 자르기·밝기·모자이크 굽기 · 얼굴 자동 찾기 · 편집 창 · 복사 · 번호대로 받기.
+// 🖼 사진 공용 (블로그·게시물 탭): 읽기 · 자르기·밝기·모자이크·꾸미기(필터·테두리·글자·이모지) 굽기 · 얼굴 자동 찾기 · 편집 창 · 복사 · 번호대로 받기.
 // 사진 처리는 이 기기 안에서만 한다 (AI 에는 1024px 사본만). index.html 전역 toast 를 씀 → window.PHOTO
 // cropRect 는 Node 테스트(tests/photo.test.mjs)에서도 불러서, 위쪽 코드는 DOM 없이 읽혀야 한다.
 (function (root, factory) {
@@ -8,14 +8,21 @@
 
 const MP = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const FACE_MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite";
-const JSZIP = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+const HEIC = "https://cdn.jsdelivr.net/npm/heic-to@1.6.5/dist/heic-to.js"; // 아이폰 HEIC → JPG (크롬·윈도우는 HEIC를 못 읽음, 사파리는 바로 읽음). 3MB라 HEIC 올 때만 받음
 const RATIOS = { orig: 0, "4:5": 4 / 5, "1:1": 1, "4:3": 4 / 3, "3:4": 3 / 4, "16:9": 16 / 9 };
 const pad = (n) => String(n).padStart(2, "0");
 let seq = 0;
 
 const loadScript = (src) => new Promise((ok, no) => { if (document.querySelector(`script[src="${src}"]`)) return ok(); const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.append(s); });
 const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-const blankEdits = () => ({ ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast: 0, blurs: [] });
+const blankEdits = () => ({ ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast: 0, blurs: [], filter: "none", frame: "none", items: [] });
+// ── 꾸미기 ── 필터 값 = [채도, R·G·B 배율, 더할 밝기, 대비]
+const FILTERS = { none: "원본", warm: "따뜻하게", cool: "시원하게", vivid: "선명하게", soft: "부드럽게", mono: "흑백", vintage: "빈티지" };
+const FX = { warm: [1.05, 1.08, 1, 0.88, 6, 1], cool: [1, 0.92, 1, 1.1, 4, 1], vivid: [1.4, 1, 1, 1, 0, 1.08], soft: [0.85, 1, 1, 1, 14, 0.85], mono: [0, 1, 1, 1, 0, 1.05], vintage: [0.55, 1.08, 1, 0.82, 18, 0.88] };
+const FRAMES = { none: ["없음"], white: ["흰 테두리", "#fff"], polaroid: ["폴라로이드", "#fff"], purple: ["퍼플", "#493087"], yellow: ["옐로", "#E0D120"] };
+const COLORS = { "#ffffff": "흰색", "#111111": "검정", "#493087": "퍼플", "#E0D120": "옐로" };
+const EMOJI = ["😊", "😍", "🤣", "👍", "🔥", "✨", "🎉", "❤️", "⭐", "💬", "📚", "☕", "🌸", "🌏"];
+const TEXT_FONT = '"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif', EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 
 // ── 읽기 ──
 async function fromBlob(blob, name, faced = false) {
@@ -27,8 +34,14 @@ async function fromBlob(blob, name, faced = false) {
 async function fromFiles(files) {
   const out = [];
   for (const f of files) {
-    if (!/^image\//.test(f.type) && !/\.(heic|heif)$/i.test(f.name)) continue;
-    try { out.push(await fromBlob(f, f.name)); } catch { toast(`${f.name}: 이 형식은 못 읽어요 (HEIC면 JPG로 바꿔서 올려 주세요)`); }
+    const heic = /hei[cf]/i.test(f.type) || /\.(heic|heif)$/i.test(f.name);
+    if (!/^image\//.test(f.type) && !heic) continue;
+    try { out.push(await fromBlob(f, f.name)); continue; } catch { if (!heic) { toast(`${f.name}: 이 형식은 못 읽어요`); continue; } }
+    try { // 이 브라우저가 HEIC를 못 읽음 → JPG로 바꿔서 다시
+      toast(`${f.name}: 아이폰 사진(HEIC)을 JPG로 바꾸는 중…`);
+      const { heicTo } = await import(HEIC);
+      out.push(await fromBlob(await heicTo({ blob: f, type: "image/jpeg", quality: 0.92 }), f.name.replace(/\.hei[cf]$/i, ".jpg")));
+    } catch (e) { console.error(e); toast(`${f.name}: HEIC를 바꾸지 못했어요. JPG로 바꿔서 올려 주세요`); }
   }
   return out;
 }
@@ -51,19 +64,68 @@ function cropRect(p) {
   let w = W, h = W / r; if (h > H) { h = H; w = H * r; }
   return { x: (W - w) * p.edits.ox, y: (H - h) * p.edits.oy, w, h };
 }
+// 얼굴 가리기 = 블러 (10-28 모자이크 → 블러). 아주 작게 줄였다가(얼굴 정보 날림) 부드럽게 키움 → 어느 폰에서나 흐릿한 덩어리.
+// 캔버스 블러(ctx.filter)를 아는 브라우저는 한 번 더 가우시안으로 문질러 더 매끈하게 (옛 아이폰 사파리는 몰라서 위 방식만으로도 안 보이게)
 function mosaic(ctx, x, y, w, h) {
   if (w < 2 || h < 2) return;
-  const cell = Math.max(6, Math.round(Math.max(w, h) / 9)), t = document.createElement("canvas");
-  t.width = Math.max(1, Math.ceil(w / cell)); t.height = Math.max(1, Math.ceil(h / cell));
-  t.getContext("2d").drawImage(ctx.canvas, x, y, w, h, 0, 0, t.width, t.height);
-  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(t, 0, 0, t.width, t.height, x, y, w, h); ctx.restore();
+  const cell = Math.max(6, Math.round(Math.max(w, h) / 7), Math.round(Math.max(ctx.canvas.width, ctx.canvas.height) / 110)); // 작은(먼) 얼굴도 알아보지 못하게: 사진 크기에 맞춘 최소 크기
+  const s = document.createElement("canvas"); s.width = Math.max(2, Math.ceil(w / cell)); s.height = Math.max(2, Math.ceil(h / cell));
+  const sc = s.getContext("2d"); sc.imageSmoothingEnabled = true; sc.imageSmoothingQuality = "high"; sc.drawImage(ctx.canvas, x, y, w, h, 0, 0, s.width, s.height);
+  const m = document.createElement("canvas"); m.width = s.width * 8; m.height = s.height * 8; // 두 번에 나눠 키워야 네모 자국이 덜 남
+  const mc = m.getContext("2d"); mc.imageSmoothingEnabled = true; mc.imageSmoothingQuality = "high"; mc.drawImage(s, 0, 0, m.width, m.height);
+  const t = document.createElement("canvas"); t.width = Math.max(1, Math.round(w)); t.height = Math.max(1, Math.round(h));
+  const tc = t.getContext("2d"); tc.imageSmoothingEnabled = true; tc.imageSmoothingQuality = "high";
+  if ("filter" in tc) { const r = Math.max(2, cell * 0.6); tc.filter = `blur(${r}px)`; tc.drawImage(m, -r, -r, t.width + 2 * r, t.height + 2 * r); tc.filter = "none"; } // 가장자리까지 꽉 차게 조금 크게 그림
+  else { tc.drawImage(m, 0, 0, t.width, t.height); boxBlur(tc, t.width, t.height, Math.max(2, Math.round(cell * 0.5))); } // 옛 사파리: 직접 문지르기
+  ctx.drawImage(t, x, y, w, h);
+}
+// 상자 블러 3번 = 가우시안과 거의 같음 (가로·세로 따로, 가장자리는 끝 픽셀로 채움). 얼굴 칸만이라 가벼움
+function boxBlur(c, w, h, r) {
+  const img = c.getImageData(0, 0, w, h), a = img.data, tmp = new Uint8ClampedArray(a.length);
+  const pass = (src, dst, horiz) => {
+    const n = horiz ? w : h, m = horiz ? h : w, st = horiz ? 4 : w * 4, ln = horiz ? w * 4 : 4;
+    for (let j = 0; j < m; j++) for (let ch = 0; ch < 3; ch++) {
+      const o = j * ln + ch, at = (i) => src[o + Math.min(n - 1, Math.max(0, i)) * st];
+      let sum = 0; for (let i = -r; i <= r; i++) sum += at(i);
+      for (let i = 0; i < n; i++) { dst[o + i * st] = sum / (2 * r + 1); sum += at(i + r + 1) - at(i - r); dst[o + i * st + 3 - ch] = 255; }
+    }
+  };
+  for (let k = 0; k < 3; k++) { pass(a, tmp, true); pass(tmp, a, false); }
+  c.putImageData(img, 0, 0);
+}
+// 밝기·대비·필터 (a = RGBA 픽셀 배열, Uint8ClampedArray 라 0~255 로 알아서 잘림). Node 테스트에서도 부름
+function toneData(a, e) {
+  const [sat, kr, kg, kb, add, con] = FX[e.filter] || [1, 1, 1, 1, 0, 1], k = [kr, kg, kb];
+  const c = (100 + e.contrast) / 100 * con, b = e.bright * 2.2 + add;
+  for (let i = 0; i < a.length; i += 4) {
+    const y = 0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2];
+    for (let j = 0; j < 3; j++) a[i + j] = ((y + (a[i + j] - y) * sat) * k[j] - 128) * c + 128 + b;
+  }
 }
 function tone(ctx, e) {
-  if (!e.bright && !e.contrast) return;
-  const { width: w, height: h } = ctx.canvas, d = ctx.getImageData(0, 0, w, h), a = d.data;
-  const b = e.bright * 2.2, c = (100 + e.contrast) / 100;
-  for (let i = 0; i < a.length; i += 4) for (let k = 0; k < 3; k++) a[i + k] = Math.max(0, Math.min(255, (a[i + k] - 128) * c + 128 + b));
-  ctx.putImageData(d, 0, 0);
+  if (!e.bright && !e.contrast && !FX[e.filter]) return;
+  const { width: w, height: h } = ctx.canvas, d = ctx.getImageData(0, 0, w, h);
+  toneData(d.data, e); ctx.putImageData(d, 0, 0);
+}
+// 테두리는 자르기 칸 안쪽에 칠함 → 고른 비율(인스타 4:5 등)이 그대로 유지됨
+function frame(ctx, e, x, y, w, h) {
+  const col = FRAMES[e.frame]?.[1]; if (!col) return;
+  const t = Math.min(w, h) * 0.035, bot = e.frame === "polaroid" ? Math.min(w, h) * 0.16 : t;
+  ctx.fillStyle = col; ctx.beginPath(); ctx.rect(x, y, w, h); ctx.rect(x + t, y + t, w - 2 * t, h - t - bot); ctx.fill("evenodd");
+}
+// 글자·이모지: x·y 는 원본 사진 좌표(가운데), size 는 사진 긴 변의 % → 비율을 바꿔도 크기·자리가 안 변함
+function items(ctx, e, s, ox, oy, long) {
+  for (const it of e.items) {
+    const fs = it.size / 100 * long * s, lines = it.t.split("\n"), lh = fs * 1.25, x = (it.x - ox) * s, y = (it.y - oy) * s;
+    ctx.save(); ctx.font = it.k === "emoji" ? `${fs}px ${EMOJI_FONT}` : `800 ${fs}px ${TEXT_FONT}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const w = Math.max(...lines.map((l) => ctx.measureText(l).width)), h = lh * lines.length, dark = it.color === "#111111" || it.color === "#493087";
+    if (it.k === "text" && it.band) { ctx.fillStyle = dark ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.5)"; ctx.beginPath(); ctx.roundRect(x - w / 2 - fs * 0.4, y - h / 2 - fs * 0.15, w + fs * 0.8, h + fs * 0.3, fs * 0.3); ctx.fill(); }
+    else if (it.k === "text" && !dark) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = fs * 0.18; }
+    ctx.fillStyle = it.color; lines.forEach((l, i) => ctx.fillText(l, x, y - h / 2 + lh * (i + 0.5)));
+    ctx.restore();
+    it._box = { x: it.x - w / 2 / s, y: it.y - h / 2 / s, w: w / s, h: h / s }; // 편집 창에서 눌러 고르기용 (사진 좌표)
+  }
 }
 // 편집 반영한 사진 (crop: 자르기 적용 여부)
 function draw(p, maxSide, e = p.edits, crop = true) {
@@ -73,6 +135,8 @@ function draw(p, maxSide, e = p.edits, crop = true) {
   const ctx = cv.getContext("2d"); ctx.drawImage(p.img, c.x, c.y, c.w, c.h, 0, 0, cv.width, cv.height);
   e.blurs.forEach((r) => mosaic(ctx, (r.x - c.x) * s, (r.y - c.y) * s, r.w * s, r.h * s));
   tone(ctx, e);
+  const k = cropRect({ ...p, edits: e }); frame(ctx, e, (k.x - c.x) * s, (k.y - c.y) * s, k.w * s, k.h * s);
+  items(ctx, e, s, c.x, c.y, Math.max(W, H));
   return { cv, s, c };
 }
 async function bake(p) {
@@ -82,10 +146,38 @@ async function bake(p) {
   if (p.url) URL.revokeObjectURL(p.url);
   p.url = URL.createObjectURL(p.blob);
   p.ai = draw(p, 1024).cv.toDataURL("image/jpeg", 0.8).split(",")[1];
+  if (vdlg?.open && VW.list[VW.i] === p) vShow(VW.i); // 크게 보는 중에 다시 구워지면(AI 꾸미기 등) 바로 바뀐 사진으로
 }
-async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; await bake(p); } }
+async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; if (p.deco && p.deco !== "manual") decoEdits(p, p.deco === "none" ? null : p.deco); await bake(p); } } // 자동 꾸미기 글자는 새 자르기 칸에 다시 놓음
 
-// ── 얼굴 찾기: 전체 + 2×2 조각(작은 얼굴용)으로 돌리고 겹치는 건 합침 ──
+// ── 자동 꾸미기 (게시물 탭, 신고 #3): AI(blog-write deco)가 사진마다 고른 한 벌 → 그대로 굽고, 매니저가 [편집]에서 고침(deco=manual 은 다시 안 건드림) ──
+// 한 벌 = { filter, frame, bright, contrast, text, text_pos, text_color, band, emoji, emoji_pos }. 언어 세트는 AI 가 안 될 때 대신 쓰는 기본값
+const LANGS = { en: { name: "영어", frame: "purple", filter: "vivid", emoji: "💬", text: "English Talk" }, ja: { name: "일본어", frame: "white", filter: "warm", emoji: "🌸", text: "日本語" },
+  zh: { name: "중국어", frame: "yellow", filter: "vivid", emoji: "🏮", text: "中文" }, es: { name: "스페인어", frame: "polaroid", filter: "warm", emoji: "☀️", text: "Español" } };
+const preset = (lang) => LANGS[lang] ? { bright: 0, contrast: 0, text_pos: "bottom", text_color: "#ffffff", band: true, emoji_pos: "top-right", ...LANGS[lang] } : null;
+const clamp40 = (v) => Math.max(-40, Math.min(40, Math.round(+v || 0)));
+function decoEdits(p, d) {
+  const e = p.edits;
+  e.items = e.items.filter((it) => !it.auto);
+  if (!d) { e.frame = "none"; e.filter = "none"; e.bright = 0; e.contrast = 0; return; }
+  e.frame = FRAMES[d.frame] ? d.frame : "none"; e.filter = FILTERS[d.filter] ? d.filter : "none"; e.bright = clamp40(d.bright); e.contrast = clamp40(d.contrast);
+  const c = cropRect(p), long = Math.max(p.img.naturalWidth, p.img.naturalHeight), m = Math.min(c.w, c.h), pol = e.frame === "polaroid";
+  if (d.emoji) {
+    const [v, h] = String(d.emoji_pos || "top-right").split("-");
+    e.items.push({ k: "emoji", t: d.emoji, x: h === "left" ? c.x + m * 0.13 : c.x + c.w - m * 0.13, y: v === "bottom" ? c.y + c.h - m * (pol ? 0.26 : 0.13) : c.y + m * 0.13, size: 9 * m / long, color: "#ffffff", band: false, auto: true });
+  }
+  const t = String(d.text ?? "").trim().slice(0, 30);
+  if (t) {
+    const pos = pol ? "bottom" : d.text_pos, y = pos === "top" ? c.y + m * 0.14 : pos === "center" ? c.y + c.h / 2 : c.y + c.h - m * (pol ? 0.08 : 0.12);
+    e.items.push({ k: "text", t, x: c.x + c.w / 2, y, size: (t.length > 12 ? 5.5 : 7) * m / long, color: pol ? "#493087" : COLORS[d.text_color] ? d.text_color : "#ffffff", band: pol ? false : !!d.band, auto: true }); // 폴라로이드는 아래 흰 띠 안에 퍼플 글자
+  }
+}
+async function applyDeco(list, specs) { for (const [i, p] of list.entries()) { if (p.deco === "manual") continue; decoEdits(p, specs[i]); p.deco = specs[i] ?? "none"; await bake(p); } }
+const applyLang = (list, lang) => applyDeco(list, list.map(() => preset(lang)));
+
+// ── 얼굴 찾기: 전체 + 2·3·4·6·8칸 조각으로 확대해서 돌림 (작은·먼 얼굴용) → 겹치는 건 합침 → 헷갈리는 건 다시 확인 ──
+// 10-28 시험(공개 단체사진 6장): 예전(전체+2×2) 식당 6명 중 3명·단체 100명 중 0명 → 지금 5명·91명, 술병·잔 같은 헛것은 다시 확인으로 걸러냄.
+// 뒤돌아 얼굴이 안 보이는 사람은 못 찾음 → [편집]에서 직접 칠하기
 let detector;
 async function faceDetector() {
   if (detector) return detector;
@@ -94,31 +186,69 @@ async function faceDetector() {
   detector = await v.FaceDetector.createFromOptions(fs, { baseOptions: { modelAssetPath: FACE_MODEL }, runningMode: "IMAGE", minDetectionConfidence: 0.35 });
   return detector;
 }
+const GRIDS = [[1, 1], [2, 0.6], [3, 0.42], [4, 0.32], [6, 0.22], [8, 0.16]]; // [n×n 칸, 조각 크기(사진 대비)]
+const overlap = (a, b) => { const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); return x * y / Math.min(a.w * a.h, b.w * b.h); };
 async function findFaces(p) {
-  const d = await faceDetector(), W = p.img.naturalWidth, H = p.img.naturalHeight, boxes = [];
-  const run = (sx, sy, sw, sh) => {
+  const d = await faceDetector(), img = p.img, W = img.naturalWidth, H = img.naturalHeight, boxes = [];
+  const run = (sx, sy, sw, sh, n) => {
     const k = Math.min(1, 1024 / Math.max(sw, sh)), cv = document.createElement("canvas");
     cv.width = Math.round(sw * k); cv.height = Math.round(sh * k);
-    cv.getContext("2d").drawImage(p.img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
-    for (const det of d.detect(cv).detections) { const b = det.boundingBox; boxes.push({ x: sx + b.originX / k, y: sy + b.originY / k, w: b.width / k, h: b.height / k }); }
+    cv.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    for (const det of d.detect(cv).detections) { const b = det.boundingBox; boxes.push({ x: sx + b.originX / k, y: sy + b.originY / k, w: b.width / k, h: b.height / k, s: det.categories[0].score, n, tw: sw }); }
   };
-  run(0, 0, W, H);
-  const tw = W * 0.6, th = H * 0.6;
-  for (const fx of [0, 0.4]) for (const fy of [0, 0.4]) run(W * fx, H * fy, tw, th);
-  const iou = (a, b) => { const x = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), y = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)); return x * y / Math.min(a.w * a.h, b.w * b.h); };
-  const keep = [];
-  boxes.sort((a, b) => b.w * b.h - a.w * a.h).forEach((b) => { if (!keep.some((k) => iou(k, b) > 0.3)) keep.push(b); });
-  return keep.map((b) => ({ x: Math.max(0, b.x - b.w * 0.25), y: Math.max(0, b.y - b.h * 0.35), w: b.w * 1.5, h: b.h * 1.6 }));
+  for (const [n, f] of GRIDS) { const tw = W * f, th = H * f; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) run(n === 1 ? 0 : (W - tw) * i / (n - 1), n === 1 ? 0 : (H - th) * j / (n - 1), tw, th, n); }
+  const groups = []; // 같은 얼굴끼리 묶음 (점수 높은 것이 대표)
+  boxes.sort((a, b) => b.s - a.s).forEach((b) => { const g = groups.find((g) => overlap(g[0], b) > 0.3); g ? g.push(b) : groups.push([b]); });
+  const likely = groups.filter((g) => { const b = g[0]; return b.s >= 0.75 || (b.w / b.tw < 0.25 && b.s >= 0.5) || (new Set(g.map((x) => x.n)).size >= 2 && b.s >= 0.55); }).map((g) => g[0]);
+  const recheck = (b) => { // 얼굴 둘레를 잘라 다시 찾기: 진짜 얼굴은 또 나오고, 술병·무늬 같은 헛것은 대개 안 나옴
+    const side = Math.max(b.w, b.h) * 2.4, cx = b.x + b.w / 2, cy = b.y + b.h / 2, sx = Math.max(0, cx - side / 2), sy = Math.max(0, cy - side / 2), sw = Math.min(W - sx, side), sh = Math.min(H - sy, side);
+    const k = 256 / Math.max(sw, sh), cv = document.createElement("canvas"); cv.width = Math.round(sw * k); cv.height = Math.round(sh * k);
+    cv.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+    return Math.max(0, ...d.detect(cv).detections.filter((t) => { const q = t.boundingBox; return Math.abs(sx + (q.originX + q.width / 2) / k - cx) < b.w / 2 && Math.abs(sy + (q.originY + q.height / 2) / k - cy) < b.h / 2; }).map((t) => t.categories[0].score));
+  };
+  return likely.filter((b) => b.s >= 0.85 || recheck(b) >= 0.55)
+    .map((b) => ({ x: Math.max(0, b.x - b.w * 0.25), y: Math.max(0, b.y - b.h * 0.35), w: b.w * 1.5, h: b.h * 1.6 })); // 머리카락·턱까지 넉넉히
 }
-// 아직 확인 안 한 사진만 돌림. 찾은 얼굴 수를 돌려준다 (불러오기 실패면 throw)
-async function faceAll(list) {
-  let n = 0;
-  for (const p of list.filter((x) => !x.faced)) { const f = await findFaces(p); p.edits.blurs.push(...f); n += f.length; await bake(p); p.faced = true; /* 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감 */ }
+// 이미 칠한 곳과 겹치지 않는 새 얼굴만 더함 → 몇 번 눌러도 중복 안 생김
+const addFaces = (e, f) => { const add = f.filter((b) => !e.blurs.some((x) => overlap(x, b) > 0.5)); e.blurs.push(...add); return add.length; };
+// again=false(올리기 전 안전 확인): 아직 확인 안 한 사진만 · again=true(버튼): 모든 사진 다시 (놓친 얼굴 더 찾기). onStep(i, 전체) = 진행 표시
+async function faceAll(list, again = false, onStep) {
+  let n = 0; const todo = again ? list : list.filter((x) => !x.faced);
+  for (const [i, p] of todo.entries()) {
+    onStep?.(i + 1, todo.length); await new Promise((r) => setTimeout(r)); // 화면에 진행 표시가 그려지게
+    n += addFaces(p.edits, await findFaces(p)); await bake(p); p.faced = true; /* 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감 */
+  }
   return n;
 }
 
+// ── 🔍 크게 보기 (블로그·게시물 썸네일 누르기): 꾸미기·블러가 다 보이게 원본 비율 그대로, ◀ ▶·키보드로 넘기고 ✏️ 편집으로 바로 ──
+let vdlg = null;
+const VW = { list: [], i: 0, onEdit: null };
+function view(list, i, { onEdit } = {}) {
+  if (!vdlg) {
+    vdlg = document.createElement("dialog"); vdlg.id = "phViewDlg";
+    vdlg.innerHTML = `<div class="vbar"><b id="phVwNo"></b><span class="mut" id="phVwInfo"></span><span style="flex:1"></span><button type="button" class="btn" id="phVwEdit">✏️ 편집</button><button type="button" class="btn ghost" id="phVwClose">닫기</button></div>
+      <div class="vimg"><button type="button" class="vnav" data-vw="-1" aria-label="앞 사진">◀</button><img id="phVwImg" alt=""><button type="button" class="vnav" data-vw="1" aria-label="다음 사진">▶</button></div>`;
+    document.body.append(vdlg);
+    vdlg.addEventListener("click", (e) => {
+      const nv = e.target.closest("[data-vw]"); if (nv) return vShow(VW.i + +nv.dataset.vw);
+      if (e.target.id === "phVwClose" || e.target === vdlg) return vdlg.close(); // 바깥 눌러도 닫힘
+      if (e.target.id === "phVwEdit") { const p = VW.list[VW.i]; vdlg.close(); VW.onEdit?.(p); }
+    });
+    vdlg.addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") vShow(VW.i - 1); if (e.key === "ArrowRight") vShow(VW.i + 1); });
+  }
+  Object.assign(VW, { list, onEdit }); vShow(i); vdlg.showModal();
+}
+function vShow(i) {
+  const n = VW.list.length; if (!n) return; VW.i = (i + n) % n; const p = VW.list[VW.i], e = p.edits;
+  vdlg.querySelector("#phVwImg").src = p.url; vdlg.querySelector("#phVwNo").textContent = `사진 ${pad(VW.i + 1)} / ${pad(n)}`;
+  vdlg.querySelector("#phVwInfo").textContent = [FILTERS[e.filter] && e.filter !== "none" ? `필터 ${FILTERS[e.filter]}` : "", FRAMES[e.frame] && e.frame !== "none" ? `테두리 ${FRAMES[e.frame][0]}` : "",
+    e.items.length ? `글자·이모지 ${e.items.length}` : "", e.blurs.length ? `블러 ${e.blurs.length}` : "", e.ratio !== "orig" ? e.ratio : ""].filter(Boolean).join(" · ");
+  vdlg.querySelectorAll(".vnav").forEach((b) => (b.hidden = n < 2));
+}
+
 // ── 편집 창 (처음 열 때 body 에 붙임) ──
-const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null };
+const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null, sel: null, hf: null, oldImg: null, saved: false };
 let dlg = null;
 const $e = (s) => dlg.querySelector(s);
 function editorDom() {
@@ -126,25 +256,38 @@ function editorDom() {
   dlg = document.createElement("dialog"); dlg.id = "phEditDlg";
   dlg.innerHTML = `<h3 style="margin:0 0 8px">🖼 사진 편집 <small class="mut" id="phEdNo"></small></h3>
     <div class="tb"><span class="mut">비율</span><span class="blseg" id="phEdRatio">${Object.keys(RATIOS).map((r) => `<button type="button" data-ratio="${r}">${r === "orig" ? "원본" : r}</button>`).join("")}</span></div>
-    <div class="tb"><span class="blseg" id="phEdMode"><button type="button" data-emode="blur">🟦 모자이크 그리기</button><button type="button" data-emode="pan">✋ 자르기 위치</button></span>
-      <button type="button" class="btn ghost small" id="phEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="phEdClear">모자이크 지우기</button>
+    <div class="tb"><span class="blseg" id="phEdMode"><button type="button" data-emode="blur">🟦 블러 그리기</button><button type="button" data-emode="pan">✋ 자르기 위치</button></span>
+      <button type="button" class="btn ghost small" id="phEdFace">🙂 얼굴 자동 찾기</button><button type="button" class="btn ghost small" id="phEdClear">블러 지우기</button>
       <span class="mut">밝기</span><input type="range" id="phEdBright" min="-40" max="40" value="0"><span class="mut">대비</span><input type="range" id="phEdContrast" min="-40" max="40" value="0"></div>
     <div class="cv"><canvas id="phEdCv"></canvas></div>
-    <div class="mut" style="margin-top:6px">모자이크: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요.</div>
+    <div class="mut" style="margin-top:6px">블러: 끌어서 네모 그리기 · 네모를 누르면 지워져요. 학생 얼굴은 동의가 없으면 꼭 가려 주세요. 글자·이모지는 눌러서 고르고 끌어서 옮겨요.</div>
+    <div class="deco"><b>✨ 꾸미기</b>
+      <div class="tb"><span class="mut">필터</span><span class="blseg" id="phEdFilter">${Object.entries(FILTERS).map(([k, v]) => `<button type="button" data-filter="${k}">${v}</button>`).join("")}</span></div>
+      <div class="tb"><span class="mut">테두리</span><span class="blseg" id="phEdFrame">${Object.entries(FRAMES).map(([k, v]) => `<button type="button" data-frame="${k}">${v[0]}</button>`).join("")}</span></div>
+      <div class="tb"><textarea id="phEdText" rows="1" placeholder="사진에 넣을 글자 (엔터로 줄바꿈)"></textarea><button type="button" class="btn ghost small" id="phEdAddText">✏️ 글자 넣기</button></div>
+      <div class="tb" id="phEdEmoji"><span class="mut">이모지</span>${EMOJI.map((x) => `<button type="button" class="emo" data-emo="${x}">${x}</button>`).join("")}</div>
+      <div class="tb sel" id="phEdSel" hidden><span class="mut">고른 것</span><span class="mut">크기</span><input type="range" id="phEdSize" min="2" max="30" step="0.5">
+        <span class="txo blseg" id="phEdColor">${Object.entries(COLORS).map(([k, v]) => `<button type="button" data-color="${k}" title="${v}"><i style="background:${k}"></i>${v}</button>`).join("")}</span>
+        <button type="button" class="txo btn ghost small" id="phEdBand">글자 뒤 띠</button><button type="button" class="btn ghost small" id="phEdDel">🗑 빼기</button></div>
+    </div>
+    <div class="hf" id="phEdHf" hidden><b>🪄 힉스필드 AI 다듬기</b> <span class="mut">사람 없는 사진만(교실·교재·간판 등) · 지점마다 하루 10장 · 사진 전체를 다시 그려서 원본과 비교 후 골라요</span>
+      <div class="tb"><button type="button" class="btn ghost small" data-hf="enhance">✨ 보정 (밝기·색감·선명)</button><button type="button" class="btn ghost small" data-hf="clean">🧹 배경 정리</button><button type="button" class="btn ghost small" data-hf="tall">↕️ 세로로 늘리기 (인스타)</button></div>
+      <div id="phEdHfOut"></div></div>
     <label>사진 메모 (AI에게 알려줄 내용, 선택)</label><input id="phEdNote" placeholder="예) 토요반 프리토킹 시간, 원어민 강사">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn ghost" id="phEdCancel">취소</button><button type="button" class="btn" id="phEdSave">적용</button></div>`;
   document.body.append(dlg);
   wireEditor();
 }
-function edit(p, { title = "", onSave } = {}) {
+function edit(p, { title = "", onSave, hf } = {}) {
   editorDom();
-  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave;
+  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave; ED.sel = null; ED.hf = hf ?? null; ED.oldImg = null; ED.saved = false; ED.hfImg = null;
+  $e("#phEdHf").hidden = !hf || !HF_ON; $e("#phEdHfOut").innerHTML = "";
   $e("#phEdNo").textContent = title;
   $e("#phEdBright").value = ED.e.bright; $e("#phEdContrast").value = ED.e.contrast; $e("#phEdNote").value = p.note;
   dlg.showModal(); edDraw();
 }
 function edDraw() {
-  const { p, e } = ED, maxW = Math.min(940, window.innerWidth - 60), maxH = window.innerHeight * 0.55;
+  const { p, e } = ED, maxW = Math.min(940, window.innerWidth - 60), maxH = window.innerHeight * 0.5;
   const s = Math.min(maxW / p.img.naturalWidth, maxH / p.img.naturalHeight, 1); ED.s = s;
   const { cv: src } = draw(p, Math.max(p.img.naturalWidth, p.img.naturalHeight) * s, e, false);
   const cv = $e("#phEdCv"); cv.width = src.width; cv.height = src.height;
@@ -156,18 +299,39 @@ function edDraw() {
   ctx.setLineDash([5, 4]); ctx.strokeStyle = "#ffd400";
   e.blurs.forEach((r) => ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s));
   if (ED.drag?.rect) { const r = ED.drag.rect; ctx.strokeStyle = "#4dabf7"; ctx.strokeRect(r.x * s, r.y * s, r.w * s, r.h * s); }
+  if (ED.sel?._box) { const r = ED.sel._box, m = 6 / s; ctx.strokeStyle = "#4dabf7"; ctx.strokeRect((r.x - m) * s, (r.y - m) * s, (r.w + 2 * m) * s, (r.h + 2 * m) * s); }
   ctx.setLineDash([]);
   dlg.querySelectorAll("[data-ratio]").forEach((b) => b.classList.toggle("on", b.dataset.ratio === e.ratio));
   dlg.querySelectorAll("[data-emode]").forEach((b) => b.classList.toggle("on", b.dataset.emode === ED.mode));
+  dlg.querySelectorAll("[data-filter]").forEach((b) => b.classList.toggle("on", b.dataset.filter === e.filter));
+  dlg.querySelectorAll("[data-frame]").forEach((b) => b.classList.toggle("on", b.dataset.frame === e.frame));
+  const it = ED.sel; $e("#phEdSel").hidden = !it;
+  if (it) {
+    $e("#phEdSize").value = it.size; dlg.querySelectorAll(".txo").forEach((x) => (x.hidden = it.k !== "text"));
+    dlg.querySelectorAll("[data-color]").forEach((b) => b.classList.toggle("on", b.dataset.color === it.color));
+    $e("#phEdBand").classList.toggle("on", it.band);
+  }
+}
+// 고르면 글자 칸에 그 글자를 띄움 → 칸을 고치면 바로 바뀜
+function select(it) { ED.sel = it; if (it?.k === "text") $e("#phEdText").value = it.t; }
+function addItem(k, t, size) {
+  const c = cropRect({ ...ED.p, edits: ED.e }), it = { k, t, x: c.x + c.w / 2, y: c.y + c.h / 2, size, color: "#ffffff", band: false };
+  ED.e.items.push(it); select(it); edDraw();
 }
 function edPoint(ev) { const cv = $e("#phEdCv"), r = cv.getBoundingClientRect(), k = cv.width / r.width; return { x: (ev.clientX - r.left) * k / ED.s, y: (ev.clientY - r.top) * k / ED.s }; }
 function wireEditor() {
   const cv = $e("#phEdCv");
-  cv.onpointerdown = (ev) => { cv.setPointerCapture(ev.pointerId); const pt = edPoint(ev); ED.drag = { start: pt, last: pt, moved: false }; };
+  cv.onpointerdown = (ev) => {
+    cv.setPointerCapture(ev.pointerId); const pt = edPoint(ev), m = 10 / ED.s; // 손가락으로도 잡히게 둘레 여유
+    const item = ED.e.items.findLast((it) => it._box && pt.x >= it._box.x - m && pt.x <= it._box.x + it._box.w + m && pt.y >= it._box.y - m && pt.y <= it._box.y + it._box.h + m);
+    if (item) select(item);
+    ED.drag = { start: pt, last: pt, moved: false, item }; edDraw();
+  };
   cv.onpointermove = (ev) => {
     const d = ED.drag; if (!d) return; const pt = edPoint(ev);
     if (Math.abs(pt.x - d.start.x) + Math.abs(pt.y - d.start.y) > 6 / ED.s) d.moved = true;
-    if (ED.mode === "blur") d.rect = { x: Math.min(d.start.x, pt.x), y: Math.min(d.start.y, pt.y), w: Math.abs(pt.x - d.start.x), h: Math.abs(pt.y - d.start.y) };
+    if (d.item) { d.item.x += pt.x - d.last.x; d.item.y += pt.y - d.last.y; }
+    else if (ED.mode === "blur") d.rect = { x: Math.min(d.start.x, pt.x), y: Math.min(d.start.y, pt.y), w: Math.abs(pt.x - d.start.x), h: Math.abs(pt.y - d.start.y) };
     else {
       const c = cropRect({ ...ED.p, edits: ED.e }), W = ED.p.img.naturalWidth, H = ED.p.img.naturalHeight;
       if (W > c.w) ED.e.ox = Math.max(0, Math.min(1, ED.e.ox + (pt.x - d.last.x) / (W - c.w)));
@@ -177,7 +341,8 @@ function wireEditor() {
   };
   cv.onpointerup = () => {
     const d = ED.drag; ED.drag = null; if (!d) return;
-    if (ED.mode === "blur") {
+    if (!d.item && !d.moved) select(null);
+    if (!d.item && ED.mode === "blur") {
       if (d.moved && d.rect.w > 4 && d.rect.h > 4) ED.e.blurs.push(d.rect);
       else if (!d.moved) { const { x, y } = d.start, i = ED.e.blurs.findIndex((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h); if (i >= 0) ED.e.blurs.splice(i, 1); }
     }
@@ -188,18 +353,63 @@ function wireEditor() {
   $e("#phEdBright").oninput = (ev) => { ED.e.bright = +ev.target.value; edDraw(); };
   $e("#phEdContrast").oninput = (ev) => { ED.e.contrast = +ev.target.value; edDraw(); };
   $e("#phEdClear").onclick = () => { ED.e.blurs = []; edDraw(); };
+  $e("#phEdFilter").onclick = (ev) => { const f = ev.target.closest("[data-filter]")?.dataset.filter; if (f) { ED.e.filter = f; edDraw(); } };
+  $e("#phEdFrame").onclick = (ev) => { const f = ev.target.closest("[data-frame]")?.dataset.frame; if (f) { ED.e.frame = f; edDraw(); } };
+  $e("#phEdAddText").onclick = () => { const t = $e("#phEdText").value.trim(); if (!t) return toast("넣을 글자를 먼저 써 주세요"); addItem("text", t, 7); };
+  $e("#phEdEmoji").onclick = (ev) => { const t = ev.target.closest("[data-emo]")?.dataset.emo; if (t) addItem("emoji", t, 10); };
+  $e("#phEdText").oninput = (ev) => { if (ED.sel?.k === "text") { ED.sel.t = ev.target.value; edDraw(); } };
+  $e("#phEdSize").oninput = (ev) => { if (ED.sel) { ED.sel.size = +ev.target.value; edDraw(); } };
+  $e("#phEdColor").onclick = (ev) => { const c = ev.target.closest("[data-color]")?.dataset.color; if (c && ED.sel) { ED.sel.color = c; edDraw(); } };
+  $e("#phEdBand").onclick = () => { if (ED.sel) { ED.sel.band = !ED.sel.band; edDraw(); } };
+  $e("#phEdDel").onclick = () => { ED.e.items.splice(ED.e.items.indexOf(ED.sel), 1); ED.sel = null; edDraw(); };
   $e("#phEdFace").onclick = async (ev) => {
     ev.target.disabled = true; ev.target.textContent = "찾는 중…";
-    try { const f = await findFaces(ED.p); ED.e.blurs.push(...f); toast(f.length ? `얼굴 ${f.length}개를 찾았어요` : "찾은 얼굴이 없어요. 직접 칠해 주세요"); }
+    try { const n = addFaces(ED.e, await findFaces(ED.p)); toast(n ? `얼굴 ${n}개를 더 찾았어요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 직접 칠해 주세요"); }
     catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요"); }
     ev.target.disabled = false; ev.target.textContent = "🙂 얼굴 자동 찾기"; edDraw();
   };
   $e("#phEdCancel").onclick = () => dlg.close();
+  dlg.addEventListener("close", () => { if (!ED.saved && ED.oldImg) { ED.p.img = ED.oldImg; ED.oldImg = null; } }); // 취소·Esc = AI 다듬기 바꾼 것도 되돌림
+  $e("#phEdHf").addEventListener("click", (ev) => { const b = ev.target.closest("[data-hf]"); if (b) return hfRun(b.dataset.hf); if (ev.target.closest("[data-hfuse]")) return hfUse(); if (ev.target.closest("[data-hfdrop]")) { ED.hfImg = null; $e("#phEdHfOut").innerHTML = ""; } });
   $e("#phEdSave").onclick = async () => {
-    const p = ED.p; p.edits = ED.e; p.note = $e("#phEdNote").value.trim();
+    const p = ED.p; ED.saved = true; if (ED.oldImg) { ED.oldImg = null; p.raw = null; } p.edits = ED.e; p.note = $e("#phEdNote").value.trim();
     await bake(p); p.faced = true; // 편집 창에서 직접 봤으면 확인한 것으로. 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감
     dlg.close(); ED.onSave?.(p);
   };
+}
+
+// ── 🪄 힉스필드 AI 다듬기 (편집 창): 얼굴 있으면 안 보냄 → 원본(편집 전)을 2048px 로 보내 다시 그린 사진을 받아 나란히 비교 → [이걸로 바꾸기] = 바탕 사진 교체 (적용 눌러야 확정) ──
+const HF_ON = false; // 10-29 대표 결정: 힉스필드 API 잔액 충전 전까지 🪄 칸 숨김 → 충전하면 true 로 (서버 blog-write hf·HF_KEY 는 그대로)
+const HF_ASPECT = [["1:1", 1], ["2:3", 2 / 3], ["3:2", 1.5], ["3:4", 0.75], ["4:3", 4 / 3], ["7:9", 7 / 9], ["9:7", 9 / 7], ["9:16", 9 / 16], ["16:9", 16 / 9], ["21:9", 21 / 9]];
+const nearAspect = (r) => HF_ASPECT.reduce((a, b) => (Math.abs(Math.log(b[1] / r)) < Math.abs(Math.log(a[1] / r)) ? b : a))[0];
+async function hfRun(mode) {
+  const p = ED.p, out = $e("#phEdHfOut"), btns = dlg.querySelectorAll("[data-hf]");
+  if (ED.e.blurs.length) return toast("얼굴을 가린 사진은 AI 다듬기를 쓸 수 없어요 (얼굴이 바뀔 수 있어요)");
+  const say = (t) => (out.innerHTML = `<div class="mut hfnote">${t}</div>`);
+  btns.forEach((b) => (b.disabled = true));
+  try {
+    say("🙂 사진에 사람이 있는지 확인 중…");
+    let faces; try { faces = await findFaces(p); } catch (e) { console.error(e); return say("얼굴 확인이 안 돼서 보내지 않았어요. 잠시 뒤 다시 눌러 주세요."); }
+    if (faces.length) return say(`🙅 사람 얼굴이 ${faces.length}개 보여요. 학생 얼굴이 바뀔 수 있어서 AI 다듬기는 사람 없는 사진(교실·교재·간판 등)만 돼요.`);
+    const W = p.img.naturalWidth, H = p.img.naturalHeight, k = Math.min(1, 2048 / Math.max(W, H)), cv = document.createElement("canvas");
+    cv.width = Math.round(W * k); cv.height = Math.round(H * k); cv.getContext("2d").drawImage(p.img, 0, 0, cv.width, cv.height);
+    const aspect = mode === "tall" ? (W / H > 0.8 ? "3:4" : "9:16") : nearAspect(W / H);
+    say("🪄 힉스필드가 다듬는 중… (보통 10~60초, 창을 닫지 마세요)");
+    const r = await ED.hf({ data: cv.toDataURL("image/jpeg", 0.9).split(",")[1], mode, aspect });
+    if (ED.p !== p || !dlg.open) return; // 그 사이 다른 사진을 열었거나 닫음
+    if (!r?.image) return say("다듬기를 하지 못했어요. 위 알림을 확인해 주세요.");
+    ED.hfImg = await loadImg(`data:${r.media_type};base64,${r.image}`); ED.hfMode = mode;
+    out.innerHTML = `<div class="hfcmp"><figure><img src="${p.img.src}" alt=""><figcaption>지금 사진</figcaption></figure><figure><img src="${ED.hfImg.src}" alt=""><figcaption>🪄 AI 다듬기</figcaption></figure></div>
+      <div class="tb"><button type="button" class="btn small" data-hfuse="1">이걸로 바꾸기</button><button type="button" class="btn ghost small" data-hfdrop="1">버리기</button><span class="mut">오늘 ${r.left}장 남음 · 바꾼 뒤 [적용]을 눌러야 저장돼요</span></div>`;
+  } finally { btns.forEach((b) => (b.disabled = false)); }
+}
+function hfUse() {
+  const p = ED.p, img = ED.hfImg; if (!img) return;
+  const sx = img.naturalWidth / p.img.naturalWidth, sy = img.naturalHeight / p.img.naturalHeight, long0 = Math.max(p.img.naturalWidth, p.img.naturalHeight), long1 = Math.max(img.naturalWidth, img.naturalHeight);
+  if (ED.hfMode === "tall") { const s = img.naturalWidth / p.img.naturalWidth, dy = (img.naturalHeight - p.img.naturalHeight * s) / 2; ED.e.items.forEach((it) => { it.x *= s; it.y = it.y * s + dy; it.size *= long0 * s / long1; }); ED.e.ratio = "4:5"; }
+  else ED.e.items.forEach((it) => { it.x *= sx; it.y *= sy; it.size *= long0 * Math.min(sx, sy) / long1; });
+  ED.oldImg ??= p.img; p.img = img; ED.hfImg = null;
+  $e("#phEdHfOut").innerHTML = `<div class="mut hfnote">✅ 바꿨어요. 마음에 들면 [적용], 되돌리려면 [취소]</div>`; edDraw();
 }
 
 // ── 복사·받기 ──
@@ -215,18 +425,18 @@ async function copy(text, html) {
     const ok = document.execCommand("copy"); t.remove(); if (!ok) toast("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"); return ok;
   }
 }
-// list: [{name: "01.jpg", blob}] — 폰은 공유 시트(사진 앱 저장), 그 외는 zip 한 개
-async function share(list, zipName) {
-  const files = list.map((x) => new File([x.blob], x.name, { type: "image/jpeg" }));
+// list: [{name: "01.jpg", blob}] — 폰은 공유 시트(사진 앱 저장), 그 외는 JPG 낱장으로 받기 (이름: 앞말_01.jpg)
+async function share(list, prefix) {
+  const files = list.map((x) => new File([x.blob], `${prefix}_${x.name}`, { type: "image/jpeg" }));
   if (/iPhone|iPad|Android/i.test(navigator.userAgent) && navigator.canShare?.({ files })) {
     try { await navigator.share({ files }); return; } catch (e) { if (e.name === "AbortError") return; }
   }
-  await loadScript(JSZIP);
-  const zip = new JSZip(); files.forEach((f) => zip.file(f.name, f));
-  const a = document.createElement("a"); a.href = URL.createObjectURL(await zip.generateAsync({ type: "blob" }));
-  a.download = zipName; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요`);
+  for (const f of files) { // 크롬은 처음에 "여러 파일 다운로드 허용?"을 한 번 물어봄
+    const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000); await new Promise((r) => setTimeout(r, 300));
+  }
+  toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
-return { RATIOS, pad, loadScript, cropRect, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
+return { RATIOS, FILTERS, LANGS, preset, decoEdits, applyDeco, applyLang, view, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
 });

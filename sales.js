@@ -23,7 +23,7 @@ const mEnd = (s) => { const [y, m] = s.month.split("-").map(Number); return iso(
 const workDays = (from, to) => { let n = 0; for (let d = addDays(from, 1); d <= to; d = addDays(d, 1)) if (!isOff(d)) n++; return n; };
 const newPlan = (month, prev) => ({ ...RATES, members: MEMBERS(), ...(prev ? pick(prev) : {}),
   month, start: month + "-01", current: 0, base: addDays(month + "-01", -1), end: mEnd({ month }), problems: "", strategyAdd: "" });
-const pick = (p) => Object.fromEntries(["goal", "reply", "consult", "pay", "arpu", "refundRate", "firstContact", "members"].filter((k) => p[k] != null).map((k) => [k, p[k]]));
+const pick = (p) => Object.fromEntries(["goal", "reply", "consult", "pay", "arpu", "refundRate", "firstContact", "members", "labor", "ads"].filter((k) => p[k] != null).map((k) => [k, p[k]]));
 
 // 목표 금액에서 거꾸로: 결제자 → 상담자 → 회신자 → 지원자 (단계마다 올림)
 function need(s, amount) {
@@ -202,7 +202,22 @@ function compareFill(s, c) {
   setH("slCur_pay", cell(s.pay, r(m.payers, m.consults), "%", 1, "pay"));
   setH("slCur_arpu", cell(s.arpu, arpu, "원", 1, "arpu"));
   setH("slCur_refundRate", cell(s.refundRate || 0, r(m.refund, m.amount), "%", -1, "refundRate"));
+  const L = SL.labor;
+  const ld = L && s.labor > 0 ? L.cost - s.labor : null; // 인건비는 목표(예산)보다 적으면 좋음
+  setH("slCur_labor", L ? `현재 <b>${won(L.cost)}원</b> · 🕒 조교 근무기록 ${Math.round(L.h * 100) / 100}h × ${won(L.rate)}원${ld == null ? "" : ` · <b class="${ld <= 0 ? "up" : "dn"}">목표 ${ld <= 0 ? "안" : "초과"} ${won(Math.abs(ld))}원</b>`}` : "현재: 🕒 조교 근무기록에 이 달 기록이 없어요");
   setH("slCompare", `<p class="slhint">현재 = ${md(pStart(s))}~오늘 누계 · 회신·상담은 달력 입력${s.linked ? ", 결제·금액은 재무 시트" : ", 결제·금액도 달력 입력"}</p>`);
+}
+
+// 💸 비용: 목표 순매출에서 조교 인건비·광고비를 빼면 남는 금액, 결제자 1명당 광고비
+function costHtml(s, c) {
+  const labor = s.labor || 0, ads = s.ads || 0, cost = labor + ads; if (!cost) return `<p class="slhint">조교 인건비·광고비를 적으면 월 목표 순매출에서 빼고 남는 금액이 나와요.</p>`;
+  const per = c.month.payers ? ads / c.month.payers : 0;
+  return `<table class="slt slcost"><tr><th>💸 비용 (목표)</th><th>금액</th><th>순매출 대비</th></tr>
+    <tr><td>월 목표 순매출</td><td>${won(s.goal)}원</td><td>100%</td></tr>
+    <tr><td>조교 인건비</td><td>−${won(labor)}원</td><td>${pct(labor / s.goal * 100)}%</td></tr>
+    <tr><td>광고비</td><td>−${won(ads)}원</td><td>${pct(ads / s.goal * 100)}%</td></tr>
+    <tr><td>비용 빼고 남는 금액</td><td><b>${won(s.goal - cost)}원</b></td><td>${pct((s.goal - cost) / s.goal * 100)}%</td></tr>
+    ${ads && c.month.payers ? `<tr><td>결제자 1명당 광고비</td><td>${won(per)}원</td><td><small class="mut">결제자 목표 ${c.month.payers}명</small></td></tr>` : ""}</table>`;
 }
 
 // 📅 일일 / 🗓 주간 목표 카드: 목표(월 목표에서 자동으로 나눔) | 현재 | 차이. days = 그 기간의 날짜들
@@ -421,12 +436,39 @@ ${a.days ? `[실적 누계] ${a.days}일 입력 기준
 const V = () => document.getElementById("salesView");
 const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log: {}, sheet: { days: {}, sync: null }, myTeam: undefined };
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
+SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
+SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
+// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 월말 보고 달(MG.month)을 보고 있을 때만. 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
+const SEC = { s1: "[1] 월별 목표", s2: "[2] 목표 객단가 비율", s5: "[5] 일일 실행 목표" };
+function renderSec() {
+  const on = !!window.MG && SL.month === MG.month, ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
+  const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
+  V().querySelectorAll(".slsec").forEach((el) => {
+    const k = el.dataset.sec, d = done[k];
+    el.innerHTML = !on ? "" : `<div class="slsecbar">${d ? `<span class="ok">✅ 저장됨 · ${esc(d.by)} ${hm(d.at)}</span>` : `<span class="mut">📮 월말 보고 — 다 채우고 저장하면 ✅</span>`}`
+      + (ro ? "" : `<button class="btn${d ? " ghost" : ""}" type="button" data-secsave="${k}">${d ? "다시 저장" : `💾 ${SEC[k]} 저장`}</button>`) + `</div>`;
+  });
+}
+SL.renderSec = renderSec;
+// 📮 월말 보고 제출 조건: 그달 계획(sales_plans.data)에서 [1]·[2]·[5] 빈 칸 (지원자수는 비우면 계산값이 칸에 보여서 뺌) + 그 계획의 하루 최소 상담
+SL.planCheck = (data, month) => {
+  const d = data || {}, pos = (k) => d[k] > 0, ms = Array.isArray(d.members) ? d.members : [];
+  const s1 = [["start", "집계 시작일", !!d.start], ["goal", "월 목표 순매출", pos("goal")], ["reply", "회신율", pos("reply")],
+    ["consult", "상담률", pos("consult")], ["pay", "결제율", pos("pay")], ["arpu", "객단가", pos("arpu")], ["refundRate", "환불율", typeof d.refundRate === "number" && d.refundRate >= 0]].filter((x) => !x[2]).map((x) => x[1]);
+  const sumP = ms.reduce((a, m) => a + (typeof m.p === "number" ? m.p : 0), 0);
+  const s2 = !ms.length ? ["멤버십"] : [...(ms.some((m) => !(m.price > 0)) ? ["단가"] : []), ...(ms.some((m) => typeof m.p !== "number") ? ["비율"] : Math.abs(sumP - 100) > 0.05 ? [`비율 합계 ${pct(sumP)}% → 100%`] : [])];
+  const s5 = pos("firstContact") ? [] : ["첫 연락 목표"];
+  let consultMin = null;
+  try { const c = calc(applyAuto(compose({ ...newPlan(month), ...d, month }, {}, null))); consultMin = Math.ceil(c.month.consults / c.month.days - 1e-9); } catch {}
+  return { s1, s2, s5, ok: !s1.length && !s2.length && !s5.length, consultMin, goal: d.goal ?? null, done: d.mgDone || {} }; // done = 칸별 [저장] 누른 기록
+};
 
 V().innerHTML = `
 <div class="slbar"><h2>💰 매출 목표</h2><select id="slTeam" class="adminonly" aria-label="지점"></select><b id="slTeamName"></b>
   <input type="month" data-k="month" aria-label="목표 월"><a href="https://sso.pallo.co.kr/select?pick=branch" target="_blank" rel="noopener" class="btn ghost">지원자 수 확인 (SSO)</a><button class="btn ghost hidden" id="slSync" type="button">🔄 시트 새로고침</button><small id="slSheet"></small><small id="slSaved"></small></div>
 <div id="slEmpty" class="hidden"></div>
 <div id="slBody">
+<div id="mgCard"></div><!-- 📮 월말 보고 (month-goal.js) -->
 <details class="slcard sldefs"><summary><b>📏 단계별 세는 법</b> <small>(모든 매니저가 같은 기준으로 입력)</small></summary><table>
   <tr><td><b>지원자</b></td><td>그날 SSO 지점 화면에 새로 들어온 신청 수 (하루치, 누계 아님)</td></tr>
   <tr><td><b>회신자</b></td><td>그날 상담 오기로 한 사람 — 연락해서 전산 상담 일정(캘린더)에 잡힌 사람</td></tr>
@@ -445,13 +487,13 @@ V().innerHTML = `
     <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
     <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
-    <div id="slMonth"></div><div id="slCompare"></div></section>
+    <div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr><tr id="slMemRf"></tr><tr id="slMemNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
-    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p></section>
+    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p><div class="slsec" data-sec="s2"></div></section>
   <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
     <div class="slr2">
     <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
@@ -467,7 +509,7 @@ V().innerHTML = `
     <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div>
     <div id="slMemRNote"></div></section>
   <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
-    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div></section>
+    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div><div class="slsec" data-sec="s5"></div></section>
 </div>
 <div class="slgrid">
   <section class="slcard"><h3>📅 일일 목표 — 날짜별 목표 vs 현재</h3><div id="slDay"></div></section>
@@ -486,6 +528,11 @@ V().innerHTML = `
   <p class="slhint">위 전략은 목표와 실적 숫자를 보고 자동으로 씁니다. 덧붙일 실행 전략은 아래에 쓰세요.</p>
   <textarea data-k="strategyAdd" class="grow" placeholder="예: 이번 주 금요일 휴무 전날(목) 상담 예약을 집중 배치"></textarea></section>
 <section class="slcard"><h3>📋 보고문</h3><pre id="slReport" style="max-height:420px;overflow:auto"></pre><button class="btn" id="slCopy" type="button">보고문 복사</button></section>
+<section class="slcard"><h3>💰 인센티브</h3>
+  <div class="slrow"><label>조교 인건비<small>그달 조교 급여 합계 (목표)</small></label><span class="u"><input data-k="labor" data-money><i>원</i></span></div>
+  <p class="slhint" id="slCur_labor"></p>
+  <div class="slrow"><label>광고비<small>메타·네이버·구글 등 합계</small></label><span class="u"><input data-k="ads" data-money><i>원</i></span></div>
+  <div id="slCost"></div></section>
 </div>
 <dialog id="slDlg"><form method="dialog">
   <h3 id="slDlgTitle"></h3>
@@ -528,6 +575,7 @@ SL.load = async function () {
   SL.plan = p.data ? { ...newPlan(SL.month), ...p.data.data, month: SL.month } : newPlan(SL.month, prev.data?.data); // 새 달은 지난달 비율·멤버십 이어받기
   await loadDays();
   render();
+  window.MG?.load(); // 📮 월말 보고
 };
 async function loadDays() {
   const s = SL.plan, from = s.base < mStart(s) ? s.base : mStart(s), to = s.end > mEnd(s) ? s.end : mEnd(s);
@@ -537,6 +585,17 @@ async function loadDays() {
   if (fail(m.error || sd.error || sy.error)) return;
   SL.log = Object.fromEntries(m.data.map((r) => [r.day, r]));
   SL.sheet = { days: Object.fromEntries(sd.data.map((r) => [r.day, r])), sync: sy.data };
+  SL.labor = await laborOf(SL.team, SL.month);
+}
+// 💸 조교 인건비 현재 = 🕒 조교 근무기록 그달 칸 시간 합 × 시급 (근무기록 탭과 같은 계산, 기록 없으면 null)
+async function laborOf(team, month) {
+  const ym = month + "-01", [mo, rs] = await Promise.all([sb.from("work_months").select("rate").eq("team_id", team).eq("ym", ym).maybeSingle(),
+    sb.from("work_rows").select("id").eq("team_id", team).eq("ym", ym)]);
+  if (mo.error || rs.error || !rs.data.length) return null;
+  const cs = await sb.from("work_cells").select("val").in("row_id", rs.data.map((r) => r.id));
+  if (cs.error) return null;
+  const h = cs.data.reduce((t, c) => t + (WRC.num(c.val) ?? 0), 0), rate = mo.data?.rate ?? 10320;
+  return h ? { h, rate, cost: h * rate } : null;
 }
 let saveT;
 function savePlan() {
@@ -544,7 +603,7 @@ function savePlan() {
   const team = SL.team, month = SL.month, data = { ...SL.plan }; delete data.month;
   saveT = setTimeout(async () => {
     const { error } = await sb.from("sales_plans").upsert({ team_id: team, month, data });
-    if (!fail(error)) setT("slSaved", "저장됨 ✓");
+    if (!fail(error)) { setT("slSaved", "저장됨 ✓"); window.MG?.recheck?.(); } // 📮 월말 보고 체크리스트도 다시
   }, 600);
 }
 // 다른 매니저가 고치면 다시 불러옴 (입력 중이면 끝난 뒤)
@@ -589,6 +648,7 @@ function render() {
   setH("slPace", paceHtml(s, c));
   dayWeekCards(s, c);
   setH("slLever", leverHtml(s));
+  setH("slCost", costHtml(s, c));
   setH("slMonth", `<p class="slhint">${md(pStart(s))}~${md(mEnd(s))}, 영업일 ${c.month.days}일 (금요일 휴무 제외)</p>` + tbl(c.month, c.month.days, "하루 평균"));
   setH("slRemain", tbl(c, c.days, "처음 계획 하루 평균") + `<p class="slhint">예상 최종 순매출 <b>${won(c.final)}원</b> (목표 대비 ${pct(c.final / s.goal * 100)}%)</p>`);
   setT("slPeriod", `현재 달성률 ${pct(c.rate)}% · 남은 목표 ${won(c.remain)}원 · ${md(addDays(s.base, 1))}~${md(s.end)}, 영업일 ${c.days}일 (금요일 휴무 제외)`);
@@ -636,6 +696,7 @@ function render() {
   setH("slDaily", `<table class="slt">${dailyRows.map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`);
 
   renderCal(s, c);
+  renderSec();
   const cu = catchUp(s, a);
   const rp = replyPace(s, c), up = rp.dyn > rp.plan;
   setH("slCalNote", `📅 캘린더 = <b>회신자</b>(그날 상담 오기로 한 사람). 실제 순매출 <b>${won(rp.net)}원</b>${s.linked ? " (📗 시트)" : ""} → 남은 목표 매출 <b>${won(rp.remain)}원</b>에 회신 ${rp.n.replies}명 · 상담 ${rp.n.consults}명 · 결제 ${rp.n.payers}명 필요 → 남은 영업일 ${rp.left}일 동안 <b style="color:${up ? "var(--red)" : "var(--green)"}">하루 회신 최소 ${rp.dyn}명 · 상담 ${rp.left ? Math.ceil(rp.n.consults / rp.left - 1e-9) : 0}명</b> (처음 계획 하루 회신 ${rp.plan}명 → 매출이 ${up ? "부족해 늘어남" : "앞서 줄어듦"}).`);
@@ -721,6 +782,14 @@ V().addEventListener("change", async (ev) => {
   }
 });
 V().addEventListener("click", async (ev) => {
+  const sv = ev.target.dataset.secsave; // 📮 칸별 [저장]: 빈 칸 있으면 막고, 다 찼으면 누가·언제 기록
+  if (sv) {
+    const miss = SL.planCheck(SL.plan, SL.month)[sv];
+    if (miss.length) return toast(`${SEC[sv]} — 아직 비었어요: ${miss.join(", ")}`);
+    SL.plan.mgDone = { ...(SL.plan.mgDone || {}), [sv]: { by: myName, at: new Date().toISOString() } };
+    savePlan(); renderSec(); toast(`✅ ${SEC[sv]} 저장 — 월말 보고 체크에 표시돼요`);
+    return;
+  }
   const fx = ev.target.dataset.mixfix;
   if (fx) {
     const p = SL.plan, s2 = S(), c2 = calc(s2), mp = mixPlan(s2, c2), cur = memberMix(s2, 0);

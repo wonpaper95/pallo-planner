@@ -47,9 +47,9 @@ dialog::backdrop { background: rgba(5,4,12,.45); -webkit-backdrop-filter: blur(4
 @media (max-width: 860px) { aside { background: var(--mob); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); } }
 
 /* 카드: 반투명 + 윗줄 하이라이트 */
-#routinebox, #assignbox, #mustbox, #duebox, .tcard, .slcard, .slkpi, .bcard, .card, #briefText, .briefText, .rows, #somedayView details {
+#routinebox, #simbox, #assignbox, #mustbox, #duebox, .tcard, .slcard, .slkpi, .bcard, .card, #briefText, .briefText, .rows, #somedayView details {
   background: var(--panel); border: 1px solid var(--edge); border-radius: 20px; box-shadow: var(--hi), var(--shadow); }
-#routinebox, #assignbox, #mustbox, #duebox { padding: 12px 16px; }
+#routinebox, #simbox, #assignbox, #mustbox, #duebox { padding: 12px 16px; }
 #mustbox { border-color: color-mix(in srgb, var(--red) 40%, transparent); } #assignbox { border-color: color-mix(in srgb, var(--blue) 35%, transparent); }
 .bcard.ok { border-color: color-mix(in srgb, var(--green) 55%, transparent); }
 .rows { padding: 2px 12px; } .row:last-child { border-bottom: 0; } .row:hover { background: var(--rowhov); border-radius: 10px; }

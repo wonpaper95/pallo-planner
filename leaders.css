@@ -1,0 +1,216 @@
+/* 🧑‍🏫 리더 현황 보드 탭 (leaders.js) */
+body:not(.ldv) #ldView { display: none; }
+#ldView { max-width: 1400px; margin: 0 auto; padding: 16px 20px 100px; }
+#ldView .ldbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+#ldView .ldbar h2 { margin: 0; }
+#ldView select, #ldDlg input, #ldDlg select, #ldDlg textarea { padding: 7px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+#ldView .ldseg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+#ldView .ldseg button { padding: 6px 14px; background: var(--panel); border: 0; color: var(--text); cursor: pointer; }
+#ldView .ldseg button.on { background: var(--accent); color: #fff; font-weight: 700; }
+#ldView .ldnav { display: inline-flex; align-items: center; gap: 6px; }
+#ldView .ldnav button { padding: 5px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--text); cursor: pointer; }
+#ldView .ldact { margin-left: auto; display: inline-flex; gap: 6px; }
+#ldView .ldsum { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px; font-size: 14px; }
+#ldView .ldsum small { flex-basis: 100%; }
+#ldView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+#ldView .ldblk h3 { margin: 18px 0 6px; font-size: 16px; }
+#ldView .ldneed { color: #e5484d; font-weight: 600; }
+#ldView .re { color: #ea8a00; font-weight: 700; }
+#ldView .on { color: #30a46c; font-weight: 600; }
+#ldView .ldtw { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+#ldView table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+#ldView th { background: var(--accent); color: #fff; font-weight: 600; padding: 6px 8px; white-space: nowrap; text-align: center; }
+#ldView th.td { background: #E0D120; color: #222; }
+#ldView td { border-top: 1px solid var(--line); padding: 5px 8px; text-align: center; white-space: nowrap; }
+#ldView tr.need td { background: rgba(229, 72, 77, .08); }
+#ldView td.nm { text-align: left; }
+#ldView td.nm .ph { display: block; font-size: 12px; color: var(--sub); } #ldView td.nm .ph a { margin-left: 4px; text-decoration: none; font-size: 11px; }
+#ldView td.nt { min-width: 220px; max-width: 320px; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.45; text-align: left; color: var(--sub); } /* 특이사항: 길면 줄바꿈해서 다 보이게 */
+#ldView td.m { line-height: 1.6; }
+#ldView .ldo { color: #30a46c; font-weight: 600; } #ldView .ldx { color: #e5484d; font-weight: 600; }
+#ldView .ldstars { white-space: nowrap; }
+#ldView .ldstars button { background: none; border: 0; padding: 0 1px; font-size: 17px; line-height: 1; cursor: pointer; color: var(--line); }
+#ldView .ldstars.rlow button { color: #e5484d; } #ldView .ldstars.rmid button { color: #f59e0b; } #ldView .ldstars.rhigh button { color: #30a46c; }
+#ldView .ldstars.rnone button { color: var(--sub); opacity: .5; }
+#ldView .st { border: 0; border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
+#ldView .st.ok { background: rgba(48, 164, 108, .15); color: #30a46c; } #ldView .st.need { background: rgba(229, 72, 77, .15); color: #e5484d; font-weight: 700; }
+#ldView .att { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--sub); font-weight: 800; cursor: pointer; }
+#ldView .att.o { background: rgba(48, 164, 108, .15); color: #30a46c; border-color: #30a46c; }
+#ldView .att.x { background: rgba(229, 72, 77, .15); color: #e5484d; border-color: #e5484d; }
+#ldView .att.fut { opacity: .45; }
+#ldView .ldfl { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: center; }
+#ldView .aw { border: 1px solid #30a46c; background: rgba(48, 164, 108, .12); color: #30a46c; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+#ldView .aw.done { background: #30a46c; color: #fff; }
+#ldView .lded { padding: 3px 7px; }
+#ldDlg { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); width: min(560px, 94vw); }
+#ldDlg .ldform { display: flex; flex-direction: column; gap: 8px; }
+#ldDlg .ldform h2 { margin: 0 0 4px; }
+#ldDlg label { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; font-size: 14px; }
+#ldDlg .row { display: flex; gap: 8px; margin-top: 6px; }
+#ldDlg textarea { width: 100%; font: 13px monospace; }
+@media (max-width: 700px) { #ldView .ldact { margin-left: 0; } #ldDlg label { grid-template-columns: 1fr; } }
+#ldView .att.sub { width: auto; min-width: 34px; padding: 0 6px; }
+#ldView .att i { display: block; font-style: normal; font-size: 10.5px; font-weight: 600; line-height: 1.1; }
+#ldView .att small { display: block; font-size: 10px; font-weight: 500; line-height: 1.1; }
+#ldView td.ina { white-space: normal; } #ldView td.ina .att { height: auto; min-height: 30px; margin: 2px; padding: 2px 6px; width: auto; }
+#ldView .cv { color: #3b82f6; font-weight: 600; font-size: 12px; }
+#ldView .edu { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); color: #fff; font-weight: 800; cursor: pointer; }
+#ldView .edu.on { background: #30a46c; border-color: #30a46c; }
+#ldView tr.rerow td { background: rgba(245, 158, 11, .14); } /* 🚨 재관리 줄은 주황 (구해야 함 분홍보다 우선) */
+#ldView .nd { display: block; margin-top: 3px; color: #e5484d; font-size: 15px; font-weight: 800; }
+#ldView td.sd { font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+#ldView td.sd .dp { display: block; margin-top: 2px; color: var(--accent); font-size: 14px; font-weight: 800; }
+#ldView [data-f] { cursor: text; }
+#ldView .ldin { width: 100%; min-width: 80px; padding: 4px 6px; font: inherit; color: var(--text); background: var(--bg); border: 1.5px solid var(--accent); border-radius: 6px; }
+#ldView td.att2 { padding: 4px 6px; }
+#ldView .ag { display: inline-grid; grid-auto-flow: row; gap: 3px 4px; }
+#ldView .ag .att { width: 46px; height: auto; min-height: 34px; padding: 2px 2px; line-height: 1.15; }
+#ldView .ag .att small { color: var(--sub); }
+#ldView .att.tdy { outline: 2px solid #E0D120; outline-offset: 1px; }
+#ldView th .agh { display: block; font-size: 10.5px; font-weight: 500; opacity: .85; }
+#ldDlg .slotpick { display: flex; gap: 6px; } #ldDlg .slotpick > * { flex: 1; min-width: 0; } #ldDlg .slotpick .hidden { display: none; }
+#ldView tr.gone td { opacity: .55; } /* 👋 그만둔 리더: 그 달까지만 흐리게 보임 */
+#ldView .gonetag { display: block; font-size: 11.5px; color: var(--sub); font-weight: 600; }
+#ldView .ldstars.ghost button { opacity: .35; } /* 지난달 라포 — 이번 달 아직 */
+#ldView .night { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+#ldView .night.on { background: rgba(73, 48, 135, .15); border-color: #493087; }
+#ldView .mrp { color: #f59e0b; font-weight: 700; font-size: 12px; }
+#ldView .ldneedtb { margin-bottom: 14px; } /* 🔴 맨 위 구해야 함 현황표 */
+#ldView .ldneedtb h3 { margin: 4px 0 6px; font-size: 16px; color: #e5484d; } #ldView .ldneedtb h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldneedtb.ok { padding: 10px 14px; background: rgba(48, 164, 108, .1); border: 1px solid rgba(48, 164, 108, .3); border-radius: 12px; color: #30a46c; font-weight: 600; }
+#ldView .ldneedtb th { background: #e5484d; }
+#ldView .ldneedtb td small { display: block; font-size: 11.5px; color: var(--sub); white-space: normal; max-width: 220px; }
+#ldView .ldneedtb .nd { margin: 0; font-size: 14px; color: #f59e0b; } #ldView .ldneedtb .nd.long { color: #e5484d; }
+#ldView .ldneedtb .goto { background: none; border: 0; color: var(--accent); font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0; font: inherit; }
+#ldView .ldneedtb td.nn { min-width: 260px; width: 45%; }
+#ldView .ldneedtb textarea { width: 100%; min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.45; font-family: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; resize: vertical; field-sizing: content; }
+/* 🔴 현황 접기: 한 줄 긴 막대 (기본 접힘) — 누르면 표가 펼쳐짐 */
+#ldView .ldfold { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 16px; list-style: none; cursor: pointer; user-select: none; background: rgba(229, 72, 77, .09); border: 1.5px solid rgba(229, 72, 77, .45); border-radius: 12px; color: #e5484d; font-size: 15.5px; }
+#ldView .ldfold::-webkit-details-marker { display: none; }
+#ldView .ldfold:hover { background: rgba(229, 72, 77, .15); }
+#ldView .ldfold .cnt { font-weight: 800; }
+#ldView .ldfold .bdgs { margin: 0; }
+#ldView .ldfold .fold { margin-left: auto; padding: 4px 12px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
+#ldView .ldfold .fold::after { content: "▼ 펼쳐 보기"; }
+#ldView .ldneedtb[open] .ldfold { margin-bottom: 6px; }
+#ldView .ldneedtb[open] .ldfold .fold::after { content: "▲ 접기"; }
+#ldView .ldnh { margin: 0 0 6px; font-size: 12.5px; }
+#ldView tr.flash td { background: rgba(224, 209, 32, .35) !important; transition: background .3s; }
+/* ✏️ 한 번 눌러 고치는 칸: 빈 칸은 '+ 적기' 점선, 마우스 올리면 연필 */
+#ldView .addh { display: inline-block; padding: 2px 8px; border: 1.5px dashed var(--line); border-radius: 7px; color: var(--sub); font-size: 12px; font-weight: 600; cursor: pointer; }
+#ldView td.ed1 { cursor: pointer; position: relative; }
+#ldView td.ed1:hover { background: rgba(73, 48, 135, .07); box-shadow: inset 0 0 0 1.5px rgba(73, 48, 135, .35); }
+#ldView td.ed1:hover .addh { border-color: var(--accent); color: var(--accent); }
+#ldView td.ed1:hover::after { content: "✏️"; position: absolute; top: 3px; right: 4px; font-size: 11px; }
+#ldView td.endc { padding: 4px 6px; } /* 👋 그만둠 버튼 칸 */
+#ldView .endb { border: 1px solid var(--line); background: var(--bg); color: var(--sub); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+#ldView .endb:hover { border-color: #e5484d; color: #e5484d; background: rgba(229, 72, 77, .08); }
+#ldView .endb.back:hover { border-color: var(--accent); color: var(--accent); background: rgba(73, 48, 135, .08); }
+#ldView tr.gone td.endc { opacity: 1; }
+/* 🎨 현황표 시간대 색: 평일 오전 노랑 · 오후 주황 · 저녁 보라 · 주말 초록 · 기타 회색 */
+#ldView .ldneedtb .b-am { --bc: #c9b800; --bg2: rgba(224, 209, 32, .13); }
+#ldView .ldneedtb .b-pm { --bc: #ea8a00; --bg2: rgba(245, 158, 11, .12); }
+#ldView .ldneedtb .b-ev { --bc: #6b4fc4; --bg2: rgba(73, 48, 135, .1); }
+#ldView .ldneedtb .b-we { --bc: #30a46c; --bg2: rgba(48, 164, 108, .11); }
+#ldView .ldneedtb .b-etc { --bc: #8b8d98; --bg2: rgba(139, 141, 152, .1); }
+#ldView .ldneedtb tr[class*="b-"] td { background: var(--bg2); }
+#ldView .ldneedtb tr[data-id] td:first-child { box-shadow: inset 5px 0 0 var(--bc); }
+#ldView .ldneedtb tr.bhead td { text-align: left; font-weight: 800; color: var(--bc); font-size: 13.5px; padding: 7px 12px; border-top: 2px solid var(--bc); }
+#ldView .ldneedtb tr.bhead span { font-weight: 600; opacity: .8; margin-left: 4px; }
+#ldView .ldneedtb .bdgs { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: 8px; vertical-align: middle; }
+#ldView .ldneedtb .bdg { padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--bc); background: var(--bg2); border: 1px solid var(--bc); }
+#ldView .ldneedtb .slotchip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 999px; border: 1.5px solid var(--bc); background: var(--panel); }
+#ldView .ldneedtb .slotchip .goto { color: var(--bc); text-decoration: none; }
+#ldView .ldneedtb .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; padding: 0 4px; opacity: .6; } #ldView .ldneedtb .slotedit:hover { opacity: 1; }
+#ldView .ldneedtb span.ed1 { cursor: pointer; border-radius: 5px; padding: 1px 3px; } #ldView .ldneedtb span.ed1:hover { box-shadow: 0 0 0 1.5px rgba(73, 48, 135, .4); background: rgba(73, 48, 135, .06); }
+#ldView .ldneedtb .ldin { min-width: 120px; }
+#ldView .btn.ai { background: linear-gradient(135deg, #493087, #6b4fc4); color: #fff; border: 0; } /* 🤖 AI 전략 */
+#ldDlg .ldai { width: 100%; }
+#ldDlg:has(.ldai) { width: min(760px, 96vw); }
+#ldDlg .aitext { max-height: 62vh; overflow: auto; white-space: pre-wrap; line-height: 1.65; font-size: 14px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+#ldDlg .aitext p { margin: 0; white-space: normal; }
+#ldDlg .ldai select { flex: 0 0 auto; width: auto; } #ldDlg .ldai .row .mut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 🔀 팀 믹싱 메모: 투명 글 뒤 .tbbk 에 줄마다 쓴 사람 색 (시뮬레이터와 같은 방식) */
+#ldView .ldmix { margin-bottom: 14px; }
+#ldView .ldmix h3 { margin: 4px 0 6px; font-size: 16px; color: var(--accent); } #ldView .ldmix h3 .mut { font-size: 12.5px; font-weight: 500; } #ldView .ldmix h3 small { font-size: 12px; color: var(--sub); font-weight: 500; margin-left: 6px; }
+#ldView .mixleg { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; font-weight: 700; margin-bottom: 6px; } #ldView .mixleg:empty { display: none; }
+#ldView .mixw { position: relative; background: var(--panel); border-radius: 12px; }
+#ldView .mixw textarea, #ldView .mixw .tbbk { font-family: inherit; font-size: 14px; line-height: 1.6; padding: 10px 12px; border: 3px solid #E0D120; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; letter-spacing: normal; }
+#ldView .mixw textarea { position: relative; z-index: 1; display: block; width: 100%; min-height: 140px; field-sizing: content; resize: vertical; background: transparent; color: transparent; caret-color: var(--text); }
+#ldView .mixw textarea::placeholder { color: var(--sub); } #ldView .mixw textarea::selection { color: var(--text); background: rgba(73, 48, 135, .35); }
+#ldView .mixw .tbbk { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; color: var(--text); border-color: transparent; margin: 0; }
+/* 📜 자격증 · 🔁 서브리더 */
+#ldView .certc { white-space: nowrap; }
+#ldView .cert { display: inline-block; border: 1px solid #b8860b; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 700; margin: 1px 2px; background: none; color: #b8860b; }
+#ldView button.cert { cursor: pointer; }
+#ldView .cert.due { background: #E0D120; border-color: #c9b800; color: #1f1d2b; }
+#ldView .cert.done { background: rgba(48, 164, 108, .12); border-color: #30a46c; color: #30a46c; }
+#ldView .cert.wait { border-style: dashed; color: var(--muted, #888); border-color: var(--line); font-weight: 500; }
+#ldView .ldcerttb { margin-bottom: 14px; }
+#ldView .ldcerttb h3 { margin: 4px 0 6px; font-size: 16px; color: #b8860b; } #ldView .ldcerttb h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldsubblk h3 .btn { margin-left: 6px; }
+#ldView .promo { border: 1.5px solid var(--line); border-radius: 999px; background: var(--bg); padding: 2px 8px; cursor: pointer; font-size: 12px; }
+#ldView .promo.on { background: rgba(224, 209, 32, .25); border-color: #c9b800; font-weight: 700; }
+#ldView .ldfind { margin-bottom: 12px; } /* 🔍 리더 찾기 — 한 줄로 짧게 */
+#ldView .ldfind input { width: 100%; max-width: 420px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; -webkit-appearance: none; appearance: none; } /* 16px = 아이폰 확대 안 됨 */
+#ldView .ldfind input::placeholder { color: var(--sub); opacity: 1; }
+#ldView .ldfind input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+#ldView .endb.del { margin-left: 4px; padding: 4px 7px; }
+#ldView .rpwho { display: block; margin-top: 2px; font-size: 11.5px; color: var(--sub); white-space: nowrap; }
+#ldView .rpwho .me { color: var(--accent); font-weight: 700; }
+#ldView .ldtoday { margin-bottom: 14px; }
+#ldView .ldtoday h3 { margin: 4px 0 6px; font-size: 16px; color: var(--accent); } #ldView .ldtoday h3 .mut { font-size: 12.5px; font-weight: 500; }
+#ldView .ldtoday .on { color: #1f9d55; } #ldView .ldtoday .re { color: #e5484d; }
+#ldView .tdrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; } #ldView .tdrow > b { min-width: 64px; font-size: 13px; }
+#ldView .cfm { border: 1px solid var(--line); background: var(--bg); color: inherit; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 13.5px; cursor: pointer; }
+#ldView .cfm.on { border-color: #1f9d55; background: rgba(31, 157, 85, .1); } #ldView .cfm small { color: var(--sub); font-size: 11px; }
+#ldView span.cfm { display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 0; cursor: default; }
+#ldView span.cfm > button { all: unset; cursor: pointer; padding: 5px 4px 5px 11px; font-size: 13.5px; }
+#ldView .cfnote { color: #d9730d; font-size: 12px; font-weight: 700; }
+#ldView .cflate { border: 0; background: transparent; color: var(--sub); font: inherit; font-size: 12px; padding: 2px; max-width: 30px; cursor: pointer; border-radius: 999px; } #ldView .cflate:hover { background: var(--hover); }
+#ldView .cfm.vac { cursor: default; color: #e5484d; border-style: dashed; }
+#ldView .ldcerttb summary { cursor: pointer; list-style: none; } #ldView .ldcerttb summary::-webkit-details-marker { display: none; }
+#ldView .ldcerttb summary h3::before { content: "▸ "; } #ldView .ldcerttb[open] summary h3::before { content: "▾ "; }
+#ldView .lddrag { cursor: grab; user-select: none; color: var(--sub); padding-right: 4px; }
+#ldView .lddragging { opacity: .4; }
+#ldView tr.ldover td { box-shadow: inset 0 2px 0 var(--accent); }
+@media (max-width: 680px) { #ldView .lddrag { display: none; } }
+
+/* ↩ 출석 되돌리기 바 (화면 아래 가운데, 8초) */
+#ldUndo { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 12px; background: #2b2540; color: #fff; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: calc(100vw - 32px); }
+#ldUndo.hidden { display: none; }
+#ldUndo button { background: #e0d120; color: #2b2540; border: 0; border-radius: 8px; padding: 6px 12px; font-weight: 700; cursor: pointer; white-space: nowrap; font: inherit; font-weight: 700; }
+
+/* 📌 보드 (10-29): 오늘·내일 리더 · 요일 페이지 · 시간대 칸 · 서브리더·대기 리더 */
+#ldDlg .hidden { display: none !important; }
+#ldView .ldpage button { font-weight: 700; }
+#ldView .ldtd2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+#ldView .ldday { padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+#ldView .ldday h3 { margin: 2px 0 8px; font-size: 16px; color: var(--accent); } #ldView .ldday h3 .dd { color: var(--text); font-size: 14px; } #ldView .ldday h3 .mut { font-size: 12.5px; font-weight: 500; margin-left: 4px; }
+#ldView .ldday .on { color: #1f9d55; } #ldView .ldday .re { color: #e5484d; }
+#ldView .ldday .tdrow { display: grid; grid-template-columns: 48px 1fr; align-items: start; gap: 6px; margin: 6px 0; } #ldView .ldday .tdrow > b { min-width: 0; padding-top: 6px; }
+#ldView .ldday .tdc { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+#ldView .lv, #ldView .lg { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 17px; vertical-align: 1px; white-space: nowrap; }
+#ldView .lv { background: rgba(73, 48, 135, .1); color: var(--accent); }
+#ldView .lg { color: var(--sub); border: 1px solid var(--line); line-height: 15px; }
+#ldView .subadd, #ldView .subtag { all: unset; cursor: pointer; font-size: 12px; padding: 4px 6px; border-radius: 999px; white-space: nowrap; }
+#ldView .subadd { opacity: .45; } #ldView .subadd:hover { opacity: 1; background: var(--hover); }
+#ldView .subtag { background: rgba(59, 130, 246, .14); color: #2563eb; font-weight: 700; margin-right: 2px; }
+#ldView .cfm.hasub > button:first-child b { text-decoration: line-through; opacity: .6; } /* 대타가 들어가는 리더 = 이름 줄 긋기 */
+#ldView .ldmix summary { list-style: none; cursor: pointer; } #ldView .ldmix summary::-webkit-details-marker { display: none; }
+#ldView .ldmix summary h3::before { content: "▸ "; } #ldView .ldmix[open] summary h3::before { content: "▾ "; }
+#ldView .ldmix:not([open]) { padding: 8px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; } #ldView .ldmix:not([open]) h3 { margin: 0; }
+#ldView .lddays { margin: 6px 0 4px; } #ldView .lddays button { padding: 8px 20px; font-size: 15px; font-weight: 700; }
+#ldView .ldcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+#ldView .ldcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+#ldView .ldcard h3 { margin: 2px 2px 6px; font-size: 15.5px; }
+#ldView .ldcard td { text-align: left; padding: 5px 6px; white-space: normal; }
+#ldView .ldcard td.lvc { width: 64px; color: var(--sub); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+#ldView .ldcard tr.subrow td { border-top: 1px dashed var(--line); background: rgba(59, 130, 246, .06); }
+#ldView .ldcard tr.subrow td.lvc { color: #2563eb; }
+#ldView .sbc { display: inline-block; margin: 1px 6px 1px 0; font-weight: 600; } #ldView .sbc.flash { background: rgba(224, 209, 32, .35); border-radius: 6px; }
+#ldView .tel { margin-left: 4px; text-decoration: none; font-size: 11px; }
+#ldView td.edc { width: 28px; text-align: right; } #ldView .edc .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; opacity: .35; } #ldView .edc .slotedit:hover { opacity: 1; }
+#ldView .ldpool h3 .btn { margin-left: 6px; } #ldView .ldpool td { text-align: left; }
+@media (max-width: 760px) { #ldView .ldtd2 { grid-template-columns: 1fr; } }
+#ldView .ldday span.cfm { flex-wrap: wrap; max-width: 100%; } #ldView .ldday span.cfm > button { white-space: nowrap; } /* 폰: 대타 표시는 칩 안에서 다음 줄로 */

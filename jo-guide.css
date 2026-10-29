@@ -1,0 +1,92 @@
+/* 🧑‍🎓 조교 가이드 (jo-guide.js) — 플래너 탭과 guide.html 같이 씀. 색은 glass.css 변수 */
+body:not(.jgv) #jgView { display: none; }
+.jg { max-width: 820px; margin: 0 auto; padding: 16px 16px 100px; line-height: 1.55; }
+.jg h2 { margin: 0; font-size: 21px; }
+.jg h3 { margin: 0 0 8px; font-size: 16px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.jg h3 small, .jg summary small { color: var(--sub); font-weight: 500; font-size: 12.5px; }
+.jg h4 { margin: 16px 0 6px; font-size: 13.5px; color: var(--sub); }
+.jg p { margin: 6px 0; }
+.jg ul { margin: 6px 0; padding-left: 20px; } .jg li { margin: 2px 0; }
+.jgmut, .jgsub { color: var(--sub); font-size: 13.5px; }
+.jgwarn { color: var(--orange); font-weight: 600; }
+.jggoal { font-weight: 600; font-size: 15px; }
+.jgcard { background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: 18px; box-shadow: var(--hi, none); padding: 14px 16px; margin-top: 12px; }
+.jgafter { border-color: color-mix(in srgb, var(--green) 45%, transparent); }
+
+.jglang { display: inline-flex; gap: 4px; margin-left: auto; }
+.jglang button { padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--sub); font: inherit; font-size: 13px; cursor: pointer; }
+.jglang button.on { background: var(--on, var(--hover)); color: var(--text); font-weight: 600; border-color: var(--edge, var(--line)); }
+.jgtitle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; }
+.jgsub .must, .jgsub .add { white-space: nowrap; font-weight: 600; color: var(--text); }
+.jgtabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px 0 2px; }
+.jgtabs::-webkit-scrollbar { display: none; }
+.jgtabs button { flex: none; padding: 7px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--fill, var(--panel)); color: var(--sub); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.jgtabs button.on { background: var(--yellow); color: var(--onyel, #1a1600); border-color: transparent; }
+.jgtabs button.ok:not(.on) { color: var(--green); }
+
+.jgbtn { padding: 7px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--fill, var(--panel)); color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
+.jgbtn.pri { background: var(--yellow); color: var(--onyel, #1a1600); border-color: transparent; font-weight: 700; }
+.jglink { background: none; border: 0; color: var(--sub); text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }
+.jgrow { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.jgscore { font-size: 18px; }
+.jgfoot { text-align: center; color: var(--sub); font-size: 12.5px; margin-top: 20px; }
+
+/* 접는 칸 */
+.jg details { border-top: 1px solid var(--line); }
+.jg details:first-of-type { border-top: 0; }
+.jg summary { cursor: pointer; padding: 9px 0; display: flex; align-items: baseline; gap: 8px; list-style: none; }
+.jg summary::-webkit-details-marker { display: none; }
+.jg summary::after { content: "›"; margin-left: auto; color: var(--sub); transition: rotate .15s; }
+.jg details[open] > summary::after { rotate: 90deg; }
+.jg details > :not(summary) { margin-left: 2px; }
+.jgread > summary b { flex: 1; }
+.jgref { border: 1px solid var(--line) !important; border-radius: 12px; padding: 0 12px; margin: 6px 0; background: var(--bg); }
+.jgref > summary { font-size: 14px; font-weight: 600; }
+.jgref[open] { padding-bottom: 8px; }
+.jgbr { font-size: 11px; font-weight: 600; color: var(--orange); border: 1px solid currentColor; border-radius: 99px; padding: 0 6px; }
+
+.jgstep > summary { align-items: center; }
+.jgstep .tag { flex: none; }
+.jgstep .when { flex: none; font-size: 12px; color: var(--sub); background: var(--fill, var(--hover)); border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+.jgstep b { flex: 1; min-width: 0; }
+.jgstep.add b { font-weight: 500; }
+
+/* 체크 */
+.jgck { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
+.jgck:first-of-type { border-top: 0; }
+.jgck input { width: 20px; height: 20px; margin-top: 2px; flex: none; accent-color: var(--yellow); }
+.jgck span { display: flex; flex-direction: column; }
+.jgck small { color: var(--sub); font-size: 13px; }
+.jgck.on b { color: var(--sub); text-decoration: line-through; }
+.jgin { margin: -4px 0 6px 30px; }
+
+/* 퀴즈 */
+.jgq { padding: 10px 0; border-top: 1px solid var(--line); }
+.jgq:first-of-type { border-top: 0; }
+.jgq label { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0 4px 6px; cursor: pointer; font-size: 14.5px; }
+.jgq input { margin-top: 4px; accent-color: var(--accent); }
+.jgq.ok > b { color: var(--green); } .jgq.no > b { color: var(--red); }
+.jgwhy { font-size: 13px; color: var(--sub); }
+
+/* 표 · 검색 */
+.jgtw { overflow-x: auto; margin: 6px 0; }
+.jg table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
+.jg th, .jg td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.jg th { color: var(--sub); font-weight: 600; white-space: nowrap; }
+.jg td:first-child { white-space: nowrap; font-weight: 600; }
+.jg tr.hi td { background: color-mix(in srgb, var(--yellow) 42%, transparent); }
+.jg tr.hi td:first-child { border-radius: 8px 0 0 8px; } .jg tr.hi td:last-child { border-radius: 0 8px 8px 0; }
+.jgsearch { width: 100%; box-sizing: border-box; padding: 9px 12px; margin: 6px 0 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+@media (max-width: 560px) { .jg { padding: 12px 12px 90px; } .jgcard { padding: 12px; } .jg td:first-child { white-space: normal; } }
+.jgimp { color: var(--red); font-weight: 800; white-space: nowrap; }
+.jgshot { display: block; margin: 8px 0 2px; }
+.jgshot img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.jgcap { font-size: 12px; color: var(--sub); margin: 2px 0 6px; }
+/* 🧑‍🎓 진행 연동 (10-29): 조교 '나' + 📍 지금 몇 일차 · 매니저 조교별 진행표 */
+.jg .jgme { margin-top: 10px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--accent); background: var(--panel); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.jg .jgme select { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 14px; }
+.jg .jgnow { font-size: 18px; color: var(--accent); }
+.jg .jgsteps { display: flex; flex-wrap: wrap; gap: 4px; font-size: 12px; } .jg .jgsteps span { padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--sub); white-space: nowrap; }
+.jg .jgsteps span.ok { color: var(--green); border-color: var(--green); } .jg .jgsteps span.cur { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+.jg .jgsteps.big { font-size: 13px; } .jg .jgsteps.big span { padding: 4px 10px; }
+.jg .jgprog summary { cursor: pointer; } .jg .jgpt { width: 100%; border-collapse: collapse; font-size: 14px; } .jg .jgpt td { padding: 7px 6px; border-top: 1px solid var(--line); vertical-align: middle; }

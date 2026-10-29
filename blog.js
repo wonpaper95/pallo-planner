@@ -82,7 +82,7 @@ function shell() {
     <div class="bltabs"><button data-bt="new">새 글</button><button data-bt="list">보관함</button><button data-bt="profile">지점 설정</button><button data-bt="usage" class="hidden">사용량</button><button data-bt="fb">개선사항 보내기</button></div>
     <span id="blQuota" class="mut"></span></div>
   <div id="blBody"></div>
-  <input type="file" id="blFile" accept="image/*" multiple hidden>
+  <input type="file" id="blFile" accept="image/*,.heic,.heif" multiple hidden>
   <dialog id="blConvDlg" class="wide"><h3 style="margin:0 0 8px">🔁 다른 채널용</h3><div id="blConvBody"></div>
     <div style="text-align:right;margin-top:12px"><button type="button" class="btn ghost" onclick="this.closest('dialog').close()">닫기</button></div></dialog>
   <dialog id="blStyleDlg"><h3 style="margin:0 0 4px">➕ 블로그 스타일 추가</h3><p class="mut" style="margin:0">잘 쓴다고 생각하는 네이버 블로그 글 주소를 넣으면 구조·톤·사진 리듬만 분석해서 프리셋으로 저장해요. 문장은 베끼지 않아요.</p>
@@ -122,6 +122,10 @@ BL.load = async function () {
   }
   BL.styles = (await sb.from("blog_styles").select("id, name, team_id").order("created_at")).data ?? [];
   call("usage").then((r) => r && setQuota(r.quota));
+  if (!BL.post) { // 화면이 새로 열렸으면 하루 안에 열어 둔 글을 다시
+    let m = null; try { m = JSON.parse(localStorage.getItem("bl-open") || "null"); } catch {}
+    if (m?.id && m.team === BL.team && Date.now() - m.at < 864e5) { const { data } = await sb.from("blog_posts").select("id, post").eq("id", m.id).maybeSingle(); if (data?.post) { BL.post = data.post; BL.postId = data.id; BL.tab = "new"; } else remember(null); }
+  }
   renderTab();
 };
 // ── 내 기본값 (blog_prefs, 사람마다 1줄): 새 글 옵션을 지점 기본값 위에 덮어씀. 지점에 없는 과목은 건너뜀 ──
@@ -180,7 +184,19 @@ function renderNew() {
   const o = BL.opts, subs = P().subjects ?? [];
   const styles = [...PRESETS, ...BL.styles.map((s) => [`custom:${s.id}`, `⭐ ${s.name}${s.team_id ? "" : " (공용)"}`])];
   if (!styles.some(([k]) => k === o.preset)) o.preset = "auto"; // 기본값에 저장된 스타일이 이 지점에서 안 보이면
-  $b("#blBody").innerHTML = `<div class="blgrid"><div class="blform card">
+  $b("#blBody").innerHTML = `<section class="card blbench">
+    <div class="blbench-h"><h3>🔎 쓰기 전에 벤치마킹</h3>${seenBench() ? "" : `<span class="blnew">🆕 업데이트</span>`}<span class="mut">키워드 검색 추이와 네이버 블로그 상위 10개 글을 먼저 보고, 우리 글 각도를 정해요</span></div>
+    <details class="blhow" id="blHow" ${seenBench() ? "" : "open"}><summary>❓ 사용법 <small>(10/29 새로 생긴 기능)</small></summary>
+      <ol><li><b>키워드 넣고 엔터</b> (또는 📈 버튼) — 오늘 쓸 글의 메인 키워드. 예) 대구 영어회화</li>
+        <li><b>비교하고 싶으면</b> 아래 키워드 칩을 한 번 눌러 서브로 고르고 다시 조회 → 그래프에 같이 그려져요 (최대 4개)</li>
+        <li><b>그래프</b> — 가장 많이 찾은 달과 이번 달 % 를 봐요. 많이 찾는 시기에 맞춰 모집·이벤트 글을 미리 써 두기</li>
+        <li><b>상위 10개 글</b> — 제목·첫 문단을 훑고 <b>다들 쓰는 각도는 피하고</b>, 우리만 있는 것(1:1 언어교환·소수정예·실제 수강생 변화)을 찾기. 제목을 누르면 새 탭</li>
+        <li><b>그 키워드 그대로 ✨ 시안 만들기</b> — 키워드가 아래 폼에 자동으로 들어가고, AI 도 상위 글을 참고해 겹치지 않게 써요</li></ol>
+      <div class="mut">⚠️ 남의 글 문장은 베끼지 말고 구조·각도만 참고해요. 그래프는 검색 '수'가 아니라 비교값이라, 실제 월 검색수는 폼 아래 🔍 네이버 검색량 보기에서.</div></details>
+    <div class="blbench-q"><input data-o="main_keyword" id="blBenchKw" value="${esc(o.main_keyword)}" placeholder="메인 키워드 예) 대구 영어회화" enterkeyhint="search"><button type="button" class="btn" id="blResBtn">📈 추이 · 상위 글 보기</button></div>
+    <div class="mut">아래 키워드 칩에서 서브로 고른 것(최대 4개)도 그래프에 같이 그려요. 여기 키워드가 글의 메인 키워드가 돼요.</div>
+    <div id="blRes"></div></section>
+  <div class="blgrid"><div class="blform card">
     <div class="blseg" id="blMode"><button type="button" data-mode="photo">📷 사진 보고 쓰기</button><button type="button" data-mode="topic">📝 주제 주고 쓰기</button></div>
     <div class="bldrop" id="blDrop">📷 사진을 끌어다 놓거나 눌러서 고르세요<br><small>올린 순서대로 번호가 붙어요 · 끌어서 순서 바꾸기</small></div>
     <div class="blthumbs" id="blThumbs"></div>
@@ -202,7 +218,7 @@ function renderNew() {
     <button type="button" class="btn blgo" id="blGo">✨ 시안 만들기</button><div class="mut" id="blGoNote" style="margin-top:6px"></div>
   </div><div id="blOut"></div></div>`;
   $b("#blTopic").value = o.topic;
-  syncMode(); renderThumbs(); renderChips(); presetWhy(); renderOut();
+  syncMode(); renderThumbs(); renderChips(); presetWhy(); renderOut(); renderRes();
 }
 function syncMode() {
   const topic = BL.opts.mode === "topic";
@@ -231,9 +247,10 @@ function renderThumbs() {
     <button type="button" class="x" data-rm="${p.id}" title="빼기">✕</button><button type="button" class="ed" data-ed="${p.id}">편집</button>${p.faced ? `<span class="face">🙂${p.edits.blurs.length || ""}</span>` : ""}
     <input data-note="${p.id}" value="${esc(p.note)}" placeholder="메모"></div>`).join("");
   const n = BL.photos.length, unchecked = BL.photos.filter((p) => !p.faced).length;
-  $b("#blFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="blFaceAll">🙂 얼굴 자동 모자이크${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서만 처리돼요</small>` : "";
+  $b("#blFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="blFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서만 처리돼요</small>` : "";
 }
 function renderChips() {
+  V().querySelectorAll("[data-o=main_keyword]").forEach((i) => { if (i !== document.activeElement) i.value = BL.opts.main_keyword; }); // 벤치마킹 칸·폼 칸 같은 값
   const el = $b("#blChips"); if (!el) return;
   const o = BL.opts, re = SUBJ_RE[o.subject];
   const all = [...new Set([...(P().mainKeywords ?? []), ...BL.extraKw, ...(P().subKeywords ?? [])])].filter((k) => !re || re.test(k) || /언어교환/.test(k));
@@ -243,17 +260,17 @@ function renderChips() {
 // ── 사진: 읽기·편집은 photo.js(PHOTO) ──
 async function addFiles(files) { BL.photos.push(...await PHOTO.fromFiles(files)); renderThumbs(); presetWhy(); }
 async function faceAll() {
-  if (!BL.photos.some((p) => !p.faced)) return toast("모든 사진을 이미 확인했어요");
+  if (!BL.photos.length) return toast("사진을 먼저 올려 주세요");
   const btn = $b("#blFaceAll"); if (btn) { btn.disabled = true; btn.textContent = "🙂 얼굴 찾는 중…"; }
-  try {
-    const n = await PHOTO.faceAll(BL.photos);
-    toast(n ? `얼굴 ${n}개를 모자이크했어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "찾은 얼굴이 없어요. 작은 얼굴은 [편집]에서 확인해 주세요");
+  try { // 버튼은 매번 모든 사진을 다시 봄 (놓친 얼굴만 더하고, 이미 칠한 곳은 그대로)
+    const n = await PHOTO.faceAll(BL.photos, true, (i, all) => btn && (btn.textContent = `🙂 얼굴 찾는 중… ${i}/${all}`));
+    toast(n ? `얼굴 ${n}개를 블러 처리했어요. 뒤돌아 있는 등 놓친 얼굴은 [편집]에서 직접 칠해 주세요` : "새로 찾은 얼굴이 없어요. 놓친 얼굴은 [편집]에서 직접 칠해 주세요");
   } catch (e) { console.error(e); toast("얼굴 찾기를 불러오지 못했어요. [편집]에서 직접 칠해 주세요"); }
   renderThumbs(); if (BL.post) renderOut();
 }
 function openEditor(id) {
   const p = BL.photos.find((x) => x.id === id); if (!p) return;
-  PHOTO.edit(p, { title: `사진 ${pad(BL.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); if (BL.post) renderOut(); } });
+  PHOTO.edit(p, { title: `사진 ${pad(BL.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); if (BL.post) renderOut(); }, hf: (b) => call("hf", b) }); // 🪄 힉스필드
 }
 
 // ── 시안 만들기 ──
@@ -288,8 +305,10 @@ function blockHtml(b, i, n) {
   if (b.type === "divider") return `<div class="blk divider" data-i="${i}">${tools}<hr></div>`;
   if (b.type === "map") return `<div class="blk map" data-i="${i}">${tools}<div class="mapbox">📍 지도: ${esc(P().display || BL.teamName)} — 붙여넣은 뒤 스마트에디터 [장소]로 넣어 주세요</div></div>`;
   const p = photoOf(b.pid);
-  return `<div class="blk photo" draggable="true" data-i="${i}">${tools}<span class="tag">사진 ${pad(n)}</span>
+  // 네이버는 대표사진을 따로 안 고르면 첫 사진을 대표(썸네일)로 씀 → 사진 01 = 대표, ⭐ 는 그 사진을 01 자리와 맞바꿈
+  return `<div class="blk photo" draggable="true" data-i="${i}">${tools}<span class="tag">사진 ${pad(n)}${n === 1 ? " · ⭐ 대표" : ""}</span>
     <figure>${p ? `<img src="${p.url}" alt="">` : `<div class="ph">📷 ${esc(b.text || "안 쓴 사진을 여기로 끌어다 놓으세요")}${b.pid ? "<br><small>원본은 처음 만든 기기에만 있어요</small>" : ""}</div>`}</figure>
+    ${p ? `<div class="pacts"><button type="button" class="btn ghost small" data-pcopy="${i}">📋 사진 ${pad(n)} 복사</button>${n === 1 ? "" : `<button type="button" class="btn ghost small" data-cover="${i}">⭐ 대표사진으로</button>`}</div>` : ""}
     <div class="cap" contenteditable="true" data-cap="${i}">${esc(b.caption)}</div></div>`;
 }
 function renderOut() {
@@ -305,18 +324,17 @@ function renderOut() {
     <div class="blchips">${(X.thumbnail_texts ?? []).map((t) => `<button type="button" class="blchip" data-copy="${esc(t)}">${esc(t)}</button>`).join("")}</div>
     <div class="mut" style="margin-top:10px">메인 <b>${esc(X.main_keyword)}</b> · 서브 ${esc((X.sub_keywords ?? []).join(", "))} · ${esc(presetName(X.opts?.preset))}</div>
     ${spare.length ? `<div class="mut" style="margin-top:10px">안 쓴 사진 — 본문으로 끌어다 놓으세요</div><div class="bltray">${spare.map((p) => `<div class="blthumb" draggable="true" data-spare="${p.id}"><img src="${p.url}" alt=""></div>`).join("")}</div>` : ""}
-    <div class="mut" style="margin-top:10px">💡 시안의 사진은 네이버 글쓰기 창으로 바로 끌어다 놓을 수 있어요 (크롬)</div>
+    <div class="mut" style="margin-top:10px">💡 네이버에 올리기: <b>📋 본문 복사</b> → 네이버에 붙여넣기 → <b>📋 다음 사진 복사</b>를 누를 때마다 01·02·03… 차례로 복사돼요. '📷 사진 01' 줄을 지우고 그 자리에 붙여넣기(⌘V / Ctrl+V), 다음 사진도 같은 방법. 사진 01이 대표사진(썸네일) — 바꾸려면 원하는 사진의 <b>⭐ 대표사진으로</b></div>
     <div class="blpaper" id="blPaper">${X.blocks.map((b, i) => blockHtml(b, i, b.type === "photo" ? ++n : n)).join("")}</div>
     <div class="bltags" id="blTags" contenteditable="true">${esc((X.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" "))}</div>
     <details style="margin-top:10px"><summary class="mut">🔁 AI 자체 검수 메모</summary><div class="mut" style="white-space:pre-wrap;margin-top:6px">${esc(X.self_review)}</div></details>
     <h3 style="margin:16px 0 4px">🚦 발행 전 점검</h3><div class="blcheck" id="blCheck"></div>
     <div class="blacts">
-      <button type="button" class="btn" id="blCopy">📋 본문 복사</button><button type="button" class="btn ghost" id="blCopyTitle">제목 복사</button>
+      <button type="button" class="btn" id="blCopy">📋 본문 복사</button><button type="button" class="btn" id="blNextPhoto">${nextLabel()}</button><button type="button" class="btn ghost" id="blCopyTitle">제목 복사</button>
       <button type="button" class="btn ghost" id="blPhotos">🖼 사진 번호대로 받기</button><button type="button" class="btn ghost" id="blTagsCopy"># 해시태그 복사</button>
-      <button type="button" class="btn ghost" id="blCopyAll" title="사진까지 한 번에 붙여넣기 (스마트에디터에서 안 될 수 있어요)">🧪 사진까지 통째 복사</button>
       <button type="button" class="btn ghost" id="blConv">🔁 인스타·당근·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
     </div></div>`;
-  check(); similarSoon(); publishUsed();
+  check(); similarSoon();
 }
 const pasteAsText = (ev) => { if (!ev.target.closest("[contenteditable]")) return; ev.preventDefault(); document.execCommand("insertText", false, ev.clipboardData.getData("text/plain")); };
 
@@ -327,40 +345,46 @@ function plainText() {
   return BL.post.blocks.map((b) => b.type === "photo" ? `📷 사진 ${pad(++n)}${b.caption ? ` — ${b.caption}` : ""}` : b.type === "divider" ? "────────" : b.type === "map" ? `📍 [지도: ${P().display || BL.teamName}]` : b.text).join("\n\n") + "\n\n" + tagsText();
 }
 const tagsText = () => (BL.post.hashtags ?? []).map((t) => "#" + String(t).replace(/^#/, "")).join(" ");
-// 네이버 스마트에디터는 data:/blob: 이미지를 거부하고(“허용되지 않는 형식”) https 주소 이미지는 가져가서 다시 올린다.
-// → 모자이크 반영된 사진을 임시 공개 보관함(blog-temp, 무작위 이름, 2일 뒤 삭제)에 올려 그 주소로 붙여넣기·끌어놓기
-async function publish(p) {
-  if (p.pub && p.pubOf === p.url) return p.pub;
-  const path = `${BL.team}/${crypto.randomUUID()}.jpg`;
-  const { error } = await sb.storage.from("blog-temp").upload(path, p.blob, { contentType: "image/jpeg" });
-  if (error) throw error;
-  p.pub = sb.storage.from("blog-temp").getPublicUrl(path).data.publicUrl; p.pubOf = p.url;
-  return p.pub;
-}
-const publishUsed = debounce(async () => {
-  for (const pid of used()) { const p = photoOf(pid); if (p) try { await publish(p); } catch (e) { console.warn("사진 임시 올리기 실패", e); } }
-}, 600);
-async function richHtml(embed) {
+// 네이버 스마트에디터: 붙여넣은 HTML 속 사진은 data: 면 빠지고, https 주소면 외부 주소 사진으로만 남아 대표·업로드가 안 됨 (10-28 실측)
+// → 글은 '📷 사진 NN' 자리표시로, 사진은 한 장씩 이미지 클립보드(copyImg)로. 예전 임시 공개 보관함(blog-temp) 업로드는 그만둠
+async function richHtml() {
   const lines = (t) => String(t).split("\n").map((l) => `<p>${l.trim() ? esc(l) : "<br>"}</p>`).join("");
-  const urls = new Map();
-  if (embed) for (const pid of used()) { const p = photoOf(pid); if (p) urls.set(p.id, await publish(p)); }
   let n = 0; const out = [];
   for (const b of BL.post.blocks) {
     if (b.type === "text") out.push(lines(b.text));
     else if (b.type === "quote") out.push(`<blockquote><p><b>${esc(b.text)}</b></p></blockquote>`);
     else if (b.type === "divider") out.push("<hr>");
     else if (b.type === "map") out.push(`<p>📍 [지도: ${esc(P().display || BL.teamName)}]</p>`);
-    else { n++; const p = photoOf(b.pid); out.push(embed && p ? `<p><img src="${urls.get(p.id)}" alt=""></p>${b.caption ? `<p>${esc(b.caption)}</p>` : ""}` : `<p>📷 사진 ${pad(n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`); }
+    else out.push(`<p>📷 사진 ${pad(++n)}${b.caption ? ` — ${esc(b.caption)}` : ""}</p>`);
     out.push("<p><br></p>");
   }
   out.push(`<p>${esc(tagsText())}</p>`);
   return out.join("");
 }
+// 사진 한 장을 '이미지'로 클립보드에 (캡처 붙여넣기와 같은 길 → 스마트에디터가 사진으로 올림. HTML 속 주소는 글자로 들어갈 때가 있음)
+// 크롬 클립보드는 PNG 만 받음 → 긴 변 1600px PNG 로. Safari 는 클릭 직후 write 를 불러야 해서 내용은 Promise 로
+async function copyImg(p) {
+  if (!p) return false;
+  const png = createImageBitmap(p.blob).then((bm) => {
+    const k = Math.min(1, 1600 / Math.max(bm.width, bm.height)), c = document.createElement("canvas");
+    c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k); c.getContext("2d").drawImage(bm, 0, 0, c.width, c.height);
+    return new Promise((ok) => c.toBlob(ok, "image/png"));
+  });
+  try { await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]); return true; }
+  catch (e) { console.warn("사진 복사 실패", e); toast("이 브라우저에선 사진 복사가 안 돼요. 🖼 사진 번호대로 받기로 받아서 올려 주세요"); return false; }
+}
+// [📋 다음 사진 복사] 차례: 시안의 사진 자리 번호(빈 자리 건너뜀) 순서. BL.next = 다음에 복사할 칸
+const shots = () => { let n = 0; return (BL.post?.blocks ?? []).flatMap((b) => b.type !== "photo" ? [] : (n++, photoOf(b.pid) ? [{ no: pad(n), p: photoOf(b.pid) }] : [])); };
+function nextLabel() {
+  const L = shots(); if (BL.nextOf !== BL.post) { BL.nextOf = BL.post; BL.next = 0; } // 다른 글을 열면 01부터
+  if (!L.length) return "📋 다음 사진 복사";
+  return BL.next >= L.length ? `✅ 사진 ${L.length}장 다 복사 · 다시 01부터` : `📋 다음 사진 복사 (${L[BL.next].no} · ${BL.next + 1}/${L.length})`;
+}
 async function photosOut() {
   const list = []; let n = 0;
   BL.post.blocks.forEach((b) => { if (b.type === "photo") { n++; const p = photoOf(b.pid); if (p) list.push({ name: `${pad(n)}.jpg`, blob: p.blob }); } });
   if (!list.length) return toast("시안에 들어간 사진이 없어요");
-  await PHOTO.share(list, `${BL.teamName}_${today()}_사진${list.length}장.zip`);
+  await PHOTO.share(list, `${BL.teamName}_${today()}`);
 }
 
 // ── 발행 전 점검 ──
@@ -384,7 +408,7 @@ function check() {
   add(todo ? "bad" : "ok", todo ? `[확인 필요] ${todo}곳 — 채우거나 지우고 발행하세요` : "[확인 필요] 없음");
   if (review) add("warn", `[강사 검수] ${review}곳 — 외국어 표현을 강사님께 확인받고 표시를 지우세요`);
   add(empty ? "warn" : "info", empty ? `사진 자리 ${empty}곳이 비어 있어요` : `사진 ${placed.length}장 (장 수는 순위와 무관 — 내용에 맞게)`);
-  if (placed.length) add(unfaced ? "warn" : "ok", unfaced ? `얼굴 확인 안 한 사진 ${unfaced}장 — 🙂 얼굴 자동 모자이크 또는 [편집]` : "사진 얼굴 확인 완료");
+  if (placed.length) add(unfaced ? "warn" : "ok", unfaced ? `얼굴 확인 안 한 사진 ${unfaced}장 — 🙂 얼굴 자동 블러 또는 [편집]` : "사진 얼굴 확인 완료");
   add(tags >= 8 && tags <= 12 ? "ok" : "warn", `해시태그 ${tags}개 (8~12개)`);
   add(cl.length >= 3 ? "warn" : "ok", cl.length >= 3 ? `AI 티 나는 표현: ${esc(cl.join(", "))}` : "AI 티 나는 상투어 적음");
   el.innerHTML = L.join("") + `<div class="info" id="blSim"><b>·</b><span>다른 글과 겹침 확인 중…</span></div>`;
@@ -404,11 +428,14 @@ const similarSoon = debounce(async () => {
 const edited = debounce(() => { check(); similarSoon(); }, 400);
 
 // ── 저장·보관함 ──
+// 열어 둔 글 기억: 다른 사이트에 올리고 돌아왔을 때 화면이 새로 열려도 그 글을 다시 띄움
+const remember = (id) => { try { id ? localStorage.setItem("bl-open", JSON.stringify({ id, team: BL.team, at: Date.now() })) : localStorage.removeItem("bl-open"); } catch {} };
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && BL.post) savePost(true); }); // 다른 앱·사이트로 갈 때 바로 저장
 async function savePost(silent) {
   const X = BL.post; if (!X) return;
   const row = { team_id: BL.team, title: X.titles[X.sel] ?? "", keyword: X.main_keyword ?? "", body: bodyText(), post: X, updated_at: new Date().toISOString() };
   if (BL.postId) { const { error } = await sb.from("blog_posts").update(row).eq("id", BL.postId); if (!fail(error) && !silent) toast("저장했어요"); }
-  else { const { data, error } = await sb.from("blog_posts").insert(row).select("id").single(); if (!fail(error)) { BL.postId = data.id; if (!silent) toast("보관함에 저장했어요"); } }
+  else { const { data, error } = await sb.from("blog_posts").insert(row).select("id").single(); if (!fail(error)) { BL.postId = data.id; remember(data.id); if (!silent) toast("보관함에 저장했어요"); } }
 }
 async function renderList() {
   $b("#blBody").innerHTML = `<div class="mut">불러오는 중…</div>`;
@@ -480,6 +507,42 @@ function renderKw() {
     <div class="mut">검색량 많고 경쟁 "낮음·중간"인 키워드가 블로그로 노리기 좋아요.</div>`;
 }
 
+// ── 검색 추이·블로그 상위 글 (NAVER API HUB). 상위 글은 시안 만들 때 서버가 메인 키워드로 다시 찾아 AI 에 넘김 ──
+async function research() {
+  const o = BL.opts, kws = [...new Set([o.main_keyword, ...o.sub_keywords].map((k) => k.trim()).filter(Boolean))].slice(0, 5);
+  if (!kws.length) return toast("메인 키워드를 넣거나 칩을 골라 주세요");
+  const btn = $b("#blResBtn"); btn.disabled = true; btn.textContent = "📈 조회 중…";
+  const r = await call("research", { keywords: kws });
+  btn.disabled = false; btn.textContent = "📈 추이 · 상위 글 보기";
+  if (!r) return;
+  BL.res = r; renderRes();
+}
+const LINE = ["var(--accent)", "#e0a020", "#3aa676", "#d0607a", "#4a8fd8"];
+function trendSvg(trend) {
+  const W = 480, H = 200, n = trend[0]?.data.length ?? 0; if (n < 2) return "";
+  const x = (i) => 16 + (i * (W - 32)) / (n - 1), y = (v) => H - 26 - (v / 100) * (H - 40);
+  const grid = [0, 50, 100].map((v) => `<line x1="16" x2="${W - 16}" y1="${y(v)}" y2="${y(v)}" class="g"/>`).join("");
+  const lines = trend.map((t, k) => `<polyline fill="none" stroke="${LINE[k]}" stroke-width="${k ? 2 : 3.5}" stroke-linejoin="round" points="${t.data.map((d, i) => `${x(i).toFixed(1)},${y(d.ratio).toFixed(1)}`).join(" ")}"/>`).join("");
+  const dots = trend[0].data.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.ratio).toFixed(1)}" r="3.5" fill="${LINE[0]}"/>`).join("");
+  const labels = trend[0].data.map((d, i) => `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle">${+d.month.slice(5)}월</text>`).join("");
+  return `<svg class="bltrend" viewBox="0 0 ${W} ${H}" role="img" aria-label="최근 12개월 검색 추이">${grid}${lines}${dots}${labels}</svg>`;
+}
+const seenBench = () => { try { return localStorage.getItem("bl-bench-seen") === "1"; } catch { return false; } }; // 🆕 표시·사용법 펼침은 처음 한 번만
+function renderRes() {
+  const el = $b("#blRes"), r = BL.res; if (!el || !r) return;
+  const t0 = r.trend[0], d = t0?.data ?? [], peak = d.reduce((a, b) => (b.ratio > a.ratio ? b : a), d[0] ?? { ratio: 0 }), last = d[d.length - 1];
+  const note = t0 && peak?.ratio ? `<b>${esc(t0.keyword)}</b> 가장 많이 찾은 달은 <b>${+peak.month.slice(5)}월</b> · 이번 달은 그때의 <b>${Math.round((last.ratio / peak.ratio) * 100)}%</b> (이번 달은 진행 중)` : "검색 추이 데이터가 없어요 (검색이 너무 적은 키워드)";
+  el.innerHTML = `<div class="blres">
+    <div class="blres-chart"><h4>📈 최근 12개월 검색 추이</h4>
+      ${trendSvg(r.trend)}
+      <div class="bllegend">${r.trend.map((t, k) => `<span><i style="background:${LINE[k]}"></i>${esc(t.keyword)}</span>`).join("")}</div>
+      <p>${note}</p>
+      <div class="mut">숫자가 아니라 넣은 키워드 중 최고치를 100으로 본 비교값이에요.</div></div>
+    <div class="blres-top"><h4>🏆 '${esc(t0?.keyword ?? "")}' 네이버 블로그 상위 ${r.top.items.length}개 <span class="mut">· 전체 ${r.top.total.toLocaleString()}개 글</span></h4>
+      <ol class="bltop">${r.top.items.map((x) => `<li><a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.title)}</a><div class="mut">${esc(x.blogger)} · ${esc(x.date.replace(/(\d{4})(\d\d)(\d\d)/, "$1.$2.$3"))}</div>${x.desc ? `<div class="desc">${esc(x.desc)}</div>` : ""}</li>`).join("") || `<li class="mut">글이 없어요</li>`}</ol>
+      <div class="mut">제목을 누르면 새 탭으로 열려요. ✨ 시안 만들 때 이 상위 글 제목도 AI가 함께 보고, 겹치지 않는 각도로 써요.</div></div></div>`;
+}
+
 // ── 다른 채널 변환 ──
 async function convert() {
   const btn = $b("#blConv"); btn.disabled = true; btn.textContent = "🔁 바꾸는 중…";
@@ -495,7 +558,7 @@ async function convert() {
 function wire() {
   const v = V();
   $b("#blFile").onchange = (ev) => { addFiles([...ev.target.files]); ev.target.value = ""; };
-  $b("#blTeam").onchange = (ev) => { BL.team = +ev.target.value; try { localStorage.setItem("blog-team", ev.target.value); } catch {} BL.profile = null; BL.post = null; BL.postId = null; BL.sim = null; BL.kw = null; BL.load(); };
+  $b("#blTeam").onchange = (ev) => { BL.team = +ev.target.value; try { localStorage.setItem("blog-team", ev.target.value); } catch {} BL.profile = null; BL.post = null; BL.postId = null; BL.sim = null; BL.kw = null; BL.res = null; BL.load(); };
   v.addEventListener("paste", pasteAsText);
   v.addEventListener("click", async (ev) => {
     const t = ev.target, d = t.dataset ?? {}, X = BL.post;
@@ -504,6 +567,7 @@ function wire() {
     if (t.closest("#blDrop")) return $b("#blFile").click();
     if (d.rm) { BL.photos = BL.photos.filter((p) => p.id !== +d.rm); renderThumbs(); presetWhy(); if (X) renderOut(); return; }
     if (d.ed) return openEditor(+d.ed);
+    const th = t.closest("#blThumbs .blthumb"); if (th && !t.closest("button, input")) return PHOTO.view(BL.photos, +th.dataset.thumb, { onEdit: (p) => openEditor(p.id) }); // 🔍 크게 보기
     if (t.id === "blFaceAll") return faceAll();
     const chip = t.closest("[data-chip]");
     if (chip) {
@@ -514,6 +578,7 @@ function wire() {
       $b("[data-o=main_keyword]").value = o.main_keyword; return renderChips();
     }
     if (t.id === "blKwBtn") return keywordVolume();
+    if (t.id === "blResBtn") return research();
     if (t.id === "blKwLocal") { BL.kwLocal = t.checked; return renderKw(); }
     const row = t.closest("[data-kwrow]");
     if (row) { const k = row.dataset.kwrow; if (!BL.extraKw.includes(k)) BL.extraKw.unshift(k); BL.opts.main_keyword = k; $b("[data-o=main_keyword]").value = k; return renderChips(); }
@@ -531,13 +596,14 @@ function wire() {
     if (d.mv) { const i = +d.i, j = i + +d.mv, B = X.blocks; if (j < 0 || j >= B.length) return; [B[i], B[j]] = [B[j], B[i]]; renderOut(); return; }
     if (d.add) { X.blocks.splice(+d.add + 1, 0, { type: "text", text: "", photo: 0, caption: "", pid: 0 }); renderOut(); v.querySelector(`[data-tx="${+d.add + 1}"]`)?.focus(); return; }
     if (d.del) { X.blocks.splice(+d.del, 1); return renderOut(); }
-    if (t.id === "blCopy") { if (await copy(plainText(), richHtml(false))) toast("본문 복사! 스마트에디터 본문에 붙여넣고 📷 사진 01 자리에 01번 사진을 올리세요"); return; }
-    if (t.id === "blCopyAll") {
-      t.textContent = "🧪 사진 올리는 중…"; let failed = false;
-      const html = richHtml(true); html.catch(() => { failed = true; });
-      const ok = await copy(plainText(), html); t.textContent = "🧪 사진까지 통째 복사";
-      if (ok) toast(failed ? "사진을 올리지 못해 글자만 복사했어요. 인터넷 연결을 확인하고 다시 눌러 주세요" : "사진까지 복사했어요. 네이버 글쓰기에 붙여넣으면 사진은 네이버가 가져가 올려요");
-      return;
+    if (d.pcopy) { const no = t.textContent.match(/\d+/)?.[0]; if (await copyImg(photoOf(X.blocks[+d.pcopy].pid))) toast(`사진 ${no} 복사! 네이버 글쓰기 '📷 사진 ${no}' 자리에 붙여넣으세요(⌘V / Ctrl+V)`); return; }
+    if (d.cover) { const B = X.blocks, i = +d.cover, f = B.findIndex((b) => b.type === "photo"); [B[f], B[i]] = [B[i], B[f]]; renderOut(); toast("이 사진이 사진 01(대표사진)이 됐어요"); return; }
+    if (t.id === "blCopy") { BL.next = 0; $b("#blNextPhoto").textContent = nextLabel(); if (await copy(plainText(), richHtml())) toast("본문 복사! 네이버에 붙여넣은 뒤 [📋 다음 사진 복사] → '📷 사진 01' 자리에 붙여넣기를 사진마다 반복하세요"); return; }
+    if (t.id === "blNextPhoto") {
+      const L = shots(); if (!L.length) return toast("시안에 들어간 사진이 없어요");
+      const { no, p } = L[BL.next % L.length];
+      if (await copyImg(p)) { BL.next = BL.next % L.length + 1; toast(`사진 ${no} 복사! '📷 사진 ${no}' 줄을 지우고 그 자리에 붙여넣으세요(⌘V / Ctrl+V)${no === "01" ? " — 대표사진" : ""}`); }
+      t.textContent = nextLabel(); return;
     }
     if (t.id === "blCopyTitle") { if (await copy(X.titles[X.sel])) toast("제목 복사했어요"); return; }
     if (t.id === "blTagsCopy") { if (await copy(tagsText())) toast("해시태그 복사했어요"); return; }
@@ -547,7 +613,7 @@ function wire() {
     if (d.open) {
       const { data, error } = await sb.from("blog_posts").select("id, post").eq("id", +d.open).single();
       if (fail(error)) return;
-      BL.post = data.post; BL.postId = data.id; BL.sim = null; BL.tab = "new"; return renderTab();
+      BL.post = data.post; BL.postId = data.id; BL.sim = null; BL.tab = "new"; remember(data.id); return renderTab();
     }
     if (d.pub) {
       const url = prompt("발행한 네이버 글 주소를 붙여 주세요 (없으면 비워 두세요)", ""); if (url === null) return;
@@ -565,6 +631,8 @@ function wire() {
     if (d.fbk) { V().querySelectorAll("[data-fbk]").forEach((b) => b.classList.toggle("on", b === t)); return; }
     if (t.id === "blFbSend") return sendFb();
   });
+  v.addEventListener("toggle", (ev) => { if (ev.target.id === "blHow" && !ev.target.open) { try { localStorage.setItem("bl-bench-seen", "1"); } catch {} $b(".blnew")?.remove(); } }, true); // 사용법 접으면 '봤음'
+  v.addEventListener("keydown", (ev) => { if (ev.target.id === "blBenchKw" && ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); research(); } });
   v.addEventListener("input", (ev) => {
     const t = ev.target, d = t.dataset, X = BL.post;
     if (d.o) { BL.opts[d.o] = t.value; if (d.o === "main_keyword") renderChips(); presetWhy(); return; }
@@ -589,12 +657,8 @@ function wire() {
     const th = ev.target.closest?.("[data-thumb]"), sp = ev.target.closest?.("[data-spare]"), bk = ev.target.closest?.(".blk.photo");
     drag = th ? { kind: "thumb", i: +th.dataset.thumb } : sp ? { kind: "spare", pid: +sp.dataset.spare } : bk ? { kind: "blk", i: +bk.dataset.i } : null;
     if (!drag) return;
-    // 네이버 글쓰기로 끌 때: 크롬 기본값은 blob: 주소라 네이버가 거부 → 미리 올려 둔 https 주소로 바꿔 실음 (다른 사이트 사진 끌어오기와 같은 방식)
     // 내부 표시는 다른 사이트가 안 읽는 타입으로만 단다
     ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("application/x-pallo", "1");
-    const p = photoOf(drag.kind === "spare" ? drag.pid : drag.kind === "blk" ? BL.post?.blocks[drag.i]?.pid : 0);
-    if (p?.pub && p.pubOf === p.url) { ev.dataTransfer.setData("text/uri-list", p.pub); ev.dataTransfer.setData("text/html", `<img src="${p.pub}" alt="">`); }
-    else if (p) { publish(p).catch(() => {}); toast("사진을 준비하는 중이에요. 2~3초 뒤 다시 끌어 주세요"); }
     (th || sp || bk).classList.add("dragging");
   });
   v.addEventListener("dragend", () => { drag = null; v.querySelectorAll(".dragging, .dropbefore, .dropon").forEach((x) => x.classList.remove("dragging", "dropbefore", "dropon")); });

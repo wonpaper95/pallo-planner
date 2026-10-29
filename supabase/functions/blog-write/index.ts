@@ -1,13 +1,15 @@
 // ✍️ 블로그 작성기 Edge Function. 화면(blog.js)이 sb.functions.invoke("blog-write", { body: { action, ... } }) 로 부른다.
-// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
-// 비밀값: ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET (supabase secrets set …)
+// action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | research(API HUB 검색 추이·블로그 상위 글) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
+// 비밀값: HF_KEY(🪄 힉스필드 AI 다듬기 — 콘솔의 API Key 통째 = "키ID:비밀값", 또는 HF_API_KEY_ID·HF_API_KEY_SECRET 둘), ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import {
-  COMMON, CONCEPTS, CONVERT_SCHEMA, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
+  COMMON, CONCEPTS, CONVERT_SCHEMA, DECO_SCHEMA, DECO_SYSTEM, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
 } from "./prompt.ts";
 
 const MODEL = "claude-opus-5-5";
+const DECO_MODEL = "claude-sonnet-5-5"; // 사진 꾸미기는 가볍게 (하루 제한에 안 셈)
 const PRICE = { in: 4 / 1e6, out: 20 / 1e6, cacheRead: 0.2 / 1e6, cacheWrite: 5 / 1e6 }; // USD / token
 const AI_KINDS = ["write", "convert", "style", "sns"]; // 하루 제한에 세는 것 (블로그·게시물 합산)
 const CORS = {
@@ -37,8 +39,11 @@ Deno.serve(async (req) => {
       case "write": return json(await write(who, team, body));
       case "convert": return json(await convert(who, team, body));
       case "sns": return json(await sns(who, team, body));
+      case "deco": return json(await deco(who, team, body));
+      case "hf": return json(await hf(who, team, body));
       case "style": return json(await style(who, team, body));
       case "keywords": return json(await keywords(who, team, body));
+      case "research": return json(await research(who, team, body));
       case "similar": return json(await similar(team, body));
       case "usage": return json(await usage(team));
       default: throw new HttpError(400, "알 수 없는 action");
@@ -103,9 +108,9 @@ async function record(who: Who, team: number, kind: string, u?: Anthropic.Beta.B
 }
 
 // ── Claude 호출 (구조화 출력 + 거절 시 서버 측 대체 모델) ──
-async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high") {
+async function ask(system: Anthropic.Beta.BetaTextBlockParam[], content: Anthropic.Beta.BetaContentBlockParam[], schema: { [key: string]: unknown }, effort: "low" | "medium" | "high", model = MODEL) {
   const msg = await anthropic().beta.messages.stream({
-    model: MODEL,
+    model,
     max_tokens: 32000,
     betas: ["server-side-fallback-2026-07-01"],
     // @ts-ignore 최신 SDK 타입에 없을 수 있음: 거절 카테고리에 맞춰 대체 모델로 다시 돌림
@@ -136,6 +141,7 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     if (s) preset = { name: s.name, rules: s.rules };
   }
   const recent = (await admin.from("blog_posts").select("title, body, created_at").eq("team_id", team.id).order("created_at", { ascending: false }).limit(8)).data ?? [];
+  const top = o.main_keyword ? await topBlogs(o.main_keyword).catch((e) => (console.error("상위 글 조회 실패", e), null)) : null;
   const p = team.profile as Record<string, any>;
   const lines = [
     `오늘: ${new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)}`,
@@ -150,6 +156,7 @@ async function write(who: Who, team: Team, b: { photos?: Photo[]; options?: Reco
     `메인 키워드: ${o.main_keyword || "(지점 키워드 중 이 글에 가장 맞는 롱테일로 골라라)"}`,
     `서브 키워드 후보: ${(o.sub_keywords ?? []).join(", ") || (p.subKeywords ?? []).slice(0, 12).join(", ")}`,
     `사진: ${photos.length}장 (아래 순서가 사진 번호). ${photos.length ? "모든 사진을 한 번씩 photo 블록으로 배치하라. 순서는 글 흐름에 맞게 바꿔도 된다." : "사진이 없으니 photo 블록의 photo=0, text 에 찍으면 좋을 사진을 안내하라 (6~8개)."}`,
+    top?.items.length ? `# 네이버 블로그 '${o.main_keyword}' 상위 글 (경쟁 글 — 제목·첫 문단 각도가 겹치지 않게, 이 글들에 없는 정보·경험으로 차별화. 문장·표현은 가져오지 말 것)\n${top.items.map((t: { title: string; desc: string }, i: number) => `${i + 1}. ${t.title} :: ${t.desc}`).join("\n")}` : "",
     recent.length ? `# 이 지점 최근 글 (겹치지 않게)\n${recent.map((r) => `- ${r.title} :: ${String(r.body).slice(0, 120).replace(/\s+/g, " ")}`).join("\n")}` : "",
   ].filter(Boolean).join("\n");
 
@@ -206,6 +213,86 @@ async function sns(who: Who, team: Team, b: { photos?: Photo[]; topic?: string; 
   return { result: out, quota: await record(who, team.id, "sns", usage) };
 }
 
+// ── deco: 게시물 사진 AI 자동 꾸미기 (사진마다 한 줄, 같은 순서). 하루 생성 제한에 안 세고 비용만 기록(kind=deco) ──
+const DECO_LANG: Record<string, string> = { en: "영어", ja: "일본어", zh: "중국어(간체)", es: "스페인어" };
+async function deco(who: Who, team: Team, b: { photos?: Photo[]; lang?: string; topic?: string }) {
+  const photos = (b.photos ?? []).slice(0, 10);
+  if (!photos.length) throw new HttpError(400, "사진이 없어요");
+  const content: Anthropic.Beta.BetaContentBlockParam[] = [{ type: "text", text: [`지점: ${team.name}`, `글자 언어: ${DECO_LANG[b.lang ?? ""] ?? "영어"}`, b.topic ? `게시물 주제: ${String(b.topic).slice(0, 300)}` : "", `사진 ${photos.length}장 — photos 배열도 같은 순서·같은 개수로`].filter(Boolean).join("\n") }];
+  photos.forEach((ph, i) => {
+    content.push({ type: "text", text: `사진 ${i + 1}${ph.note ? ` (매니저 메모: ${ph.note})` : ""}` });
+    content.push({ type: "image", source: { type: "base64", media_type: ph.media_type as "image/jpeg", data: ph.data } });
+  });
+  const { out, usage } = await ask(sys(DECO_SYSTEM), content, DECO_SCHEMA, "low", DECO_MODEL);
+  await record(who, team.id, "deco", usage);
+  return { result: out };
+}
+
+// ── hf: 🪄 힉스필드 AI 다듬기 (Qwen Image 3 편집). 사람 얼굴 있는 사진은 화면에서 막고 보냄 — 이 모델은 사진 전체를 다시 그림 ──
+// 올리기(presigned) → 제출(Hf-Expires-After 1시간) → 상태 보기 → 결과 받기 → 힉스필드 쪽 기록 바로 지움. 지점마다 하루 HF_DAILY 장 (돈이 드는 거라 따로 셈)
+const HF = "https://api.higgsfield.ai", HF_DAILY = 10;
+const HF_KEEP = "Keep every person, face, hand, text, letter, sign, logo and object exactly as in the original — do not add, remove, redraw or move them. Photorealistic, natural, no illustration style.";
+const HF_MODES: Record<string, string> = {
+  enhance: "Improve this photo like a professional photo retouch: balanced exposure, natural vivid colors, sharper details, less noise. Keep the same framing and composition. " + HF_KEEP,
+  clean: "Tidy up the background of this photo: remove clutter, stray cables, trash and distracting small objects from the background only, keep the space looking real. Keep the same framing. " + HF_KEEP,
+  tall: "Extend this photo outward to a taller vertical frame: keep the original photo content unchanged in the middle and naturally continue the surroundings (ceiling, wall, floor, table) above and below it. " + HF_KEEP,
+};
+const HF_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "7:9", "9:7", "9:16", "16:9", "21:9"];
+async function hf(who: Who, team: Team, b: { data?: string; mode?: string; aspect?: string }) {
+  const id = Deno.env.get("HF_API_KEY_ID"), secret = Deno.env.get("HF_API_KEY_SECRET"), key = Deno.env.get("HF_KEY")?.trim() || (id && secret ? `${id}:${secret}` : "");
+  if (!key) throw new HttpError(503, "힉스필드 API 키가 아직 연결되지 않았어요 (대표님이 Supabase 비밀값 HF_KEY 에 넣어야 해요)");
+  const prompt = HF_MODES[b.mode ?? ""]; if (!prompt) throw new HttpError(400, "알 수 없는 다듬기");
+  if (!b.data) throw new HttpError(400, "사진이 없어요");
+  const { count } = await admin.from("blog_gens").select("id", { count: "exact", head: true }).eq("team_id", team.id).eq("kind", "hf").gte("created_at", kstMidnight());
+  if ((count ?? 0) >= HF_DAILY) throw new HttpError(429, `🪄 AI 다듬기는 지점마다 하루 ${HF_DAILY}장까지예요. 내일 다시 쓸 수 있어요.`);
+  const auth = { Authorization: `Key ${key}` };
+  const hfErr = async (r: Response, what: string) => {
+    const t = (await r.text()).slice(0, 300);
+    if (r.status === 401) return new HttpError(502, "힉스필드 API 키가 틀렸어요 (대표님 확인 필요)");
+    if (r.status === 402 || /balance|insufficient|credit/i.test(t)) return new HttpError(402, "힉스필드 API 잔액이 부족해요 (대표님이 충전해야 해요)");
+    if (r.status === 429) return new HttpError(429, "힉스필드가 바빠요. 1분 뒤 다시 눌러 주세요.");
+    return new HttpError(502, `힉스필드 ${what} 실패 (${r.status}): ${t}`);
+  };
+  // 1) 올리기
+  const u = await fetch(`${HF}/files/generate-upload-url`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ content_type: "image/jpeg" }) });
+  if (!u.ok) throw await hfErr(u, "올리기 준비");
+  const up = await u.json();
+  const put = await fetch(up.upload_url, { method: "PUT", headers: up.upload_headers ?? { "Content-Type": "image/jpeg" }, body: Uint8Array.from(atob(b.data), (c) => c.charCodeAt(0)) });
+  if (!put.ok) throw new HttpError(502, `힉스필드 사진 올리기 실패 (${put.status})`);
+  // 2) 제출
+  const s = await fetch(`${HF}/alibaba/qwen-image-3/edit`, {
+    method: "POST", headers: { ...auth, "Content-Type": "application/json", "Hf-Expires-After": "3600" },
+    body: JSON.stringify({ prompt, image_urls: [up.public_url], resolution: "2k", aspect_ratio: HF_ASPECTS.includes(b.aspect ?? "") ? b.aspect : "1:1", prompt_extend: false, enable_thinking: false,
+      negative_prompt: "extra people, changed faces, distorted faces, extra fingers, garbled text, cartoon, illustration, watermark" }),
+  });
+  if (!s.ok) throw await hfErr(s, "제출");
+  const sub = await s.json(), rid = sub.request_id as string;
+  // 3) 기다리기 (2초부터 10초까지 늘리며, 최대 120초)
+  let res: any = null, wait = 2000;
+  for (const t0 = Date.now(); Date.now() - t0 < 120000;) {
+    await new Promise((r) => setTimeout(r, wait)); wait = Math.min(wait * 1.5, 10000);
+    const r = await fetch(sub.status_url ?? `${HF}/requests/${rid}/status`, { headers: auth });
+    if (r.status === 401 || r.status === 404) throw await hfErr(r, "상태 확인");
+    if (!r.ok) continue;
+    res = await r.json();
+    if (["completed", "failed", "nsfw", "canceled"].includes(res.status)) break;
+  }
+  try {
+    if (res?.status !== "completed") {
+      if (res?.status === "nsfw") throw new HttpError(422, "힉스필드가 이 사진을 거절했어요 (내용 검사)");
+      if (!res || !["failed", "canceled"].includes(res.status)) { await fetch(`${HF}/requests/${rid}/cancel`, { method: "POST", headers: auth }).catch(() => {}); throw new HttpError(504, "힉스필드가 너무 오래 걸려요. 잠시 뒤 다시 눌러 주세요."); }
+      throw new HttpError(502, `힉스필드 다듬기 실패${res.error ? `: ${String(res.error).slice(0, 200)}` : ""}`);
+    }
+    const out = await fetch(res.images?.[0]?.url);
+    if (!out.ok) throw new HttpError(502, "다듬은 사진을 받지 못했어요");
+    const type = out.headers.get("content-type") ?? "image/png", data = encodeBase64(new Uint8Array(await out.arrayBuffer()));
+    await admin.from("blog_gens").insert({ team_id: team.id, user_id: who.id, kind: "hf", input_tokens: 0, output_tokens: 0, cost_usd: 0 }); // 성공만 셈 (힉스필드도 성공만 청구)
+    return { image: data, media_type: type, left: HF_DAILY - (count ?? 0) - 1 };
+  } finally {
+    await fetch(`${HF}/requests/${rid}`, { method: "DELETE", headers: auth }).catch(() => {}); // 학원 사진이 힉스필드에 남지 않게 바로 지움
+  }
+}
+
 // ── style: 블로그 URL → 스타일 프리셋 저장 ──
 async function style(who: Who, team: Team, b: { url?: string; text?: string; shared?: boolean }) {
   await guard(team.id);
@@ -255,6 +342,45 @@ async function keywords(who: Who, team: Team, b: { hints?: string[] }) {
   return { keywords: list.slice(0, 200) };
 }
 
+// ── NAVER API HUB (ncloud): 검색어 트렌드·블로그 검색. 헤더 2개로 인증 ──
+async function hub(path: string, body?: unknown) {
+  const id = Deno.env.get("NAVER_HUB_ID"), secret = Deno.env.get("NAVER_HUB_SECRET");
+  if (!id || !secret) throw new HttpError(503, "NAVER API HUB 키가 아직 연결되지 않았어요");
+  const r = await fetch((Deno.env.get("NAVER_HUB_URL") ?? "https://naverapihub.apigw.ntruss.com") + path, {
+    method: body ? "POST" : "GET", body: body ? JSON.stringify(body) : undefined,
+    headers: { "X-NCP-APIGW-API-KEY-ID": id, "X-NCP-APIGW-API-KEY": secret, ...(body ? { "Content-Type": "application/json" } : {}) },
+  });
+  if (!r.ok) throw new HttpError(502, `NAVER API HUB 오류 ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return await r.json();
+}
+const plain = (s: unknown) => String(s ?? "").replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+async function topBlogs(q: string) {
+  const d = await hub(`/search/v1/blog?${new URLSearchParams({ query: q, display: "10", sort: "sim" })}`);
+  return { total: d.total ?? 0, items: (d.items ?? []).map((x: any) => ({ title: plain(x.title), blogger: plain(x.bloggername), date: x.postdate, link: x.link, desc: plain(x.description).slice(0, 120) })) };
+}
+
+// ── research: 키워드 최근 12개월 검색 추이(넣은 키워드 중 최고치=100 상대값, 최대 5개) + 첫 키워드 블로그 상위 10 ──
+async function research(who: Who, team: Team, b: { keywords?: string[] }) {
+  const kws = [...new Set((b.keywords ?? []).map((k) => String(k).trim()).filter(Boolean))].slice(0, 5);
+  if (!kws.length) throw new HttpError(400, "메인 키워드를 먼저 넣어 주세요");
+  const now = new Date(Date.now() + 9 * 3600e3), end = now.toISOString().slice(0, 10);
+  const start = new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10); // 이번 달 포함 12개월
+  const [trend, top] = await Promise.all([
+    hub("/search-trend/v1/search", { startDate: start, endDate: end, timeUnit: "month", keywordGroups: kws.map((k) => ({ groupName: k, keywords: [k] })) }),
+    topBlogs(kws[0]),
+  ]);
+  await record(who, team.id, "research");
+  // 검색이 너무 적은 달은 네이버가 빼고 줌 → 12칸을 채워 0으로 (그래프가 달을 밀려 그리지 않게)
+  const months = Array.from({ length: 12 }, (_, i) => new Date(Date.UTC(now.getUTCFullYear() - 1, now.getUTCMonth() + 1 + i, 1)).toISOString().slice(0, 7));
+  return {
+    trend: (trend.results ?? []).map((r: any) => {
+      const got = Object.fromEntries((r.data ?? []).map((x: any) => [x.period.slice(0, 7), x.ratio]));
+      return { keyword: r.title, data: months.map((m) => ({ month: m, ratio: got[m] ?? 0 })) };
+    }),
+    top,
+  };
+}
+
 // ── similar: 전 지점 최근 글과 겹침 (3글자 조각 자카드) ──
 const shingles = (s: string) => { const t = s.replace(/\s+/g, "").replace(/[^\p{L}\p{N}]/gu, ""), set = new Set<string>(); for (let i = 0; i + 3 <= t.length; i++) set.add(t.slice(i, i + 3)); return set; };
 async function similar(team: Team, b: { text?: string; exclude_id?: number; channel?: string }) {
@@ -278,13 +404,14 @@ async function similar(team: Team, b: { text?: string; exclude_id?: number; chan
   return { matches };
 }
 
-// ── usage: 오늘 남은 횟수 (블로그 탭 열 때마다 불림 → 그 김에 2일 지난 임시 사진 정리) ──
+// ── usage: 오늘 남은 횟수 (블로그 탭 열 때마다 불림 → 그 김에 30일 지난 임시 사진 정리) ──
+// 30일: 예전 통째 복사로 붙인 글은 네이버가 이 주소를 그대로 끌어다 보여 줘서, 너무 빨리 지우면 글 사진이 깨짐 (10-28 2일 → 30일)
 async function usage(team: Team) {
   await cleanTemp(team.id).catch((e) => console.error("blog-temp 정리 실패", e));
   return { quota: await usedToday(team.id) };
 }
 async function cleanTemp(team: number) {
   const { data } = await admin.storage.from("blog-temp").list(String(team), { limit: 1000 });
-  const old = (data ?? []).filter((f) => f.created_at && Date.now() - Date.parse(f.created_at) > 2 * 864e5).map((f) => `${team}/${f.name}`);
+  const old = (data ?? []).filter((f) => f.created_at && Date.now() - Date.parse(f.created_at) > 30 * 864e5).map((f) => `${team}/${f.name}`);
   if (old.length) await admin.storage.from("blog-temp").remove(old);
 }

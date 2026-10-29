@@ -3,7 +3,7 @@
   "name": "팔로 플래너 위젯",
   "short_name": "플래너 위젯",
   "start_url": "./widget.html",
-  "scope": "./",
+  "scope": "./widget.html",
   "display": "standalone",
   "background_color": "#0b0a14",
   "theme_color": "#0b0a14",

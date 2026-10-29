@@ -1,0 +1,86 @@
+/* ✅ 조교체크리스트 탭 (jc.js) */
+body:not(.jcv) #jcView { display: none; }
+#jcView { max-width: 1080px; margin: 0 auto; padding: 16px 20px 100px; }
+#jcView .jcbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#jcView .jcbar h2 { margin: 0; } #jcView .jcbar small { font-size: 12px; font-weight: 400; margin-left: 6px; }
+#jcView select, #jcView input, #jcView textarea { padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; }
+#jcView .jctabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+#jcView .jctabs button { padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub); font: inherit; font-weight: 600; cursor: pointer; }
+#jcView .jctabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#jcView .jcpanel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+#jcView h3 { font-size: 14px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+#jcView h3 .mut, #jcView h4 .mut, #jcView summary .mut { font-weight: 400; font-size: 12px; }
+#jcView h4 { font-size: 13px; margin: 0 0 8px; }
+#jcView .jcform { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+#jcView .jcform input:not([type=date]) { flex: 1; }
+#jcView .jcform textarea { flex: 1; resize: none; height: 40px; }
+#jcView .jcsubf { flex-wrap: wrap; } #jcView .jcsubf select[name=out], #jcView .jcsubf select[name=in] { min-width: 100px; }
+#jcView .jcform .mut { font-size: 11px; }
+#jcView .jclist { display: flex; flex-direction: column; gap: 6px; }
+#jcView .jcscroll { max-height: 260px; overflow-y: auto; }
+#jcView .jcempty { font-size: 13px; padding: 10px 2px; } #jcView .jccenter { text-align: center; padding: 18px; }
+#jcView .jcgrow { flex: 1; min-width: 0; }
+#jcView .jcrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+#jcView .jcmemo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 680px) { #jcView .jcmemo { grid-template-columns: 1fr; } }
+#jcView .jcmi, #jcView .jcsub, #jcView .jclink { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 8px; background: var(--fill); }
+#jcView .jcsub, #jcView .jclink { align-items: center; flex-wrap: wrap; font-size: 13px; }
+#jcView .jcsub.editing { flex-direction: column; align-items: flex-start; }
+#jcView .jcsub.editing select, #jcView .jcsub.editing input { padding: 6px 8px; font-size: 12px; }
+#jcView .jcmi.pinned, #jcView .jclink.pinned { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+#jcView .jcmi.done { opacity: .55; } #jcView .jcmi.done .jcmt { text-decoration: line-through; }
+#jcView .jcmi input[type=checkbox] { margin-top: 3px; width: 16px; height: 16px; padding: 0; accent-color: var(--accent); flex-shrink: 0; }
+#jcView .jcmt { font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+#jcView .jcts { font-size: 11px; color: var(--sub); margin-top: 3px; font-variant-numeric: tabular-nums; }
+#jcView .jcby { color: var(--text); font-size: 12px; } /* ✍️ 보낸 사람 */
+#jcView .jcwho { flex: 0 0 auto; max-width: 130px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+#jcView .jclink a { color: var(--accent); font-weight: 600; text-decoration: none; overflow-wrap: anywhere; } #jcView .jclink a:hover { text-decoration: underline; }
+#jcView .jcicon { border: 0; background: transparent; color: var(--sub); cursor: pointer; font-size: 12px; min-width: 22px; height: 22px; border-radius: 999px; flex-shrink: 0; line-height: 1; padding: 0 4px; }
+#jcView .jcicon:hover { background: var(--hover); }
+#jcView .jcicon.arm { background: var(--red); color: #fff; font-size: 10px; padding: 0 8px; }
+#jcView .jcpin { opacity: .45; } #jcView .jcpin.on { opacity: 1; }
+#jcView .jcdrag { cursor: grab; user-select: none; color: var(--sub); font-size: 14px; padding: 0 2px; flex-shrink: 0; }
+#jcView .jcdragging { opacity: .4; }
+#jcView tr.jcover td, #jcView .jclink.jcover { box-shadow: inset 0 2px 0 var(--accent); }
+@media (max-width: 680px) { #jcView .jcdrag { display: none; } }
+#jcView summary { cursor: pointer; font-size: 14px; font-weight: 700; }
+#jcView .jcnames { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+#jcView .jcname { display: flex; align-items: center; gap: 4px; background: var(--fill); border-radius: 999px; padding: 3px 4px 3px 3px; }
+#jcView .jcname-in { width: 90px; padding: 3px 8px; border-radius: 999px; border-color: var(--accent); font-size: 12px; }
+.jcchip { display: inline-flex; align-items: center; color: #2b2621; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; max-width: 86px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; font-family: inherit; }
+#jcView button.jcchip { cursor: text; }
+#jcView .jcdot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); cursor: pointer; padding: 0; flex-shrink: 0; }
+#jcView .jcgbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; } #jcView .jcgbar h3 { margin: 0; }
+#jcView .jcscrollx { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+#jcView table.jcgrid { border-collapse: collapse; width: max-content; min-width: 100%; }
+#jcView .jcgrid th, #jcView .jcgrid td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+#jcView .jcgrid th { background: var(--fill); font-size: 11px; font-weight: 700; color: var(--sub); padding: 8px 6px; }
+#jcView th.jcday { min-width: 92px; font-variant-numeric: tabular-nums; }
+#jcView .jcgrid .today { background: color-mix(in srgb, var(--accent) 16%, transparent); } #jcView th.today { color: var(--accent); }
+#jcView td.gray { background: var(--fill); }
+#jcView .jcgrid .jctask { position: sticky; left: 0; z-index: 1; background: var(--bg); min-width: 230px; max-width: 230px; padding: 8px 10px; text-align: left; font-size: 13px; line-height: 1.4; }
+#jcView th.jctask { z-index: 2; }
+#jcView tr.jcsec td { background: color-mix(in srgb, var(--accent) 10%, var(--bg)); padding: 6px 10px; font-size: 12.5px; } /* ■ 구간 제목 줄 */
+#jcView tr.jcsec .jcrow { position: sticky; left: 10px; width: max-content; max-width: 90vw; flex-wrap: nowrap; }
+@media (max-width: 680px) { #jcView .jcgrid .jctask { min-width: 130px; max-width: 130px; } #jcView { padding: 12px 12px 100px; } }
+#jcView td.jccell { padding: 4px; text-align: center; vertical-align: middle; }
+#jcView .jccb { width: 100%; min-height: 36px; border: 1px dashed transparent; border-radius: 8px; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 3px; padding: 4px; font: inherit; }
+#jcView .jccb:hover { border-color: var(--line); }
+#jcView .jcplus { color: var(--line); font-size: 15px; } #jcView .jccb:hover .jcplus { color: var(--sub); }
+#jcView .jcmore { font-size: 10px; color: var(--sub); font-weight: 700; }
+.jcpop { position: fixed; z-index: 60; background: var(--float); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px; color: var(--text); }
+.jcpop[hidden] { display: none; }
+.jcpop .jcpt { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 8px; }
+.jcpop .jcplist { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 8px; font-size: 12px; }
+.jcpop label { display: flex; align-items: center; gap: 8px; cursor: pointer; } .jcpop label input { width: 16px; height: 16px; accent-color: var(--accent); }
+.jcpop .jcclose { width: 100%; }
+.jcpop .jcsw { display: grid; grid-template-columns: repeat(4, 26px); gap: 8px; }
+.jcpop .jcsw button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; } .jcpop .jcsw button.on { border-color: var(--text); }
+#jcView .jcfile { cursor: pointer; white-space: nowrap; }
+#jcView .jcphotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+#jcView .jcph { margin: 0; background: var(--fill); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+#jcView .jcph.pinned { box-shadow: 0 0 0 2px var(--accent); }
+#jcView .jcph img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--line); }
+#jcView .jcph figcaption { display: flex; align-items: flex-start; gap: 4px; padding: 8px 8px 8px 10px; }
+#jcView .jcph .jcmt { display: block; }
+@media (max-width: 680px) { #jcView .jcphotos { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
