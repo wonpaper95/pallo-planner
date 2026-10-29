@@ -90,7 +90,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 | 5 | 블로그 방문자 | 크롬: 블로그 통계 어제 | `save-daily.mjs blog` |
 | 6 | 당근 | 크롬: 비즈프로필 통계 어제 | `save-daily.mjs daangn` |
 | 7 | 전산 | 크롬: 데이터보드 3곳, 어제 날짜 건만 유입경로별 집계 | `save-daily.mjs jeonsan` |
-| 8 | 리포트 | 5칸 계산 + 플래그 → Claude 코멘트 → 저장 | `build-report.mjs <date>` → `save-report.mjs daily <json>` |
+| 8 | 리포트 | 5칸 계산 + 플래그 → Claude 코멘트 → 저장 | `build-report.mjs <date> <out.json>`(stdout 은 요약 한 줄) → `save-report.mjs <date> daily <out.json> --comment-file <txt>` |
 | 9 | 월요일 | 지난 7일 종합 입력 → Claude 본문 → 저장 | `build-report.mjs <date> --weekly` → `save-report.mjs weekly` |
 
 - 채널마다 독립. 하나가 깨져도(화면 변경·로그인) 그 채널만 `failed`/`login_required` 행 1개 저장하고 다음으로.

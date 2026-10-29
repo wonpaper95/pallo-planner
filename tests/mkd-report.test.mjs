@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReport, prepareSave, slim, reportFrom } from "../scripts/mkd/report.mjs";
+import { buildReport, prepareSave, slim, reportFrom, shortSummary, dateMismatch } from "../scripts/mkd/report.mjs";
 import { toRowsPure, D as DC } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
@@ -152,12 +152,18 @@ test("prepareSave daily: flags·unit 이름에 컬컴이 있어도 comment 가 �
   assert.equal(p.error, undefined);
   assert.match(JSON.stringify(p.data.flags), /컬컴/);
 });
-test("prepareSave daily: 저장 모양 — teams 상세는 빼고 status·summary·flags·flagCounts·days·comment", () => {
-  const p = prepareSave("daily", daily({ comment: "  좋은 아침이에요.  " }));
-  assert.deepEqual(Object.keys(p.data), ["status", "summary", "flags", "flagCounts", "days", "comment"]);
+test("prepareSave daily: 저장 모양 — teams 상세·summary 는 빼고 status·flags·flagCounts·days·comment (화면은 summary 를 mkd_daily 로 다시 계산)", () => {
+  const r = daily({ comment: "  좋은 아침이에요.  " });
+  assert.ok(Array.isArray(r.summary) && r.summary.length); // 입력엔 있다 (필수 검사 대상)
+  const p = prepareSave("daily", r);
+  assert.deepEqual(Object.keys(p.data), ["status", "flags", "flagCounts", "days", "comment"]);
+  assert.equal(p.data.summary, undefined);
   assert.equal(p.data.comment, "좋은 아침이에요.");
   assert.equal(p.data.days, 2);
   assert.equal(p.data.teams, undefined);
+  assert.deepEqual(p.data.status, r.status);
+  assert.deepEqual(p.data.flags, r.flags);
+  assert.deepEqual(p.data.flagCounts, r.flagCounts);
 });
 test("prepareSave daily: comment 는 600자까지", () => {
   assert.equal(prepareSave("daily", daily({ comment: "가".repeat(700) })).data.comment.length, 600);
@@ -185,4 +191,28 @@ test("prepareSave weekly: body 필수, 나머지 필드는 그대로, 컬컴 검
 });
 test("prepareSave: 모르는 kind 는 던진다", () => {
   assert.throws(() => prepareSave("monthly", {}), /kind/);
+});
+
+// ── 요약 한 줄 (build-report <D> out.json 이 stdout 에 찍는 것) ──
+test("shortSummary: status·flagCounts·flags([level,team,msg])·summary([label,d1,d3]) 만 — 전체 JSON 보다 훨씬 짧다", () => {
+  const r = buildReport(fixture(), TEAMS, END), s = shortSummary(r);
+  assert.deepEqual(Object.keys(s), ["status", "flagCounts", "flags", "summary"]);
+  assert.deepEqual(s.status, r.status);
+  assert.deepEqual(s.flagCounts, r.flagCounts);
+  assert.deepEqual(s.flags[0], ["red", "대구동성로점", "구글 검색광고 '컬컴 영어 대구_구글검색' 예비 결제 수단 없음"]);
+  assert.equal(s.flags.length, r.flags.length);
+  assert.deepEqual(s.summary.map((x) => x[0]), ["문의", "등록", "총 광고비", "문의당 비용"]);
+  assert.deepEqual(s.summary[0], ["문의", { value: 3, change: 0.5, days: 1, prevDays: 1 }, { value: 5, change: null, days: 2, prevDays: 0 }]);
+  assert.ok(JSON.stringify(s).length < JSON.stringify(r).length / 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(s)), s);
+});
+
+test("dateMismatch: report.date 가 있고 저장 날짜와 다를 때만 메시지", () => {
+  assert.equal(dateMismatch({ date: "2026-10-28" }, "2026-10-28"), null);
+  assert.equal(dateMismatch({ comment: "x" }, "2026-10-28"), null); // date 없는 파일(손으로 쓴 것)은 다른 검사(status·summary)가 막는다
+  assert.equal(dateMismatch({ date: "2026-10-27" }, "2026-10-28"), "리포트 날짜(2026-10-27)와 저장 날짜(2026-10-28)가 달라요");
+  assert.match(dateMismatch({ date: null }, "2026-10-28"), /달라요/);
+  assert.match(dateMismatch({ date: 20261028 }, "2026-10-28"), /달라요/);
+  assert.equal(dateMismatch(null, "2026-10-28"), null); // 객체가 아니면 prepareSave 가 거부한다
+  assert.equal(dateMismatch([], "2026-10-28"), null);
 });

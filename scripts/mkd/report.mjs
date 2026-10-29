@@ -28,8 +28,14 @@ export function buildReport(allRows, teams, date) {
   return { date, days: new Set(rows.map((r) => r.date)).size, status: D.status(rows, date), summary: D.summary(rows, date).map(slim), flags, flagCounts: count(flags), teams: perTeam };
 }
 
+// build-report 를 파일로 낼 때 stdout 에 찍는 짧은 요약: 상태·플래그 수·플래그([수준, 지점, 문장])·핵심 4개([이름, d1 칸, d3 칸]). Claude 는 이것만 보고 comment 를 쓴다.
+export const shortSummary = (r) => ({ status: r.status, flagCounts: r.flagCounts, flags: r.flags.map((f) => [f.level, f.team, f.msg]), summary: r.summary.map((s) => [s.label, s.cells.d1, s.cells.d3]) });
+
+// 리포트 파일의 date 가 저장 날짜와 다르면 메시지, 아니면 null. date 가 없으면(손으로 쓴 파일) 여기서는 보지 않는다 — 객체가 아닌 파일도 prepareSave 가 거부한다.
+export const dateMismatch = (r, date) => (r !== null && typeof r === "object" && !Array.isArray(r) && Object.hasOwn(r, "date") && r.date !== date ? `리포트 날짜(${String(r.date)})와 저장 날짜(${date})가 달라요` : null);
+
 // 저장할 모양 만들기. 반환: {data} 또는 {error}(한국어 — 호출자가 종료 2 로 알린다). kind 가 틀리면 프로그래밍 오류라 던진다.
-//   daily : build-report 출력에 Claude 가 붙인 comment(1~3줄). teams 상세는 빼고 status·summary·flags·flagCounts·days·comment 만.
+//   daily : build-report 출력에 Claude 가 붙인 comment(1~3줄). teams 상세·summary 는 빼고 status·flags·flagCounts·days·comment 만(화면은 숫자를 mkd_daily 로 다시 계산, 코멘트·플래그만 읽는다).
 //   weekly: {body, …} 그대로(5단계).
 // 컬컴/CULCOM·전화번호 검사는 Claude 가 쓴 글(daily comment · weekly body)에만 건다 — 캠페인 이름(flags·unit)에는 옛 브랜드가 실제로 들어 있고, 전화번호는 저장할 때 이미 걸렀다.
 export function prepareSave(kind, r) {
@@ -41,7 +47,7 @@ export function prepareSave(kind, r) {
   if (/컬컴|culcom/i.test(text)) return { error: `${field} 에 '컬컴/CULCOM' 이 들어 있어요. 빼고 다시 저장해 주세요.` };
   if (looksPersonal(text)) return { error: `${field} 에 전화번호처럼 보이는 값이 있어요. 빼고 다시 저장해 주세요.` }; // 값은 메시지에 싣지 않는다
   if (kind === "weekly") return { data: { ...r, body: text } };
-  // 숫자 없는 코멘트 파일로 기존 리포트를 덮어쓰지 않게: build-report 출력(status·summary)이 있어야 한다
+  // 숫자 없는 코멘트 파일로 기존 리포트를 덮어쓰지 않게: build-report 출력(status·summary)이 있어야 한다 — summary 는 확인용일 뿐 저장하지 않는다
   if (r.status === null || typeof r.status !== "object" || !Array.isArray(r.summary)) return { error: "status·summary 가 없어요. build-report 출력에 comment 만 붙여 저장해 주세요." };
-  return { data: { status: r.status, summary: r.summary, flags: r.flags ?? [], flagCounts: r.flagCounts ?? {}, days: r.days ?? 0, comment: text.slice(0, COMMENT_MAX) } };
+  return { data: { status: r.status, flags: r.flags ?? [], flagCounts: r.flagCounts ?? {}, days: r.days ?? 0, comment: text.slice(0, COMMENT_MAX) } };
 }
