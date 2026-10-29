@@ -25,7 +25,7 @@ TK.render = function () {
     g ? g.n++ : groups.push({ branch: r.branch, q: r.q, at: r.at, n: 1 });
   }
   const kb = TK.kb.filter((r) => show(r.branch)), e = TK.edit;
-  V().innerHTML = `<div class="tkbar"><h2>💬 톡톡봇</h2><select id="tkBr">${opts(TK.br).replace(">3지점 공통<", ">전체 지점 보기<")}</select>
+  V().innerHTML = `<div class="tkbar"><h2>💬 네이버톡톡 봇</h2><select id="tkBr">${opts(TK.br).replace(">3지점 공통<", ">전체 지점 보기<")}</select>
       <span class="mut">봇은 아래 '봇이 아는 것'만 보고 답해요. 모르는 건 매니저에게 넘기고 여기에 쌓여요.</span></div>
     <section class="tksec"><h3>❓ 봇이 몰라서 넘긴 질문 <span class="mut">${groups.length}개</span></h3>
       ${groups.length ? groups.map((g, i) => `<div class="card tkask" data-i="${i}">
