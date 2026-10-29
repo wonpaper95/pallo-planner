@@ -83,7 +83,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 
 | 순서 | 채널 | 하는 일 | 스크립트 |
 |---|---|---|---|
-| 1 | 네이버 광고 | StatReport API로 어제 캠페인별 통계 → 바로 저장 | `naver-ad.mjs <date>` |
+| 1 | 네이버 광고 | 검색광고 API(`/ncc/campaigns` + `/stats`)로 어제 캠페인별 통계 → 바로 저장. 계정 둘: 대구(`NAVER_AD_*`, dsr·jpcn)·울산(`NAVER_AD_*_ULSAN`, ulsan), 한 계정이 실패해도 다른 계정은 계속 | `naver-ad.mjs <date>` |
 | 2 | 구글 광고 | 크롬: 계정 2개, 날짜 "어제" 맞춤 기간, 캠페인 표 + 알림 읽기 → JSON | Claude가 읽고 `save-daily.mjs google_ad <json>` |
 | 3 | 메타 광고 | 크롬: 광고관리자, 열 구성 "팔로 마케팅 분석용", 기간 어제, 광고세트 보기 → JSON | `save-daily.mjs meta_ad` |
 | 4 | 블로그 순위 | `keywords.mjs` 로 켜진 키워드 목록 → 크롬에서 통합검색 → 우리 글 위치 | `save-daily.mjs blog` |
