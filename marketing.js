@@ -375,15 +375,22 @@ async function send() {
 async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(50);
   if (fail(error)) return;
-  const rows = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
-  const at = rows[0]?.data?.collected;
+  const all = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
+  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key));
+  const at = rows[0]?.data?.collected, ytAt = yt[0]?.data?.collected;
+  const ytList = yt.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div><a href="https://www.youtube.com/shorts/${esc(r.key.slice(3))}" target="_blank" rel="noopener">${esc(d.title || "(제목 없음)")}</a></div>
+      <div class="mut">${esc(d.channel ?? "")} · 조회 ${n(d.views).toLocaleString("ko-KR")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · ${n(d.duration_s)}초 · ${esc(d.published ?? "")}</div></div></div>`; }).join("");
   const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
       <span class="mut">${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개로 돌림` : ""} · ${esc(d.media_type || "?")}${d.cta ? ` · ${esc(d.cta)}` : ""}${(d.keywords ?? []).length ? ` · 검색어 ${esc(d.keywords.join(", "))}` : ""}</span></div>
       <div>${esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90))}</div></div></div>`; }).join("");
   $m("#mkBody").innerHTML = `<div class="card"><b>📈 요즘 오래 도는 광고 — 업종 밖 (눌러서 광고 라이브러리 원문)</b>
     <p class="mut">기준: 자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일 넘게 돌거나 광고 3개 이상으로 돌리는 것 · 광고주당 2개${at ? ` · 수집 ${esc(new Date(at).toLocaleString("ko-KR"))}` : ""}</p>
     ${list || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`;
+    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`
+    + `<div class="card"><b>🎬 요즘 뜨는 숏폼 — 유튜브 쇼츠 (한국, 3분 이하)</b>
+    <p class="mut">기준: 한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${ytAt ? ` · 수집 ${esc(new Date(ytAt).toLocaleString("ko-KR"))}` : ""}</p>
+    ${ytList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
+    <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요.</p></div>`;
 }
 
 // ── 🤖 에이전트 (mka_items: 대표는 전부+승인·킬스위치, 매니저는 자기 지점 것만 읽기 — 서버 RLS 가 거름) ──
