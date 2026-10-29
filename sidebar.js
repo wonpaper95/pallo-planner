@@ -5,4 +5,8 @@ if (matchMedia("(min-width: 900px)").matches) {
   document.body.classList.add("side-on");
   const hh = () => document.documentElement.style.setProperty("--hh", document.querySelector("header").offsetHeight + "px");
   hh(); new ResizeObserver(hh).observe(document.querySelector("header"));
+  // ⇤ 왼쪽 메뉴 접기·펼치기 (기본 펼침, 기기에 기억 side-off) — 마야 요청 10-29
+  const btn = document.getElementById("sideBtn"), set = (off) => { document.body.classList.toggle("side-off", off); btn.textContent = off ? "☰" : "⇤"; btn.title = off ? "왼쪽 메뉴 펼치기" : "왼쪽 메뉴 접기"; };
+  try { set(localStorage.getItem("side-off") === "1"); } catch { set(false); }
+  btn.onclick = () => { const off = !document.body.classList.contains("side-off"); set(off); try { localStorage.setItem("side-off", off ? "1" : "0"); } catch {} };
 }

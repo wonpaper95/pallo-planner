@@ -15,7 +15,10 @@
   .seg #weeks .bar { display: block; height: 4px; margin-top: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
   body.side-on .layout { grid-template-columns: minmax(0, 1fr); width: 100%; } /* .wm 격자 칸 안에서 margin:auto 가 내용 폭으로 줄이는 것 막기 */
   body.side-on:not(.mv) #somedayView { padding-left: 24px; }
+  /* ⇤ 접으면 메뉴 숨기고 본문 전체 폭 */
+  body.side-off #app { padding-left: 0; } body.side-off header { margin-left: 0; } body.side-off .seg { display: none !important; }
 }
+#sideBtn { display: none; } body.side-on #sideBtn { display: inline-flex; } /* PC(사이드바 있을 때)만 */
 /* 주 목록은 주간 화면에서만 (다른 탭에선 숨김 — index.html 의 .layout 숨김 규칙과 같은 목록) */
 body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .ldv, .smv, .eduv, .rpv, .jgv, .wkv, .jcv, .tkv, .fnv) .seg #weeks { display: none; }
 .seg [data-v=week] { --ic: "◫"; } .seg [data-v=month] { --ic: "▦"; } .seg [data-v=team] { --ic: "◎"; } .seg [data-v=sales] { --ic: "₩"; } .seg [data-v=fn] { --ic: "◑"; }
