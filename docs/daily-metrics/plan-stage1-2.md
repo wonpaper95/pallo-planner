@@ -939,6 +939,7 @@ await run(async () => {
 
 ```bash
 cd ~/.cache/pallo-planner-dev && export SRK=$(supabase status -o env | sed -n 's/^SERVICE_ROLE_KEY="\(.*\)"/\1/p') && printf 'SUPABASE_URL=http://127.0.0.1:54321\nSUPABASE_SERVICE_ROLE_KEY=%s\n' "$SRK" > /tmp/mk-local.env
+docker exec -i supabase_db_pallo-planner-dev psql -U postgres -d postgres -c "delete from mkd_daily where date='2026-10-28' and channel='naver_ad'"   # Task 1 권한 점검이 넣은 테스트 행 (기대값에서 뺌)
 cat > /tmp/mkd-j.json <<'JSON'
 {"rows":[{"team_key":"dsr","unit":"전체","metrics":{"inquiries":3,"enrolls":1}},{"team_key":"dsr","unit":"meta","metrics":{"inquiries":2,"enrolls":1}},{"team_key":"dsr","unit":"gads_daegu_en_search","metrics":{"inquiries":1,"enrolls":0}}]}
 JSON
@@ -1061,7 +1062,7 @@ function mkdChannel(ch) {
 
 ```bash
 cd ~/pallo-planner-daily && V=$(TZ=Asia/Seoul date +%Y%m%d%H%M) && OLD=$(cat version.txt) \
- && sed -i '' "s#<script src=\"mkc-core.js?v=[0-9]*\"></script>#&\n<script src=\"mkd-core.js?v=$V\"></script>#" index.html \
+ && perl -0pi -e "s#(<script src=\"mkc-core.js\?v=\d+\"></script>)#\$1\n<script src=\"mkd-core.js?v=$V\"></script>#" index.html \
  && sed -i '' "s#marketing.js?v=[0-9]*#marketing.js?v=$V#; s#marketing.css?v=[0-9]*#marketing.css?v=$V#; s#content=\"$OLD\"#content=\"$V\"#" index.html \
  && echo "$V" > version.txt && grep -n "mkd-core.js\|marketing.js?v\|marketing.css?v\|app-version" index.html && cat version.txt
 ```
@@ -1069,11 +1070,8 @@ Expected: `mkd-core.js?v=<V>` 가 mkc-core 다음 줄에 있고, marketing.js/cs
 
 - [ ] **Step 5: 로컬에서 확인** (로컬 Supabase 에 Task 4·7 의 행이 있음)
 
-1. `~/pallo-planner-daily/.claude/launch.json` 이 없으면 만든다:
-   ```json
-   { "version": "0.0.1", "configurations": [ { "name": "planner-daily", "runtimeExecutable": "python3", "runtimeArgs": ["-m", "http.server", "8768"], "port": 8768 } ] }
-   ```
-   `preview_start` `{name: "planner-daily"}` → `http://localhost:8768/` (localhost 라 `config.js` 가 로컬 Supabase 를 쓴다).
+1. 실행 설정은 세션 폴더 `/Volumes/wonpaper308/.claude/launch.json` 의 `planner-daily`(포트 8770, `--directory ~/pallo-planner-daily`) — 컨트롤러가 미리 넣어 둔다. worktree 에는 launch.json 을 만들지 않는다.
+   `preview_start` `{name: "planner-daily"}` → `http://localhost:8770/` (localhost 라 `config.js` 가 로컬 Supabase 를 쓴다).
 2. 로그인: `~/.cache/pallo-planner-dev/dev-accounts.txt` 의 `boss@pallo.test` (로컬 개발 계정). 📣 마케팅 → "일일 현황" 이 기본으로 열린다.
 3. `read_page` 로 확인: 기준일 `2026-10-28`, 칩에 구글 ✅·메타 🔒·전산 ✅·나머지 ⚪, "오늘 한 줄" 에 테스트 코멘트, 표에 `핵심 › 문의 3`, `총 광고비 ₩22,300`, `문의당 비용 ₩7,433`, 구글 채널 행 클릭 시 캠페인 3개 펼침(`[미분류] 이름없는캠페인` 포함), 모든 칸의 작은 글씨가 `1일`(비교 기간 없음).
 4. `read_console_messages` 에 오류 없음. 지점 선택을 `울산점`(로컬 이름)으로 바꾸면 구글 울산 캠페인만.
@@ -1082,7 +1080,7 @@ Expected: `mkd-core.js?v=<V>` 가 mkc-core 다음 줄에 있고, marketing.js/cs
 - [ ] **Step 6: 커밋**
 
 ```bash
-cd ~/pallo-planner-daily && git add marketing.js marketing.css index.html version.txt .claude/launch.json && git commit -m "📊 마케팅 탭 '일일 현황' 화면 1판 (5칸 표·상태 칩·이상 징후·코멘트)"
+cd ~/pallo-planner-daily && git add marketing.js marketing.css index.html version.txt && git commit -m "📊 마케팅 탭 '일일 현황' 화면 1판 (5칸 표·상태 칩·이상 징후·코멘트)"
 ```
 
 ---
@@ -1165,7 +1163,7 @@ Expected: `naver_ad`·`google_ad`·`jeonsan` 이 `ok`(키 없으면 naver `faile
 
 - [ ] **Step 4: 운영 데이터로 화면 확인**
 
-`preview_start` `{name: "planner-daily"}` 로 띄운 뒤 **운영 Supabase 를 쓰도록** `http://$(scutil --get LocalHostName).local:8768/` 로 연다(localhost 가 아니면 `config.js` 가 운영을 고른다). 대표 계정으로 로그인은 **사용자가 직접**(운영 비밀번호는 입력하지 않는다) — 로그인돼 있지 않으면 화면 확인은 사용자에게 부탁하고 `read_page` 결과만 받는다. 확인: 기준일 = 어제, 칩 3개 ✅, 표에 네이버·구글 캠페인·전산 유입경로가 펼쳐진다. 스크린샷 1장을 보고에 첨부.
+`preview_start` `{name: "planner-daily"}` 로 띄운 뒤 **운영 Supabase 를 쓰도록** `http://$(scutil --get LocalHostName).local:8770/` 로 연다(localhost 가 아니면 `config.js` 가 운영을 고른다). 대표 계정으로 로그인은 **사용자가 직접**(운영 비밀번호는 입력하지 않는다) — 로그인돼 있지 않으면 화면 확인은 사용자에게 부탁하고 `read_page` 결과만 받는다. 확인: 기준일 = 어제, 칩 3개 ✅, 표에 네이버·구글 캠페인·전산 유입경로가 펼쳐진다. 스크린샷 1장을 보고에 첨부.
 
 - [ ] **Step 5: 기록·커밋**
 
