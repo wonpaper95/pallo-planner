@@ -204,18 +204,18 @@ function compareFill(s, c) {
   setH("slCur_refundRate", cell(s.refundRate || 0, r(m.refund, m.amount), "%", -1, "refundRate"));
   const L = SL.labor;
   const ld = L && s.labor > 0 ? L.cost - s.labor : null; // 인건비는 목표(예산)보다 적으면 좋음
-  setH("slCur_labor", L ? `<b>${won(L.cost)}원</b><small class="${ld == null ? "" : ld <= 0 ? "up" : "dn"}">🕒 근무기록 ${Math.round(L.h * 100) / 100}h × ${won(L.rate)}원${ld == null ? "" : ` · 목표 ${ld <= 0 ? "안" : "초과"} ${won(Math.abs(ld))}원`}</small>` : `<b>-</b><small>🕒 조교 근무기록에 이 달 기록이 없어요</small>`);
-  setH("slCur_ads", `<b>-</b><small>자동 측정 없음 — 목표 칸에 이 달 광고 예산</small>`);
+  setH("slCur_labor", L ? `현재 <b>${won(L.cost)}원</b> · 🕒 조교 근무기록 ${Math.round(L.h * 100) / 100}h × ${won(L.rate)}원${ld == null ? "" : ` · <b class="${ld <= 0 ? "up" : "dn"}">목표 ${ld <= 0 ? "안" : "초과"} ${won(Math.abs(ld))}원</b>`}` : "현재: 🕒 조교 근무기록에 이 달 기록이 없어요");
   setH("slCompare", `<p class="slhint">현재 = ${md(pStart(s))}~오늘 누계 · 회신·상담은 달력 입력${s.linked ? ", 결제·금액은 재무 시트" : ", 결제·금액도 달력 입력"}</p>`);
 }
 
 // 💸 비용: 목표 순매출에서 조교 인건비·광고비를 빼면 남는 금액, 결제자 1명당 광고비
 function costHtml(s, c) {
-  const labor = s.labor || 0, ads = s.ads || 0, cost = labor + ads; if (!cost) return "";
+  const labor = s.labor || 0, ads = s.ads || 0, cost = labor + ads; if (!cost) return `<p class="slhint">조교 인건비·광고비를 적으면 월 목표 순매출에서 빼고 남는 금액이 나와요.</p>`;
   const per = c.month.payers ? ads / c.month.payers : 0;
   return `<table class="slt slcost"><tr><th>💸 비용 (목표)</th><th>금액</th><th>순매출 대비</th></tr>
-    <tr><td>조교 인건비</td><td>${won(labor)}원</td><td>${pct(labor / s.goal * 100)}%</td></tr>
-    <tr><td>광고비</td><td>${won(ads)}원</td><td>${pct(ads / s.goal * 100)}%</td></tr>
+    <tr><td>월 목표 순매출</td><td>${won(s.goal)}원</td><td>100%</td></tr>
+    <tr><td>조교 인건비</td><td>−${won(labor)}원</td><td>${pct(labor / s.goal * 100)}%</td></tr>
+    <tr><td>광고비</td><td>−${won(ads)}원</td><td>${pct(ads / s.goal * 100)}%</td></tr>
     <tr><td>비용 빼고 남는 금액</td><td><b>${won(s.goal - cost)}원</b></td><td>${pct((s.goal - cost) / s.goal * 100)}%</td></tr>
     ${ads && c.month.payers ? `<tr><td>결제자 1명당 광고비</td><td>${won(per)}원</td><td><small class="mut">결제자 목표 ${c.month.payers}명</small></td></tr>` : ""}</table>`;
 }
@@ -487,9 +487,7 @@ V().innerHTML = `
     <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
     <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
     <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
-    <div class="slrow sl3"><label>조교 인건비<small>그달 조교 급여 합계</small></label><span class="u"><input data-k="labor" data-money><i>원</i></span><div class="slcur" id="slCur_labor"></div></div>
-    <div class="slrow sl3"><label>광고비<small>메타·네이버·구글 등 합계</small></label><span class="u"><input data-k="ads" data-money><i>원</i></span><div class="slcur" id="slCur_ads"></div></div>
-    <div id="slCost"></div><div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
+    <div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
@@ -530,6 +528,11 @@ V().innerHTML = `
   <p class="slhint">위 전략은 목표와 실적 숫자를 보고 자동으로 씁니다. 덧붙일 실행 전략은 아래에 쓰세요.</p>
   <textarea data-k="strategyAdd" class="grow" placeholder="예: 이번 주 금요일 휴무 전날(목) 상담 예약을 집중 배치"></textarea></section>
 <section class="slcard"><h3>📋 보고문</h3><pre id="slReport" style="max-height:420px;overflow:auto"></pre><button class="btn" id="slCopy" type="button">보고문 복사</button></section>
+<section class="slcard"><h3>💰 인센티브</h3>
+  <div class="slrow"><label>조교 인건비<small>그달 조교 급여 합계 (목표)</small></label><span class="u"><input data-k="labor" data-money><i>원</i></span></div>
+  <p class="slhint" id="slCur_labor"></p>
+  <div class="slrow"><label>광고비<small>메타·네이버·구글 등 합계</small></label><span class="u"><input data-k="ads" data-money><i>원</i></span></div>
+  <div id="slCost"></div></section>
 </div>
 <dialog id="slDlg"><form method="dialog">
   <h3 id="slDlgTitle"></h3>
