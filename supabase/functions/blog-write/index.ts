@@ -1,6 +1,6 @@
 // ✍️ 블로그 작성기 Edge Function. 화면(blog.js)이 sb.functions.invoke("blog-write", { body: { action, ... } }) 로 부른다.
 // action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | research(API HUB 검색 추이·블로그 상위 글) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
-// 비밀값: HF_API_KEY_ID·HF_API_KEY_SECRET(🪄 힉스필드 AI 다듬기), ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
+// 비밀값: HF_KEY(🪄 힉스필드 AI 다듬기 — 콘솔의 API Key 통째 = "키ID:비밀값", 또는 HF_API_KEY_ID·HF_API_KEY_SECRET 둘), ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
@@ -239,13 +239,13 @@ const HF_MODES: Record<string, string> = {
 };
 const HF_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "7:9", "9:7", "9:16", "16:9", "21:9"];
 async function hf(who: Who, team: Team, b: { data?: string; mode?: string; aspect?: string }) {
-  const id = Deno.env.get("HF_API_KEY_ID"), secret = Deno.env.get("HF_API_KEY_SECRET");
-  if (!id || !secret) throw new HttpError(503, "힉스필드 API 키가 아직 연결되지 않았어요 (대표님이 Supabase 비밀값에 넣어야 해요)");
+  const id = Deno.env.get("HF_API_KEY_ID"), secret = Deno.env.get("HF_API_KEY_SECRET"), key = Deno.env.get("HF_KEY")?.trim() || (id && secret ? `${id}:${secret}` : "");
+  if (!key) throw new HttpError(503, "힉스필드 API 키가 아직 연결되지 않았어요 (대표님이 Supabase 비밀값 HF_KEY 에 넣어야 해요)");
   const prompt = HF_MODES[b.mode ?? ""]; if (!prompt) throw new HttpError(400, "알 수 없는 다듬기");
   if (!b.data) throw new HttpError(400, "사진이 없어요");
   const { count } = await admin.from("blog_gens").select("id", { count: "exact", head: true }).eq("team_id", team.id).eq("kind", "hf").gte("created_at", kstMidnight());
   if ((count ?? 0) >= HF_DAILY) throw new HttpError(429, `🪄 AI 다듬기는 지점마다 하루 ${HF_DAILY}장까지예요. 내일 다시 쓸 수 있어요.`);
-  const auth = { Authorization: `Key ${id}:${secret}` };
+  const auth = { Authorization: `Key ${key}` };
   const hfErr = async (r: Response, what: string) => {
     const t = (await r.text()).slice(0, 300);
     if (r.status === 401) return new HttpError(502, "힉스필드 API 키가 틀렸어요 (대표님 확인 필요)");
