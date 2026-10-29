@@ -21,3 +21,11 @@ test("safeUrl: https 만", () => {
   assert.equal(C.safeUrl("http://x"), "");
   assert.equal(C.safeUrl(null), "");
 });
+
+test("safeImg: JPEG data URL 만", () => {
+  assert.equal(C.safeImg("data:image/jpeg;base64,/9j/4AAQ+/="), true);
+  assert.equal(C.safeImg('data:image/jpeg;base64,abc" onerror="x'), false);
+  assert.equal(C.safeImg("data:image/svg+xml;base64,PHN2Zz4="), false);
+  assert.equal(C.safeImg("https://x/y.jpg"), false);
+  assert.equal(C.safeImg(null), false);
+});

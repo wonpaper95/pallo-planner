@@ -17,6 +17,8 @@ function freshTop(rows, now = Date.now()) {
 const BRANCH = { DAEGUDSR: "대구 동성로(영어)", DAEGUJPCH: "대구 일본어·중국어", ULSAN: "울산" };
 // 링크는 https 만 연다 (DB 값이라도 화면에 넣기 전에 거른다)
 const safeUrl = (u) => (typeof u === "string" && /^https:\/\//.test(u) ? u : "");
+// 썸네일은 에이전트가 넣은 JPEG data URL 만 (base64 글자만 허용 → 따옴표·태그 끼어들 틈 없음)
+const safeImg = (s) => typeof s === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s);
 
-return { KINDS, TOPAD_FRESH_HOURS, freshTop, BRANCH, safeUrl };
+return { KINDS, TOPAD_FRESH_HOURS, freshTop, BRANCH, safeUrl, safeImg };
 });

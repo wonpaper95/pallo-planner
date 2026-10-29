@@ -311,16 +311,18 @@ async function renderAgent(admin) {
   const posted = threads.filter((r) => r.status === "posted").sort((a, b) => String(b.data?.posted_at).localeCompare(String(a.data?.posted_at))).slice(0, 8);
   const ready = threads.filter((r) => r.status === "ready");
   const link = (u, t) => (MKACORE.safeUrl(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t));
+  const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : `<div class="${cls} agimg-no"></div>`);
   const age = rows.length ? Math.max(...rows.filter((r) => r.kind !== "control").map((r) => new Date(r.updated_at).getTime()), 0) : 0;
-  const comp = (cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name)).slice(0, 12);
+  const seen = new Set(); // 같은 페이지·같은 문구(광고 여러 개로 도는 같은 소재)는 한 번만
+  const comp = (cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name) && !seen.has(a.page_name + "|" + (a.headline || a.body)) && seen.add(a.page_name + "|" + (a.headline || a.body))).slice(0, 12);
 
   const killCard = `<div class="card ${kill ? "warn" : ""}"><div class="mkbar"><b>${kill ? "🛑 에이전트 멈춤 (스레드 자동 게시 중단)" : "🟢 에이전트 켜짐"}</b>
     ${admin ? `<button class="btn" id="agKill" style="${kill ? "" : "background:#a3201a"}">${kill ? "다시 켜기" : "🛑 전부 멈추기"}</button>` : ""}</div>
     <p class="mut">${admin ? `누르면 다음 스레드 게시 직전에 바로 멈춰요. 급하면 Claude에게 "에이전트 멈춰"라고 해도 돼요.` : "대표님이 켜고 끄는 스위치예요. 아래는 우리 지점 것만 보여요."}${age ? ` 마지막 동기화 ${esc(new Date(age).toLocaleString("ko-KR"))}` : " 아직 동기화 기록이 없어요."}</p></div>`;
 
-  const topHtml = top.length ? `<div class="tw"><table><tr><th>광고</th><th>최근 30일 리드</th><th>리드당</th><th>지출</th><th>상태</th></tr>${top.map((r) => { const d = r.data ?? {}; return `<tr><td>${link(d.link, d.name)}</td><td>${n(d.leads)}</td><td>${usd(d.cpl)}</td><td>${usd(d.spend)}</td><td class="mut">${esc(d.status ?? "")}</td></tr>`; }).join("")}</table></div><p class="mut">이름을 누르면 광고 미리보기가 열려요. 리드 기준이고, 노출 1,000 미만은 뺐어요.</p>` : `<div class="mut">아직 없어요. 에이전트 동기화가 돌면 채워져요.</div>`;
+  const topHtml = top.length ? `<div class="tw"><table><tr><th>광고</th><th>최근 30일 리드</th><th>리드당</th><th>지출</th><th>상태</th></tr>${top.map((r) => { const d = r.data ?? {}; return `<tr><td><div class="agrow">${img(d.image, "agthumb")}${link(d.link, d.name)}</div></td><td>${n(d.leads)}</td><td>${usd(d.cpl)}</td><td>${usd(d.spend)}</td><td class="mut">${esc(d.status ?? "")}</td></tr>`; }).join("")}</table></div><p class="mut">이름을 누르면 광고 미리보기가 열려요. 리드 기준이고, 노출 1,000 미만은 뺐어요.</p>` : `<div class="mut">아직 없어요. 에이전트 동기화가 돌면 채워져요.</div>`;
 
-  const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${AST[r.status] ?? esc(r.status)}</span> <span class="mut">#${esc(r.key)}</span></div>
+  const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agprop")}<div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${AST[r.status] ?? esc(r.status)}</span> <span class="mut">#${esc(r.key)}</span></div>
       <div><b>${esc(d.angle ?? "")}</b></div><div>${esc(d.hook ?? "")}</div><div class="mut">제목: ${esc(d.headline ?? "")}${d.replaces_ad_name ? ` · 교체 대상: ${esc(d.replaces_ad_name)}` : ""}</div>
       <div class="mut">${esc(d.experiment ?? "")}</div>
       ${admin && r.status === "proposed" ? `<div class="mkbar"><button class="btn" data-ap="${esc(r.key)}" data-st="approved">승인</button><button class="btn" data-ap="${esc(r.key)}" data-st="rejected" style="background:var(--sub)">반려</button></div>` : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
