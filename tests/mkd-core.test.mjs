@@ -311,3 +311,73 @@ test("flags: 결측 2일째 (한 번이라도 데이터 있던 채널만)", () =
   assert.match(f[0].msg, /로그인 필요|수집 안 됨/);
   assert.deepEqual(D.flags([row("2026-10-27", "daangn", "전체", { views: 1 }), row(END, "daangn", "전체", {}, "failed")], END), []);
 });
+
+// ── 리뷰 수정 1: 없는 데이터는 0이 아니다 ──
+const codes = (rows, end = END) => D.flags(rows, end).map((f) => f.code);
+const naverSpike = days(END, 6, "naver_ad", "a", (i) => ({ spend: i < 3 ? 2000 : 1000, clicks: 5 }));
+
+test("flags: 비용 급증 — 전산이 전부 실패했거나 아예 없으면 '문의 0건'으로 보지 않는다", () => {
+  const failed = days(END, 6, "jeonsan", "전체", { inquiries: 0 }, "failed");
+  assert.ok(!codes([...naverSpike, ...failed]).includes("spend_spike"));
+  assert.ok(!codes(naverSpike).includes("spend_spike"));                       // 전산 행이 하나도 없음
+  assert.ok(!codes([...naverSpike, row(END, "jeonsan", "전체", {}, "login_required")]).includes("spend_spike"));
+  // 전산 데이터가 2일 이상 있고 3일 문의가 진짜 0 이면 여전히 켜진다
+  const zero = days(END, 6, "jeonsan", "전체", { inquiries: 0 });
+  const f = D.flags([...naverSpike, ...zero], END).find((x) => x.code === "spend_spike");
+  assert.match(f.msg, /0건이에요/); assert.match(f.msg, /▲100%인데/);
+  // 3일 안에 쓸 수 있는 전산 날이 하루뿐이면 0건 판단 보류 (직전 기간 대비 감소로도 안 잡히는 경우)
+  const oneDay = [row(END, "jeonsan", "전체", { inquiries: 0 }), ...days(D.addDays(END, -1), 5, "jeonsan", "전체", { inquiries: 0 }, "failed")];
+  assert.ok(!codes([...naverSpike, ...oneDay]).includes("spend_spike"));
+});
+
+test("flags: 클릭 있는데 문의 0 — 전산 쓸 수 있는 행이 이번 주에 없으면 판단 안 함", () => {
+  const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });   // 주간 클릭 70
+  const failed = days(END, 7, "jeonsan", "전체", { inquiries: 0 }, "failed");
+  assert.ok(!codes([...clicks, ...failed]).includes("clicks_no_inquiry"));
+  const oldOnly = [...failed, row("2026-10-10", "jeonsan", "전체", { inquiries: 3 })];      // 이번 주 밖의 정상 행뿐
+  assert.ok(!codes([...clicks, ...oldOnly]).includes("clicks_no_inquiry"));
+});
+
+test("flags: 문의 급감 — 전산 실패일이 섞여도 주간을 일수로 환산해 비교한다", () => {
+  const steady = days(END, 28, "jeonsan", "전체", (i) => ({ inquiries: 2 }), "ok").map((r, i) => (i === 1 || i === 3 || i === 5 ? { ...r, status: "failed" } : r));
+  assert.deepEqual(D.flags(steady, END), []);                                     // 7일 중 4일만 정상(8건) = 주 14건 환산, 4주 평균도 14
+  const few = days(END, 28, "jeonsan", "전체", { inquiries: 2 }).map((r, i) => (i >= 1 && i <= 4 ? { ...r, status: "failed" } : r));
+  assert.deepEqual(D.flags(few, END), []);                                        // 주간에 쓸 날이 3일뿐이면 판단 보류
+  const drop = days(END, 28, "jeonsan", "전체", (i) => ({ inquiries: i < 7 ? 1 : 3 })).map((r, i) => (i === 2 ? { ...r, status: "failed" } : r));
+  const f = D.flags(drop, END).find((x) => x.code === "inquiry_drop");            // 6일 6건 → 주 7건 환산
+  assert.match(f.msg, /주간 문의 7건/);
+});
+
+test("flags: 순위 이탈은 빠진 첫날 한 번만, 숫자 하락은 마지막으로 안 순위와 비교", () => {
+  const kw = "동성로 영어회화", mk = [row("2026-10-25", "blog", kw, { rank: 4 }), row("2026-10-26", "blog", kw, { rank: null }), row("2026-10-27", "blog", kw, { rank: null }), row("2026-10-28", "blog", kw, { rank: null })];
+  assert.deepEqual(codes(mk, "2026-10-26"), ["rank_drop"]);
+  assert.deepEqual(codes(mk, "2026-10-27"), []);
+  assert.deepEqual(codes(mk, "2026-10-28"), []);
+  // 이탈 중에 실패 행이 끼어도 직전 '쓸 수 있는' 행이 순위 있던 날이면 이탈로 본다
+  const gap = [row("2026-10-26", "blog", kw, { rank: 4 }), row("2026-10-27", "blog", kw, {}, "failed"), row(END, "blog", kw, { rank: null })];
+  assert.deepEqual(codes(gap), ["rank_drop"]);
+  // 이탈 뒤 다시 들어왔는데 처음보다 3계단 이상 낮으면 마지막으로 안 순위(4위)와 비교해 잡는다
+  const back = [row("2026-10-26", "blog", kw, { rank: 4 }), row("2026-10-27", "blog", kw, { rank: null }), row(END, "blog", kw, { rank: 8 })];
+  assert.deepEqual(codes(back), ["rank_drop"]);
+});
+
+test("flags: 결측 — 로그인 필요/수집 안 됨 구분과 실제 연속 일수", () => {
+  const login4 = [row("2026-10-24", "daangn", "전체", { views: 1 }), ...[25, 26, 27, 28].map((d) => row(`2026-10-${d}`, "daangn", "전체", { note: "x" }, "login_required"))];
+  const f = D.flags(login4, END).filter((x) => x.code === "missing");
+  assert.equal(f.length, 1); assert.match(f[0].msg, /로그인 필요 4일째/);
+  const failed3 = [row("2026-10-25", "daangn", "전체", { views: 1 }), ...[26, 27, 28].map((d) => row(`2026-10-${d}`, "daangn", "전체", {}, "failed"))];
+  assert.match(D.flags(failed3, END)[0].msg, /수집 안 됨 3일째/);
+  // 어제 로그인 필요 + 오늘 행 없음 → 로그인 필요 (기준일 행이 없다고 '수집 안 됨'으로 덮지 않는다)
+  const yest = [row("2026-10-26", "daangn", "전체", { views: 1 }), row("2026-10-27", "daangn", "전체", { note: "x" }, "login_required")];
+  assert.match(D.flags(yest, END)[0].msg, /로그인 필요 2일째/);
+});
+
+test("flags: 메시지 띄어쓰기 (이/인데 앞에 공백 없음)", () => {
+  const stopped = days(END, 10, "google_ad", "대구_영어", (i) => ({ impressions: i < 3 ? 0 : 50 }));
+  assert.match(D.flags(stopped, END)[0].msg, /노출 0이 3일째예요/);
+  const clicks = days(END, 7, "google_ad", "대구_영어", { impressions: 100, clicks: 10 });
+  const noSrc = days(END, 7, "jeonsan", "전체", { inquiries: 2 });
+  assert.match(D.flags([...clicks, ...noSrc], END)[0].msg, /주간 클릭 70인데/);
+  const zero = days(END, 6, "jeonsan", "전체", { inquiries: 0 });
+  assert.match(D.flags([...naverSpike, ...zero], END)[0].msg, /▲100%인데 문의는/);
+});

@@ -151,38 +151,40 @@ function flags(rows, end) {
     if (/일시\s*중지|paused|중지됨/i.test(String(at(end)?.metrics?.status ?? ""))) continue;
     const last3 = [0, 1, 2].map((i) => num(at(addDays(end, -i))?.metrics?.impressions));
     const ranBefore = [3, 4, 5, 6, 7, 8, 9].some((i) => num(at(addDays(end, -i))?.metrics?.impressions) > 0);
-    if (last3.every((v) => v === 0) && ranBefore) push("red", "ad_stopped", c, u, `${L(c)} '${u}' 노출 0 이 3일째예요`);
+    if (last3.every((v) => v === 0) && ranBefore) push("red", "ad_stopped", c, u, `${L(c)} '${u}' 노출 0이 3일째예요`);
   }
   // 2 승인/결제 문제: 구글·메타 화면에서 읽은 경고 문구(metrics.flags)
   for (const c of ["google_ad", "meta_ad"]) for (const r of chRows(c).filter((r) => r.date === end)) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) push("red", "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
-  // 3 비용 급증: 채널 3일 비용 ▲30%↑ 인데 전체 문의 3일은 ▼ 또는 0
-  const sm = summary(rows, end), inq3 = sm[0].cells[1];
+  // 3 비용 급증: 채널 3일 비용 ▲30%↑ 인데 전체 문의 3일은 ▼ 또는 0. '0'은 쓸 수 있는 전산 날이 2일 이상일 때만 — 전산 결측·실패는 0건이 아니다.
+  const inq3 = summary(rows, end)[0].cells.find((c) => c.key === "d3");
   for (const c of AD_CHANNELS) {
     const sp = cell(totalRows(chRows(c)), "spend", end, 3);
-    if (sp.change !== null && sp.change >= 0.3 && (!inq3.value || (inq3.change !== null && inq3.change < 0))) push("yellow", "spend_spike", c, ALL, `${L(c)} 3일 비용 ▲${pct(sp.change)}% 인데 문의는 ${inq3.value ? "줄었어요" : "0건이에요"}`);
+    if (sp.change !== null && sp.change >= 0.3 && ((inq3.value === 0 && inq3.days >= 2) || (inq3.change !== null && inq3.change < 0))) push("yellow", "spend_spike", c, ALL, `${L(c)} 3일 비용 ▲${pct(sp.change)}%인데 문의는 ${inq3.value === 0 ? "0건이에요" : "줄었어요"}`);
   }
-  // 4 문의 급감: 주간 문의가 4주 주평균 대비 ▼40%↑ (전산 데이터가 14일 이상일 때만)
-  const jt = totalRows(chRows("jeonsan")), w1 = cell(jt, "inquiries", end, 7), w4 = cell(jt, "inquiries", end, 28);
-  if (w4.days >= 14 && w1.value !== null && w4.value) { const avg = w4.value / (w4.days / 7); if (avg > 0 && (w1.value - avg) / avg <= -0.4) push("yellow", "inquiry_drop", "jeonsan", ALL, `주간 문의 ${w1.value}건 — 4주 주평균 ${Math.round(avg * 10) / 10}건보다 ${pct(1 - w1.value / avg)}% 적어요`); }
-  // 5 순위 하락: 키워드 순위 3계단↑ 하락 또는 1페이지 이탈(rank→null). 직전에 순위가 있던 날과 비교.
+  // 4 문의 급감: 주간 문의가 4주 주평균 대비 ▼40%↑ (전산 데이터가 14일 이상, 이번 주엔 4일 이상일 때만). 주간도 데이터 있는 날 수로 7일 환산해 비교한다.
+  const jt = totalRows(chRows("jeonsan")), w1 = cell(jt, "inquiries", end, 7), w4 = cell(jt, "inquiries", end, 28), r1 = (x) => Math.round(x * 10) / 10;
+  if (w4.days >= 14 && w1.days >= 4 && w1.value !== null && w4.value) { const wk = w1.value / w1.days * 7, avg = w4.value / (w4.days / 7); if (avg > 0 && (wk - avg) / avg <= -0.4) push("yellow", "inquiry_drop", "jeonsan", ALL, `주간 문의 ${r1(wk)}건 — 4주 주평균 ${r1(avg)}건보다 ${pct(1 - wk / avg)}% 적어요`); }
+  // 5 순위 하락: 키워드 순위 3계단↑ 하락(마지막으로 안 순위와 비교) 또는 1페이지 이탈(rank→null, 직전 쓸 수 있는 행에 순위가 있던 첫날만).
   for (const u of unitsOf(chRows("blog")).filter((u) => u !== "방문자")) {
     const ur = chRows("blog").filter((r) => r.unit === u && usable(r)).sort(byDate), today = ur.find((r) => r.date === end); if (!today) continue;
-    const prevR = [...ur].reverse().find((r) => r.date < end && num(r.metrics?.rank) !== null); if (!prevR) continue;
+    const before = [...ur].reverse().filter((r) => r.date < end), last = before[0], prevR = before.find((r) => num(r.metrics?.rank) !== null); if (!prevR) continue;
     const cur = num(today.metrics?.rank), prev = num(prevR.metrics?.rank);
-    if (cur === null) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`);
+    if (cur === null) { if (last === prevR) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`); }
     else if (cur - prev >= 3) push("yellow", "rank_drop", "blog", u, `'${u}' ${prev}위 → ${cur}위`);
   }
-  // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (전산 데이터가 있을 때만)
-  if (chRows("jeonsan").length) for (const c of AD_CHANNELS) {
+  // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (이번 주에 쓸 수 있는 전산 행이 있을 때만)
+  if (cell(jt, "inquiries", end, 7).value !== null) for (const c of AD_CHANNELS) {
     const ck = cell(totalRows(chRows(c)), "clicks", end, 7); if ((ck.value ?? 0) < 50) continue;
     const q = cell(chRows("jeonsan").filter((r) => channelOfSource(r.unit) === c), "inquiries", end, 7);
     if (!q.value) push("yellow", "clicks_no_inquiry", c, ALL, `${L(c)} 주간 클릭 ${ck.value}인데 전산 문의 0건 — 추적·폼 확인`);
   }
-  // 7 결측: 기준일·전날 모두 ok/partial 이 아닌 채널 (데이터가 한 번이라도 있던 채널만)
+  // 7 결측: 기준일·전날 모두 ok/partial 이 아닌 채널 (데이터가 한 번이라도 있던 채널만). 며칠째인지는 기준일부터 거꾸로 세어 최대 28일.
   for (const c of CHANNELS) {
     if (!chRows(c).length) continue;
     const st = [status(rows, end)[c], status(rows, addDays(end, -1))[c]];
-    if (st.every((s) => s !== "ok" && s !== "partial")) push("gray", "missing", c, ALL, `${L(c)} ${st[0] === "login_required" ? "로그인 필요" : "수집 안 됨"} 2일째`);
+    if (!st.every((s) => s !== "ok" && s !== "partial")) continue;
+    const okDays = new Set(chRows(c).filter(usable).map((r) => r.date)); let n = 0; while (n < 28 && !okDays.has(addDays(end, -n))) n++;
+    push("gray", "missing", c, ALL, `${L(c)} ${st.includes("login_required") ? "로그인 필요" : "수집 안 됨"} ${n}일째`);
   }
   return out;
 }
