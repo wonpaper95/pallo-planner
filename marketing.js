@@ -375,15 +375,28 @@ async function send() {
 async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(50);
   if (fail(error)) return;
-  const rows = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
-  const at = rows[0]?.data?.collected;
-  const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
+  const all = (data ?? []).sort((a, b) => (a.data?.rank ?? 99) - (b.data?.rank ?? 99));
+  const rows = all.filter((r) => !r.data?.src), yt = all.filter((r) => r.data?.src === "yt" && /^yt:[\w-]{11}$/.test(r.key));
+  const at = rows[0]?.data?.collected, ytAt = yt[0]?.data?.collected;
+  const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : "");
+  // 쇼츠는 썸네일을 누르면 그 자리에서 재생(youtube-nocookie 임베드), 제목은 유튜브로 이동
+  const ytList = yt.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${MKACORE.safeImg(d.image) ? `<button class="agplay" data-yt="${esc(r.key.slice(3))}" title="여기서 재생">${img(d.image, "agthumb")}<span>▶</span></button>` : ""}<div class="cmp-b"><div><a href="https://www.youtube.com/shorts/${esc(r.key.slice(3))}" target="_blank" rel="noopener">${esc(d.title || "(제목 없음)")}</a></div>
+      <div class="mut">${esc(d.channel ?? "")} · 조회 ${n(d.views).toLocaleString("ko-KR")} · 좋아요 ${n(d.likes).toLocaleString("ko-KR")} · ${n(d.duration_s)}초 · ${esc(d.published ?? "")}</div></div></div>`; }).join("");
+  const list = rows.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agthumb")}<div class="cmp-b"><div><a href="${esc(MKCCORE.libraryUrl(r.key))}" target="_blank" rel="noopener">${esc(d.page_name || "광고")}</a>
       <span class="mut">${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개로 돌림` : ""} · ${esc(d.media_type || "?")}${d.cta ? ` · ${esc(d.cta)}` : ""}${(d.keywords ?? []).length ? ` · 검색어 ${esc(d.keywords.join(", "))}` : ""}</span></div>
       <div>${esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90))}</div></div></div>`; }).join("");
   $m("#mkBody").innerHTML = `<div class="card"><b>📈 요즘 오래 도는 광고 — 업종 밖 (눌러서 광고 라이브러리 원문)</b>
     <p class="mut">기준: 자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일 넘게 돌거나 광고 3개 이상으로 돌리는 것 · 광고주당 2개${at ? ` · 수집 ${esc(new Date(at).toLocaleString("ko-KR"))}` : ""}</p>
     ${list || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
-    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`;
+    <p class="mut">라이브러리엔 성과 숫자가 없어서, 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요. 훅·형식만 참고하고 문장은 베끼지 않아요. 에이전트 추천 광고에도 이 목록이 근거로 붙어요.</p></div>`
+    + `<div class="card"><b>🎬 요즘 뜨는 숏폼 — 유튜브 쇼츠 (한국, 3분 이하)</b>
+    <p class="mut">기준: 한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${ytAt ? ` · 수집 ${esc(new Date(ytAt).toLocaleString("ko-KR"))}` : ""}</p>
+    ${ytList || `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}
+    <p class="mut">릴스에서도 같은 밈·포맷·음원이 같이 돌아요. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요. 썸네일을 누르면 여기서 바로 재생돼요.</p></div>`;
+  V().querySelectorAll("[data-yt]").forEach((b) => b.addEventListener("click", () => {
+    if (!/^[\w-]{11}$/.test(b.dataset.yt)) return;
+    b.outerHTML = `<iframe class="agyt" src="https://www.youtube-nocookie.com/embed/${b.dataset.yt}?autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+  }));
 }
 
 // ── 🤖 에이전트 (mka_items: 대표는 전부+승인·킬스위치, 매니저는 자기 지점 것만 읽기 — 서버 RLS 가 거름) ──
@@ -393,7 +406,7 @@ const BR = MKACORE.BRANCH;
 async function renderAgent(admin) {
   const [ir, cr, onr] = await Promise.all([
     sb.from("mka_items").select("kind, key, data, status, updated_at").order("updated_at", { ascending: false }).limit(300),
-    sb.from("mkc_ads").select("library_id, grp, page_name, competitor_id, headline, body, start_date, media_type, n_ads").eq("active", true).not("start_date", "is", null).lte("start_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).order("start_date", { ascending: true }).limit(1000),
+    sb.from("mkc_ads").select("library_id, grp, page_name, competitor_id, headline, body, start_date, media_type, n_ads, thumb_path").eq("active", true).not("start_date", "is", null).lte("start_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).order("start_date", { ascending: true }).limit(1000),
     sb.from("mkc_competitors").select("id").eq("status", "on"),
   ]);
   if (fail(ir.error) || fail(cr.error) || fail(onr.error)) return;
@@ -408,6 +421,9 @@ async function renderAgent(admin) {
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : `<div class="${cls} agimg-no"></div>`);
   const age = rows.length ? Math.max(...rows.filter((r) => r.kind !== "control").map((r) => new Date(r.updated_at).getTime()), 0) : 0;
   const comp = MKACORE.pickCompetitorAds((cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name)), (onr.data ?? []).map((c) => c.id), today);
+  // 경쟁사 카드 스크린샷(비공개 버킷) → 1시간짜리 서명 주소 (경쟁사 탭과 같은 방식)
+  const signed = {}, paths = comp.map((a) => a.thumb_path).filter(Boolean);
+  if (paths.length) { const { data } = await sb.storage.from("mkc-thumbs").createSignedUrls(paths, 3600); (data ?? []).forEach((x, i) => { if (x.signedUrl && !x.error) signed[x.path ?? paths[i]] = x.signedUrl; }); }
 
   const killCard = `<div class="card ${kill ? "warn" : ""}"><div class="mkbar"><b>${kill ? "🛑 에이전트 멈춤 (스레드 자동 게시 중단)" : "🟢 에이전트 켜짐"}</b>
     ${admin ? `<button class="btn" id="agKill" style="${kill ? "" : "background:#a3201a"}">${kill ? "다시 켜기" : "🛑 전부 멈추기"}</button>` : ""}</div>
@@ -418,10 +434,10 @@ async function renderAgent(admin) {
   const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agprop")}<div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${AST[r.status] ?? esc(r.status)}</span> <span class="mut">#${esc(r.key)}</span></div>
       <div><b>${esc(d.angle ?? "")}</b></div><div>${esc(d.hook ?? "")}</div><div class="mut">제목: ${esc(d.headline ?? "")}${d.replaces_ad_name ? ` · 교체 대상: ${esc(d.replaces_ad_name)}` : ""}</div>
       <div class="mut">${esc(d.experiment ?? "")}</div>
-      ${(d.trend_refs ?? []).length ? `<div class="mut">📈 참고한 트렌드 광고(업종 밖): ${d.trend_refs.map((t) => `${link(MKCCORE.libraryUrl(t.library_id), t.page_name || "광고")}${t.why ? ` — ${esc(t.why)}` : ""}`).join(" · ")}</div>` : ""}
+      ${(d.trend_refs ?? []).length ? `<div class="mut">📈 참고한 트렌드 광고(업종 밖): ${d.trend_refs.map((t) => `${MKACORE.safeImg(t.image) ? `<img class="agref" src="${t.image}" alt="" loading="lazy">` : ""}${link(MKCCORE.libraryUrl(t.library_id), t.page_name || "광고")}${t.why ? ` — ${esc(t.why)}` : ""}`).join(" · ")}</div>` : ""}
       ${admin && r.status === "proposed" ? `<div class="mkbar"><button class="btn" data-ap="${esc(r.key)}" data-st="approved">승인</button><button class="btn" data-ap="${esc(r.key)}" data-st="rejected" style="background:var(--sub)">반려</button></div>` : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
 
-  const compHtml = comp.length ? comp.map((a) => `<div class="cmp"><div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
+  const compHtml = comp.length ? comp.map((a) => `<div class="cmp">${signed[a.thumb_path] ? `<img class="agthumb" src="${esc(signed[a.thumb_path])}" alt="" loading="lazy">` : ""}<div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
       <div>${esc(MKACORE.adText(a).slice(0, 90))}</div></div></div>`).join("") : `<div class="mut">조건에 맞는 경쟁사 광고가 아직 없어요.</div>`;
 
   const postedHtml = posted.length ? posted.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div>${link(d.permalink, String(d.text ?? "").split("\n")[0].slice(0, 60))} <span class="mut">${esc(BR[d.branch] ?? d.branch ?? "")} · ${esc(String(d.posted_at ?? "").slice(0, 16).replace("T", " "))}</span></div></div></div>`; }).join("") : `<div class="mut">아직 올라간 글이 없어요.</div>`;

@@ -65,4 +65,9 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .agthumb { width: 120px; height: auto; border-radius: 8px; background: var(--bg); flex: none; } /* 잘리지 않게 원본 비율 그대로 */
 #mkView .cmp img.agprop, #mkView .agprop { width: 220px; height: auto; object-fit: contain; border-radius: 10px; background: var(--bg); flex: none; }
 #mkView .agimg-no { display: inline-block; }
+#mkView .agplay { position: relative; border: 0; padding: 0; background: none; cursor: pointer; flex: none; line-height: 0; }
+#mkView .agplay span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 28px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.6); line-height: 1; }
+#mkView .agyt { width: 200px; aspect-ratio: 9 / 16; border: 0; border-radius: 10px; flex: none; background: #000; }
+@media (max-width: 640px) { #mkView .agyt { width: 150px; } }
+#mkView .agref { width: 56px; height: auto; border-radius: 6px; vertical-align: middle; margin: 2px 4px 2px 0; }
 @media (max-width: 640px) { #mkView .agthumb { width: 80px; } #mkView .cmp img.agprop, #mkView .agprop { width: 130px; } }
