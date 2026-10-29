@@ -5,8 +5,8 @@ import { createRequire } from "node:module";
 const MK = createRequire(import.meta.url)("../../mk-core.js");
 
 export const ACCOUNTS = [
-  // 대구 계정: 이름에 일본어·중국어·일중(·일어/중어 줄임말)이 있으면 jpcn, 나머지('팔로 소상고인'·'팔로 네이버플레이스'·대구 영어)는 dsr
-  { suffix: "", name: "대구", teams: ["dsr", "jpcn"], teamOf: (n) => (MK.teamKeyOf(n) === "jpcn" || /일어|중어/.test(n) ? "jpcn" : "dsr") },
+  // 대구 계정: 이름에 울산·구미가 있으면 그 지점(ulsan·gumi), 일본어·중국어·일중(·일어/중어 줄임말)이 있으면 jpcn, 나머지('팔로 소상고인'·'팔로 네이버플레이스'·대구 영어)는 dsr
+  { suffix: "", name: "대구", teams: ["dsr", "jpcn"], teamOf: (n) => { const k = MK.teamKeyOf(n); return k === "gumi" || k === "ulsan" ? k : k === "jpcn" || /일어|중어/.test(n) ? "jpcn" : "dsr"; } },
   { suffix: "_ULSAN", name: "울산", teams: ["ulsan"], teamOf: () => "ulsan" },
 ];
 const NO_CAMPAIGN = "운영 캠페인 없음";

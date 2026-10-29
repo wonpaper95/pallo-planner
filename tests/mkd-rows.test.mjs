@@ -173,11 +173,26 @@ test("중복은 최종 unit 기준 — 같은 이름이라도 다른 지점이�
 });
 
 // ── 행의 개인정보 ──
-test("unit 에 전화번호가 있으면 거부, 메시지에 숫자 안 찍음", () => {
-  for (const u of ["대구 010-1234-5678", "01012345678", "010 1234 5678", "(053) 123-4567"]) {
-    const msg = errOf(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: u }] }));
-    assert.equal(msg, "rows[0]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit", u);
+test("unit 에 전화번호가 있으면 광고 채널 밖(전산·블로그·당근)에서는 거부, 메시지에 숫자 안 찍음", () => {
+  for (const ch of ["jeonsan", "blog", "daangn"]) for (const u of ["대구 010-1234-5678", "01012345678", "010 1234 5678", "(053) 123-4567"]) {
+    const msg = errOf(() => rows(ch, { rows: [{ team_key: "dsr", unit: u }] }));
+    assert.equal(msg, "rows[0]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit", `${ch} ${u}`);
   }
+});
+test("광고 채널(naver_ad·google_ad·meta_ad)의 unit 은 캠페인 이름(업무 글)이라 전화번호 모양이면 던지지 않고 숫자 덩어리를 #로 가린다", () => {
+  const masked = { "대구 010-1234-5678": "대구 #-#-#", "01012345678": "#", "010 1234 5678": "# # #", "(053) 123-4567": "(#) #-#", "대구_영어 2호점 010-1234-5678": "대구_영어 #호점 #-#-#" };
+  for (const ch of ["naver_ad", "google_ad", "meta_ad"]) for (const [u, want] of Object.entries(masked)) {
+    const out = rows(ch, { rows: [{ team_key: "dsr", unit: u, metrics: { clicks: 1 } }] });
+    assert.equal(out[0].unit, want, `${ch} ${u}`);
+    assert.equal(looksPersonal(out[0].unit), false, `${ch} ${u}`);
+  }
+  assert.equal(rows("google_ad", { rows: [{ team_key: "dsr", unit: "대구 영어 2호점", metrics: {} }] })[0].unit, "대구 영어 2호점"); // 전화번호 모양이 아니면 숫자도 그대로
+  // 가린 뒤 같아지는 이름은 중복으로 알린다 (조용히 합치지 않음)
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a 010-1111-2222" }, { team_key: "dsr", unit: "a 010-3333-4444" }] }), /같은 지점·unit 이 여러 번/);
+  // note·flags·문자열 지표는 광고 채널에서도 계속 거부 (스킬이 가려서 보낸다)
+  assert.throws(() => rows("naver_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { note: "010-1234-5678" } }] }), /개인정보.*: note$/);
+  assert.throws(() => rows("meta_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { flags: ["010 1234 5678"] } }] }), /개인정보.*: flags$/);
+  assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { status: "(053) 123-4567" } }] }), /개인정보.*: status$/);
 });
 test("note·flags 의 전화번호도 행 단위로 거부", () => {
   assert.throws(() => rows("google_ad", { rows: [{ team_key: "dsr", unit: "a", metrics: { note: "010-1234-5678" } }] }), /개인정보.*: note$/);
@@ -205,7 +220,8 @@ test("행 단위 오류는 rows[i]: 접두어 — 몇 번째 행인지 알려 �
   assert.equal(errOf(() => rows("google_ad", at(1, { team_key: "dsr", unit: "a", metrics: { name: "홍길동" } }))), "rows[1]: 모르는 지표 키: name");
   assert.equal(errOf(() => rows("google_ad", at(2, { team_key: "dsr", unit: "a", metrics: { clicks: "12,3,4" } }))), "rows[2]: clicks 는 숫자여야 해요 (길이 6)");
   assert.equal(errOf(() => rows("google_ad", at(4, { team_key: "dsr", unit: "a", status: "bad" }))), "rows[4]: status 는 ok/partial/failed/login_required: bad");
-  assert.equal(errOf(() => rows("google_ad", at(2, { team_key: "dsr", unit: "대구 010-1234-5678" }))), "rows[2]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit");
+  assert.equal(errOf(() => rows("blog", at(2, { team_key: "dsr", unit: "대구 010-1234-5678" }))), "rows[2]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: unit");
+  assert.equal(errOf(() => rows("google_ad", at(2, { team_key: "dsr", unit: "a", metrics: { note: "010-1234-5678" } }))), "rows[2]: 개인정보(전화번호)처럼 보이는 값이 있어 저장하지 않아요: note");
   assert.match(errOf(() => rows("jeonsan", at(1, { team_key: "dsr", unit: "홍길동 0101234" }))), /^rows\[1\]: jeonsan unit/);
   assert.match(errOf(() => rows("blog", at(5, { unit: "x" }))), /^rows\[5\]: team_key 가 필요해요/);
   assert.match(errOf(() => rows("google_ad", at(1, { team_key: "dsr", unit: 5 }))), /^rows\[1\]: unit 은 문자열/);

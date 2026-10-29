@@ -61,6 +61,14 @@ test("대구 계정 매핑: 소상공인일어중어·일본어·중국어·대�
   const cases = [["소상공인일어중어", "jpcn"], ["팔로 소상고인", "dsr"], ["팔로 네이버플레이스", "dsr"], ["대구 영어회화", "dsr"], ["대구_영어(검색광고)", "dsr"], ["대구일중", "jpcn"], ["대구 일본어", "jpcn"], ["팔로 중국어 파워링크", "jpcn"], ["동성로 영어", "dsr"]];
   for (const [name, team] of cases) assert.equal(DAEGU.teamOf(name), team, name);
 });
+test("대구 계정 매핑: 이름에 울산·구미가 있으면 그 지점으로 (dsr 로 강제하지 않는다), 일어/중어·기본값은 그대로", () => {
+  const cases = [["울산 영어", "ulsan"], ["울산_영어(검색광고)", "ulsan"], ["울산 일본어", "ulsan"], ["구미 영어", "gumi"], ["구미 중국어", "gumi"], ["대구 구미 영어", "gumi"], ["소상공인일어중어", "jpcn"], ["대구 영어", "dsr"], ["", "dsr"]];
+  for (const [name, team] of cases) assert.equal(DAEGU.teamOf(name), team, name);
+  // 행으로도 그대로 간다
+  const rows = real(campaignRows(DAEGU, [camp("울산 영어", "ELIGIBLE", "u1"), camp("구미 영어", "ELIGIBLE", "g1"), camp("대구 영어", "ELIGIBLE", "d1")], [st("u1", 10, 1, 100), st("g1", 20, 2, 200), st("d1", 30, 3, 300)]));
+  assert.deepEqual(rows.map((r) => `${r.team_key}:${r.unit}`), ["ulsan:울산 영어", "gumi:구미 영어", "dsr:대구 영어"]);
+  assert.deepEqual(toRowsPure("naver_ad", D, { rows }, TEAMS).map((r) => r.team_id), [3, 4, 1]);
+});
 test("울산 계정 매핑: 이름이 뭐든 ulsan", () => {
   for (const name of ["울산 영어", "팔로 네이버플레이스", "대구 영어", "소상공인일어중어", ""]) assert.equal(ULSAN.teamOf(name), "ulsan", name);
 });

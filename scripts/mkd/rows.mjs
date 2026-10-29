@@ -13,6 +13,7 @@
 //     ('1,204' '₩18,200' '$12.50' 허용, '--' 는 null, 음수는 rank·avg_rank 만). 문자열 키: status note campaign_id top_url our_url (campaign_id 는 유한한 숫자로 와도 문자열로 바꿔 받는다). 배열 키: flags.
 //   · 행 하나의 오류는 'rows[3]: …' 로 몇 번째 행인지 앞에 붙여 던진다(메시지 본문은 그대로). 봉투·중복 오류는 접두어 없음.
 //   · 전화번호처럼 보이는 값은 unit·note·flags·문자열 지표에서 거부한다(top_url·our_url·campaign_id 는 제외). jeonsan unit 은 이름 규칙까지 본다.
+//     단 광고 채널(naver_ad|google_ad|meta_ad)의 unit 은 캠페인 이름이라 거부하지 않고 숫자 덩어리를 #로 가려 저장한다. note·flags 는 광고 채널에서도 거부(스킬이 미리 가린다).
 import { createRequire } from "node:module";
 const req = createRequire(import.meta.url);
 export const D = req("../../mkd-core.js");
@@ -97,6 +98,7 @@ export function toRowsPure(channel, date, input, teams) {
     const xk = Object.keys(r).find((k) => !ROW_KEYS.has(k)); if (xk !== undefined) throw bad(`모르는 키: ${xk.slice(0, 40)}`);
     if (r.unit !== undefined && r.unit !== null && typeof r.unit !== "string") throw new Error("unit 은 문자열이어야 해요");
     let unit = (r.unit ?? "").trim() || D.ALL;
+    if (D.AD_CHANNELS.includes(channel) && looksPersonal(unit)) unit = unit.replace(/\d+/g, "#"); // 광고 캠페인 이름은 업무 글 — 전화번호 모양이면 던지지 않고 숫자만 가린다
     noPersonal(unit, "unit");
     if (channel === "jeonsan" && !JEONSAN_UNIT.test(unit) && (unit.length > 20 || /\d{3}/.test(unit))) throw new Error("jeonsan unit 은 전체|meta|homepage|기타|gads_…|nad_… 이거나 20자 이하(숫자 3자리 연속 불가)여야 해요");
     // 지점: team_key·team_id 로 정한다. blog·daangn·jeonsan 과 '전체' 행은 필수, 광고 채널만 unit 이름으로 추정.
