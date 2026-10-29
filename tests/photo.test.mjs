@@ -15,3 +15,19 @@ test("toneData: 흑백은 세 값이 같다", () => { const [r, g, b] = px("mono
 test("toneData: 따뜻하게는 빨강↑ 파랑↓, 시원하게는 반대", () => { const w = px("warm", [128, 128, 128]), c = px("cool", [128, 128, 128]); assert.ok(w[0] > w[2] && c[2] > c[0]); });
 test("toneData: 0~255 밖으로 안 나감", () => assert.deepEqual(px("vivid", [255, 0, 255], 40, 40).map((v) => v >= 0 && v <= 255), [true, true, true]));
 test("FILTERS: 필터마다 값이 있다", () => Object.keys(PH.FILTERS).filter((k) => k !== "none").forEach((k) => assert.notDeepEqual(px(k, [120, 90, 60]), [120, 90, 60], k)));
+// 🌏 언어 꾸미기 세트 (게시물 탭)
+const Q = (W, H, ratio, items = []) => ({ img: { naturalWidth: W, naturalHeight: H }, edits: { ratio, ox: 0.5, oy: 0.5, filter: "none", frame: "none", items } });
+test("langEdits: 언어마다 테두리·필터·이모지·글자, 둘 다 자르기 칸 안", () => {
+  for (const [k, L] of Object.entries(PH.LANGS)) {
+    const p = Q(4000, 3000, "4:5"), c = PH.cropRect(p); PH.langEdits(p, k);
+    assert.equal(p.edits.frame, L[1]); assert.equal(p.edits.filter, L[2]);
+    assert.deepEqual(p.edits.items.map((it) => it.t), [L[3], L[4]], k);
+    for (const it of p.edits.items) assert.ok(it.x > c.x && it.x < c.x + c.w && it.y > c.y && it.y < c.y + c.h, `${k} ${it.t} 칸 밖`);
+  }
+});
+test("langEdits: 언어 바꾸면 자동 글자만 바뀌고 직접 넣은 글자는 남음, none = 다 뺌", () => {
+  const p = Q(3000, 3000, "1:1", [{ k: "text", t: "내 글자", x: 1, y: 1, size: 5 }]);
+  PH.langEdits(p, "en"); PH.langEdits(p, "ja");
+  assert.deepEqual(p.edits.items.map((it) => it.t), ["내 글자", "🌸", "日本語"]);
+  PH.langEdits(p, "none"); assert.deepEqual(p.edits.items.map((it) => it.t), ["내 글자"]); assert.equal(p.edits.frame, "none");
+});

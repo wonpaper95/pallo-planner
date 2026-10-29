@@ -33,7 +33,10 @@ async function call(action, body = {}) {
 function setQuota(q) { const el = $p("#psQuota"); if (el && q) el.textContent = `오늘 남은 생성 ${Math.max(0, q.limit - q.used)}/${q.limit}회 (블로그와 합산)`; }
 // 열어 둔 게시물 기억: 다른 사이트에 올리고 돌아왔을 때 화면이 새로 열려도(폰이 메모리 정리·새 버전) 그 게시물을 다시 띄움
 const remember = (id) => { try { id ? localStorage.setItem("ps-open", JSON.stringify({ id, team: PS.team, at: Date.now() })) : localStorage.removeItem("ps-open"); } catch {} };
-function reset() { remember(null); PS.photos = []; PS.post = null; PS.jobs = []; PS.topic = ""; PS.tone = "friendly"; PS.ch = "instagram"; PS.sel = allKeys(); }
+function reset() { remember(null); PS.photos = []; PS.post = null; PS.jobs = []; PS.topic = ""; PS.tone = "friendly"; PS.ch = "instagram"; PS.sel = allKeys(); PS.lang = null; }
+// 🌏 언어 꾸미기: 고른 언어 > 주제 글 > 지점 (일중점 = 일본어, 나머지 = 영어). "none" = 꾸미기 안 함
+const LANG_RE = [["zh", /중국어|HSK|中文/], ["ja", /일본어|JLPT|JPT|日本/], ["es", /스페인어|DELE/], ["en", /영어|오픽|토익|토플|아이엘츠|IELTS|English/i]];
+const langNow = () => PS.lang ?? LANG_RE.find(([, re]) => re.test(PS.topic))?.[0] ?? (/일중|일본어|중국어/.test(PS.teamName ?? "") ? "ja" : "en");
 
 // ── 화면 뼈대 (한 번만) ──
 function shell() {
@@ -87,6 +90,7 @@ function renderMake() {
     <div class="blthumbs" id="psThumbs"></div>
     <div id="psFaceRow" style="margin-top:6px"></div>
     <div class="psratio" id="psRatio"></div>
+    <div class="psratio" id="psLang"></div>
     <label>주제·메모 <small>(선택 · 비우면 사진만 보고 써요)</small></label>
     <textarea data-f="topic" placeholder="예) 11월부터 토요일 오전 10시 프리토킹반을 새로 열어요"></textarea>
     <label>어투</label><select data-f="tone" style="width:100%">${opt(TONES, PS.tone)}</select>
@@ -103,13 +107,17 @@ function renderThumbs() {
     <div class="psmv"><button type="button" data-mv="-1" data-i="${i}" title="앞으로">◀</button><button type="button" data-mv="1" data-i="${i}" title="뒤로">▶</button></div></div>`).join("");
   const n = PS.photos.length, unchecked = PS.photos.filter((p) => !p.faced).length;
   $p("#psFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="psFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서 처리한 뒤 올려요</small>` : "";
+  const ln = langNow();
+  $p("#psLang").innerHTML = n ? `<span class="mut">언어 꾸미기</span><span class="blseg">${[...Object.entries(PHOTO.LANGS).map(([k, v]) => [k, v[0]]), ["none", "없음"]].map(([k, t]) => `<button type="button" data-lang="${k}" class="${k === ln ? "on" : ""}">${t}</button>`).join("")}</span><small class="mut">${PS.photos.some((p) => p.deco === "manual") ? " · [편집]으로 고친 사진은 그대로" : ""}</small>` : "";
   $p("#psRatio").innerHTML = n ? `<span class="mut">한 번에 자르기</span><span class="blseg">${[["4:5", "4:5 세로 (인스타 추천)"], ["1:1", "1:1"], ["orig", "원본"]].map(([r, t]) => `<button type="button" data-ratio="${r}">${t}</button>`).join("")}</span>` : "";
 }
 async function addFiles(files) {
   const room = 10 - PS.photos.length;
   if (room <= 0) return toast("사진은 10장까지예요");
   if (files.length > room) toast(`10장까지라 ${files.length - room}장은 뺐어요`);
-  PS.photos.push(...await PHOTO.fromFiles(files.slice(0, room)));
+  const got = await PHOTO.fromFiles(files.slice(0, room));
+  PS.lang = langNow(); await PHOTO.applyLang(got, PS.lang); // 언어 꾸미기 자동 (처음 정한 언어로 고정 — 버튼과 사진이 늘 같게)
+  PS.photos.push(...got);
   renderThumbs(); photosChanged();
 }
 function photosChanged() { if (PS.post) { renderOut(); saveSoon(); } }
@@ -356,7 +364,7 @@ async function openPost(id) {
   $p("#psBody").innerHTML = `<div class="mut">사진 불러오는 중…</div>`;
   const got = await PHOTO.fromUrls(data.photos.map((x) => pub(x.path)));
   if (got.includes(null)) toast("불러오지 못한 사진이 있어요 (지워졌을 수 있어요)");
-  PS.photos = got.map((p, i) => p && Object.assign(p, { path: data.photos[i].path, pathOf: p.url })).filter(Boolean);
+  PS.photos = got.map((p, i) => p && Object.assign(p, { path: data.photos[i].path, pathOf: p.url, deco: "manual" })).filter(Boolean); // 저장된 사진은 이미 꾸민 채로 구워짐 → 다시 안 꾸밈
   // 못 불러온 사진은 목록에 넣지 않는다. 넣으면 다음 저장 때 일시적 실패로 파일이 지워진다
   PS.post = { id: data.id, savedPaths: PS.photos.map((x) => x.path), topic: data.topic, tone: data.tone, draft: data.draft, channels: C.normalizeChannels(data.channels), self_review: "" };
   PS.topic = data.topic; PS.tone = data.tone; PS.ch = "instagram";
@@ -390,8 +398,14 @@ function wire() {
     if (d.rm) { PS.photos = PS.photos.filter((p) => p.id !== +d.rm); renderThumbs(); return photosChanged(); }
     if (d.ed) {
       const p = PS.photos.find((x) => x.id === +d.ed);
-      if (p) PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); photosChanged(); } });
+      if (p) PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); } });
       return;
+    }
+    if (d.lang) {
+      PS.lang = d.lang; V().querySelectorAll("[data-lang]").forEach((b) => { b.disabled = true; });
+      await PHOTO.applyLang(PS.photos, d.lang); renderThumbs();
+      toast(d.lang === "none" ? "언어 꾸미기를 뺐어요" : `${PHOTO.LANGS[d.lang][0]} 꾸미기로 바꿨어요 · 사진마다 고치려면 [편집]`);
+      return photosChanged();
     }
     if (d.mv) { const i = +d.i, j = i + +d.mv; if (j < 0 || j >= PS.photos.length) return; [PS.photos[i], PS.photos[j]] = [PS.photos[j], PS.photos[i]]; renderThumbs(); return photosChanged(); }
     if (d.ratio) {

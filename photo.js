@@ -147,7 +147,20 @@ async function bake(p) {
   p.url = URL.createObjectURL(p.blob);
   p.ai = draw(p, 1024).cv.toDataURL("image/jpeg", 0.8).split(",")[1];
 }
-async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; await bake(p); } }
+async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = ratio; if (LANGS[p.deco]) langEdits(p, p.deco); await bake(p); } } // 언어 꾸미기 글자는 새 자르기 칸에 다시 놓음
+
+// ── 언어별 꾸미기 세트 (게시물 탭, 신고 #3): [이름, 테두리, 필터, 이모지, 글자]. 사진 올리면 자동, [편집]에서 고친 사진(deco=manual)은 안 건드림 ──
+const LANGS = { en: ["영어", "purple", "vivid", "💬", "English Talk"], ja: ["일본어", "white", "warm", "🌸", "日本語"], zh: ["중국어", "yellow", "vivid", "🏮", "中文"], es: ["스페인어", "polaroid", "warm", "☀️", "Español"] };
+function langEdits(p, lang) {
+  const e = p.edits, L = LANGS[lang];
+  e.items = e.items.filter((it) => !it.auto);
+  if (!L) { e.frame = "none"; e.filter = "none"; return; }
+  e.frame = L[1]; e.filter = L[2];
+  const c = cropRect(p), long = Math.max(p.img.naturalWidth, p.img.naturalHeight), m = Math.min(c.w, c.h), pol = L[1] === "polaroid";
+  e.items.push({ k: "emoji", t: L[3], x: c.x + c.w - m * 0.13, y: c.y + m * 0.13, size: 9 * m / long, color: "#ffffff", band: false, auto: true },
+    { k: "text", t: L[4], x: c.x + c.w / 2, y: pol ? c.y + c.h - m * 0.08 : c.y + c.h - m * 0.11, size: 7 * m / long, color: pol ? "#493087" : "#ffffff", band: !pol, auto: true }); // 폴라로이드는 아래 흰 띠 안에 퍼플 글자
+}
+async function applyLang(list, lang) { for (const p of list) { if (p.deco === "manual") continue; langEdits(p, lang); p.deco = lang; await bake(p); } }
 
 // ── 얼굴 찾기: 전체 + 2·3·4·6·8칸 조각으로 확대해서 돌림 (작은·먼 얼굴용) → 겹치는 건 합침 → 헷갈리는 건 다시 확인 ──
 // 10-28 시험(공개 단체사진 6장): 예전(전체+2×2) 식당 6명 중 3명·단체 100명 중 0명 → 지금 5명·91명, 술병·잔 같은 헛것은 다시 확인으로 걸러냄.
@@ -346,5 +359,5 @@ async function share(list, prefix) {
   toast(`사진 ${files.length}장을 01, 02… 번호대로 받았어요${files.length > 1 ? " (여러 파일 허용을 물으면 '허용'을 눌러 주세요)" : ""}`);
 }
 
-return { RATIOS, FILTERS, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
+return { RATIOS, FILTERS, LANGS, applyLang, langEdits, pad, loadScript, cropRect, toneData, fromFiles, fromUrls, bake, setRatio, faceAll, edit, copy, share };
 });
