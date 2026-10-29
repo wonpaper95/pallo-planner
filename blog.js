@@ -270,7 +270,7 @@ async function faceAll() {
 }
 function openEditor(id) {
   const p = BL.photos.find((x) => x.id === id); if (!p) return;
-  PHOTO.edit(p, { title: `사진 ${pad(BL.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); if (BL.post) renderOut(); } });
+  PHOTO.edit(p, { title: `사진 ${pad(BL.photos.indexOf(p) + 1)}`, onSave: () => { renderThumbs(); if (BL.post) renderOut(); }, hf: (b) => call("hf", b) }); // 🪄 힉스필드
 }
 
 // ── 시안 만들기 ──

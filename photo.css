@@ -27,3 +27,9 @@
 #phViewDlg img { display: block; max-width: 100%; max-height: calc(100vh - 140px); object-fit: contain; }
 #phViewDlg .vnav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 18px; cursor: pointer; }
 #phViewDlg .vnav[data-vw="-1"] { left: 10px; } #phViewDlg .vnav[data-vw="1"] { right: 10px; }
+/* 🪄 힉스필드 AI 다듬기 (편집 창) */
+#phEditDlg .hf { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; } #phEditDlg .hf .mut { font-size: 12px; }
+#phEditDlg .hfnote { margin-top: 6px; font-size: 13px; }
+#phEditDlg .hfcmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+#phEditDlg .hfcmp figure { margin: 0; background: #111; border-radius: 8px; overflow: hidden; } #phEditDlg .hfcmp img { display: block; width: 100%; max-height: 260px; object-fit: contain; }
+#phEditDlg .hfcmp figcaption { font-size: 12px; text-align: center; padding: 4px; color: #fff; background: rgba(0,0,0,.5); }

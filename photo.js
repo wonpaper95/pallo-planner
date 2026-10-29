@@ -248,7 +248,7 @@ function vShow(i) {
 }
 
 // ── 편집 창 (처음 열 때 body 에 붙임) ──
-const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null, sel: null };
+const ED = { p: null, e: null, mode: "blur", s: 1, drag: null, onSave: null, sel: null, hf: null, oldImg: null, saved: false };
 let dlg = null;
 const $e = (s) => dlg.querySelector(s);
 function editorDom() {
@@ -270,14 +270,18 @@ function editorDom() {
         <span class="txo blseg" id="phEdColor">${Object.entries(COLORS).map(([k, v]) => `<button type="button" data-color="${k}" title="${v}"><i style="background:${k}"></i>${v}</button>`).join("")}</span>
         <button type="button" class="txo btn ghost small" id="phEdBand">글자 뒤 띠</button><button type="button" class="btn ghost small" id="phEdDel">🗑 빼기</button></div>
     </div>
+    <div class="hf" id="phEdHf" hidden><b>🪄 힉스필드 AI 다듬기</b> <span class="mut">사람 없는 사진만(교실·교재·간판 등) · 지점마다 하루 10장 · 사진 전체를 다시 그려서 원본과 비교 후 골라요</span>
+      <div class="tb"><button type="button" class="btn ghost small" data-hf="enhance">✨ 보정 (밝기·색감·선명)</button><button type="button" class="btn ghost small" data-hf="clean">🧹 배경 정리</button><button type="button" class="btn ghost small" data-hf="tall">↕️ 세로로 늘리기 (인스타)</button></div>
+      <div id="phEdHfOut"></div></div>
     <label>사진 메모 (AI에게 알려줄 내용, 선택)</label><input id="phEdNote" placeholder="예) 토요반 프리토킹 시간, 원어민 강사">
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn ghost" id="phEdCancel">취소</button><button type="button" class="btn" id="phEdSave">적용</button></div>`;
   document.body.append(dlg);
   wireEditor();
 }
-function edit(p, { title = "", onSave } = {}) {
+function edit(p, { title = "", onSave, hf } = {}) {
   editorDom();
-  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave; ED.sel = null;
+  ED.p = p; ED.e = structuredClone(p.edits); ED.mode = "blur"; ED.onSave = onSave; ED.sel = null; ED.hf = hf ?? null; ED.oldImg = null; ED.saved = false; ED.hfImg = null;
+  $e("#phEdHf").hidden = !hf; $e("#phEdHfOut").innerHTML = "";
   $e("#phEdNo").textContent = title;
   $e("#phEdBright").value = ED.e.bright; $e("#phEdContrast").value = ED.e.contrast; $e("#phEdNote").value = p.note;
   dlg.showModal(); edDraw();
@@ -365,11 +369,46 @@ function wireEditor() {
     ev.target.disabled = false; ev.target.textContent = "🙂 얼굴 자동 찾기"; edDraw();
   };
   $e("#phEdCancel").onclick = () => dlg.close();
+  dlg.addEventListener("close", () => { if (!ED.saved && ED.oldImg) { ED.p.img = ED.oldImg; ED.oldImg = null; } }); // 취소·Esc = AI 다듬기 바꾼 것도 되돌림
+  $e("#phEdHf").addEventListener("click", (ev) => { const b = ev.target.closest("[data-hf]"); if (b) return hfRun(b.dataset.hf); if (ev.target.closest("[data-hfuse]")) return hfUse(); if (ev.target.closest("[data-hfdrop]")) { ED.hfImg = null; $e("#phEdHfOut").innerHTML = ""; } });
   $e("#phEdSave").onclick = async () => {
-    const p = ED.p; p.edits = ED.e; p.note = $e("#phEdNote").value.trim();
+    const p = ED.p; ED.saved = true; if (ED.oldImg) { ED.oldImg = null; p.raw = null; } p.edits = ED.e; p.note = $e("#phEdNote").value.trim();
     await bake(p); p.faced = true; // 편집 창에서 직접 봤으면 확인한 것으로. 굽기(모자이크) 끝난 뒤에야 확인 완료로 표시 — 그 전에 저장되면 모자이크 전 사진이 올라감
     dlg.close(); ED.onSave?.(p);
   };
+}
+
+// ── 🪄 힉스필드 AI 다듬기 (편집 창): 얼굴 있으면 안 보냄 → 원본(편집 전)을 2048px 로 보내 다시 그린 사진을 받아 나란히 비교 → [이걸로 바꾸기] = 바탕 사진 교체 (적용 눌러야 확정) ──
+const HF_ASPECT = [["1:1", 1], ["2:3", 2 / 3], ["3:2", 1.5], ["3:4", 0.75], ["4:3", 4 / 3], ["7:9", 7 / 9], ["9:7", 9 / 7], ["9:16", 9 / 16], ["16:9", 16 / 9], ["21:9", 21 / 9]];
+const nearAspect = (r) => HF_ASPECT.reduce((a, b) => (Math.abs(Math.log(b[1] / r)) < Math.abs(Math.log(a[1] / r)) ? b : a))[0];
+async function hfRun(mode) {
+  const p = ED.p, out = $e("#phEdHfOut"), btns = dlg.querySelectorAll("[data-hf]");
+  if (ED.e.blurs.length) return toast("얼굴을 가린 사진은 AI 다듬기를 쓸 수 없어요 (얼굴이 바뀔 수 있어요)");
+  const say = (t) => (out.innerHTML = `<div class="mut hfnote">${t}</div>`);
+  btns.forEach((b) => (b.disabled = true));
+  try {
+    say("🙂 사진에 사람이 있는지 확인 중…");
+    let faces; try { faces = await findFaces(p); } catch (e) { console.error(e); return say("얼굴 확인이 안 돼서 보내지 않았어요. 잠시 뒤 다시 눌러 주세요."); }
+    if (faces.length) return say(`🙅 사람 얼굴이 ${faces.length}개 보여요. 학생 얼굴이 바뀔 수 있어서 AI 다듬기는 사람 없는 사진(교실·교재·간판 등)만 돼요.`);
+    const W = p.img.naturalWidth, H = p.img.naturalHeight, k = Math.min(1, 2048 / Math.max(W, H)), cv = document.createElement("canvas");
+    cv.width = Math.round(W * k); cv.height = Math.round(H * k); cv.getContext("2d").drawImage(p.img, 0, 0, cv.width, cv.height);
+    const aspect = mode === "tall" ? (W / H > 0.8 ? "3:4" : "9:16") : nearAspect(W / H);
+    say("🪄 힉스필드가 다듬는 중… (보통 10~60초, 창을 닫지 마세요)");
+    const r = await ED.hf({ data: cv.toDataURL("image/jpeg", 0.9).split(",")[1], mode, aspect });
+    if (ED.p !== p || !dlg.open) return; // 그 사이 다른 사진을 열었거나 닫음
+    if (!r?.image) return say("다듬기를 하지 못했어요. 위 알림을 확인해 주세요.");
+    ED.hfImg = await loadImg(`data:${r.media_type};base64,${r.image}`); ED.hfMode = mode;
+    out.innerHTML = `<div class="hfcmp"><figure><img src="${p.img.src}" alt=""><figcaption>지금 사진</figcaption></figure><figure><img src="${ED.hfImg.src}" alt=""><figcaption>🪄 AI 다듬기</figcaption></figure></div>
+      <div class="tb"><button type="button" class="btn small" data-hfuse="1">이걸로 바꾸기</button><button type="button" class="btn ghost small" data-hfdrop="1">버리기</button><span class="mut">오늘 ${r.left}장 남음 · 바꾼 뒤 [적용]을 눌러야 저장돼요</span></div>`;
+  } finally { btns.forEach((b) => (b.disabled = false)); }
+}
+function hfUse() {
+  const p = ED.p, img = ED.hfImg; if (!img) return;
+  const sx = img.naturalWidth / p.img.naturalWidth, sy = img.naturalHeight / p.img.naturalHeight, long0 = Math.max(p.img.naturalWidth, p.img.naturalHeight), long1 = Math.max(img.naturalWidth, img.naturalHeight);
+  if (ED.hfMode === "tall") { const s = img.naturalWidth / p.img.naturalWidth, dy = (img.naturalHeight - p.img.naturalHeight * s) / 2; ED.e.items.forEach((it) => { it.x *= s; it.y = it.y * s + dy; it.size *= long0 * s / long1; }); ED.e.ratio = "4:5"; }
+  else ED.e.items.forEach((it) => { it.x *= sx; it.y *= sy; it.size *= long0 * Math.min(sx, sy) / long1; });
+  ED.oldImg ??= p.img; p.img = img; ED.hfImg = null;
+  $e("#phEdHfOut").innerHTML = `<div class="mut hfnote">✅ 바꿨어요. 마음에 들면 [적용], 되돌리려면 [취소]</div>`; edDraw();
 }
 
 // ── 복사·받기 ──

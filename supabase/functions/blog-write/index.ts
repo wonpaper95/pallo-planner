@@ -1,8 +1,9 @@
 // ✍️ 블로그 작성기 Edge Function. 화면(blog.js)이 sb.functions.invoke("blog-write", { body: { action, ... } }) 로 부른다.
 // action: write(글 시안) | convert(인스타·당근·카톡) | style(블로그 URL → 스타일 프리셋) | keywords(네이버 검색광고 검색량) | research(API HUB 검색 추이·블로그 상위 글) | similar(유사도, channel=naver 면 네이버 소식) | sns(게시물 4채널 문구)
-// 비밀값: ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
+// 비밀값: HF_API_KEY_ID·HF_API_KEY_SECRET(🪄 힉스필드 AI 다듬기), ANTHROPIC_API_KEY, NAVER_AD_CUSTOMER_ID, NAVER_AD_API_KEY, NAVER_AD_SECRET, NAVER_HUB_ID, NAVER_HUB_SECRET (supabase secrets set …)
 import Anthropic from "npm:@anthropic-ai/sdk@0.137.0";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 import {
   COMMON, CONCEPTS, CONVERT_SCHEMA, DECO_SCHEMA, DECO_SYSTEM, CONVERT_SYSTEM, POST_SCHEMA, PRESETS, READERS, SNS_SCHEMA, SNS_SYSTEM, SNS_TONES, STYLE_SCHEMA, STYLE_SYSTEM, TONES, WRITERS,
 } from "./prompt.ts";
@@ -39,6 +40,7 @@ Deno.serve(async (req) => {
       case "convert": return json(await convert(who, team, body));
       case "sns": return json(await sns(who, team, body));
       case "deco": return json(await deco(who, team, body));
+      case "hf": return json(await hf(who, team, body));
       case "style": return json(await style(who, team, body));
       case "keywords": return json(await keywords(who, team, body));
       case "research": return json(await research(who, team, body));
@@ -224,6 +226,71 @@ async function deco(who: Who, team: Team, b: { photos?: Photo[]; lang?: string; 
   const { out, usage } = await ask(sys(DECO_SYSTEM), content, DECO_SCHEMA, "low", DECO_MODEL);
   await record(who, team.id, "deco", usage);
   return { result: out };
+}
+
+// ── hf: 🪄 힉스필드 AI 다듬기 (Qwen Image 3 편집). 사람 얼굴 있는 사진은 화면에서 막고 보냄 — 이 모델은 사진 전체를 다시 그림 ──
+// 올리기(presigned) → 제출(Hf-Expires-After 1시간) → 상태 보기 → 결과 받기 → 힉스필드 쪽 기록 바로 지움. 지점마다 하루 HF_DAILY 장 (돈이 드는 거라 따로 셈)
+const HF = "https://api.higgsfield.ai", HF_DAILY = 10;
+const HF_KEEP = "Keep every person, face, hand, text, letter, sign, logo and object exactly as in the original — do not add, remove, redraw or move them. Photorealistic, natural, no illustration style.";
+const HF_MODES: Record<string, string> = {
+  enhance: "Improve this photo like a professional photo retouch: balanced exposure, natural vivid colors, sharper details, less noise. Keep the same framing and composition. " + HF_KEEP,
+  clean: "Tidy up the background of this photo: remove clutter, stray cables, trash and distracting small objects from the background only, keep the space looking real. Keep the same framing. " + HF_KEEP,
+  tall: "Extend this photo outward to a taller vertical frame: keep the original photo content unchanged in the middle and naturally continue the surroundings (ceiling, wall, floor, table) above and below it. " + HF_KEEP,
+};
+const HF_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "7:9", "9:7", "9:16", "16:9", "21:9"];
+async function hf(who: Who, team: Team, b: { data?: string; mode?: string; aspect?: string }) {
+  const id = Deno.env.get("HF_API_KEY_ID"), secret = Deno.env.get("HF_API_KEY_SECRET");
+  if (!id || !secret) throw new HttpError(503, "힉스필드 API 키가 아직 연결되지 않았어요 (대표님이 Supabase 비밀값에 넣어야 해요)");
+  const prompt = HF_MODES[b.mode ?? ""]; if (!prompt) throw new HttpError(400, "알 수 없는 다듬기");
+  if (!b.data) throw new HttpError(400, "사진이 없어요");
+  const { count } = await admin.from("blog_gens").select("id", { count: "exact", head: true }).eq("team_id", team.id).eq("kind", "hf").gte("created_at", kstMidnight());
+  if ((count ?? 0) >= HF_DAILY) throw new HttpError(429, `🪄 AI 다듬기는 지점마다 하루 ${HF_DAILY}장까지예요. 내일 다시 쓸 수 있어요.`);
+  const auth = { Authorization: `Key ${id}:${secret}` };
+  const hfErr = async (r: Response, what: string) => {
+    const t = (await r.text()).slice(0, 300);
+    if (r.status === 401) return new HttpError(502, "힉스필드 API 키가 틀렸어요 (대표님 확인 필요)");
+    if (r.status === 402 || /balance|insufficient|credit/i.test(t)) return new HttpError(402, "힉스필드 API 잔액이 부족해요 (대표님이 충전해야 해요)");
+    if (r.status === 429) return new HttpError(429, "힉스필드가 바빠요. 1분 뒤 다시 눌러 주세요.");
+    return new HttpError(502, `힉스필드 ${what} 실패 (${r.status}): ${t}`);
+  };
+  // 1) 올리기
+  const u = await fetch(`${HF}/files/generate-upload-url`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify({ content_type: "image/jpeg" }) });
+  if (!u.ok) throw await hfErr(u, "올리기 준비");
+  const up = await u.json();
+  const put = await fetch(up.upload_url, { method: "PUT", headers: up.upload_headers ?? { "Content-Type": "image/jpeg" }, body: Uint8Array.from(atob(b.data), (c) => c.charCodeAt(0)) });
+  if (!put.ok) throw new HttpError(502, `힉스필드 사진 올리기 실패 (${put.status})`);
+  // 2) 제출
+  const s = await fetch(`${HF}/alibaba/qwen-image-3/edit`, {
+    method: "POST", headers: { ...auth, "Content-Type": "application/json", "Hf-Expires-After": "3600" },
+    body: JSON.stringify({ prompt, image_urls: [up.public_url], resolution: "2k", aspect_ratio: HF_ASPECTS.includes(b.aspect ?? "") ? b.aspect : "1:1", prompt_extend: false, enable_thinking: false,
+      negative_prompt: "extra people, changed faces, distorted faces, extra fingers, garbled text, cartoon, illustration, watermark" }),
+  });
+  if (!s.ok) throw await hfErr(s, "제출");
+  const sub = await s.json(), rid = sub.request_id as string;
+  // 3) 기다리기 (2초부터 10초까지 늘리며, 최대 120초)
+  let res: any = null, wait = 2000;
+  for (const t0 = Date.now(); Date.now() - t0 < 120000;) {
+    await new Promise((r) => setTimeout(r, wait)); wait = Math.min(wait * 1.5, 10000);
+    const r = await fetch(sub.status_url ?? `${HF}/requests/${rid}/status`, { headers: auth });
+    if (r.status === 401 || r.status === 404) throw await hfErr(r, "상태 확인");
+    if (!r.ok) continue;
+    res = await r.json();
+    if (["completed", "failed", "nsfw", "canceled"].includes(res.status)) break;
+  }
+  try {
+    if (res?.status !== "completed") {
+      if (res?.status === "nsfw") throw new HttpError(422, "힉스필드가 이 사진을 거절했어요 (내용 검사)");
+      if (!res || !["failed", "canceled"].includes(res.status)) { await fetch(`${HF}/requests/${rid}/cancel`, { method: "POST", headers: auth }).catch(() => {}); throw new HttpError(504, "힉스필드가 너무 오래 걸려요. 잠시 뒤 다시 눌러 주세요."); }
+      throw new HttpError(502, `힉스필드 다듬기 실패${res.error ? `: ${String(res.error).slice(0, 200)}` : ""}`);
+    }
+    const out = await fetch(res.images?.[0]?.url);
+    if (!out.ok) throw new HttpError(502, "다듬은 사진을 받지 못했어요");
+    const type = out.headers.get("content-type") ?? "image/png", data = encodeBase64(new Uint8Array(await out.arrayBuffer()));
+    await admin.from("blog_gens").insert({ team_id: team.id, user_id: who.id, kind: "hf", input_tokens: 0, output_tokens: 0, cost_usd: 0 }); // 성공만 셈 (힉스필드도 성공만 청구)
+    return { image: data, media_type: type, left: HF_DAILY - (count ?? 0) - 1 };
+  } finally {
+    await fetch(`${HF}/requests/${rid}`, { method: "DELETE", headers: auth }).catch(() => {}); // 학원 사진이 힉스필드에 남지 않게 바로 지움
+  }
 }
 
 // ── style: 블로그 URL → 스타일 프리셋 저장 ──

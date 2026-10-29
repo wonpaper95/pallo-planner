@@ -417,12 +417,12 @@ function wire() {
     if (d.rm) { PS.photos = PS.photos.filter((p) => p.id !== +d.rm); renderThumbs(); return photosChanged(); }
     if (d.ed) {
       const p = PS.photos.find((x) => x.id === +d.ed);
-      if (p) PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); } });
+      if (p) PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); }, hf: (b) => call("hf", b) });
       return;
     }
     if (d.lang) { PS.lang = d.lang; return autoDeco(PS.photos); }
     if (d.redeco) return autoDeco(PS.photos);
-    const th = t.closest("#psThumbs .blthumb"); if (th && !t.closest("button")) { const i = [...th.parentNode.children].indexOf(th); return PHOTO.view(PS.photos, i, { onEdit: (p) => PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); } }) }); } // 🔍 크게 보기
+    const th = t.closest("#psThumbs .blthumb"); if (th && !t.closest("button")) { const i = [...th.parentNode.children].indexOf(th); return PHOTO.view(PS.photos, i, { onEdit: (p) => PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); }, hf: (b) => call("hf", b) }) }); } // 🔍 크게 보기
     if (d.mv) { const i = +d.i, j = i + +d.mv; if (j < 0 || j >= PS.photos.length) return; [PS.photos[i], PS.photos[j]] = [PS.photos[j], PS.photos[i]]; renderThumbs(); return photosChanged(); }
     if (d.ratio) {
       V().querySelectorAll("[data-ratio]").forEach((b) => { b.disabled = true; });
