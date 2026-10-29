@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NO_TOKEN, SKIPPED_PRINT, NO_FX, unitOf, aggregateAds, parseFx, lastKnownFx, fxUrl, tokenPath, sanitizeReason, refreshOutcome, refreshOk, metaRows, activeTeamIds, emptyRows, buildInput, summarize } from "../scripts/mkd/meta-rows.mjs";
+import { NO_TOKEN, NO_TOKEN_PERM, SKIPPED_PRINT, NO_FX, PULL_TIMEOUT_MS, unitOf, aggregateAds, parseFx, fxSourceOf, lastKnownFx, fxUrl, tokenPath, tokenSkip, testOverrides, sanitizeReason, refreshOutcome, refreshOk, metaRows, activeTeamIds, emptyRows, buildInput, summarize } from "../scripts/mkd/meta-rows.mjs";
 import { toRowsPure, D as DC } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
@@ -51,14 +51,24 @@ test("aggregateAds: 입력 배열을 바꾸지 않는다", () => {
 });
 
 // ── 환율 ──
-test("fxUrl: frankfurter USD→KRW 날짜 주소 (기본 서버, 바꿀 수도 있음)", () => {
-  assert.equal(fxUrl(DAY), "https://api.frankfurter.app/2026-10-29?from=USD&to=KRW");
-  assert.equal(fxUrl("latest"), "https://api.frankfurter.app/latest?from=USD&to=KRW");
+test("fxUrl: frankfurter(.dev/v1) USD→KRW 날짜 주소 (기본 서버, 바꿀 수도 있음)", () => {
+  assert.equal(fxUrl(DAY), "https://api.frankfurter.dev/v1/2026-10-29?from=USD&to=KRW");
+  assert.equal(fxUrl("latest"), "https://api.frankfurter.dev/v1/latest?from=USD&to=KRW");
   assert.equal(fxUrl(DAY, "http://127.0.0.1:9/"), "http://127.0.0.1:9/2026-10-29?from=USD&to=KRW");
 });
 test("parseFx: rates.KRW 가 0 보다 큰 유한한 숫자일 때만, 아니면 null", () => {
   assert.equal(parseFx({ amount: 1, base: "USD", date: DAY, rates: { KRW: 1447.3 } }), 1447.3);
   for (const bad of [null, undefined, {}, { rates: {} }, { rates: { KRW: 0 } }, { rates: { KRW: -3 } }, { rates: { KRW: "1447" } }, { rates: { KRW: NaN } }, { rates: { KRW: null } }, "x", []]) assert.equal(parseFx(bad), null, JSON.stringify(bad));
+});
+test("parseFx: 500~3000 밖의 환율은 무효 (경계값 500·3000 은 유효)", () => {
+  const j = (v) => ({ rates: { KRW: v } });
+  assert.equal(parseFx(j(500)), 500); assert.equal(parseFx(j(3000)), 3000);
+  for (const bad of [499.99, 3000.01, 0.5, 1, 14473, 1e9]) assert.equal(parseFx(j(bad)), null, String(bad));
+});
+test("fxSourceOf: 응답 날짜가 요청한 날과 같을 때만 '당일', 아니면 '직전 영업일(응답 날짜)', 날짜가 이상하면 '날짜 모름'", () => {
+  assert.equal(fxSourceOf(DAY, DAY), "당일");
+  assert.equal(fxSourceOf("2026-10-28", DAY), "직전 영업일(2026-10-28)");
+  for (const bad of [undefined, null, "", 20261029, "10/29", "2026-10-29<b>"]) assert.equal(fxSourceOf(bad, DAY), "직전 영업일(날짜 모름)", String(bad));
 });
 test("lastKnownFx: 그 날짜보다 앞선 meta_ad 행 중 가장 최근의 fx — 이후·당일·숫자 아닌 값은 무시", () => {
   const rows = [
@@ -70,6 +80,11 @@ test("lastKnownFx: 그 날짜보다 앞선 meta_ad 행 중 가장 최근의 fx �
   assert.equal(lastKnownFx(rows, "2026-10-26"), null);
   assert.equal(lastKnownFx([], DAY), null);
   assert.equal(lastKnownFx([{ date: "2026-10-27", metrics: { fx: null } }, { date: "2026-10-28", metrics: null }, { date: "2026-10-28" }], DAY), null);
+});
+test("lastKnownFx: 500~3000 밖의 저장값은 건너뛰고 그 앞의 쓸 수 있는 값을 쓴다", () => {
+  const rows = [{ date: "2026-10-26", metrics: { fx: 1440 } }, { date: "2026-10-28", metrics: { fx: 99999 } }, { date: "2026-10-27", metrics: { fx: 3.5 } }];
+  assert.equal(lastKnownFx(rows, DAY), 1440);
+  assert.equal(lastKnownFx([rows[1], rows[2]], DAY), null);
 });
 
 // ── 행 만들기 ──
@@ -99,15 +114,54 @@ test("tokenPath: META_TOKEN_FILE 이 있으면 그것, 없으면 ~/Downloads/GEO
   assert.equal(tokenPath({}, "/home/u"), "/home/u/Downloads/GEO:SEO 스킬/meta-ads/meta-token.txt");
   assert.equal(tokenPath({ META_TOKEN_FILE: "" }, "/home/u"), "/home/u/Downloads/GEO:SEO 스킬/meta-ads/meta-token.txt");
 });
+test("tokenSkip: 읽을 수 있으면 null, EACCES·EPERM 은 '토큰 읽기 권한 없음', 없거나 그 밖의 오류는 '토큰 없음' (내용은 읽지 않고 경로만 넘긴다)", () => {
+  const boom = (code) => () => { throw Object.assign(new Error("x"), { code }); };
+  const seen = []; assert.equal(tokenSkip("/x/t.txt", (p) => { seen.push(p); }), null); assert.deepEqual(seen, ["/x/t.txt"]);
+  assert.equal(tokenSkip("/x", boom("ENOENT")), NO_TOKEN);
+  assert.equal(tokenSkip("/x", boom("ENOTDIR")), NO_TOKEN);
+  assert.equal(tokenSkip("/x", boom(undefined)), NO_TOKEN);
+  assert.equal(tokenSkip("/x", boom("EACCES")), NO_TOKEN_PERM);
+  assert.equal(tokenSkip("/x", boom("EPERM")), NO_TOKEN_PERM);
+  assert.equal(NO_TOKEN_PERM, "skipped (토큰 읽기 권한 없음)"); assert.notEqual(NO_TOKEN_PERM, NO_TOKEN);
+  assert.equal(refreshOk(NO_TOKEN_PERM), false);
+});
+test("testOverrides: MKD_PULL_META·MKD_FX_BASE 는 MK_ENV 도 있을 때만 쓴다 (없으면 무시)", () => {
+  const set = { MKD_PULL_META: "/x/fake-pull.mjs", MKD_FX_BASE: "http://127.0.0.1:9" }, none = { pull: undefined, fxBase: undefined };
+  assert.deepEqual(testOverrides(set), none);
+  assert.deepEqual(testOverrides({ ...set, MK_ENV: "" }), none);
+  assert.deepEqual(testOverrides(undefined), none);
+  assert.deepEqual(testOverrides({ MK_ENV: "/x/fake.env", ...set }), { pull: "/x/fake-pull.mjs", fxBase: "http://127.0.0.1:9" });
+  assert.deepEqual(testOverrides({ MK_ENV: "/x/fake.env" }), none);
+  assert.deepEqual(testOverrides({ MK_ENV: "/x/fake.env", MKD_FX_BASE: "" }), none);
+});
+test("PULL_TIMEOUT_MS: 자식 새로고침은 90초 (Bash 도구 기본 120초보다 먼저 끝나야 부모가 실패 표시를 남긴다)", () => {
+  assert.equal(PULL_TIMEOUT_MS, 90_000);
+});
 test("refreshOutcome: 종료코드 0 + 마지막 stdout 줄이 ok:true JSON 이면 'ok' (앞줄은 무시)", () => {
   assert.equal(refreshOutcome({ status: 0, stdout: "잡음\n{\"ok\":true,\"daily\":77}\n", stderr: "" }), "ok");
   assert.equal(refreshOk("ok"), true);
 });
-test("refreshOutcome: 실패는 'failed: 이유' — 이유는 stderr 마지막 줄, 4자리 이상 숫자는 #", () => {
-  const r = refreshOutcome({ status: 1, stdout: "", stderr: "무언가\n실패: 메타 API 190: Error validating access token (2026-10-29~2026-10-29)\n" });
-  assert.match(r, /^failed: /); assert.doesNotMatch(r, /\d{4}/); assert.match(r, /메타 API 190/);
+test("refreshOutcome: 메타 API 실패는 'failed: 메타 API <코드>' 만 — 메타가 보낸 자유 문장·기간은 전부 버린다", () => {
+  const r = refreshOutcome({ status: 1, stdout: "", stderr: "무언가\n실패: 메타 API 190: Error validating access token: Session has expired (2026-10-29~2026-10-29)\n" });
+  assert.equal(r, "failed: 메타 API 190");
   assert.equal(refreshOk(r), false);
+  assert.equal(refreshOutcome({ status: 1, stdout: "", stderr: "실패: 메타 API 4: Application request limit reached\n" }), "failed: 메타 API 4");
+  assert.equal(refreshOutcome({ status: 1, stdout: "", stderr: "Error: 메타 API 17: User request limit reached\n    at x (y:1:1)\n" }), "failed: 메타 API 17");
+  assert.doesNotMatch(refreshOutcome({ status: 1, stdout: "", stderr: "실패: 메타 API 80004: too many calls\n" }), /\d{4}/); // 4자리 이상 숫자는 #
+});
+test("refreshOutcome: 메타 API 줄도 Error: 줄도 없으면 이유 문장은 쓰지 않고 '종료코드 N'", () => {
   assert.equal(refreshOutcome({ status: 2, stdout: "", stderr: "" }), "failed: 종료코드 2");
+  assert.equal(refreshOutcome({ status: 1, stdout: "", stderr: "실패: mk_ad_daily 쓰기 실패 401: {\"message\":\"JWT expired\"}\n" }), "failed: 종료코드 1");
+});
+test("refreshOutcome: 자식이 죽었으면(스택) 마지막 줄이 아니라 처음 'Error:' 줄을 쓴다 — 16자 넘는 덩어리(경로·토큰)는 #", () => {
+  const stderr = [
+    "node:internal/fs/utils:356", "    throw err;", "    ^", "",
+    "Error: EACCES: permission denied, open '/Users/a/Downloads/GEO:SEO 스킬/meta-ads/meta-token.txt'",
+    "    at Object.openSync (node:fs:573:3)", "Error: 두 번째 Error: 줄은 안 쓴다", "", "Node.js v22.23.4"].join("\n");
+  const r = refreshOutcome({ status: 1, stdout: "", stderr });
+  assert.match(r, /^failed: Error: EACCES: permission denied, open /);
+  assert.doesNotMatch(r, /Users|meta-token|GEO|두 번째|Node\.js/);
+  assert.ok(r.length <= "failed: ".length + 80);
 });
 test("refreshOutcome: 시간 초과·실행 오류·응답 이상", () => {
   assert.equal(refreshOutcome({ status: null, signal: "SIGTERM", error: Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" }), stdout: "", stderr: "" }), "failed: 시간 초과");
@@ -118,14 +172,17 @@ test("refreshOutcome: 시간 초과·실행 오류·응답 이상", () => {
   assert.match(refreshOutcome(undefined), /^failed: /);
   assert.equal(refreshOk(NO_TOKEN), false); assert.equal(refreshOk(SKIPPED_PRINT), false);
 });
-test("sanitizeReason: 토큰·access_token 값·긴 영숫자 덩어리를 가리고, 4자리 이상 숫자는 #, 80자까지", () => {
+test("sanitizeReason: 토큰·access_token 값·긴 영숫자 덩어리를 가리고, 공백 없는 16자 이상 덩어리는 #, 4자리 이상 숫자는 #, 80자까지", () => {
   const tok = "EAAGm0PX4ZCpsBAKZCtoken1234567890abcdefXYZ";
   const t1 = sanitizeReason(`요청 실패 https://graph.facebook.com/v21.0/act_3542016502769477/insights?access_token=${tok}&x=1`);
   assert.doesNotMatch(t1, /EAAGm0|abcdefXYZ|access_token=E/); assert.doesNotMatch(t1, /\d{4}/);
   const t2 = sanitizeReason(`Error validating ${tok}`);
   assert.doesNotMatch(t2, /EAAGm0|1234567890/);
   assert.equal(sanitizeReason("A".repeat(40)), "***");
-  assert.equal(sanitizeReason("가".repeat(300)).length, 80);
+  assert.equal(sanitizeReason("가나다 ".repeat(100)).length, 80);
+  assert.equal(sanitizeReason("open /Users/a/Downloads/x/meta-token.txt now"), "open # now");
+  assert.equal(sanitizeReason("a".repeat(15)), "a".repeat(15)); assert.equal(sanitizeReason("a".repeat(16)), "#");
+  assert.equal(sanitizeReason("가".repeat(300)), "#");
   assert.equal(sanitizeReason(undefined), "undefined");
 });
 test("refreshOutcome: stderr 에 토큰이 섞여 있어도 이유에 남지 않는다", () => {
@@ -161,6 +218,21 @@ test("buildInput: 줄이 있으면 캠페인 행 (환율 있음), 환율이 없�
   const b = buildInput({ ads, fx: null, refresh: "ok", activeIds: [] });
   assert.deepEqual(b.rows.map((r) => r.status), ["partial", "partial"]);
 });
+test("buildInput: 줄이 있는 날 — 최근 7일에 있었는데 그날 줄이 없는 지점은 '메타 집행 없음' 0 행을 더한다 (새로고침 상태와 무관), 최근 7일에도 없던 지점(구미)은 행 없음", () => {
+  const ads = [ad(2, "A", "a", { spend: 10 })];
+  for (const refresh of ["ok", NO_TOKEN, NO_TOKEN_PERM, "failed: 시간 초과"]) {
+    const r = buildInput({ ads, fx: 1000, refresh, activeIds: [1, 2, 3] });
+    assert.deepEqual(r.rows.map((x) => [x.team_id, x.unit, x.status, x.metrics.spend, x.metrics.note]), [[1, "전체", undefined, 0, "메타 집행 없음"], [2, "A", undefined, 10000, undefined], [3, "전체", undefined, 0, "메타 집행 없음"]], refresh);
+    assert.deepEqual(r.rows[0].metrics, { impressions: 0, clicks: 0, leads: 0, spend_usd: 0, spend: 0, note: "메타 집행 없음" });
+  }
+  assert.deepEqual(buildInput({ ads, fx: 1000, refresh: "ok", activeIds: [] }).rows.map((x) => x.team_id), [2]);
+  assert.deepEqual(buildInput({ ads, fx: 1000, refresh: "ok", activeIds: [2] }).rows.map((x) => x.team_id), [2], "줄이 있는 지점에는 더하지 않는다");
+  assert.deepEqual(buildInput({ ads, fx: 1000, refresh: "ok" }).rows.map((x) => x.team_id), [2], "activeIds 없어도 안전");
+});
+test("buildInput: 줄이 있는 날 환율이 없어도 0 행은 그대로 ok (캠페인 행만 partial), 지점 번호순", () => {
+  const r = buildInput({ ads: [ad(3, "C", "c"), ad(1, "A", "a")], fx: null, refresh: "ok", activeIds: [1, 2, 3, 4] });
+  assert.deepEqual(r.rows.map((x) => [x.team_id, x.unit, x.status]), [[1, "A", "partial"], [2, "전체", undefined], [3, "C", "partial"], [4, "전체", undefined]]);
+});
 test("buildInput: 줄이 0 — 새로고침 실패·건너뜀이면 최근 7일에 있던 지점만 failed, 성공이면 그 지점만 '집행 없음' 0 행", () => {
   const bad = buildInput({ ads: [], fx: null, refresh: NO_TOKEN, activeIds: [1, 3] });
   assert.deepEqual(bad.rows.map((r) => [r.team_id, r.unit, r.status]), [[1, "전체", "failed"], [3, "전체", "failed"]]);
@@ -188,6 +260,11 @@ test("toRowsPure: 캠페인 행(환율 있음·없음)과 전체 failed 행·집
   assert.deepEqual(empty.map((r) => [r.team_id, r.unit, r.status, r.metrics.spend]), [[4, "전체", "ok", 0]]);
   const all = toRowsPure("meta_ad", DAY, buildInput({ ads: [], fx: null, refresh: "failed: x", activeIds: [] }), TEAMS);
   assert.deepEqual(all.map((r) => [r.team_id, r.unit, r.status]), TEAMS.map((t) => [t.id, "전체", "failed"]));
+});
+test("toRowsPure: 캠페인 행 + 다른 지점의 '메타 집행 없음' 0 행이 한 번에 통과한다 (구미는 행 없음)", () => {
+  const rows = toRowsPure("meta_ad", DAY, buildInput({ ads: [ad(1, "대구 영어", "a", { spend: 10 })], fx: 1000, refresh: NO_TOKEN, activeIds: [1, 2, 3] }), TEAMS);
+  assert.deepEqual(rows.map((r) => [r.team_id, r.unit, r.status, r.metrics.spend]), [[1, "대구 영어", "ok", 10000], [2, "전체", "ok", 0], [3, "전체", "ok", 0]]);
+  assert.equal(rows.some((r) => r.team_id === 4), false);
 });
 test("toRowsPure: 전화번호 모양 캠페인 이름은 숫자만 #로 가려 저장된다 (광고 채널 규칙)", () => {
   const rows = toRowsPure("meta_ad", DAY, buildInput({ ads: [ad(1, "문의 010-1234-5678 캠페인", "a")], fx: 1000, refresh: "ok", activeIds: [] }), TEAMS);
@@ -224,6 +301,10 @@ test("summarize: 지점 이름별 비용(원)·USD·리드 합 — 환율 없는
   assert.deepEqual(summarize(partial, TEAMS), { 대구동성로점: { spend: null, spend_usd: 10, leads: 2 } });
   const failed = toRowsPure("meta_ad", DAY, buildInput({ ads: [], fx: null, refresh: NO_TOKEN, activeIds: [1] }), TEAMS);
   assert.deepEqual(summarize(failed, TEAMS), { 대구동성로점: { spend: null, spend_usd: null, leads: null } });
+});
+test("summarize: '메타 집행 없음' 0 행인 지점은 0·0·0 (null 아님)", () => {
+  const rows = toRowsPure("meta_ad", DAY, buildInput({ ads: [ad(1, "A", "a", { spend: 10, leads: 2 })], fx: 1000, refresh: "ok", activeIds: [1, 3] }), TEAMS);
+  assert.deepEqual(summarize(rows, TEAMS), { 대구동성로점: { spend: 10000, spend_usd: 10, leads: 2 }, 울산점: { spend: 0, spend_usd: 0, leads: 0 } });
 });
 test("에러 메시지 확인용: toRowsPure 가 모르는 지점을 던지는 건 그대로 (조용히 넘기지 않음)", () => {
   assert.match(errOf(() => toRowsPure("meta_ad", DAY, buildInput({ ads: [ad(99, "A", "a")], fx: 1000, refresh: "ok", activeIds: [] }), TEAMS)), /team_id/);

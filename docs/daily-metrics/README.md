@@ -84,8 +84,8 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 | 순서 | 채널 | 하는 일 | 스크립트 |
 |---|---|---|---|
 | 1 | 네이버 광고 | 검색광고 API(`/ncc/campaigns` + `/stats`)로 어제 캠페인별 통계 → 바로 저장. 계정 둘: 대구(`NAVER_AD_*`, dsr·jpcn)·울산(`NAVER_AD_*_ULSAN`, ulsan), 한 계정이 실패해도 다른 계정은 계속 | `naver-ad.mjs <date>` |
-| 1-2 | 메타 광고 | `mk_ad_daily` 어제 줄(+토큰 파일 있으면 `pull-meta` 새로고침) → 지점+캠페인 합계 → 환율(당일 → 직전 저장값 → latest → 없으면 비용 null)로 원화 → 바로 저장. 줄이 0 이면 새로고침 결과에 따라 지점별 failed(데이터 아직 없음) / 0 행(집행 없음) | `meta-ad.mjs <date> [--print]` |
-| 2 | 구글 광고 | 크롬: 계정 2개, 날짜 "어제" 맞춤 기간, 캠페인 표 + 알림 읽기 → JSON | Claude가 읽고 `save-daily.mjs google_ad <json>` |
+| 2 | 메타 광고 | `mk_ad_daily` 어제 줄(+토큰 파일을 읽을 수 있으면 `pull-meta` 새로고침, 90초) → 지점+캠페인 합계 → 환율(frankfurter.dev, 당일 → 직전 저장값 → latest → 없으면 비용 null)로 원화 → 바로 저장. 줄이 0 이면 새로고침 결과에 따라 지점별 failed(데이터 아직 없음) / 0 행(집행 없음). 줄이 있는 날 최근 7일에 있었는데 그날 줄이 없는 지점은 '메타 집행 없음' 0 행 | `meta-ad.mjs <date> [--print]` |
+| 3 | 구글 광고 | 크롬: 계정 2개, 날짜 "어제" 맞춤 기간, 캠페인 표 + 알림 읽기 → JSON | Claude가 읽고 `save-daily.mjs google_ad <json>` |
 | 4 | 블로그 순위 | `keywords.mjs` 로 켜진 키워드 목록 → 크롬에서 통합검색 → 우리 글 위치 | `save-daily.mjs blog` |
 | 5 | 블로그 방문자 | 크롬: 블로그 통계 어제 | `save-daily.mjs blog` |
 | 6 | 당근 | 크롬: 비즈프로필 통계 어제 | `save-daily.mjs daangn` |
@@ -156,7 +156,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 |---|---|
 | 1 | 테이블·RLS 마이그레이션 + `mkd-core.js`(5칸·증감·플래그) + 테스트 |
 | 2 | 네이버 API · 전산 · 구글 수집 + `save-daily.mjs` + 화면 1판(표·상태 칩) |
-| 3 | 메타 · 당근 · 블로그(순위·방문자) 수집 + 키워드 초안 저장 + 키워드 카드 |
+| 3 | 당근 · 블로그(순위·방문자) 수집 + 키워드 초안 저장 + 키워드 카드 (메타는 완료 — `meta-ad.mjs`) |
 | 4 | 스킬 + 예약 작업 06:00 등록, 수동 1회 → 자동 2일 확인 → main 배포 |
 | 5 | 월요일 주간 종합(`--weekly`) + 화면 카드 |
 

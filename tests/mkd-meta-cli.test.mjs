@@ -4,7 +4,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,7 @@ const ad = (team_id, campaign, ad_name, o = {}) => ({ team_id, date: DAY, ad_nam
 
 let db, fx, tmp, envFile, writes, st, fxHits;
 // st: 시험마다 바꾸는 가짜 DB·환율 상태
-const reset = () => { writes.length = 0; fxHits.length = 0; st = { ads: [], recent: [], past: [], fxDay: 1400, fxLatest: 1380 }; };
+const reset = () => { writes.length = 0; fxHits.length = 0; st = { ads: [], recent: [], past: [], fxDay: 1400, fxLatest: 1380, fxJsonDate: null }; };
 before(async () => {
   writes = []; fxHits = [];
   db = createServer((req, res) => {
@@ -39,7 +39,7 @@ before(async () => {
     const day = new URL(req.url, "http://x").pathname.slice(1); fxHits.push(day);
     const v = day === "latest" ? st.fxLatest : st.fxDay;
     if (v === null) { res.writeHead(503); return res.end("{}"); }
-    res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ amount: 1, base: "USD", date: day, rates: { KRW: v } }));
+    res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify({ amount: 1, base: "USD", date: st.fxJsonDate ?? day, rates: { KRW: v } })); // fxJsonDate: 주말·휴일이면 서버가 앞 영업일 날짜로 답한다
   });
   await Promise.all([db, fx].map((s) => new Promise((r) => s.listen(0, "127.0.0.1", r))));
   tmp = mkdtempSync(join(tmpdir(), "mkd-meta-cli-"));
@@ -98,8 +98,8 @@ test("새로고침이 실패해도 있는 데이터로 계속한다 (refresh 에
   const fake = file("fake-pull-bad.mjs", `console.error("실패: 메타 API 190: Error validating access token ?access_token=${FAKE_TOKEN} (2026-10-29~2026-10-29)"); process.exit(1);`);
   const r = await sh([DAY], { META_TOKEN_FILE: token, MKD_PULL_META: fake });
   assert.equal(r.code, 0, r.err);
-  assert.match(r.last.refresh, /^failed: .*메타 API 190/);
-  for (const t of [r.out, r.err, JSON.stringify(writes)]) assert.doesNotMatch(t, /EAAGm0|abcdefXYZ|1234567890|2026-10-29~/);
+  assert.equal(r.last.refresh, "failed: 메타 API 190", "메타가 보낸 문장은 버리고 코드만");
+  for (const t of [r.out, r.err, JSON.stringify(writes)]) assert.doesNotMatch(t, /EAAGm0|abcdefXYZ|1234567890|2026-10-29~|Error validating/);
   assert.equal(r.last.saved, 1);
 });
 
@@ -144,6 +144,81 @@ test("그날 줄 0 + 직전 7일도 0: 새로고침 건너뜀이면 모든 지�
   const token = file("token4.txt", "FAKE"), fake = file("fake-pull-ok3.mjs", `console.log(JSON.stringify({ ok: true }));`);
   r = await sh([DAY], { META_TOKEN_FILE: token, MKD_PULL_META: fake });
   assert.equal(r.code, 0, r.err); assert.equal(r.last.saved, 0); assert.equal(writes.length, 0);
+});
+
+test("새로고침: 자식이 죽으면(스택) 처음 'Error:' 줄만 쓰고 경로·긴 덩어리는 #", async () => {
+  reset(); st.ads = [ad(1, "A", "a")];
+  const token = file("token-crash.txt", "FAKE");
+  const fake = file("fake-pull-crash.mjs", `throw new Error("boom cannot open /Users/x/Downloads/GEO:SEO 스킬/meta-ads/meta-token.txt");`);
+  const r = await sh([DAY], { META_TOKEN_FILE: token, MKD_PULL_META: fake });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.last.refresh, /^failed: Error: boom cannot open /);
+  for (const t of [r.out, r.err, JSON.stringify(writes)]) assert.doesNotMatch(t, /meta-token|GEO:SEO|\/Users\/x/);
+  assert.equal(r.last.saved, 1);
+});
+
+test("토큰 파일이 있는데 읽을 권한이 없으면 '토큰 읽기 권한 없음' 으로 건너뜀 (없는 파일은 '토큰 없음' 그대로), 있는 데이터로 계속", { skip: process.getuid?.() === 0 ? "root 는 권한 검사를 건너뜀" : false }, async () => {
+  reset(); st.ads = [ad(1, "A", "a")];
+  const token = file("token-noperm.txt", "FAKE"), argsOut = join(tmp, "noperm-args.json");
+  chmodSync(token, 0o000);
+  const fake = file("fake-pull-noperm.mjs", `import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(argsOut)}, "ran"); console.log(JSON.stringify({ ok: true }));`);
+  try {
+    const r = await sh([DAY], { META_TOKEN_FILE: token, MKD_PULL_META: fake });
+    assert.equal(r.code, 0, r.err);
+    assert.equal(r.last.refresh, "skipped (토큰 읽기 권한 없음)");
+    assert.throws(() => readFileSync(argsOut), /ENOENT/, "권한이 없으면 pull-meta 를 실행하지 않는다");
+    assert.equal(r.last.saved, 1);
+    st.ads = []; st.recent = [{ team_id: 1, date: "2026-10-28" }];
+    const r2 = await sh([DAY], { META_TOKEN_FILE: token, MKD_PULL_META: fake });
+    assert.equal(r2.code, 1);
+    assert.equal(mkdWrites().at(-1).body[0].metrics.note, "메타 데이터 아직 없음(skipped (토큰 읽기 권한 없음))");
+  } finally { chmodSync(token, 0o600); }
+});
+
+test("환율: 응답 날짜가 요청한 날과 다르면(주말·휴일) fxSource 는 '직전 영업일(응답 날짜)'", async () => {
+  reset(); st.ads = [ad(1, "A", "a", { spend: 10 })]; st.fxJsonDate = "2026-10-28";
+  const r = await sh([DAY, "--print"]);
+  assert.deepEqual([r.code, r.last.fx, r.last.fxSource, r.last.teams.대구동성로점.spend], [0, 1400, "직전 영업일(2026-10-28)", 14000]);
+});
+
+test("환율: 500~3000 밖의 값은 무효로 보고 다음 단계로 (당일 → 직전 저장값 → latest → 없음)", async () => {
+  reset(); st.ads = [ad(1, "A", "a", { spend: 10 })]; st.fxDay = 14000; st.past = [{ date: "2026-10-28", metrics: { fx: 1395.5 } }];
+  let r = await sh([DAY, "--print"]);
+  assert.deepEqual([r.code, r.last.fx, r.last.fxSource], [0, 1395.5, "직전 저장값"]);
+  st.past = [{ date: "2026-10-28", metrics: { fx: 3.2 } }]; st.fxLatest = 1380; // 저장값도 범위 밖 → latest
+  r = await sh([DAY, "--print"]);
+  assert.deepEqual([r.code, r.last.fx, r.last.fxSource], [0, 1380, "최신"]);
+  st.fxDay = 499; st.fxLatest = 3001; st.past = [];
+  r = await sh([DAY, "--print"]);
+  assert.deepEqual([r.code, r.last.fx, r.last.fxSource, r.last.teams.대구동성로점.spend], [0, null, "없음", null]);
+});
+
+test("줄이 있는 날: 직전 7일에 있었는데 그날 줄이 없는 지점에 '메타 집행 없음' 0 행 (새로고침 건너뜀이어도), 7일 안에 없던 지점(구미)은 없음, 종료코드 0", async () => {
+  reset(); st.ads = [ad(1, "대구 영어", "a", { spend: 10 })];
+  st.recent = [{ team_id: 1, date: "2026-10-28" }, { team_id: 2, date: "2026-10-27" }, { team_id: 3, date: "2026-10-23" }, { team_id: 3, date: "2026-10-28" }];
+  const r = await sh([DAY]);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.last.refresh, "skipped (토큰 없음 — 맥북 적재 데이터 사용)");
+  assert.deepEqual([r.last.ok, r.last.saved], [true, 3]);
+  const posts = mkdWrites(); assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].body.map((x) => [x.team_id, x.unit, x.status, x.metrics.spend, x.metrics.note]), [[1, "대구 영어", "ok", 14000, undefined], [2, "전체", "ok", 0, "메타 집행 없음"], [3, "전체", "ok", 0, "메타 집행 없음"]]);
+  assert.deepEqual(r.last.teams, { 대구동성로점: { spend: 14000, spend_usd: 10, leads: 1 }, 대구일본어중국어점: { spend: 0, spend_usd: 0, leads: 0 }, 울산점: { spend: 0, spend_usd: 0, leads: 0 } });
+  assert.equal(posts[0].body.some((x) => x.team_id === 4), false);
+  assert.ok(writes.some((w) => w.method === "DELETE" && w.query.includes("team_id=in.(1)")), "캠페인 행을 쓴 지점만 옛 '전체' 행 정리");
+  // --print 도 같은 행을 보여준다
+  const p = await sh([DAY, "--print"]);
+  const lines = p.out.trim().split("\n"); // 앞은 행 배열(여러 줄), 마지막 줄이 요약
+  assert.deepEqual(JSON.parse(lines.slice(0, -1).join("\n")).map((x) => [x.team_key, x.unit]), [["dsr", "대구 영어"], ["jpcn", "전체"], ["ulsan", "전체"]]);
+});
+
+test("시험용 환경변수(MKD_FX_BASE)는 MK_ENV 가 없으면 무시된다 — 가짜 환율 서버는 불리지 않는다 (DB 설정은 HOME 의 가짜 파일, --print 라 쓰기·새로고침 없음)", async () => {
+  reset(); st.ads = [ad(1, "A", "a", { spend: 10 })];
+  const home = join(tmp, "home"); mkdirSync(join(home, ".config", "pallo"), { recursive: true });
+  writeFileSync(join(home, ".config", "pallo", "marketing.env"), `SUPABASE_URL=http://127.0.0.1:${db.address().port}\nSUPABASE_SERVICE_ROLE_KEY=fake-key-for-test\n`);
+  const r = await sh([DAY, "--print"], { MK_ENV: undefined, HOME: home }); // 진짜 환율 서버(frankfurter)에는 읽기 요청이 간다 — 닿지 않으면 직전 저장값·없음으로 넘어갈 뿐
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(fxHits, [], "MKD_FX_BASE 가 무시돼 가짜 환율 서버는 한 번도 안 불린다");
+  assert.equal(writes.length, 0);
 });
 
 test("날짜 인자가 틀리면 종료코드 2 (아무것도 읽거나 쓰지 않는다)", async () => {
