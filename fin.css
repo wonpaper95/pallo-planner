@@ -53,3 +53,21 @@ body:not(.fnv) #fnView { display: none; }
 .fndlg .fnflist { padding-left: 18px; margin: 0 0 12px; font-size: 13px; line-height: 1.9; } .fndlg .fnflist a { color: var(--accent); }
 .fndlg .fnflist button { background: none; border: 0; cursor: pointer; }
 .fndlg p { font-size: 12.5px; line-height: 1.6; }
+
+/* ▾ 고르는 칸 (거래형태·결제수단·카드사·할부개월) — 시트 칩처럼 */
+#fnView .fnchip { display: inline-block; border-radius: 99px; padding: 3px 8px; font-size: 12px; background: color-mix(in srgb, var(--sub) 16%, transparent); color: var(--text); border: 0; }
+#fnView select.fnchip { cursor: pointer; font: inherit; font-size: 12px; padding: 3px 6px; }
+#fnView .fnchip.or { background: #f6c9b0; color: #5a2a12; } #fnView .fnchip.gr { background: #cfe9cf; color: #1d4d1f; }
+
+/* ▦ 칸 구분: 세로선 + 굵은 머리줄 + 구분(고정비…) 경계 굵게 + 줄무늬 */
+#fnView .fntbl { --grid: color-mix(in srgb, var(--text) 14%, transparent); --grid2: color-mix(in srgb, var(--text) 38%, transparent); }
+#fnView .fntbl th, #fnView .fntbl td { border-bottom: 1px solid var(--grid); border-right: 1px solid var(--grid); }
+#fnView .fntbl th:last-child, #fnView .fntbl td:last-child { border-right: 0; }
+#fnView .fntbl thead th { border-bottom: 2px solid var(--grid2); color: var(--text); text-align: center; }
+#fnView .fntbl tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+#fnView .fntbl tbody tr:hover td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+#fnView .fntbl td:first-child, #fnView .fntbl th:first-child { border-right: 2px solid var(--grid2); } /* 날짜 칸 */
+#fnView .fntbl:not(.fncost):not(.fnday) td:nth-child(3), #fnView .fntbl:not(.fncost):not(.fnday) th:nth-child(3) { border-right: 2px solid var(--grid2); font-weight: 600; } /* 매출 칸 */
+#fnView .fncost td:nth-child(3), #fnView .fncost th:nth-child(3) { border-right: 2px solid var(--grid2); font-weight: 600; } /* 금액 칸 */
+#fnView .fnsec .fnsech th { border-top: 2px solid var(--grid2); border-bottom: 2px solid var(--grid2); border-right: 0; }
+#fnView .fntbl td input { width: 100%; }

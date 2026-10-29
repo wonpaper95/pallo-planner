@@ -5,7 +5,7 @@
 (() => {
 const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", shell: "" });
 const V = () => document.getElementById("fnView");
-const { SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
+const { OPTS, chip, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
 const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 const canEdit = () => !jo();
@@ -15,7 +15,7 @@ const ymNow = () => today().slice(0, 7);
 const ymAdd = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const ymLabel = (m) => `${+m.slice(0, 4)}년 ${+m.slice(5, 7)}월`;
 const NUMK = new Set(["매출", "금액", "근무시간"]);
-const W_ = { 날짜: 92, 멤버쉽: 120, 매출: 100, 이름: 70, 언어: 56, 거래형태: 84, 결제수단: 74, 카드사: 56, 할부개월: 52, 결제상세: 140, 코멘트: 180, 가입경로: 70, Lv: 40, 전화번호: 110, 상담자: 60, 스포입력: 60, 성별: 40, 나이: 40, 사용처: 200, 금액: 110, 비고: 160, 근무시간: 70 };
+const W_ = { 날짜: 92, 멤버쉽: 120, 매출: 100, 이름: 70, 언어: 56, 거래형태: 112, 결제수단: 88, 카드사: 68, 할부개월: 58, 결제상세: 140, 코멘트: 180, 가입경로: 70, Lv: 40, 전화번호: 110, 상담자: 60, 스포입력: 60, 성별: 40, 나이: 40, 사용처: 200, 금액: 110, 비고: 160, 근무시간: 70 };
 const safeKey = (name) => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || ""); const ext = m ? "." + m[1].toLowerCase() : ""; const base = (name || "file").slice(0, 40).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""); return `${Date.now()}_${base || "file"}${ext}`; }; // Storage 키는 ASCII 만
 
 FN.load = async function () {
@@ -116,8 +116,14 @@ const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" dat
 const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
 function cellIn(r, k) {
   const v = r.vals[k] ?? "", show = NUMK.has(k) ? fmtNum(v) : String(v), neg = NUMK.has(k) && (toNum(v) ?? 0) < 0;
+  if (OPTS[k]) { // ▾ 시트처럼 고르는 칸
+    const c = chip(k, show);
+    if (!canEdit()) return `<td>${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
+    const list = show && !OPTS[k].includes(show) ? [...OPTS[k], show] : OPTS[k];
+    return `<td><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}" style="width:${W_[k] ?? 80}px"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
+  }
   if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}">${esc(show)}</td>`;
-  return `<td><input data-id="${r.id}" data-k="${k}" value="${esc(show)}" style="width:${W_[k] ?? 80}px" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ${k === "날짜" ? 'title="10/6 처럼 적어도 돼요"' : ""}></td>`;
+  return `<td style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ${k === "날짜" ? 'title="10/6 처럼 적어도 돼요"' : ""}></td>`;
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
@@ -258,7 +264,7 @@ document.addEventListener("click", async (e) => {
 });
 document.addEventListener("change", (e) => {
   if (e.target.id === "fnTeam") { FN.team = +e.target.value; try { localStorage.setItem("fn-team", FN.team); } catch {} FN.shell = ""; return FN.load(); }
-  if (e.target.matches("#fnView input[data-id]")) saveCell(e.target);
+  if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; }
 });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("#fnView input[data-id]")) e.target.blur(); });
