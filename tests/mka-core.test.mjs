@@ -45,3 +45,12 @@ test("pickCompetitorAds: 한국어·문구 있음·30일+·페이지당 1개, �
   assert.deepEqual(C.pickCompetitorAds(ads, [7], today).map((a) => a.library_id), ["c", "b", "a1"]);
   assert.equal(C.pickCompetitorAds(ads, [], today, 1)[0].library_id, "b");
 });
+
+test("propStage: 승인 → 초안 → 켜줘 → 게재", () => {
+  assert.deepEqual(C.propStage("proposed", {}), { label: "🟡 승인 대기", act: "decide" });
+  assert.equal(C.propStage("approved", {}).act, null); // 초안 만들기 전엔 누를 것 없음
+  assert.equal(C.propStage("approved", { stage: "drafted" }).act, "activate");
+  assert.equal(C.propStage("activate", { stage: "drafted" }).act, "cancel");
+  assert.equal(C.propStage("activate", { stage: "live" }).label, "🟢 게재 중");
+  assert.equal(C.propStage("rejected", { stage: "drafted" }).act, null);
+});
