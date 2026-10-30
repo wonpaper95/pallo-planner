@@ -127,8 +127,10 @@ export const parseMoney = (text) => plain(String(text ?? "").replace(/[\s,₩]/g
 const label = (s) => String(s ?? "").replace(/\s+/g, " ").replace(/(\s*help_outline)+\s*$/, "").trim();
 const COLS = { name: "캠페인", status: "상태", impressions: "노출수", clicks: "클릭수", spend: "비용", conversions: "전환수" };
 
+// 구글 표의 아이콘 칸(펼치기·더보기 글자)은 라벨이 아니다
+const ICON = /^(expand_more|expand_less|chevron_right|more_vert)$/;
 // 표 → {campaigns, total}. headers = [role=columnheader 글], rows = [role=row 마다 칸 글 배열].
-// 열 위치는 머리글에서 찾는다. 행은 머리글보다 앞에 빈 칸이 더 있을 수 있어, 그 행의 첫 글 칸(캠페인 이름·총계 라벨)이 '캠페인' 열이라고 보고 그만큼 민다.
+// 열 위치는 머리글에서 찾는다. 라벨은 빈 칸·아이콘 칸을 건너뛴 첫 글 칸. 칸이 머리글만큼 이상이면 오른쪽 끝을 맞추고(총계 줄은 앞 아이콘 칸이 하나 더 있다), 적으면 라벨 위치로 맞춘다.
 // 캠페인 행 = 첫 글 칸이 " settings" 로 끝나거나(숫자를 못 읽으면 던진다), 숫자 칸이 모두 읽히는 행. 총계·"작성 중인 초안" 행은 캠페인이 아니다.
 export function readGrid(headers, rows) {
   const H = (headers ?? []).map(label), idx = {};
@@ -136,8 +138,8 @@ export function readGrid(headers, rows) {
   if (missing.length) throw new ReadError(`열 없음: ${missing.join(", ")}`);
   const campaigns = [], totals = [];
   for (const cells of rows ?? []) {
-    const li = cells.findIndex((c) => c !== ""); if (li < 0) continue;
-    const text = label(cells[li]), off = li - idx.name, at = (k) => cells[idx[k] + off];
+    const li = cells.findIndex((c) => { const t = label(c); return t !== "" && !ICON.test(t); }); if (li < 0) continue;
+    const text = label(cells[li]), off = cells.length >= H.length ? cells.length - H.length : li - idx.name, at = (k) => cells[idx[k] + off];
     if (text.startsWith("총계")) { totals.push({ text, at }); continue; }
     if (text.startsWith("작성 중인 초안")) continue;
     const raw = ["status", "impressions", "clicks", "spend", "conversions"].map(at);

@@ -244,6 +244,46 @@ test("readGrid: 같은 이름 캠페인도 행마다 그대로 돌려준다(합�
   assert.equal(readGrid(HEAD, rows).campaigns.length, 2);
 });
 
+// ── 구글: 실제 화면 모양 (구글 캠페인 표의 칸 글 그대로, 공백 정리 후) ──
+// 머리글·캠페인 줄은 18칸. 초안 줄과 계정 총계 줄은 두 번째 칸이 아이콘 글자 "expand_more" 라서 라벨이 세 번째 칸에 온다.
+// 캠페인 총계 줄은 19칸(앞에 아이콘 칸이 하나 더) — 머리글보다 한 칸씩 밀려 있다.
+const REAL_HEAD = ["", "", "캠페인", "예산 help_outline", "상태 help_outline", "최적화 점수 help_outline", "캠페인 유형 help_outline", "입찰 전략 유형 help_outline", "전환 가치 help_outline", "전환수 help_outline", "전환율 help_outline", "전환당비용 help_outline", "노출수 help_outline", "클릭수 help_outline", "클릭률(CTR) help_outline", "비용 help_outline", "전환수 (유사 플랫폼) help_outline", "비용당 전환 가치(유사 플랫폼) help_outline"];
+const REAL_DRAFT = ["", "expand_more", "작성 중인 초안: 1", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+const REAL_CAMP_A = ["", "", "대구_영어(검색광고) settings", "₩20,000/일", "일시중지됨 예산에 의한 제약 입찰 전략에 의해 제한됨", "—", "검색", "클릭수 최대화", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "—", "—"];
+const REAL_CAMP_B = ["", "", "대구_일본어(검색광고) settings", "₩20,000/일", "일시중지됨 예산에 의한 제약 입찰 전략에 의해 제한됨", "—", "검색", "클릭수 최대화", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "—", "—"];
+const REAL_CAMP_C = ["", "", "대구_중국어(검색광고) settings", "₩20,000/일", "일시중지됨 예산에 의한 제약 입찰 전략에 의해 제한됨", "—", "검색", "클릭수 최대화", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "—", "—"];
+const REAL_CAMP_D = ["", "", "울산_영어(검색광고) settings", "₩20,000/일", "일시중지됨 예산에 의한 제약 입찰 전략에 의해 제한됨", "—", "검색", "클릭수 최대화", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "—", "—"];
+const REAL_CAMP_B_120 = ["", "", "대구_일본어(검색광고) settings", "₩20,000/일", "일시중지됨 예산에 의한 제약 입찰 전략에 의해 제한됨", "—", "검색", "클릭수 최대화", "0.00", "0.00", "0.00%", "₩0", "120", "9", "—", "₩18,200", "—", "—"];
+const REAL_TOTAL_0 = ["", "expand_more", "총계: 현재 보기의 삭제되지 않은 모든 캠페인 help_outline", "", "", "", "—", "", "", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "0.00", "—"];
+const REAL_TOTAL_120 = ["", "expand_more", "총계: 현재 보기의 삭제되지 않은 모든 캠페인 help_outline", "", "", "", "—", "", "", "0.00", "0.00", "0.00%", "₩0", "120", "9", "—", "₩18,200", "0.00", "—"];
+const REAL_ACCOUNT_TOTAL = ["", "expand_more", "총계: 계정 help_outline", "", "₩0/일", "", "—", "", "", "0.00", "0.00", "0.00%", "₩0", "0", "0", "—", "₩0", "0.00", "—"];
+const REAL_ROWS = [REAL_HEAD, REAL_DRAFT, REAL_CAMP_A, REAL_CAMP_B, REAL_CAMP_C, REAL_CAMP_D, REAL_TOTAL_0, REAL_ACCOUNT_TOTAL];
+const REAL_ROWS_120 = [REAL_HEAD, REAL_DRAFT, REAL_CAMP_A, REAL_CAMP_B_120, REAL_CAMP_C, REAL_CAMP_D, REAL_TOTAL_120, REAL_ACCOUNT_TOTAL];
+
+test("readGrid: 실제 화면 — 아이콘 칸(expand_more)은 라벨이 아니다: 캠페인 4개만 나오고 머리글·초안 줄은 빠진다 (값은 전부 0)", () => {
+  const g = readGrid(REAL_HEAD, REAL_ROWS);
+  assert.deepEqual(g.campaigns, [
+    { name: "대구_영어(검색광고)", status: "일시중지됨", impressions: 0, clicks: 0, spend: 0, conversions: 0 },
+    { name: "대구_일본어(검색광고)", status: "일시중지됨", impressions: 0, clicks: 0, spend: 0, conversions: 0 },
+    { name: "대구_중국어(검색광고)", status: "일시중지됨", impressions: 0, clicks: 0, spend: 0, conversions: 0 },
+    { name: "울산_영어(검색광고)", status: "일시중지됨", impressions: 0, clicks: 0, spend: 0, conversions: 0 },
+  ]);
+});
+test("readGrid: 실제 화면 — 캠페인 총계 줄(19칸, 머리글보다 한 칸 밀림)을 찾아 값을 읽고 checkTotals 가 통과한다", () => {
+  const g = readGrid(REAL_HEAD, REAL_ROWS);
+  assert.deepEqual(g.total, { impressions: 0, clicks: 0, spend: 0, conversions: 0 });
+  assert.deepEqual(checkTotals(g.campaigns, g.total), { ok: true, reason: "" });
+});
+test("readGrid: 실제 화면 — 캠페인 하나가 노출 120·클릭 9·비용 ₩18,200 이면, 총계 줄은 한 칸 밀린 자리에서 120·9·18200 을 읽는다 (계정 총계 줄의 0 을 집지 않는다)", () => {
+  const g = readGrid(REAL_HEAD, REAL_ROWS_120);
+  assert.deepEqual(g.campaigns[1], { name: "대구_일본어(검색광고)", status: "일시중지됨", impressions: 120, clicks: 9, spend: 18200, conversions: 0 });
+  assert.deepEqual(g.total, { impressions: 120, clicks: 9, spend: 18200, conversions: 0 });
+  assert.deepEqual(checkTotals(g.campaigns, g.total), { ok: true, reason: "" });
+});
+test("readGrid: 실제 화면 — 초안 줄과 '총계: 계정' 줄만 있으면 캠페인도 합계도 없다", () => {
+  assert.deepEqual(readGrid(REAL_HEAD, [REAL_DRAFT, REAL_ACCOUNT_TOTAL]), { campaigns: [], total: null });
+});
+
 // ── 구글: 합계 교차 검사 ──
 test("checkTotals: 노출·클릭·비용 합이 총계와 같으면 ok", () => {
   const g = readGrid(HEAD, GRID);
