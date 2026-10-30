@@ -372,6 +372,7 @@ async function send() {
   renderUpload();
 }
 // ── 📈 트렌드 (mka_items kind=trend: 맥북 ad-agent/trend.py 가 월요일마다 광고 라이브러리에서 모은 업종 밖 광고, 조교 빼고 모두 읽기) ──
+const IG_VIDEO = /^https:\/\/[\w.-]+\.(?:cdninstagram\.com|fbcdn\.net)\/[^\s"'<>]+$/;  // build_feed.py IG_VIDEO 와 같음
 async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(200);
   if (fail(error)) return;
@@ -381,19 +382,21 @@ async function renderTrend() {
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : "");
   // 큰 카드 그리드 + 하위 탭(릴스·쇼츠·틱톡·업종 밖 광고)으로 한 번에 한 칸만. 장면을 누르면 그 자리 재생(쇼츠 youtube-nocookie, 릴스 인스타 공식 임베드)
   const card = (media, title, meta) => `<div class="trc">${media}<div class="trc-b"><div class="trc-t">${title}</div><div class="mut">${meta}</div></div></div>`;
-  const play = (attr, id, src) => `<button class="agplay trm" ${attr}="${esc(id)}" title="여기서 재생">${MKACORE.safeImg(src) ? img(src, "") : `<span class="agig-no"></span>`}<span>▶</span></button>`;
+  const play = (attr, id, src, more = "") => `<button class="agplay trm" ${attr}="${esc(id)}"${more} title="여기서 재생">${MKACORE.safeImg(src) ? img(src, "") : `<span class="agig-no"></span>`}<span>▶</span></button>`;
   const ext = (href, src) => `<a class="trm" href="${esc(href)}" target="_blank" rel="noopener">${MKACORE.safeImg(src) ? img(src, "") : `<span class="agig-no"></span>`}</a>`;
   const go = (href, t) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(t)}</a>`;
   const ko = (v) => n(v).toLocaleString("ko-KR");
   const ttUrl = (tag) => `https://www.tiktok.com/tag/${encodeURIComponent(String(tag ?? "").replace(/^#/, ""))}`;
   const when = (x) => (x ? ` · 수집 ${esc(new Date(x).toLocaleString("ko-KR"))}` : "");
   const SUB = {
-    ig: ["📸 릴스", ig, (r) => { const code = r.key.slice(3), d = r.data ?? {}; return card(play("data-ig", code, d.image), go(`https://www.instagram.com/reel/${code}/`, d.caption || "(캡션 없음)"), `${esc(d.tag ?? "")} · 좋아요 ${ko(d.likes)} · 댓글 ${ko(d.comments)}`); },
+    ig: ["📸 릴스", ig, (r) => { const code = r.key.slice(3), d = r.data ?? {}; return card(play("data-ig", code, d.image, IG_VIDEO.test(d.video ?? "") ? ` data-v="${esc(d.video)}"` : ""), go(`https://www.instagram.com/reel/${code}/`, d.caption || "(캡션 없음)"), `${esc(d.tag ?? "")} · 좋아요 ${ko(d.likes)} · 댓글 ${ko(d.comments)}`); },
       `#챌린지·#릴스·#밈·#갓생·#공부자극·#영어공부 최근 24시간 릴스를 좋아요+댓글순 · 해시태그당 4개${when(ig[0]?.data?.collected)} · 인스타는 인기순 전체 목록을 공개하지 않아 24시간 안에 반응이 빨리 붙는 것을 골라요`],
     yt: ["🎬 쇼츠", yt, (r) => { const id = r.key.slice(3), d = r.data ?? {}; return card(play("data-yt", id, d.image), go(`https://www.youtube.com/shorts/${id}`, d.title || "(제목 없음)"), `${esc(d.channel ?? "")} · 조회 ${ko(d.views)} · 좋아요 ${ko(d.likes)} · ${n(d.duration_s)}초`); },
       `한국 인기 영상 + 최근 7일 쇼츠·챌린지·밈·릴스 검색 조회수순 · 한국어 제목만 · 채널당 2개${when(ytAt)}`],
-    tt: ["🎵 틱톡", tt, (r) => { const d = r.data ?? {}; return card(ext(ttUrl(d.tag), d.image), `<b>${n(d.rank)}위</b> ${go(ttUrl(d.tag), d.tag ?? "")}`, `게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}`); },
-      `틱톡 크리에이티브 센터 한국 '최근 7일' 해시태그 순위(며칠 늦을 수 있어요) · 표지는 그 해시태그 인기 영상${when(tt[0]?.data?.collected)}`],
+    tt: ["🎵 틱톡", tt, (r) => { const d = r.data ?? {}, vids = (d.vids ?? []).filter((v) => /^\d{15,21}$/.test(v));
+        return card(vids.length ? play("data-tt", vids[0], d.image) : ext(ttUrl(d.tag), d.image), `<b>${n(d.rank)}위</b> ${go(ttUrl(d.tag), d.tag ?? "")}`,
+          `게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}${vids.slice(1).map((v, i) => ` <button class="trv" data-tt="${v}">▶ 영상 ${i + 2}</button>`).join("")}`); },
+      `틱톡 크리에이티브 센터 한국 '최근 7일' 해시태그 순위(며칠 늦을 수 있어요) · 그 해시태그 인기 영상을 눌러 여기서 재생${when(tt[0]?.data?.collected)}`],
     ad: ["📈 업종 밖 광고", rows, (r) => { const d = r.data ?? {}; return card(ext(MKCCORE.libraryUrl(r.key), d.image), esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90)), `${go(MKCCORE.libraryUrl(r.key), d.page_name || "광고")} · ${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개` : ""} · ${esc(d.media_type || "?")}`); },
       `자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일+ 또는 광고 3개+ · 광고주당 2개${when(at)} · 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요`],
   };
@@ -403,9 +406,20 @@ async function renderTrend() {
     <div class="card"><p class="mut">${how}. 포맷·훅만 참고하고 영상·문장은 그대로 쓰지 않아요.</p>
     ${items.length ? `<div class="trgrid${MK.trsub === "ad" ? " trad" : ""}">${items.map(one).join("")}</div>` : `<div class="mut">아직 없어요. 월요일 아침 에이전트가 모아 와요.</div>`}</div>`;
   V().querySelectorAll("[data-tr]").forEach((b) => b.addEventListener("click", () => { MK.trsub = b.dataset.tr; renderTrend(); }));
+  // 릴스: 인스타 CDN 영상 주소(매일 갱신, 약 3일 유효)면 <video> 로 그 자리 재생, 없거나 만료면 인스타 임베드
+  const igEmbed = (code) => `<iframe class="agyt agig" src="https://www.instagram.com/reel/${code}/embed/" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
   V().querySelectorAll("[data-ig]").forEach((b) => b.addEventListener("click", () => {
-    if (!/^[\w-]{5,40}$/.test(b.dataset.ig)) return;
-    b.outerHTML = `<iframe class="agyt agig" src="https://www.instagram.com/reel/${b.dataset.ig}/embed/" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    const code = b.dataset.ig;
+    if (!/^[\w-]{5,40}$/.test(code)) return;
+    if (!IG_VIDEO.test(b.dataset.v)) { b.outerHTML = igEmbed(code); return; }
+    const v = Object.assign(document.createElement("video"), { className: "agyt", src: b.dataset.v, controls: true, autoplay: true, playsInline: true });
+    v.addEventListener("error", () => { v.outerHTML = igEmbed(code); });
+    b.replaceWith(v);
+  }));
+  // 틱톡: 공식 임베드 플레이어(player/v1). '영상 2·3' 버튼은 같은 카드 화면을 그 영상으로 바꾼다
+  V().querySelectorAll("[data-tt]").forEach((b) => b.addEventListener("click", () => {
+    if (!/^\d{15,21}$/.test(b.dataset.tt)) return;
+    b.closest(".trc").querySelector(".trm, iframe").outerHTML = `<iframe class="agyt" src="https://www.tiktok.com/player/v1/${b.dataset.tt}?autoplay=1&rel=0" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>`;
   }));
   V().querySelectorAll("[data-yt]").forEach((b) => b.addEventListener("click", () => {
     if (!/^[\w-]{11}$/.test(b.dataset.yt)) return;
