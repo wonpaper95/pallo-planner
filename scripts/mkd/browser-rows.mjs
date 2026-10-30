@@ -20,6 +20,7 @@ export const GOOGLE_ACCOUNTS = [
 export const SSO_URL = "https://sso.pallo.co.kr/select";
 export const jeonsanUrl = (code) => `https://branch.pallo.co.kr/${code}/admin/call`;
 export const googleUrl = (ocid) => `https://ads.google.com/aw/campaigns?ocid=${ocid}`;
+export const conversionsUrl = (ocid) => `https://ads.google.com/aw/conversions/all?ocid=${ocid}`;
 
 // playwright 가 설치된 곳 후보: PLAYWRIGHT_DIR → 이 저장소의 mkc → 메인 저장소(pallo-planner)의 mkc (워크트리엔 node_modules 가 없다)
 export const playwrightCandidates = (here, home, env = {}) => [
@@ -54,6 +55,7 @@ export function monthsBack(D, now = new Date()) {
 }
 
 // 화면의 기간 글("2026년 10월 29일", "어제 2026년 10월 29일", "2026년 10월 1일 - 2026년 10월 29일", "2026. 10. 29.") → {start, end} | null
+// 구글은 같은 해의 맞춤 기간을 줄여 보여 준다: "2026년 10월 23일 ~ 29일", "2026년 10월 28일 ~ 11월 2일" (끝의 해·달 생략 → 시작의 해·달, 해를 넘어가면 다음 해)
 const pad = (n) => String(n).padStart(2, "0");
 export function parseRange(text) {
   const t = String(text ?? "");
@@ -61,10 +63,25 @@ export function parseRange(text) {
   const dots = ds.length ? [] : [...t.matchAll(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\./g)];
   const all = (ds.length ? ds : dots).map((m) => `${m[1]}-${pad(m[2])}-${pad(m[3])}`);
   if (!all.length) return null;
+  if (ds.length === 1) { // 시작 뒤에 "~ 29일" · "~ 11월 2일" 이 붙은 줄임 표기
+    const [, y, mo] = ds[0], rest = t.slice(ds[0].index + ds[0][0].length), m = /^\s*[~\-–—]\s*(?:(\d{1,2})\s*월\s*)?(\d{1,2})\s*일/.exec(rest);
+    if (m) {
+      const em = m[1] ? +m[1] : +mo, ey = em < +mo ? +y + 1 : +y;
+      return { start: all[0], end: `${ey}-${pad(em)}-${pad(m[2])}` };
+    }
+  }
   return { start: all[0], end: all[all.length - 1] };
 }
 export const rangeText = (D) => { const [y, m, d] = ymd(D); return `${y}년 ${m}월 ${d}일`; };
-export const rangeIsDay = (text, D) => { const r = parseRange(text); return !!r && r.start === D && r.end === D; };
+export const rangeIs = (text, from, to) => { const r = parseRange(text); return !!r && r.start === from && r.end === to; }; // 화면 기간 글이 from~to 와 같은가
+export const rangeIsDay = (text, D) => rangeIs(text, D, D);
+// google-range 의 날짜 검사: 문제가 있으면 짧은 이유, 없으면 "". 끝날은 어제까지(오늘·이후는 하루가 끝나지 않았다).
+export function checkRange(from, to, now = new Date()) {
+  if (!validDate(from) || !validDate(to)) return "날짜는 YYYY-MM-DD 형식이어야 해요";
+  if (from > to) return "시작일이 끝일보다 늦어요";
+  if (to >= kstDate(now)) return "오늘·이후 날짜는 읽지 않아요 (끝일은 어제까지)";
+  return "";
+}
 
 // ── 전산: 데이터 보드 스니펫 결과 합격 검사 ──
 // 규칙은 docs/meta-marketing/jeonsan-leads.md "호출한 쪽의 합격 검사". reason 은 note 로 저장되는 짧은 고정 문구(숫자 없음).
@@ -182,6 +199,40 @@ export function noticeFlags(texts) {
     if (f && !out.includes(f)) out.push(f);
   }
   return out;
+}
+
+// ── 구글 전환 화면 (/aw/conversions/all) ──
+// 표 → 전환 액션 name 의 "추적 상태" 글자(예: "조치 필요", "운영중"). headers = [role=columnheader 글], rows = [role=row 마다 칸 글 배열].
+// 행은 머리글보다 앞에 빈 칸이 하나 더 있어 readGrid 처럼 오른쪽 끝을 맞춘다(칸이 모자라면 이름 칸 위치로). 못 읽으면 null(던지지 않는다 — 전환 상태는 보조 정보).
+// 같은 이름이 둘이면 삭제되지 않은 쪽을 쓴다. 이름은 정확히 같은 줄만(비슷한 이름은 다른 전환).
+export function conversionStatus(headers, rows, name = "팔로 신청 클릭") {
+  const H = (headers ?? []).map(label), ni = H.indexOf("전환 액션"), si = H.indexOf("추적 상태");
+  if (ni < 0 || si < 0) return null;
+  const found = [];
+  for (const cells of rows ?? []) {
+    const li = cells.findIndex((c) => { const t = label(c); return t !== "" && !ICON.test(t); });
+    if (li < 0 || label(cells[li]) !== name) continue;
+    const off = cells.length >= H.length ? cells.length - H.length : li - ni, st = label(cells[si + off] ?? "");
+    if (st) found.push(st);
+  }
+  return found.find((st) => st !== "삭제됨") ?? found[0] ?? null;
+}
+
+// ── google-range: 맞춤 기간 캠페인 표 + 알림 + 전환 상태 → 출력 ──
+const sumOf = (cs, k) => cs.reduce((a, c) => a + (c[k] ?? 0), 0);
+// 읽은 계정 하나 → {account, campaigns:[{account,team,campaign,status,impressions,clicks,spend,conversions}], summary:{status:"ok",campaigns,impressions,clicks,spend,conversions,conversionStatus,notices}}
+// 값이 대시였던 칸은 null 그대로(합계에는 0 으로 더한다). notices 는 noticeFlags 로 가린 플래그.
+export function googleRangeAccount(accountName, campaigns, notices = [], conversion = null) {
+  const list = campaigns.map((c) => ({ account: accountName, team: googleTeamOf(accountName, c.name), campaign: c.name, status: c.status ?? "", impressions: c.impressions ?? null, clicks: c.clicks ?? null, spend: c.spend ?? null, conversions: c.conversions ?? null }));
+  const round = (n) => Math.round(n * 100) / 100;
+  return {
+    account: accountName, campaigns: list,
+    summary: { status: "ok", campaigns: list.length, impressions: sumOf(list, "impressions"), clicks: sumOf(list, "clicks"), spend: round(sumOf(list, "spend")), conversions: round(sumOf(list, "conversions")), conversionStatus: conversion ?? null, notices: [...notices] },
+  };
+}
+export const googleRangeFail = (accountName, note, status = "failed") => ({ account: accountName, campaigns: [], summary: { status, note: sanitizeNote(note) } });
+export function googleRangeOutput(from, to, results) {
+  return { ok: results.every((r) => r.summary.status === "ok"), from, to, accounts: Object.fromEntries(results.map((r) => [r.account, r.summary])), campaigns: results.flatMap((r) => r.campaigns) };
 }
 
 // 캠페인 → 구글 행. 같은 팀·같은 이름은 한 행으로(숫자 합, 상태는 운영 중인 쪽, 값이 전부 대시면 "--"). 계정 플래그는 표에서 맨 앞 캠페인이 든 행에만.

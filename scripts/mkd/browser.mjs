@@ -1,9 +1,11 @@
-// 사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print]
+// 사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print
 // 일일 현황의 구글 검색광고·전산 문의를 사람 없이 읽는다 — Claude in Chrome 대신 맥미니 Playwright(크롬, 지속 프로필 ~/.cache/pallo-mkd/profile, 경쟁사 정찰 pallo-mkc 와 따로).
 //   login   처음 1회·로그인이 풀렸을 때. 창이 뜨면 사람이 두 탭(전산 SSO·구글 광고)에서 직접 로그인하고 창을 닫는다. 비밀번호는 절대 입력하지 않는다.
 //   check   헤드리스로 두 사이트가 로그인된 채인지만 본다(읽기 전용) → {"jeonsan":"ok|login_required|error","google":"…"}, 종료코드 0.
 //   jeonsan 지점 3곳(DAEGUDSR·DAEGUJPCH·ULSAN) 신규 회신 › 데이터 보드에서 D 의 유입경로별 문의 건수(jeonsan-daily.js)를 세어 mkd_daily(jeonsan) 에 저장.
 //   google  계정 2곳(대구·울산) 캠페인 표에서 D 하루치 노출·클릭·비용·전환 + 알림 배너를 읽어 mkd_daily(google_ad) 에 저장.
+//   google-range  구글 3일 점검용(저장 없음, --print 만): 계정 2곳을 맞춤 기간 from~to 로 맞춰 캠페인별 {계정,지점,캠페인,상태,노출,클릭,비용,전환} + 계정 알림 + 전환 화면의 "팔로 신청 클릭" 추적 상태를
+//                JSON 한 줄 {ok,from,to,accounts,campaigns} 로 낸다. 로그인 화면이면 그 계정 login_required.
 // 둘 다 --print 면 저장하지 않고 행만 출력(읽기만 한다). 출력 JSON 한 줄 {ok,date,…}, 지점·계정이 하나라도 failed|login_required 면 종료코드 1.
 // 쿠키·토큰은 읽지 않고, 이름·전화번호가 든 페이지 글은 출력하지 않는다(알림 글은 숫자·이메일을 가린 플래그로만, note 는 고정 문구만).
 // 순수 부분(합격 검사·표 읽기·행 만들기)은 browser-rows.mjs(테스트 있음). 한 번 실행이 110초 안에 끝나도록 지점·계정을 한꺼번에 읽고 95초에 끊는다.
@@ -13,15 +15,16 @@ import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   BRANCHES, GOOGLE_ACCOUNTS, SSO_URL, jeonsanUrl, googleUrl, playwrightCandidates, needsLogin, validDate, kstDate, isYesterdayKst, monthsBack,
-  ReadError, acceptJeonsan, jeonsanRows, failRow, jeonsanOutput, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput, rangeIsDay, partitionValid,
+  ReadError, acceptJeonsan, jeonsanRows, failRow, jeonsanOutput, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput, parseRange, rangeIs, partitionValid,
+  conversionsUrl, conversionStatus, checkRange, googleRangeAccount, googleRangeFail, googleRangeOutput,
 } from "./browser-rows.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const [cmd, dateArg] = process.argv.slice(2), print = process.argv.includes("--print");
+const [cmd, dateArg, dateArg2] = process.argv.slice(2), print = process.argv.includes("--print");
 const PROFILE = join(homedir(), ".cache", "pallo-mkd", "profile"), CHROME_APP = "/Applications/Google Chrome.app";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.error(`[${new Date().toISOString().slice(11, 19)}]`, ...a); // 진행 상황 — 개인정보 없는 고정 문구만
-const usage = () => { console.error("사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print]"); process.exit(2); };
+const usage = () => { console.error("사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print"); process.exit(2); };
 // 작업 p 를 ms 안에 끝내지 못하거나 던지면 fallback(오류) 값으로 — 하나가 멈춰도 나머지를 계속한다
 const within = (p, ms, fallback) => new Promise((resolve) => {
   const t = setTimeout(() => resolve(fallback(null)), ms);
@@ -139,33 +142,66 @@ async function jeonsan(D) {
 }
 
 // ── google ──
-// 날짜 선택기를 열어 D 하루로 맞춘다. D 가 어제면 "어제" 프리셋, 아니면(또는 프리셋이 안 되면) "맞춤" 에 시작·종료를 직접 적는다. 끝나면 화면의 기간 글이 D 하루인지 확인한다.
-async function setGoogleDate(page, D) {
-  const picker = page.locator('button:not([role="row"] *), [role="button"]:not([role="row"] *)').filter({ hasText: /\d{4}년\s*\d+월/ }).filter({ visible: true }).first();
-  const shown = async () => ((await picker.innerText({ timeout: 5000 }).catch(() => "")) || "").replace(/\s+/g, " ");
-  if (rangeIsDay(await shown(), D)) return; // 이미 D 하루
-  await page.keyboard.press("Escape").catch(() => {}); // 떠 있는 팝업은 닫기만
-  const item = (text) => page.getByText(text, { exact: true }).filter({ visible: true }).first();
-  if (isYesterdayKst(D)) {
-    try { await picker.click({ timeout: 10_000 }); await sleep(1000); await item("어제").click({ timeout: 10_000 }); await sleep(3000); } catch { /* 맞춤으로 */ }
-    if (rangeIsDay(await shown(), D)) return;
-    await page.keyboard.press("Escape").catch(() => {}); await sleep(500);
-  }
-  const [y, m, d] = D.split("-").map(Number), typed = `${y}. ${m}. ${d}.`;
-  await picker.click({ timeout: 10_000 }); await sleep(1000);
-  await item("맞춤").click({ timeout: 10_000 }); await sleep(1000);
-  const boxes = page.locator('input[type="text"]').filter({ visible: true }), values = await boxes.evaluateAll((els) => els.map((e) => e.value));
-  const dateBoxes = values.map((v, i) => (/^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?$/.test(v.trim()) ? i : -1)).filter((i) => i >= 0).slice(0, 2); // 시작·종료 입력칸
-  if (dateBoxes.length < 2) throw new ReadError("날짜 설정 실패");
-  for (const i of dateBoxes) { const box = boxes.nth(i); await box.click({ clickCount: 3, timeout: 5000 }); await box.fill(typed); await box.press("Tab"); }
-  await page.getByRole("button", { name: /^적용$/ }).filter({ visible: true }).first().click({ timeout: 10_000 }); await sleep(3000);
-  if (!rangeIsDay(await shown(), D)) throw new ReadError("날짜 설정 실패");
+// 날짜 선택기를 열어 from~to 로 맞춘다. 하루(from==to)가 어제면 "어제" 프리셋, 아니면(또는 프리셋이 안 되면) "맞춤" 에 시작·종료를 직접 적는다. 끝나면 화면의 기간 글이 from~to 인지 확인한다.
+async function setGoogleRange(page, from, to) {
+  let step = "선택기"; // 어디서 막혔는지 알려 주는 고정 문구(오류 note 에 들어간다)
+  try {
+    await sleep(2500); // 표가 뜬 직후엔 화면이 아직 다시 그려져서 열어 둔 선택기가 저절로 닫히곤 한다 → 가라앉길 기다린다
+    const picker = page.locator('button:not([role="row"] *), [role="button"]:not([role="row"] *)').filter({ hasText: /\d{4}년\s*\d+월/ }).filter({ visible: true }).first();
+    const shown = async () => ((await picker.innerText({ timeout: 5000 }).catch(() => "")) || "").replace(/\s+/g, " ");
+    if (rangeIs(await shown(), from, to)) return; // 이미 그 기간
+    await page.keyboard.press("Escape").catch(() => {}); // 떠 있는 팝업은 닫기만
+    const item = (text) => page.getByText(text, { exact: true }).filter({ visible: true }).first();
+    if (from === to && isYesterdayKst(to)) {
+      try { await picker.click({ timeout: 10_000 }); await sleep(1000); await item("어제").click({ timeout: 10_000 }); await sleep(3000); } catch { /* 맞춤으로 */ }
+      if (rangeIs(await shown(), from, to)) return;
+      await page.keyboard.press("Escape").catch(() => {}); await sleep(500);
+    }
+    const typed = [from, to].map((D) => { const [y, m, d] = D.split("-").map(Number); return `${y}. ${m}. ${d}.`; });
+    const boxes = page.locator('input[type="text"]').filter({ visible: true });
+    const values = () => boxes.evaluateAll((els) => els.map((e) => e.value));
+    const dayOf = (v) => { const r = parseRange(v); return r && r.start === r.end ? r.start : null; };
+    // 시작·종료 입력칸: 값이 날짜 하루인 글상자 둘. 글 모양은 칸마다 바뀐다(커서가 있는 칸은 "2026. 10. 29.", 나머지는 "2026년 10월 29일").
+    const findIdx = async () => (await values()).map((v, i) => (dayOf(v) ? i : -1)).filter((i) => i >= 0).slice(0, 2);
+    const attempt = async () => {
+      step = "선택기 열기";
+      await picker.click({ timeout: 10_000 });
+      if (!(await item("맞춤").waitFor({ state: "visible", timeout: 4000 }).then(() => true, () => false))) throw new ReadError("날짜 설정 실패 (선택기 안 열림)");
+      step = "날짜 입력";
+      // 선택기를 열면 입력칸이 이미 보인다 — "맞춤" 항목은 입력칸이 안 보일 때만 누른다(목록이 움직이는 동안 누르면 '안정됨' 검사가 끝나지 않아 시간 초과가 나곤 했다).
+      let idx = [];
+      for (let i = 0; i < 6 && idx.length < 2; i++) { idx = await findIdx(); if (idx.length < 2) await sleep(500); }
+      if (idx.length < 2) { step = "맞춤 선택"; await item("맞춤").click({ timeout: 5000, force: true }); await sleep(1000); idx = await findIdx(); step = "날짜 입력"; }
+      if (idx.length < 2) throw new ReadError("날짜 설정 실패");
+      const filled = async () => { const vals = await values(); return idx.every((i, n) => dayOf(vals[i]) === [from, to][n]); };
+      // 시작을 먼저 쓰면 옛 끝일보다 늦을 때 값이 밀릴 수 있어, 다 쓴 뒤 맞는지 보고 한 번 더 쓴다 (최종 확인은 아래 기간 글)
+      for (let pass = 0; pass < 2 && !(await filled()); pass++) {
+        for (const [n, i] of idx.entries()) { const box = boxes.nth(i); await box.click({ clickCount: 3, timeout: 4000 }); await box.fill(typed[n]); await box.press("Tab"); }
+      }
+      step = "적용";
+      await page.getByRole("button", { name: /^적용$/ }).filter({ visible: true }).first().click({ timeout: 5000 }); await sleep(3000);
+      if (!rangeIs(await shown(), from, to)) throw new ReadError("날짜 설정 실패");
+    };
+    for (let n = 1, end = Date.now() + 40_000; ; n++) { // 열어 둔 선택기가 닫히는 따위로 막히면 닫고 처음부터 최대 3번
+      try { await attempt(); return; }
+      catch (e) {
+        if (process.env.MKD_DEBUG) log(`날짜 설정 ${n}회 (${step}): ${String(e?.message).split("\n").map((l) => l.replace(/<input[^>]*>/, "<input…>").slice(0, 160)).slice(0, 12).join(" / ").slice(0, 700)}`);
+        if (n >= 3 || Date.now() > end) throw e;
+        await page.keyboard.press("Escape").catch(() => {}); await sleep(2000);
+        if (rangeIs(await shown(), from, to)) return; // 막힌 줄 알았는데 적용돼 있었다
+      }
+    }
+  } catch (e) { if (e instanceof ReadError) throw e; throw new ReadError(`날짜 설정 실패 (${step})`); }
 }
+
+const setGoogleDate = (page, D) => setGoogleRange(page, D, D); // 하루치(google) 용
+
 // 표 → {headers, rows}. 칸 글은 숫자·캠페인 이름·상태뿐이라 개인정보가 없다.
+// 화면에 안 보이는 것(getClientRects 가 비는 것)은 뺀다 — 날짜 선택기의 달력(요일 머리글 일~토·7칸 행)이 닫힌 뒤에도 DOM 에 남아 머리글 수를 부풀리면 오른쪽 끝 맞춤이 어긋난다.
 const readTable = (page) => page.evaluate((cells) => {
-  const clean = (s) => (s ?? "").replace(/\s+/g, " ").trim();
-  const headers = [...document.querySelectorAll('[role="columnheader"]')].map((h) => clean(h.innerText));
-  const rows = [...document.querySelectorAll('[role="row"]')].map((r) => { const cs = r.querySelectorAll(cells); return [...cs].map((c) => clean(c.innerText)); }).filter((c) => c.length);
+  const clean = (s) => (s ?? "").replace(/\s+/g, " ").trim(), shown = (el) => el.getClientRects().length > 0;
+  const headers = [...document.querySelectorAll('[role="columnheader"]')].filter(shown).map((h) => clean(h.innerText));
+  const rows = [...document.querySelectorAll('[role="row"]')].filter(shown).map((r) => { const cs = r.querySelectorAll(cells); return [...cs].map((c) => clean(c.innerText)); }).filter((c) => c.length);
   return { headers, rows };
 }, CELLS);
 // 표가 가라앉을 때까지: 2.5초 간격으로 최대 3번 읽어 연속 두 번 같고 총계와 맞으면 받는다. 못 맞추면 마지막 이유로 던진다.
@@ -240,20 +276,73 @@ async function google(D) {
   return summary.ok ? 0 : 1;
 }
 
+// ── google-range ──
+// 전환 화면에서 "팔로 신청 클릭" 의 추적 상태 글자만 읽는다. 표가 뜬 직후 1초쯤은 옛 상태("운영중")가 보였다가 "조치 필요" 로 바뀌므로, 같은 값이 4초 이상 이어질 때만 받는다.
+// 30초 안에 안정되지 않거나 못 읽으면 null(보조 정보라 실패로 치지 않는다).
+async function readConversion(ctx, acct) {
+  const page = await ctx.newPage();
+  try {
+    await page.goto(conversionsUrl(acct.ocid), { waitUntil: "domcontentloaded", timeout: 30_000 });
+    let cur = null, since = Date.now();
+    for (const end = Date.now() + 30_000; Date.now() < end; await sleep(1000)) {
+      if (await onLogin(page)) return null;
+      const t = await readTable(page).catch(() => null), st = t ? conversionStatus(t.headers, t.rows) : null;
+      if (st !== cur) { cur = st; since = Date.now(); } else if (st && Date.now() - since >= 4000) return st;
+    }
+    return null;
+  } catch { return null; } finally { await page.close().catch(() => {}); }
+}
+
+async function readRangeAccount(ctx, acct, from, to) {
+  const page = await ctx.newPage(), name = acct.name;
+  try {
+    await page.goto(googleUrl(acct.ocid), { waitUntil: "domcontentloaded", timeout: 45_000 });
+    const s = await waitReady(page, gridReady, 60_000);
+    if (s === "login") return googleRangeFail(name, "로그인 필요", "login_required");
+    if (s === "timeout") return googleRangeFail(name, "표가 안 뜸");
+    await setGoogleRange(page, from, to);
+    const g = await readStable(page);
+    if (!g.campaigns.length) return googleRangeFail(name, "캠페인 행 없음");
+    return googleRangeAccount(name, g.campaigns, noticeFlags(await readNotices(page)), null);
+  } catch (e) { const note = reasonOf(e, "구글"); log(`${name}: ${note}`); if (process.env.MKD_DEBUG) log(`${name}: ${String(e?.message).split("\n")[0].slice(0, 200)}`); return googleRangeFail(name, note); }
+  finally { await page.close().catch(() => {}); }
+}
+
+// 계정을 하나씩 차례로 읽는다: 캠페인 표 → 전환 화면. 탭을 여러 개 동시에 열어 두면 뒤에 가려진 탭의 클릭이 시간 초과로 실패한다(한 번 실제로 겪음).
+// 전체 한도 100초(진입의 115초 강제 종료 안): 첫 계정의 표 45초·전환 80초, 둘째 계정의 표 85초·전환 100초까지.
+async function googleRange(from, to) {
+  const ctx = await launch(true), t0 = Date.now(), left = (at) => Math.max(1000, t0 + at - Date.now()), results = [];
+  try {
+    for (const [i, a] of GOOGLE_ACCOUNTS.entries()) {
+      const r = await within(readRangeAccount(ctx, a, from, to), left(i === 0 ? 45_000 : 85_000), (e) => googleRangeFail(a.name, e ? reasonOf(e, "구글") : "구글 시간 초과"));
+      if (r.summary.status === "ok") r.summary.conversionStatus = await within(readConversion(ctx, a), left(i === 0 ? 80_000 : 100_000), () => null);
+      results.push(r);
+    }
+  } finally { await within(ctx.close(), 8000, () => {}); }
+  const out = googleRangeOutput(from, to, results);
+  console.log(JSON.stringify(out));
+  return out.ok ? 0 : 1;
+}
+
 // ── 진입 ──
 const needDate = () => {
   if (!validDate(dateArg)) { console.error(`날짜는 YYYY-MM-DD 형식이어야 해요: ${dateArg ?? "(없음)"}`); process.exit(2); }
   if (dateArg >= kstDate()) { console.error("오늘·이후 날짜는 수집하지 않아요"); process.exit(2); }
 };
+const needRange = () => {
+  if (!print) { console.error("google-range 는 저장하지 않고 읽기만 해요 — 끝에 --print 를 붙여 주세요"); process.exit(2); }
+  const why = checkRange(dateArg, dateArg2); if (why) { console.error(`${why}: ${dateArg ?? "(없음)"} ${dateArg2 ?? "(없음)"}`); process.exit(2); }
+};
 async function main() {
-  if (!["login", "check", "jeonsan", "google"].includes(cmd)) usage();
+  if (!["login", "check", "jeonsan", "google", "google-range"].includes(cmd)) usage();
   if (cmd === "jeonsan" || cmd === "google") needDate();
+  if (cmd === "google-range") needRange();
   if (cmd !== "login") setTimeout(() => { console.error("실패: 시간 초과 — 강제 종료"); process.exit(1); }, 115_000).unref(); // Bash 기본 제한(120초) 안에 반드시 끝낸다 (login 은 사람을 기다린다)
   let code = 0;
-  try { code = (await { login, check, jeonsan: () => jeonsan(dateArg), google: () => google(dateArg) }[cmd]()) ?? 0; }
+  try { code = (await { login, check, jeonsan: () => jeonsan(dateArg), google: () => google(dateArg), "google-range": () => googleRange(dateArg, dateArg2) }[cmd]()) ?? 0; }
   catch (e) { console.error(`실패: ${String(e?.message ?? e).split("\n")[0].slice(0, 200)}`); code = 1; }
   process.exitCode = code;
   setTimeout(() => process.exit(code), 3000).unref(); // 브라우저 찌꺼기가 붙잡아도 마무리
 }
-export { readBranch, readAccount, setGoogleDate, readTable, readStable, readNotices }; // 가짜 페이지로 흐름을 시험할 때 쓴다(직접 실행할 때만 main)
+export { readBranch, readAccount, readRangeAccount, readConversion, setGoogleDate, setGoogleRange, readTable, readStable, readNotices }; // 가짜 페이지로 흐름을 시험할 때 쓴다(직접 실행할 때만 main)
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

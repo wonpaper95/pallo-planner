@@ -5,6 +5,7 @@ import {
   acceptJeonsan, jeonsanRows, failRow, jeonsanOutput,
   googleTeamOf, parseStatus, num, parseMoney, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput,
   parseRange, rangeIsDay, rangeText, partitionValid, playwrightCandidates,
+  rangeIs, checkRange, conversionsUrl, conversionStatus, googleRangeAccount, googleRangeFail, googleRangeOutput,
 } from "../scripts/mkd/browser-rows.mjs";
 import { toRowsPure } from "../scripts/mkd/rows.mjs";
 
@@ -401,4 +402,93 @@ test("playwrightCandidates: 이 저장소의 mkc → 메인 저장소의 mkc 순
   const c = playwrightCandidates("/r/pallo-planner-daily/scripts/mkd", "/home/u", {});
   assert.deepEqual(c, ["/r/pallo-planner-daily/scripts/mkc/node_modules/playwright/index.mjs", "/home/u/pallo-planner/scripts/mkc/node_modules/playwright/index.mjs"]);
   assert.equal(playwrightCandidates("/r/scripts/mkd", "/home/u", { PLAYWRIGHT_DIR: "/opt/pw" })[0], "/opt/pw/playwright/index.mjs");
+});
+
+// ── google-range: 맞춤 기간(from~to) 읽기 ──
+test("parseRange: 구글이 맞춤 기간을 줄여 보여 주는 모양('2026년 10월 23일 ~ 29일', '… ~ 11월 2일')도 읽는다 (실제 화면 글)", () => {
+  assert.deepEqual(parseRange("2026년 10월 23일 ~ 29일 arrow_drop_down"), { start: "2026-10-23", end: "2026-10-29" });
+  assert.deepEqual(parseRange("2026년 10월 10일 ~ 29일"), { start: "2026-10-10", end: "2026-10-29" });
+  assert.deepEqual(parseRange("2026년 10월 28일 ~ 11월 2일"), { start: "2026-10-28", end: "2026-11-02" });
+  assert.deepEqual(parseRange("2026년 12월 30일 ~ 1월 2일"), { start: "2026-12-30", end: "2027-01-02" }); // 해가 넘어가면 끝은 다음 해
+  assert.deepEqual(parseRange("2026년 10월 23일 - 29일"), { start: "2026-10-23", end: "2026-10-29" });
+  assert.deepEqual(parseRange("2026년 10월 29일 arrow_drop_down"), { start: "2026-10-29", end: "2026-10-29" }); // 끝이 없으면 하루
+  assert.deepEqual(parseRange("2026년 10월 23일"), { start: "2026-10-23", end: "2026-10-23" });
+  assert.equal(rangeIs("2026년 10월 23일 ~ 29일 arrow_drop_down", "2026-10-23", "2026-10-29"), true);
+  assert.equal(rangeIs("2026년 10월 23일 ~ 28일", "2026-10-23", "2026-10-29"), false);
+  assert.equal(rangeIs("2026년 10월 23일 ~ 29일", "2026-10-23", "2026-10-23"), false);
+});
+test("rangeIs: 화면의 기간 글이 from~to 와 같은지 (하루면 rangeIsDay 와 같다)", () => {
+  assert.equal(rangeIs("2026년 10월 23일 - 2026년 10월 29일", "2026-10-23", "2026-10-29"), true);
+  assert.equal(rangeIs("2026. 10. 23. – 2026. 10. 29.", "2026-10-23", "2026-10-29"), true);
+  assert.equal(rangeIs("최근 7일 2026년 10월 23일 - 2026년 10월 29일", "2026-10-23", "2026-10-29"), true);
+  assert.equal(rangeIs("2026년 10월 23일 - 2026년 10월 28일", "2026-10-23", "2026-10-29"), false); // 끝이 다름
+  assert.equal(rangeIs("2026년 10월 22일 - 2026년 10월 29일", "2026-10-23", "2026-10-29"), false); // 시작이 다름
+  assert.equal(rangeIs("2026년 10월 29일", "2026-10-23", "2026-10-29"), false);                    // 하루만 보임
+  assert.equal(rangeIs("지난 7일", "2026-10-23", "2026-10-29"), false);
+  assert.equal(rangeIs("2026년 10월 29일", "2026-10-29", "2026-10-29"), rangeIsDay("2026년 10월 29일", "2026-10-29"));
+});
+test("checkRange: 날짜 형식·시작<=끝·어제까지만 (오늘·이후는 아직 하루치가 아님) — 문제 없으면 빈 글", () => {
+  const now = new Date("2026-10-30T10:00:00Z"); // KST 10-30 19:00
+  assert.equal(checkRange("2026-10-10", "2026-10-29", now), "");
+  assert.equal(checkRange("2026-10-29", "2026-10-29", now), "");
+  assert.match(checkRange("2026-10-10", "2026-10-30", now), /오늘/);
+  assert.match(checkRange("2026-10-10", "2026-11-02", now), /오늘/);
+  assert.match(checkRange("2026-10-29", "2026-10-23", now), /시작일/);
+  assert.match(checkRange("2026-1-1", "2026-10-29", now), /YYYY-MM-DD/);
+  assert.match(checkRange("2026-10-10", undefined, now), /YYYY-MM-DD/);
+});
+
+test("conversionsUrl: 전환 화면 주소", () => { assert.equal(conversionsUrl("6771267051"), "https://ads.google.com/aw/conversions/all?ocid=6771267051"); });
+// 실제 전환 화면 모양: 머리글 10칸, 행은 앞에 빈 칸이 하나 더 있는 11칸. "추적 상태" 칸이 상태 글자.
+const CV_HEAD = ["", "전환 액션 help_outline", "전환 소스", "추적 상태 help_outline", "액션 최적화 help_outline", "횟수 help_outline", "클릭연결 전환 추적 기간 help_outline", "계정 수준 목표에 포함됨 help_outline", "모든 전환 help_outline", "모든 전환 가치 help_outline"];
+const cv = (name, status) => ["", "", name, "웹사이트", status, "기본", "1회", "90일", "예", "0.00", "0.00"];
+const CV_ROWS = [["상태:: 전체"], [""], cv("문의", "조치 필요"), cv("Clicks to call", "운영중"), cv("팔로 신청 클릭", "조치 필요"), cv("페이지 조회", "삭제됨"), ["", "", "", "", "", "", "", "", "", "0.00", "0.00"]];
+test("conversionStatus: '팔로 신청 클릭' 줄의 추적 상태 글자 (실제 화면 모양, 머리글보다 한 칸 밀린 행)", () => {
+  assert.equal(conversionStatus(CV_HEAD, CV_ROWS), "조치 필요");
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭", "기록 중")]), "기록 중");
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭", "운영중")]), "운영중");
+  assert.equal(conversionStatus(CV_HEAD, CV_ROWS, "문의"), "조치 필요");
+  assert.equal(conversionStatus(CV_HEAD, CV_ROWS, "Clicks to call"), "운영중");
+});
+test("conversionStatus: 못 읽으면 null — 그 이름의 줄이 없거나, 머리글(전환 액션·추적 상태)이 없거나, 상태 칸이 비었거나", () => {
+  assert.equal(conversionStatus(CV_HEAD, [cv("문의", "운영중")]), null);
+  assert.equal(conversionStatus(CV_HEAD.filter((h) => !/^추적 상태/.test(h)), CV_ROWS), null);
+  assert.equal(conversionStatus([], CV_ROWS), null);
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭", "")]), null);
+  assert.equal(conversionStatus(CV_HEAD, []), null);
+  assert.equal(conversionStatus(undefined, undefined), null);
+});
+test("conversionStatus: 같은 이름이 둘이면 삭제되지 않은 쪽, 이름이 비슷한 줄('팔로 신청 클릭 2')은 다른 줄", () => {
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭", "삭제됨"), cv("팔로 신청 클릭", "조치 필요")]), "조치 필요");
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭", "삭제됨")]), "삭제됨");
+  assert.equal(conversionStatus(CV_HEAD, [cv("팔로 신청 클릭 2", "운영중")]), null);
+});
+
+const GC = (name, status, impressions, clicks, spend, conversions) => ({ name, status, impressions, clicks, spend, conversions });
+test("googleRangeAccount: 캠페인별 {계정,지점,캠페인,상태,노출,클릭,비용,전환} + 합계(대시는 0 으로 더함)·알림·전환 상태", () => {
+  const a = googleRangeAccount("대구", [GC("대구_영어(검색광고)", "운영 가능", 1204, 37, 18200, 2), GC("대구_일본어(검색광고)", "일시중지됨", null, null, null, null), GC("대구_중국어(검색광고)", "운영 가능", 310, 9, 9400.5, 0)], ["[안내] [계정] 예비 결제 수단 없음"], "조치 필요");
+  assert.deepEqual(a.campaigns[0], { account: "대구", team: "dsr", campaign: "대구_영어(검색광고)", status: "운영 가능", impressions: 1204, clicks: 37, spend: 18200, conversions: 2 });
+  assert.deepEqual(a.campaigns[1], { account: "대구", team: "jpcn", campaign: "대구_일본어(검색광고)", status: "일시중지됨", impressions: null, clicks: null, spend: null, conversions: null });
+  assert.deepEqual(a.summary, { status: "ok", campaigns: 3, impressions: 1514, clicks: 46, spend: 27600.5, conversions: 2, conversionStatus: "조치 필요", notices: ["[안내] [계정] 예비 결제 수단 없음"] });
+  assert.equal(googleRangeAccount("울산", [GC("울산_영어", "운영 가능", 1, 0, 0, 0)], [], null).summary.conversionStatus, null);
+  assert.equal(googleRangeAccount("울산", [GC("아무거나", "운영 가능", 1, 0, 0, 0)], [], null).campaigns[0].team, "ulsan");
+});
+test("googleRangeFail·googleRangeOutput: 한 줄 JSON {ok,from,to,accounts,campaigns} — 계정이 하나라도 ok 가 아니면 ok=false, 실패 계정은 {status,note}", () => {
+  const ok = googleRangeAccount("대구", [GC("대구_영어", "운영 가능", 10, 1, 500, 0)], [], "조치 필요");
+  const out = googleRangeOutput("2026-10-23", "2026-10-29", [ok, googleRangeFail("울산", "로그인 필요", "login_required")]);
+  assert.equal(out.ok, false);
+  assert.deepEqual([out.from, out.to], ["2026-10-23", "2026-10-29"]);
+  assert.deepEqual(out.accounts.울산, { status: "login_required", note: "로그인 필요" });
+  assert.equal(out.accounts.대구.campaigns, 1);
+  assert.deepEqual(out.campaigns.map((c) => [c.account, c.campaign]), [["대구", "대구_영어"]]);
+  const good = googleRangeOutput("2026-10-23", "2026-10-29", [ok, googleRangeAccount("울산", [GC("울산_영어", "운영 가능", 5, 1, 300, 0)], [], "기록 중")]);
+  assert.equal(good.ok, true);
+  assert.deepEqual(good.campaigns.map((c) => c.team), ["dsr", "ulsan"]);
+  assert.ok(!JSON.stringify(good).includes("\n"));
+});
+test("googleRangeFail: note 는 4자리 이상 숫자를 # 로 가리고 120자까지 (failRow 와 같은 규칙)", () => {
+  assert.equal(googleRangeFail("대구", "코드 123456 오류").summary.note, "코드 # 오류");
+  assert.equal(googleRangeFail("대구", "가".repeat(300)).summary.note.length, 120);
+  assert.equal(googleRangeFail("대구", "표가 안 뜸").summary.status, "failed");
+  assert.deepEqual(googleRangeFail("울산", "x").campaigns, []);
 });
