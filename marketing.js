@@ -372,7 +372,7 @@ async function send() {
   renderUpload();
 }
 // ── 📈 트렌드 (mka_items kind=trend: 맥북 ad-agent/trend.py 가 월요일마다 광고 라이브러리에서 모은 업종 밖 광고, 조교 빼고 모두 읽기) ──
-const IG_VIDEO = /^https:\/\/[\w.-]+\.(?:cdninstagram\.com|fbcdn\.net)\/[^\s"'<>]+$/;  // build_feed.py IG_VIDEO 와 같음
+const IG_VIDEO = /^https:\/\/[\w.-]+\.(?:cdninstagram\.com|fbcdn\.net)\/[^\s"'<>]+$/;  // build_feed.py IG_VIDEO 와 같음(인스타·페이스북 CDN 영상)
 async function renderTrend() {
   const { data, error } = await sb.from("mka_items").select("key, data").eq("kind", "trend").limit(200);
   if (fail(error)) return;
@@ -397,7 +397,7 @@ async function renderTrend() {
         return card(vids.length ? play("data-tt", vids[0], d.image) : ext(ttUrl(d.tag), d.image), `<b>${n(d.rank)}위</b> ${go(ttUrl(d.tag), d.tag ?? "")}`,
           `게시물 ${esc(d.posts ?? "")} · 조회 ${esc(d.views ?? "")}${d.cat ? ` · ${esc(d.cat)}` : ""}${vids.slice(1).map((v, i) => ` <button class="trv" data-tt="${v}">▶ 영상 ${i + 2}</button>`).join("")}`); },
       `틱톡 크리에이티브 센터 한국 '최근 7일' 해시태그 순위(며칠 늦을 수 있어요) · 그 해시태그 인기 영상을 눌러 여기서 재생${when(tt[0]?.data?.collected)}`],
-    ad: ["📈 업종 밖 광고", rows, (r) => { const d = r.data ?? {}; return card(ext(MKCCORE.libraryUrl(r.key), d.image), esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90)), `${go(MKCCORE.libraryUrl(r.key), d.page_name || "광고")} · ${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개` : ""} · ${esc(d.media_type || "?")}`); },
+    ad: ["📈 업종 밖 광고", rows, (r) => { const d = r.data ?? {}; return card(IG_VIDEO.test(d.video ?? "") ? play("data-fv", r.key, d.image, ` data-v="${esc(d.video)}"`) : ext(MKCCORE.libraryUrl(r.key), d.image), esc(String(d.hook || d.headline || "(문구 없음)").slice(0, 90)), `${go(MKCCORE.libraryUrl(r.key), d.page_name || "광고")} · ${n(d.days)}일째${n(d.n_ads) > 1 ? ` · 광고 ${n(d.n_ads)}개` : ""} · ${esc(d.media_type || "?")}`); },
       `자기계발·챌린지·원데이클래스·스터디카페·온라인 강의·구독·운동·다이어트·취미·독서모임 검색 · 어학 업종 제외 · 30일+ 또는 광고 3개+ · 광고주당 2개${when(at)} · 오래·여러 개로 돌릴수록 잘 되는 광고로 봐요`],
   };
   if (!SUB[MK.trsub]) MK.trsub = "ig";
@@ -414,6 +414,14 @@ async function renderTrend() {
     if (!IG_VIDEO.test(b.dataset.v)) { b.outerHTML = igEmbed(code); return; }
     const v = Object.assign(document.createElement("video"), { className: "agyt", src: b.dataset.v, controls: true, autoplay: true, playsInline: true });
     v.addEventListener("error", () => { v.outerHTML = igEmbed(code); });
+    b.replaceWith(v);
+  }));
+  // 업종 밖 영상 광고: 수집 때 받은 페이스북 CDN 영상으로 그 자리 재생, 만료(오류)면 광고 라이브러리로 가는 표지로 되돌림
+  V().querySelectorAll("[data-fv]").forEach((b) => b.addEventListener("click", () => {
+    if (!/^\d+$/.test(b.dataset.fv) || !IG_VIDEO.test(b.dataset.v)) return;
+    const back = `<a class="trm" href="${esc(MKCCORE.libraryUrl(b.dataset.fv))}" target="_blank" rel="noopener">${b.querySelector("img")?.outerHTML ?? ""}</a>`;
+    const v = Object.assign(document.createElement("video"), { className: "agyt", src: b.dataset.v, controls: true, autoplay: true, playsInline: true });
+    v.addEventListener("error", () => { v.outerHTML = back; });
     b.replaceWith(v);
   }));
   // 틱톡: 공식 임베드 플레이어(player/v1). '영상 2·3' 버튼은 같은 카드 화면을 그 영상으로 바꾼다
