@@ -93,18 +93,18 @@ test("buildWeekly: 판정 규칙", () => {
   const leads = [lead("1", "A", "2026-10-01", "enroll"), lead("2", "A", "2026-10-20", "enroll"), lead("3", "D", "2026-09-30", "consult")];
   const r = MK.buildWeekly({ week, ads, organic: [], leads });
   const v = Object.fromEntries(r.ads.map((a) => [a.ad_name, [a.verdict, a.reason]]));
-  assert.deepEqual(v.A, ["keep", "등록당 비용 지점 평균 이하"]);
+  assert.deepEqual(v.A, ["keep", "예약당 비용 지점 평균 이하"]);
   assert.deepEqual(v.B, ["cut", "4주 지출 $120, 리드 0"]);
   assert.deepEqual(v.C, ["hold", "판단 보류 (표본 2건)"]);
   assert.deepEqual(v.D, ["cut", "리드당 비용 200% 상승(피로도)"]);
-  assert.equal(r.totals.enrolls4w, 2);
+  assert.equal(r.totals.booked4w, 3);
   assert.equal(r.flags.noOrganic, true);
 });
 
 test("buildWeekly: 등록 데이터 없으면 보류, 리드당 비용으로 대체 안 함", () => {
   const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "A", 50000, 10)], organic: [], leads: [] });
   assert.equal(r.flags.noLeads, true);
-  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "전산 리드 누락"]);
 });
 
 test("buildWeekly: 오가닉 상위·하위", () => {
@@ -122,13 +122,12 @@ test("buildWeekly: 오가닉 bottom 은 top 과 겹치지 않음", () => {
   assert.deepEqual(r.organic.bottom.map((x) => x.post_id), ["e", "d"]);
 });
 
-test("buildWeekly: 광고 밖 등록은 지점 평균·합계에서 빼고 otherEnrolls4w 로 따로 센다", () => {
+test("buildWeekly: 광고 밖 예약(광고명 없음)은 지점 평균·합계에서 뺀다", () => {
   const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-01", "A", 30000, 3), day("2026-10-20", "A", 30000, 3)], organic: [],
     leads: [lead("1", "A", "2026-10-20", "enroll"), lead("2", "", "2026-10-20", "enroll"), lead("3", "", "2026-10-10", "enroll")] });
-  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["keep", "등록당 비용 지점 평균 이하"]);
-  assert.equal(r.totals.enrolls4w, 1);
-  assert.equal(r.totals.otherEnrolls4w, 2);
-  assert.equal(r.totals.cpe4w, 60000);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["keep", "예약당 비용 지점 평균 이하"]);
+  assert.equal(r.totals.booked4w, 1);
+  assert.equal(r.totals.cpb4w, 60000);
 });
 
 test("buildWeekly: 이번 주 지출 있고 리드 0 이면 피로도 (cheap 이면 watch, 아니면 cut)", () => {
@@ -137,7 +136,7 @@ test("buildWeekly: 이번 주 지출 있고 리드 0 이면 피로도 (cheap 이
   const r = MK.buildWeekly({ week: "2026-10-19", ads, organic: [], leads });
   const v = Object.fromEntries(r.ads.map((a) => [a.ad_name, [a.verdict, a.reason]]));
   assert.deepEqual(v.X, ["cut", "이번 주 지출 $20,000, 리드 0 (피로도)"]);
-  assert.deepEqual(v.Y, ["watch", "등록은 좋지만 이번 주 지출 $20,000, 리드 0 (피로도)"]);
+  assert.deepEqual(v.Y, ["watch", "예약은 좋지만 이번 주 지출 $20,000, 리드 0 (피로도)"]);
 });
 
 test("buildWeekly: 리드 대부분이 7일 이내면 등록 0 이어도 판단 보류", () => {
@@ -147,7 +146,7 @@ test("buildWeekly: 리드 대부분이 7일 이내면 등록 0 이어도 판단 
   assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "판단 보류 (최근 7일 리드 4/5건)"]);
   // 오래된 리드가 더 많으면 기존 규칙 그대로
   const r2 = MK.buildWeekly({ week: "2026-10-19", ads, organic: [], leads: [lead("1", "M", "2026-10-02", "lead"), lead("2", "M", "2026-10-05", "lead"), lead("3", "M", "2026-10-20", "lead")] });
-  assert.deepEqual([r2.ads[0].verdict, r2.ads[0].reason], ["watch", "리드는 있으나 4주 등록 0"]);
+  assert.deepEqual([r2.ads[0].verdict, r2.ads[0].reason], ["watch", "리드는 있으나 4주 예약 0"]);
 });
 
 test("teamKeyOf: 평일중·일본여행 영어회화는 일본어중국어점이 아님", () => {
@@ -237,6 +236,19 @@ test("sanitizeLead: 전산 신규 회신 실제 상태값 (띄어쓰기 포함)"
   assert.equal(s("예약 확정"), "consult");
   assert.equal(s("전화상 안함"), "lost");
   assert.equal(s("등록"), "enroll");
+  assert.equal(s("방문완"), "visit"); // 상세 창 '예약 상태'
+});
+
+test("buildPersonaInputs: 기간 · CSV 기간과 겹치는 하루치 연령 행은 한 번만", () => {
+  const leads = [lead("1", "A", "2026-10-05", "visit"), lead("2", "A", "2026-10-20", "lead")];
+  const demo = [
+    { period_from: "2026-07-26", period_to: "2026-10-23", age: "25-34", gender: "male", leads: 8 },
+    { period_from: "2026-10-10", period_to: "2026-10-10", age: "25-34", gender: "male", leads: 5 }, // CSV 안 → 뺌
+    { period_from: "2026-10-25", period_to: "2026-10-25", age: "18-24", gender: "female", leads: 2 }, // CSV 밖 → 셈
+  ];
+  const r = MK.buildPersonaInputs({ leads, demo });
+  assert.equal(r.from, "2026-10-05"); assert.equal(r.to, "2026-10-20");
+  assert.deepEqual(r.leadsByAgeGender.map((x) => x.leads), [8, 2]);
 });
 
 test("sanitizeLead: 긴 숫자 리드 번호는 전화번호로 오인하지 않음", () => {
@@ -244,11 +256,11 @@ test("sanitizeLead: 긴 숫자 리드 번호는 전화번호로 오인하지 않
   assert.equal(MK.sanitizeLead({ source_key: "1", ad_name: "A", lead_date: "2026-10-20", status: "lead", subject: "01012345678" }).ok, false);
 });
 
-test("buildWeekly: 4주 안에 리드가 없으면(오래된 리드만) 등록 데이터 누락", () => {
+test("buildWeekly: 4주 안에 리드가 없으면(오래된 리드만) 전산 리드 누락", () => {
   const r = MK.buildWeekly({ week: "2026-10-19", ads: [{ date: "2026-10-20", ad_name: "A", campaign: "", adset: "", impressions: 0, reach: 0, clicks: 0, leads: 10, spend: 50 }], organic: [],
     leads: [{ source_key: "1", ad_name: "A", lead_date: "2025-01-01", status: "enroll" }] });
   assert.equal(r.flags.noLeads, true);
-  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "등록 데이터 누락"]);
+  assert.deepEqual([r.ads[0].verdict, r.ads[0].reason], ["hold", "전산 리드 누락"]);
 });
 
 test("teamKeyOf: 명시 과목이 우선, 영어 제외는 느슨한 말에만", () => {
@@ -273,4 +285,35 @@ test("buildWeekly: 이번 주 지출 $1·리드 0 은 피로도 아님, $60 은 
   const run = (sp) => MK.buildWeekly({ week: "2026-10-19", ads: mk(sp), organic: [], leads: lds }).ads[0];
   assert.doesNotMatch(run(1).reason, /피로도/);
   assert.match(run(60).reason, /피로도/);
+});
+
+test("channelOf: 동기·가입경로를 네 묶음으로", () => {
+  assert.deepEqual(["인스타", "외부 유입", "랜딩페이지", "네이버 예약", "네이버, 제미나이", "지인 소개", "재등록", "gpt", "", "QR 유입"].map(MK.channelOf),
+    ["메타", "메타", "메타", "네이버", "네이버", "지인·재등록", "지인·재등록", "기타", "기타", "기타"]);
+});
+
+test("periodStats: 결제=가입+금액>0, 같은 날 같은 사람 한 명, 환불·매체·상담자·ROAS", () => {
+  const sale = (day, amount, 거래형태, 가입경로, 상담자, who) => MK.saleRow({ day, amount, who, vals: { 거래형태, 가입경로, 언어: "영어", 상담자 } });
+  const sales = [sale("2026-10-02", 1000000, "가입", "인스타", "A", "p1"), sale("2026-10-02", 200000, "가입", "인스타", "A", "p1"), // 같은 사람 분할 → 1명
+    sale("2026-10-03", 800000, "가입", "네이버", "B", "p2"), sale("2026-10-04", -300000, "환불", "인스타", "A", "p3"), sale("2026-10-05", 50000, "차액결제(분할납부)", "인스타", "B", "p4"),
+    sale("2026-11-01", 999, "가입", "인스타", "A", "p5")];
+  const visits = [{ day: "2026-10-02", total: 4, done: 3, noshow: 1, data: { byMotive: { 외부유입: 2, "네이버 예약": 2 }, byLang: { 영어: 4 } } }];
+  const r = MK.periodStats({ from: "2026-10-01", to: "2026-10-31", sales, visits, leads: [{ lead_date: "2026-10-01", ad_name: "x" }, { lead_date: "2026-10-09", ad_name: "" }],
+    meta: [{ date: "2026-10-02", spend: 100 }], naver: [{ date: "2026-10-02", spend: 400000 }], fx: 1400 });
+  assert.equal(r.payers, 2); assert.equal(r.paid, 2000000); assert.equal(r.net, 1750000); assert.equal(r.refund, 300000); assert.equal(r.refunders, 1);
+  assert.equal(r.payRate, 2 / 3); assert.equal(r.apps, 2); assert.equal(r.adLeads, 1);
+  const ch = Object.fromEntries(r.channels.map((c) => [c.channel, c]));
+  assert.deepEqual([ch.메타.booked, ch.메타.payers, ch.메타.paid, ch.메타.spend, ch.메타.roas], [2, 1, 1200000, 140000, 1200000 / 140000]);
+  assert.deepEqual([ch.네이버.booked, ch.네이버.payers, ch.네이버.roas], [2, 1, 2]);
+  const A = r.staff.find((s) => s.staff === "A");
+  assert.deepEqual([A.payers, A.refunders, A.net], [1, 1, 900000]);
+});
+
+test("buildMonthly: 전반은 1~15일·지난달 1~15일과 비교, 전체는 전반/후반 나눔", () => {
+  const sales = [MK.saleRow({ day: "2026-10-10", amount: 100, vals: { 거래형태: "가입" } }), MK.saleRow({ day: "2026-10-20", amount: 50, vals: { 거래형태: "가입" } }), MK.saleRow({ day: "2026-09-12", amount: 70, vals: { 거래형태: "가입" } })];
+  const f = MK.buildMonthly({ month: "2026-10", half: "first", sales, months: ["2026-09", "2026-10"] });
+  assert.deepEqual([f.from, f.to, f.cur.paid, f.prev.paid, f.prev.to, f.halves], ["2026-10-01", "2026-10-15", 100, 70, "2026-09-15", null]);
+  assert.deepEqual(f.trend.map((t) => [t.month, t.paid]), [["2026-09", 70], ["2026-10", 100]]);
+  const m = MK.buildMonthly({ month: "2026-10", sales });
+  assert.deepEqual([m.to, m.cur.paid, m.halves.first.paid, m.halves.second.paid, m.prev.to], ["2026-10-31", 150, 100, 50, "2026-09-30"]);
 });

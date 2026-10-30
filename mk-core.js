@@ -161,7 +161,7 @@ function normalize(text) {
 // ── 리드 (전산) ── 이름·전화번호는 받지 않는다. 화이트리스트 밖 필드는 버린다.
 const STATUS = ["lead", "consult", "visit", "enroll", "lost"];
 // 전산 표시값 → 표준값. 실제 값은 docs/meta-marketing/jeonsan-leads.md 조사 후 보강.
-const STATUS_MAP = { 신규: "lead", 리드: "lead", 접수: "lead", 상담: "consult", 상담완료: "consult", 진행중: "lead", 최후통첩: "lead", 예약확정: "consult", 전화상안함: "lost", 방문: "visit", 방문완료: "visit", 등록: "enroll", 결제: "enroll", 결제완료: "enroll", 취소: "lost", 이탈: "lost", 부재: "lost" };
+const STATUS_MAP = { 신규: "lead", 리드: "lead", 접수: "lead", 상담: "consult", 상담완료: "consult", 진행중: "lead", 최후통첩: "lead", 예약확정: "consult", 전화상안함: "lost", 방문: "visit", 방문완: "visit", 방문완료: "visit", 등록: "enroll", 결제: "enroll", 결제완료: "enroll", 취소: "lost", 이탈: "lost", 부재: "lost" };
 const PHONE = /(?<!\d)01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}(?!\d)/;
 function sanitizeLead(raw) {
   const status = STATUS.includes(raw?.status) ? raw.status : STATUS_MAP[String(raw?.status ?? "").replace(/\s+/g, "")];
@@ -184,45 +184,48 @@ const usd = (n) => "$" + Math.round(n).toLocaleString("en-US");
 const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 70, // 달러
    FATIGUE = 1.3,
    ZERO_WEEK_MIN_SPEND = 5; // 이번 주 리드 0 피로도는 지출 5달러 이상일 때만 (소액은 우연)
-function buildWeekly({ week, ads = [], organic = [], leads = [] }) {
+function buildWeekly({ week, ads = [], organic = [], leads = [], sales = null, naver = [], fx = null }) {
   const end = addDays(week, 6), from4 = addDays(week, -21), prevEnd = addDays(week, -1);
   const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
   const ads4 = ads.filter((r) => inRange(r.date, from4, end));
   const leads4 = leads.filter((l) => inRange(l.lead_date, from4, end));
   const names = [...new Set(ads4.map((r) => r.ad_name))], adSet = new Set(names);
-  // 지점 평균·합계의 등록은 4주 안에 광고가 돈 소재의 등록만. 광고 이름이 비었거나 안 맞는 등록(광고 밖 경로)은 따로 센다.
-  const enrolls = (name) => leads4.filter((l) => l.status === "enroll" && (name === undefined ? adSet.has(l.ad_name) : l.ad_name === name)).length;
-  const otherEnrolls4w = leads4.filter((l) => l.status === "enroll" && !adSet.has(l.ad_name)).length;
-  const teamSpend4 = sum(ads4, "spend"), teamEnroll4 = enrolls(), teamCpe = teamEnroll4 ? teamSpend4 / teamEnroll4 : null;
+  // 소재 품질 = 상담 예약(전산 '예약 확정' 이후 단계). 결제는 매출 시트에 광고명이 없어 소재별로 못 센다 → 지점·매체 단위로만(totals.sales4w).
+  // 지점 평균은 4주 안에 광고가 돈 소재의 예약만.
+  const BOOKED = ["consult", "visit", "enroll"];
+  const booked = (name) => leads4.filter((l) => BOOKED.includes(l.status) && (name === undefined ? adSet.has(l.ad_name) : l.ad_name === name)).length;
+  const teamSpend4 = sum(ads4, "spend"), teamBooked4 = booked(), teamCpb = teamBooked4 ? teamSpend4 / teamBooked4 : null;
   const out = names.map((ad_name) => {
     const mine = ads4.filter((r) => r.ad_name === ad_name);
     const wk = mine.filter((r) => r.date >= week), prev = mine.filter((r) => r.date <= prevEnd);
     const spend = sum(wk, "spend"), lw = sum(wk, "leads"), spend4w = sum(mine, "spend"), leads4w = sum(mine, "leads");
     const cpl = lw ? spend / lw : null, prevCpl = sum(prev, "leads") ? sum(prev, "spend") / sum(prev, "leads") : null;
-    const enrolls4w = enrolls(ad_name), cpe4w = enrolls4w ? spend4w / enrolls4w : null;
-    const myLeads = leads4.filter((l) => l.ad_name === ad_name), young = myLeads.filter((l) => l.lead_date > addDays(end, -7)).length; // 7일 이내 리드는 아직 등록 전일 수 있음
+    const booked4w = booked(ad_name), cpb4w = booked4w ? spend4w / booked4w : null;
+    const myLeads = leads4.filter((l) => l.ad_name === ad_name), young = myLeads.filter((l) => l.lead_date > addDays(end, -7)).length; // 7일 이내 리드는 아직 예약 전일 수 있음
     const zeroWeek = spend >= ZERO_WEEK_MIN_SPEND && lw === 0 && prevCpl !== null; // 이번 주 돈만 쓰고 리드 0
-    const cheap = enrolls4w >= 1 && teamCpe !== null && cpe4w <= teamCpe;
+    const cheap = booked4w >= 1 && teamCpb !== null && cpb4w <= teamCpb;
     let verdict, reason;
     if (leads4w === 0 && spend4w >= ZERO_LEAD_SPEND) [verdict, reason] = ["cut", `4주 지출 ${usd(spend4w)}, 리드 0`];
-    else if (!leads4.length) [verdict, reason] = ["hold", "등록 데이터 누락"];
+    else if (!leads4.length) [verdict, reason] = ["hold", "전산 리드 누락"];
     else if (leads4w < MIN_SAMPLE) [verdict, reason] = ["hold", `판단 보류 (표본 ${leads4w}건)`];
     else if (zeroWeek || (cpl !== null && prevCpl !== null && cpl >= prevCpl * FATIGUE)) {
       const up = zeroWeek ? `이번 주 지출 ${usd(spend)}, 리드 0 (피로도)` : `리드당 비용 ${Math.round((cpl / prevCpl - 1) * 100)}% 상승(피로도)`;
-      [verdict, reason] = cheap ? ["watch", `등록은 좋지만 ${up}`] : ["cut", up];
-    } else if (cheap) [verdict, reason] = ["keep", "등록당 비용 지점 평균 이하"];
-    else if (!enrolls4w) [verdict, reason] = young * 2 > myLeads.length ? ["hold", `판단 보류 (최근 7일 리드 ${young}/${myLeads.length}건)`] : ["watch", "리드는 있으나 4주 등록 0"];
-    else [verdict, reason] = ["watch", "등록당 비용 지점 평균 초과"];
-    return { ad_name, spend, leads: lw, cpl, prevCpl, spend4w, leads4w, enrolls4w, cpe4w, verdict, reason };
+      [verdict, reason] = cheap ? ["watch", `예약은 좋지만 ${up}`] : ["cut", up];
+    } else if (cheap) [verdict, reason] = ["keep", "예약당 비용 지점 평균 이하"];
+    else if (!booked4w) [verdict, reason] = young * 2 > myLeads.length ? ["hold", `판단 보류 (최근 7일 리드 ${young}/${myLeads.length}건)`] : ["watch", "리드는 있으나 4주 예약 0"];
+    else [verdict, reason] = ["watch", "예약당 비용 지점 평균 초과"];
+    return { ad_name, spend, leads: lw, cpl, prevCpl, spend4w, leads4w, booked4w, cpb4w, verdict, reason };
   }).sort((a, b) => b.spend4w - a.spend4w);
   const wkAds = ads.filter((r) => inRange(r.date, week, end));
   const posts = organic.filter((p) => inRange(p.published_at, from4, end) && p.reach >= 100)
     .map((p) => ({ ...p, score: (p.saves + p.shares) / p.reach })).sort((a, b) => b.score - a.score);
   return {
     week,
-    flags: { noAds: !ads4.length, noLeads: !leads4.length, noOrganic: !organic.length },
+    flags: { noAds: !ads4.length, noLeads: !leads4.length, noOrganic: !organic.length, noSales: !sales?.length },
     totals: { spend: sum(wkAds, "spend"), leads: sum(wkAds, "leads"), cpl: sum(wkAds, "leads") ? sum(wkAds, "spend") / sum(wkAds, "leads") : null,
-      spend4w: teamSpend4, leads4w: sum(ads4, "leads"), enrolls4w: teamEnroll4, otherEnrolls4w, cpe4w: teamCpe },
+      spend4w: teamSpend4, leads4w: sum(ads4, "leads"), booked4w: teamBooked4, cpb4w: teamCpb,
+      // 4주 결제(매출 시트) — 지점 전체·매체별. 메타 광고비는 원화(fx), 네이버는 원.
+      sales4w: sales ? (({ payers, paid, net, channels, spend, coverage }) => ({ payers, paid, net, channels, spend, coverage }))(periodStats({ from: from4, to: end, sales, meta: ads4.map((r) => ({ date: r.date, spend: r.spend })), naver, fx })) : null },
     ads: out,
     organic: { top: posts.slice(0, 3), bottom: posts.slice(3).slice(-3).reverse() }, // top 과 겹치지 않게 (게시물 6개 미만이면 bottom 이 짧다)
   };
@@ -233,14 +236,103 @@ function buildPersonaInputs({ leads = [], demo = [] }) {
   const count = (arr, f) => arr.reduce((o, x) => (x[f] ? ((o[x[f]] = (o[x[f]] || 0) + 1), o) : o), {});
   const funnel = Object.fromEntries(STATUS.map((s) => [s, leads.filter((l) => l.status === s).length]));
   const enrolled = leads.filter((l) => l.status === "enroll");
+  // 연령·성별: 여러 날 묶음(CSV) 기간 안에 든 하루치(API) 행은 같은 리드를 두 번 세는 것이라 뺀다
+  const spans = demo.filter((d) => d.period_from && d.period_to > d.period_from);
+  const once = demo.filter((d) => !(d.period_from && d.period_from === d.period_to && spans.some((s) => d.period_from >= s.period_from && d.period_from <= s.period_to)));
   const g = {};
-  for (const d of demo) { const k = `${d.age}|${d.gender}`; g[k] = (g[k] || 0) + (d.leads || 0); }
+  for (const d of once) { const k = `${d.age}|${d.gender}`; g[k] = (g[k] || 0) + (d.leads || 0); }
   const total = Object.values(g).reduce((a, b) => a + b, 0);
   const leadsByAgeGender = Object.entries(g).map(([k, n]) => { const [age, gender] = k.split("|"); return { age, gender, leads: n, share: total ? Math.round((n / total) * 1000) / 1000 : 0 }; })
     .sort((a, b) => b.leads - a.leads);
-  return { sample: leads.length, funnel, enrolledBySubject: count(enrolled, "subject"), enrolledByAge: count(enrolled, "age_band"), leadsByAgeGender };
+  const days = leads.map((l) => l.lead_date).filter(Boolean).sort();
+  return { sample: leads.length, from: days[0] ?? null, to: days.at(-1) ?? null, funnel, enrolledBySubject: count(enrolled, "subject"), enrolledByAge: count(enrolled, "age_band"), leadsByAgeGender };
 }
 
-return { ALIAS, decode, teamKeyOf, teamKeyOfTeamName, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
+// ── 매출 시트·캘린더 통계 (주간 결제·월간 리포트) ──
+// 결제(등록) = 매출 시트(플래너 재무 탭 fin_rows kind=sale) 거래형태 '가입' + 금액 > 0. 전산 '이미 등록된 회원'은 실제 결제와 안 맞아 쓰지 않는다.
+// 매체 = 캘린더 통계 '동기'와 매출 시트 '가입경로'를 같은 네 묶음으로. 모르는 값은 기타.
+const CHANNELS = ["메타", "네이버", "지인·재등록", "기타"];
+function channelOf(v) {
+  const s = String(v ?? "").replace(/\s+/g, "");
+  if (/인스타|외부유입|페이스북|메타|랜딩/.test(s)) return "메타";
+  if (/네이버/.test(s)) return "네이버";
+  if (/지인|소개|재등록/.test(s)) return "지인·재등록";
+  return "기타";
+}
+// 매출 시트 한 줄 → { day, amount, type, channel, lang, staff, who }. who = 같은 날 같은 사람을 한 번만 세는 불투명 키(스크립트가 만든다, 이름 아님)
+function saleRow(r) {
+  const v = r.vals ?? {};
+  return { day: r.day, amount: Number(r.amount) || 0, type: String(v.거래형태 ?? "").trim(), channel: channelOf(v.가입경로), path: String(v.가입경로 ?? "").trim(),
+    lang: String(v.언어 ?? "").trim() || "기타", staff: String(v.상담자 ?? "").trim() || "(빈칸)", who: r.who ?? null };
+}
+const isSignup = (s) => s.type === "가입" && s.amount > 0;
+const isRefund = (s) => /환불/.test(s.type) && s.amount < 0;
+// 결제자 수: 같은 날 같은 사람(who)은 한 명. who 가 없으면 줄 수
+const payerCount = (rows) => new Set(rows.map((s, i) => (s.who ? `${s.day}|${s.who}` : `#${i}`))).size;
+
+const monthEnd = (m) => { const t = new Date(m + "-01T00:00:00Z"); t.setUTCMonth(t.getUTCMonth() + 1); t.setUTCDate(0); return t.toISOString().slice(0, 10); };
+const prevMonth = (m) => { const t = new Date(m + "-01T00:00:00Z"); t.setUTCMonth(t.getUTCMonth() - 1); return t.toISOString().slice(0, 7); };
+const ratio = (a, b) => (b ? a / b : null);
+
+// 기간 하나의 숫자. leads=mk_leads, visits=mk_visits, sales=saleRow[], meta=[{date,spend(USD)}], naver=[{date,spend(원)}], fx=USD→원
+function periodStats({ from, to, leads = [], visits = [], sales = [], meta = [], naver = [], fx = null }) {
+  const L = leads.filter((l) => inRange(l.lead_date, from, to)), V = visits.filter((v) => inRange(v.day, from, to)), S = sales.filter((s) => inRange(s.day, from, to));
+  const sign = S.filter(isSignup), refunds = S.filter(isRefund), sum = (a, f) => a.reduce((x, r) => x + (Number(r[f]) || 0), 0);
+  const metaUsd = sum(meta.filter((r) => inRange(r.date, from, to)), "spend"), naverKrw = sum(naver.filter((r) => inRange(r.date, from, to)), "spend");
+  const booked = sum(V, "total"), done = sum(V, "done"), payers = payerCount(sign), paid = sum(sign, "amount");
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 864e5) + 1;
+  const cover = (rows, f) => new Set(rows.filter((r) => inRange(r[f], from, to)).map((r) => r[f])).size;
+  const out = {
+    from, to, apps: L.length, adLeads: L.filter((l) => l.ad_name).length, booked, done, noshow: sum(V, "noshow"),
+    payers, paid, net: sum(S, "amount"), refund: -sum(refunds, "amount"), refunders: payerCount(refunds),
+    // 결제자가 방문완보다 많으면 캘린더 기록이 빠진 기간(지난달 방문자가 이번에 결제한 것도 섞임) → 결제율 비움
+    doneRate: ratio(done, booked), payRate: payers <= done ? ratio(payers, done) : null, visitsShort: payers > done, payPerApp: ratio(payers, L.length), aov: ratio(paid, payers),
+    spend: { meta: fx ? Math.round(metaUsd * fx) : null, metaUsd: Math.round(metaUsd * 100) / 100, naver: naverKrw },
+    coverage: { days, leads: cover(leads, "lead_date"), visits: cover(visits, "day"), naver: cover(naver, "date"), meta: cover(meta, "date"), sales: cover(sales, "day") },
+  };
+  // 매체별: 예약(캘린더 동기) · 결제·매출(가입경로) · 광고비 → ROAS = 결제금액 / 광고비
+  out.channels = CHANNELS.map((ch) => {
+    const b = V.reduce((x, v) => x + Object.entries(v.data?.byMotive ?? {}).reduce((y, [k, n]) => y + (channelOf(k) === ch ? n : 0), 0), 0);
+    const cs = sign.filter((s) => s.channel === ch), cPaid = sum(cs, "amount");
+    const spend = ch === "메타" ? out.spend.meta : ch === "네이버" ? naverKrw : null;
+    return { channel: ch, booked: b, payers: payerCount(cs), paid: cPaid, spend, roas: spend ? cPaid / spend : null, cpp: spend && cs.length ? spend / payerCount(cs) : null };
+  });
+  // 언어별: 예약(캘린더 언어) · 결제·매출(매출 시트 언어)
+  const langs = [...new Set([...V.flatMap((v) => Object.keys(v.data?.byLang ?? {})), ...sign.map((s) => s.lang)])];
+  out.langs = langs.map((lang) => { const ls = sign.filter((s) => s.lang === lang); return { lang, booked: V.reduce((x, v) => x + (v.data?.byLang?.[lang] ?? 0), 0), payers: payerCount(ls), paid: sum(ls, "amount") }; })
+    .sort((a, b) => b.paid - a.paid || b.booked - a.booked);
+  // 상담자별: 결제자·환불자·실매출(그 사람 줄 합계)·결제 객단가. 상담 인원은 캘린더에 담당자가 없어 비운다.
+  out.staff = [...new Set(S.map((s) => s.staff))].map((staff) => {
+    const mine = S.filter((s) => s.staff === staff), sg = mine.filter(isSignup), rf = mine.filter(isRefund);
+    return { staff, payers: payerCount(sg), paid: sum(sg, "amount"), refunders: payerCount(rf), refund: -sum(rf, "amount"), net: sum(mine, "amount"), aov: ratio(sum(sg, "amount"), payerCount(sg)) };
+  }).filter((r) => r.payers || r.refunders).sort((a, b) => b.net - a.net);
+  return out;
+}
+
+// 캘린더 통계 한 줄(jeonsan-visits.js 를 줄인 꼴) "YYYY-MM-DD|총예약|방문완|불참|방문|등록전환|상태=n,…|언어=n,…|동기=n,…" → mk_visits 행.
+// 이름표는 글자(한글·영문·공백·괄호)만, 숫자는 0 이상 정수만 — 이름·전화번호가 섞일 틈을 막는다.
+function parseVisitLine(line) {
+  const p = String(line ?? "").trim().split("|");
+  if (p.length !== 9 || !toDate(p[0]) || toDate(p[0]) !== p[0]) return { ok: false, reason: "형식" };
+  const ints = p.slice(1, 6).map(Number);
+  if (ints.some((n) => !Number.isInteger(n) || n < 0)) return { ok: false, reason: "숫자" };
+  const map = (t) => { const o = {}; for (const kv of t ? t.split(",") : []) { const m = kv.match(/^([가-힣A-Za-z ()·]{1,20})=(\d{1,4})$/); if (!m) return null; o[m[1]] = +m[2]; } return o; };
+  const [byStatus, byLang, byMotive] = [map(p[6]), map(p[7]), map(p[8])];
+  if (!byStatus || !byLang || !byMotive) return { ok: false, reason: "이름표" };
+  const [total, done, noshow, visit, enroll] = ints;
+  return { ok: true, row: { day: p[0], total, done, noshow, data: { visit, enroll, byStatus, byLang, byMotive } } };
+}
+
+// 월간 리포트. half: "first"(1~15일) | "full"(한 달). 비교 = 지난달 같은 날짜 구간. trend = months(오래된 순)의 달별 숫자(이번 달은 to 까지)
+function buildMonthly({ month, half = "full", months = [], ...data }) {
+  const from = month + "-01", to = half === "first" ? month + "-15" : monthEnd(month);
+  const pm = prevMonth(month), pTo = half === "first" ? pm + "-15" : monthEnd(pm);
+  const cur = periodStats({ from, to, ...data }), prev = periodStats({ from: pm + "-01", to: pTo, ...data });
+  const halves = half === "full" ? { first: periodStats({ from, to: month + "-15", ...data }), second: periodStats({ from: month + "-16", to, ...data }) } : null;
+  const trend = months.map((m) => { const s = periodStats({ from: m + "-01", to: m === month ? to : monthEnd(m), ...data }); return { month: m, ...s }; });
+  return { month, half, from, to, cur, prev, halves, trend };
+}
+
+return { ALIAS, decode, teamKeyOf, parseVisitLine, CHANNELS, channelOf, saleRow, isSignup, isRefund, periodStats, buildMonthly, monthEnd, prevMonth, teamKeyOfTeamName, parseCsv, toNumber, toDate, detectKind, normalize, STATUS, STATUS_MAP, sanitizeLead, addDays, weekStart,
   MIN_SAMPLE, ZERO_LEAD_SPEND, ZERO_WEEK_MIN_SPEND, FATIGUE, buildWeekly, buildPersonaInputs };
 });

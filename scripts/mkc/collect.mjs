@@ -72,7 +72,9 @@ await run(async () => {
           if (THUMBS && !thumbs.has(ad.library_id)) {
             const el = page.locator(`[data-mkc-id="${ad.library_id}"]`).first();
             // 영상 광고는 화면에 들어온 뒤에야 첫 장면(포스터)이 뜬다 → --thumbs-dir 일 때만 잠깐 기다린다
-            if (THUMBS_DIR && raw.hasVideo) { await el.scrollIntoViewIfNeeded().catch(() => {}); await page.waitForFunction((id) => { const v = document.querySelector(`[data-mkc-id="${id}"] video`); return !v || v.poster || v.readyState >= 2; }, ad.library_id, { timeout: 4000 }).catch(() => {}); await sleep(400); }
+            if (THUMBS_DIR && raw.hasVideo) { await el.scrollIntoViewIfNeeded().catch(() => {}); await page.waitForFunction((id) => { const v = document.querySelector(`[data-mkc-id="${id}"] video`); return !v || v.poster || v.readyState >= 2; }, ad.library_id, { timeout: 4000 }).catch(() => {}); await sleep(400);
+              // 트렌드 칸 '그 자리 재생'용 영상 주소(페이스북 CDN, 며칠 뒤 만료) — dry 결과(--out)에만 실리고 DB 엔 안 씀
+              ad.video_url = await page.evaluate((id) => document.querySelector(`[data-mkc-id="${id}"] video`)?.currentSrc || document.querySelector(`[data-mkc-id="${id}"] video`)?.src || "", ad.library_id).catch(() => ""); }
             try { thumbs.set(ad.library_id, await el.screenshot({ type: "jpeg", quality: 60, timeout: 8000 })); } catch (e) { log("  스크린샷 실패", ad.library_id, e.message.split("\n")[0]); }
           }
         }
