@@ -142,7 +142,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 
 - 환율 조회 실패 → 직전 저장 환율(없으면 latest) 사용 + 코멘트에 표시(`meta-ad.mjs` 출력의 `fxSource`). 모두 실패하면 비용 null + partial.
 - 구글 화면 느림 → 표가 뜰 때까지 최대 60초 기다림. 끝내 안 뜨면 그 계정 `failed`(표가 안 뜸). 날짜를 못 맞추면 `날짜 설정 실패`, 캠페인 합이 총계와 다르면(두 번 읽어도) `합계 불일치`.
-- 로그인 풀림 → 그 지점·계정 `login_required`. 터미널에서 `node scripts/mkd/browser.mjs login` 으로 다시 로그인(구글이 자동화 브라우저 로그인을 막으면 진짜 Chrome 으로 열리는지 확인).
+- 로그인 풀림 → 그 지점·계정 `login_required`. 터미널에서 `node scripts/mkd/browser.mjs login` 으로 다시 로그인(구글이 자동화 브라우저 로그인을 막으면 같은 프로필을 일반 크롬 창으로 열어 로그인한다: `open -na "Google Chrome" --args --user-data-dir=$HOME/.cache/pallo-mkd/profile https://ads.google.com/aw/campaigns?ocid=6771267051` — 창을 닫은 뒤 `check` 로 확인).
 - 메타 새로고침이 실패·건너뜀이고 그날 `mk_ad_daily` 줄이 없으면 최근 7일에 광고가 있던 지점에 `failed` 행("메타 데이터 아직 없음(이유)") — 0 으로 보이지 않게.
 - 전산 화면 구조 변경 → `jeonsan` 전부 `failed`, 코멘트에 "전산 읽기 실패".
 - 같은 날 두 번 실행 → upsert, `collected_at` 갱신.
