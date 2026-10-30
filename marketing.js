@@ -10,6 +10,8 @@ const $m = (s) => V().querySelector(s);
 const n = (v) => Number(v) || 0; // 리포트 JSON 은 스킬이 쓴 값이라, 화면에 넣는 숫자는 모두 숫자로 바꿔서 쓴다
 const usd = (v) => (v === null || v === undefined ? "–" : "$" + (Math.round(n(v) * 100) / 100).toLocaleString("en-US"));
 const pct = (v) => (Math.round(n(v) * 1000) / 10) + "%";
+const won = (v) => (v === null || v === undefined ? "–" : (n(v) < 0 ? "-₩" : "₩") + Math.abs(Math.round(n(v))).toLocaleString("ko-KR"));
+const rate = (v) => (v === null || v === undefined ? "–" : pct(v));
 let parsed = [];
 
 MK.load = async function () {
@@ -21,7 +23,7 @@ MK.load = async function () {
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
     ${admin && MK.tab !== "daily" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["monthly", "📊 월간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
@@ -31,6 +33,7 @@ MK.load = async function () {
   if (MK.tab === "trend") return renderTrend();
   if (!MK.team) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
   if (MK.tab === "upload") return renderUpload();
+  if (MK.tab === "monthly") return renderMonthly();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
 };
 
@@ -48,30 +51,70 @@ async function renderReport(kind) {
 
 function weeklyHtml(d) {
   const f = d.flags ?? {}, t = d.totals ?? {}, nt = d.notes ?? {};
-  const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "등록 데이터 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
+  const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "전산 리드 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noSales && "매출 시트 결제가 없어요 — 재무 탭 시트 동기화를 확인해 주세요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
   const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${nt.ads?.[a.ad_name] ? `<div class="mut">${esc(nt.ads[a.ad_name])}</div>` : ""}</td>
     <td><span class="vd ${esc(a.verdict)}">${VERDICT[a.verdict] ?? esc(a.verdict)}</span><div class="mut">${esc(a.reason)}</div></td>
-    <td>${usd(a.spend)}</td><td>${n(a.leads)}</td><td>${usd(a.cpl)}</td><td>${n(a.leads4w)}</td><td>${n(a.enrolls4w)}</td><td>${usd(a.cpe4w)}</td></tr>`).join("");
+    <td>${usd(a.spend)}</td><td>${n(a.leads)}</td><td>${usd(a.cpl)}</td><td>${n(a.leads4w)}</td><td>${n(a.booked4w)}</td><td>${usd(a.cpb4w)}</td></tr>`).join("");
+  const s4 = t.sales4w;
   const posts = (arr) => (arr ?? []).map((p) => `<tr><td>${String(p.permalink ?? "").startsWith("https://") ? `<a href="${esc(p.permalink)}" target="_blank" rel="noopener">${esc(p.caption || p.post_id)}</a>` : esc(p.caption || p.post_id)}<div class="mut">${esc(p.type)} · ${esc(p.published_at)}</div></td>
     <td>${n(p.reach).toLocaleString("ko-KR")}</td><td>${n(p.saves)}</td><td>${n(p.shares)}</td><td>${p.score == null ? "–" : pct(p.score)}</td></tr>`).join("");
   const ptable = (arr) => `<div class="tw"><table><tr><th>게시물</th><th>도달</th><th>저장</th><th>공유</th><th>저장+공유율</th></tr>${posts(arr)}</table></div>`;
   return warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
     + (nt.summary || nt.caution ? `<div class="card">${nt.summary ? `<b>이번 주 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${nt.tests?.length ? `<b>새로 테스트할 방향</b><ul>${nt.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
     + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${usd(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${n(t.leads)}</b></div>
-       <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 등록</span><b>${n(t.enrolls4w)}</b>${n(t.otherEnrolls4w) > 0 ? `<small class="mut">(광고 외 등록 ${n(t.otherEnrolls4w)})</small>` : ""}</div><div class="kpi"><span class="mut">4주 등록당 비용</span><b>${usd(t.cpe4w)}</b></div></div>`
-    + `<div class="card"><b>소재 판정</b><div class="tw"><table><tr><th>광고</th><th>판정</th><th>이번 주 지출</th><th>리드</th><th>리드당</th><th>4주 리드</th><th>4주 등록</th><th>등록당</th></tr>${ads || `<tr><td colspan="8">광고 없음</td></tr>`}</table></div></div>`
+       <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 상담 예약</span><b>${n(t.booked4w)}</b></div><div class="kpi"><span class="mut">4주 예약당 비용</span><b>${usd(t.cpb4w)}</b></div></div>`
+    + (s4 ? `<div class="card"><b>4주 결제 (매출 시트 '가입')</b> <span class="mut">결제 ${n(s4.payers)}명 · ${won(s4.paid)}</span>
+       <div class="tw"><table><tr><th>매체</th><th>결제</th><th>결제금액</th><th>광고비</th><th>ROAS</th><th>결제당 광고비</th></tr>${(s4.channels ?? []).map((c) => `<tr><td>${esc(c.channel)}</td><td>${n(c.payers)}</td><td>${won(c.paid)}</td><td>${won(c.spend)}</td><td>${rate(c.roas)}</td><td>${won(c.cpp)}</td></tr>`).join("")}</table></div>
+       <p class="mut">매체는 매출 시트 '가입경로'(인스타=메타). 메타 광고비는 달러를 원화로 바꾼 값${s4.coverage && s4.coverage.naver < s4.coverage.days ? ` · 네이버 광고비는 ${n(s4.coverage.naver)}/${n(s4.coverage.days)}일치만 있어요` : ""}. 소재별 결제는 시트에 광고명이 없어 못 세서, 소재 판정은 상담 예약 기준이에요.</p></div>` : "")
+    + `<div class="card"><b>소재 판정</b><div class="tw"><table><tr><th>광고</th><th>판정</th><th>이번 주 지출</th><th>리드</th><th>리드당</th><th>4주 리드</th><th>4주 예약</th><th>예약당</th></tr>${ads || `<tr><td colspan="8">광고 없음</td></tr>`}</table></div></div>`
     + `<div class="card"><b>오가닉 잘 된 게시물</b>${ptable(d.organic?.top)}</div><div class="card"><b>오가닉 아쉬운 게시물</b>${ptable(d.organic?.bottom)}</div>`;
+}
+
+// ── 📊 월간 리포트 (mk_reports kind monthly_first=전반 1~15일 · monthly=한 달) ── 숫자는 buildMonthly, 문장(notes)은 스킬이 쓴다
+async function renderMonthly() {
+  const { data: list, error } = await sb.from("mk_reports").select("week, kind, data, updated_at").eq("team_id", MK.team).in("kind", ["monthly", "monthly_first"]).order("week", { ascending: false }).limit(24);
+  if (fail(error)) return;
+  if (!list?.length) { $m("#mkBody").innerHTML = `<div class="card">아직 월간 리포트가 없어요. 매달 16일(전반)과 1일(지난달 전체) 아침에 자동으로 생겨요.</div>`; return; }
+  const keyOf = (r) => `${r.week}|${r.kind}`, cur = list.find((r) => keyOf(r) === MK.mweek) ?? list[0]; MK.mweek = keyOf(cur);
+  $m("#mkBody").innerHTML = `<div class="mkbar"><select id="mkMonth">${list.map((r) => `<option value="${esc(keyOf(r))}" ${keyOf(r) === MK.mweek ? "selected" : ""}>${esc(r.week.slice(0, 7))} ${r.kind === "monthly" ? "전체" : "전반(1~15일)"}</option>`).join("")}</select>
+    <span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span></div>` + monthlyHtml(cur.data);
+  $m("#mkMonth").addEventListener("change", (e) => { MK.mweek = e.target.value; renderMonthly(); });
+}
+
+function monthlyHtml(d) {
+  const nt = d.notes ?? {}, c = d.cur ?? {}, p = d.prev ?? {};
+  const note = (k) => (nt[k] ? `<p class="mknote">${esc(nt[k])}</p>` : "");
+  const head = `<tr><th></th><th>지원자</th><th>상담 예약</th><th>방문완</th><th>방문율</th><th>결제자</th><th>결제율</th><th>결제/지원자</th><th>결제금액</th><th>객단가</th><th>환불</th></tr>`;
+  // 그 기간에 수집한 날이 하나도 없으면 0 이 아니라 '–' (전산 신규 회신은 약 한 달치만, 캘린더 통계는 10월부터)
+  const has = (s, k) => n(s.coverage?.[k]) > 0, dash = (ok, v) => (ok ? v : "–");
+  const row = (label, s) => `<tr><td>${esc(label)}</td><td>${dash(has(s, "leads"), n(s.apps))}</td><td>${dash(has(s, "visits"), n(s.booked))}</td><td>${dash(has(s, "visits"), n(s.done))}</td><td>${dash(has(s, "visits"), rate(s.doneRate))}</td><td>${n(s.payers)}</td><td>${dash(has(s, "visits"), rate(s.payRate))}</td><td>${dash(has(s, "leads"), rate(s.payPerApp))}</td><td>${won(s.paid)}</td><td>${won(s.aov)}</td><td>${won(s.refund)}</td></tr>`;
+  const chHead = `<tr><th>매체</th><th>상담 예약</th><th>결제</th><th>결제금액</th><th>광고비</th><th>ROAS</th><th>결제당 광고비</th></tr>`;
+  const chRows = (s) => (s.channels ?? []).map((x) => `<tr><td>${esc(x.channel)}</td><td>${n(x.booked)}</td><td>${n(x.payers)}</td><td>${won(x.paid)}</td><td>${won(x.spend)}</td><td>${rate(x.roas)}</td><td>${won(x.cpp)}</td></tr>`).join("");
+  const label = d.half === "first" ? "전반" : "한 달", cv = c.coverage ?? {};
+  const gaps = [cv.visits < cv.days && `캘린더 방문은 ${n(cv.visits)}/${n(cv.days)}일치`, cv.naver < cv.days && `네이버 광고비는 ${n(cv.naver)}/${n(cv.days)}일치`].filter(Boolean);
+  const short = c.visitsShort ? `<div class="card warn">⚠️ 이번 기간 결제자(${n(c.payers)})가 캘린더 방문완(${n(c.done)})보다 많아요 — 전산 캘린더에 상담 일정이 다 들어가지 않은 것 같아요. 결제율은 비워 뒀어요.</div>` : "";
+  return short + (nt.summary ? `<div class="card"><b>이번 ${label} 한 줄</b><p>${esc(nt.summary)}</p>${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
+    + `<div class="card kpis"><div class="kpi"><span class="mut">결제금액</span><b>${won(c.paid)}</b></div><div class="kpi"><span class="mut">결제자</span><b>${n(c.payers)}</b></div>
+       <div class="kpi"><span class="mut">방문완 → 결제율</span><b>${rate(c.payRate)}</b></div><div class="kpi"><span class="mut">객단가</span><b>${won(c.aov)}</b></div><div class="kpi"><span class="mut">광고비 (메타+네이버)</span><b>${won(n(c.spend?.meta) + n(c.spend?.naver))}</b></div></div>`
+    + `<div class="card"><b>월별 추이</b>${note("trend")}<div class="tw"><table>${head}${(d.trend ?? []).map((t) => row(t.month.slice(5) + "월" + (t.month === d.month && d.half === "first" ? " (1~15일)" : ""), t)).join("")}</table></div></div>`
+    + `<div class="card"><b>${d.half === "first" ? "이번 달 전반 vs 지난달 전반" : "전반 vs 후반"}</b>${note("compare")}<div class="tw"><table>${head}${d.halves ? row("전반 1~15일", d.halves.first) + row("후반 16일~", d.halves.second) : row("지난달 1~15일", p) + row("이번 달 1~15일", c)}</table></div></div>`
+    + `<div class="card"><b>매체별</b>${note("channels")}<div class="tw"><table>${chHead}<tr><td colspan="7" class="mut">이번 ${label}</td></tr>${chRows(c)}<tr><td colspan="7" class="mut">지난달 같은 기간</td></tr>${chRows(p)}</table></div>
+       <p class="mut">상담 예약 = 전산 캘린더 '동기', 결제 = 매출 시트 '가입경로'(인스타·외부 유입·랜딩=메타). ROAS = 결제금액 ÷ 광고비.</p></div>`
+    + `<div class="card"><b>언어별</b>${note("langs")}<div class="tw"><table><tr><th>언어</th><th>상담 예약</th><th>결제</th><th>결제금액</th></tr>${(c.langs ?? []).map((x) => `<tr><td>${esc(x.lang)}</td><td>${n(x.booked)}</td><td>${n(x.payers)}</td><td>${won(x.paid)}</td></tr>`).join("")}</table></div></div>`
+    + `<div class="card"><b>상담자별</b>${note("staff")}<div class="tw"><table><tr><th>상담자</th><th>결제자</th><th>환불자</th><th>결제금액</th><th>환불</th><th>실매출</th><th>결제 객단가</th></tr>${(c.staff ?? []).map((x) => `<tr><td>${esc(x.staff)}</td><td>${n(x.payers)}</td><td>${n(x.refunders)}</td><td>${won(x.paid)}</td><td>${won(x.refund)}</td><td>${won(x.net)}</td><td>${won(x.aov)}</td></tr>`).join("")}</table></div>
+       <p class="mut">매출 시트 '상담자' 기준. 환불은 이번 기간에 처리된 환불(예전 결제 포함). 캘린더에 담당자가 없어 상담자별 방문 수·결제율은 아직 못 내요.</p></div>`
+    + `<p class="mut">결제 = 매출 시트(재무 탭) 거래형태 '가입'. 방문완 = 전산 캘린더 통계. 지원자 = 전산 신규 회신.${gaps.length ? " " + gaps.join(" · ") + "만 있어요." : ""}</p>`;
 }
 
 function personaHtml(d) {
   const p = d.persona ?? {};
-  const dist = (o) => Object.entries(o ?? {}).map(([k, v]) => `${esc(k)} ${n(v)}명`).join(" · ") || "–";
+  // 상태는 리드마다 지금 닿은 마지막 단계 하나 → 단계별 인원은 뒤 단계까지 더한다. 방문(예약 상태 '방문완')은 기간(from)이 있는 리포트부터 읽음
+  const f = d.funnel ?? {}, c = (k) => +f[k] || 0;
   return (d.borrowed ? `<div class="card warn">⚠️ 이 지점은 표본이 적어서 다른 지점 패턴을 빌려 썼어요 (표본 ${esc(d.sample)}건)</div>` : "")
     + `<div class="card"><h3>${esc(p.title ?? "페르소나")}</h3><p>${esc(p.who ?? "")}</p><p><b>원하는 것</b> ${esc(p.wants ?? "")}</p>
        ${p.messages?.length ? `<b>반응한 메시지</b><ul>${p.messages.map((m) => `<li>${esc(m)}</li>`).join("")}</ul>` : ""}
        <p><b>활동 시간</b> ${esc(p.times ?? "")}</p>${p.caution ? `<p class="mut">${esc(p.caution)}</p>` : ""}</div>`
-    + `<div class="card"><b>근거 숫자</b><p class="mut">리드 → 상담 → 방문 → 등록: ${["lead", "consult", "visit", "enroll"].map((k) => n(d.funnel?.[k])).join(" → ")} (이탈 ${n(d.funnel?.lost)})</p>
-       <p class="mut">등록자 나이대: ${dist(d.enrolledByAge)}</p><p class="mut">등록자 과목: ${dist(d.enrolledBySubject)}</p>
+    + `<div class="card"><b>근거 숫자</b><p class="mut">리드 ${n(d.sample)} → 상담 예약 ${n(c("consult") + c("visit") + c("enroll"))} → 방문 ${d.from ? n(c("visit") + c("enroll")) : "–"} → 등록 ${n(c("enroll"))} · 연락 안 됨 ${n(c("lost"))}${d.from ? ` (전산 지원 ${esc(d.from)} ~ ${esc(d.to)})` : ""}</p>
        <p class="mut">광고 리드 연령·성별: ${(d.leadsByAgeGender ?? []).slice(0, 6).map((x) => `${esc(x.age)} ${esc(x.gender)} ${pct(x.share)}`).join(" · ") || "–"}</p></div>`;
 }
 

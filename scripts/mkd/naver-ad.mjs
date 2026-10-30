@@ -14,6 +14,13 @@ import { ACCOUNTS, parseEnv, keyOutcome, campaignRows, failRows, apiErrorMessage
 const date = dateArg(2, "date"), print = process.argv.includes("--print");
 const file = process.env.MK_ENV || `${homedir()}/.config/pallo/marketing.env`;
 const env = parseEnv(readFileSync(file, "utf8"));
+// 맥북: marketing.env 에 네이버 키가 없으면 naver-ads 폴더의 yaml(naverads.py 가 쓰는 것, 대구=naver-ads-daegu.yaml · 울산=naver-ads.yaml)을 메모리로만 읽는다. 파일로 옮기거나 출력하지 않는다.
+const yamlKeys = (f) => { try { return Object.fromEntries(readFileSync(f, "utf8").split("\n").map((l) => l.match(/^(customer_id|api_key|secret_key):\s*"?([^"\s]+)"?/)).filter(Boolean).map((m) => [m[1], m[2]])); } catch { return {}; } };
+for (const [suffix, f] of [["", "naver-ads-daegu.yaml"], ["_ULSAN", "naver-ads.yaml"]]) {
+  if (env[`NAVER_AD_API_KEY${suffix}`]) continue;
+  const y = yamlKeys(`${process.env.NAVER_ADS_DIR || `${homedir()}/Downloads/GEO:SEO 스킬/naver-ads`}/${f}`);
+  if (y.api_key) Object.assign(env, { [`NAVER_AD_CUSTOMER_ID${suffix}`]: y.customer_id, [`NAVER_AD_API_KEY${suffix}`]: y.api_key, [`NAVER_AD_SECRET${suffix}`]: y.secret_key });
+}
 const BASE = "https://api.searchad.naver.com";
 
 // 서명 = HMAC-SHA256(`${timestamp}.GET.${path}`) base64 (쿼리스트링은 서명에 넣지 않는다)
