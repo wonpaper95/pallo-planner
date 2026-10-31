@@ -1,4 +1,5 @@
-// 🧑‍🎓 조교 가이드 화면 — 내용은 jo-guide-data.js(JG). 플래너 [조교 가이드] 탭과 로그인 없는 사전숙제 링크(guide.html)가 같이 씀.
+// 🧑‍🎓 조교 가이드 화면 — 플래너 [조교 가이드] 탭과 로그인 없는 사전숙제 링크(guide.html)가 같이 씀.
+// 🔒 내용(JG)은 DB(0080): 플래너는 로그인으로 jo_guide_full(), 사전숙제 링크는 매니저가 만든 7일 키(?k=)로 jo_guide_pre() — 사전 준비만. 원본은 ../guide-src (공개 저장소 밖)
 // 체크·퀴즈 점수는 이 기기에 저장(localStorage). 플래너 안에서 조교가 '나'(조교체크리스트 이름)를 고르면 jc_guide(0073)에도 저장 →
 // 조교는 📍 지금 몇 일차를 크게 보고, 같은 지점 매니저·대표는 조교별 진행표를 봄 (올리비아 신고 10-29). 사전숙제 링크(guide.html)는 기기에만.
 (() => {
@@ -14,6 +15,19 @@
   try { lang = new URLSearchParams(location.search).get("lang") || localStorage.getItem("jg-lang") || "en"; } catch {}
   const txt = (r) => (lang === "ja" && r.ja) || r.body;
   const REF = () => Object.fromEntries(JG.REF.map((r) => [r.id, r]));
+  let JG = window.JG || null, INV = null, lockMsg = ""; // INV = 사전숙제 링크 키의 { team, exp }
+  const KEY_Q = (() => { try { return new URLSearchParams(location.search).get("k") || ""; } catch { return ""; } })();
+  async function loadDoc() {
+    if (JG) return;
+    if (!cli()) { lockMsg = "인터넷 연결을 확인해 주세요."; return render(); }
+    const r = opts.standalone ? await cli().rpc("jo_guide_pre", { p_key: KEY_Q }) : await cli().rpc("jo_guide_full");
+    if (r.error || !r.data) {
+      lockMsg = opts.standalone ? "🔒 열 수 없는 링크예요 — 기간(7일)이 지났거나 주소가 잘렸어요. 매니저님께 새 링크를 받아 주세요." : "가이드를 불러오지 못했어요" + (r.error ? ": " + r.error.message : " — 플래너 계정에 지점이 연결돼 있어야 해요.");
+      return render();
+    }
+    if (opts.standalone) { JG = r.data.doc; INV = { team: r.data.team, exp: r.data.exp }; } else JG = r.data;
+    render();
+  }
 
   function body(lines) {
     let h = "", ul = false;
@@ -107,8 +121,8 @@
     }).join("");
     return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · ${opts.standalone ? "사전 준비" : "1주일"}${lang === "ja" ? " · 일본어" : ""}</h2>
       <div class="jglang">${[["en", "🇺🇸 영어"], ["ja", "🇯🇵 일본어"]].map(([k, n]) => `<button data-jgl="${k}" class="${lang === k ? "on" : ""}">${n}</button>`).join("")}</div>
-      ${opts.standalone ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 열리는 사전숙제 링크">🔗 사전숙제 링크 복사</button>`}</div>
-      ${opts.standalone ? `<p class="jgsub">출근 첫날 전에 이것만 해 오면 돼요. 1~4일차는 출근해서 매니저와 같이 봐요.</p></div>` // 사전숙제 링크: 1~4일차·찾아보기 탭 숨김 (10-31)
+      ${opts.standalone || isJo() ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 7일 동안 열리는 사전숙제 링크 — 누를 때마다 새로 만들어요">🔗 사전숙제 링크 복사</button>`}</div>
+      ${opts.standalone ? `<p class="jgsub">출근 첫날 전에 이것만 해 오면 돼요. 1~4일차는 출근해서 매니저와 같이 봐요.${INV?.exp ? ` <small>· 이 링크는 ${new Date(INV.exp).getMonth() + 1}/${new Date(INV.exp).getDate()}까지 열려요</small>` : ""}</p></div>` // 사전숙제 링크: 1~4일차·찾아보기 탭 숨김 (10-31)
         : `<p class="jgsub">사전 준비 → 1~4일차 → 5일차부터 혼자 근무. <span class="must">🔴 필수</span> = 2시간 30분 근무도 이것만은 · <span class="add">🟡 추가</span> = 4시간 근무면 더</p>
       <nav class="jgtabs">${chips}</nav>${liveBox()}</div>`}`;
   }
@@ -120,7 +134,7 @@
       ${P.read.map((r, i) => `<details class="jgread"><summary><b>${"①②③④⑤⑥⑦⑧"[i]} ${esc(r.t)}</b><small>${r.min}분</small></summary>${r.note ? `<p class="jgmut">${esc(r.note)}</p>` : ""}${refBox(r.ref, r.ref.length === 1)}</details>`).join("")}</div>
       <div class="jgcard"><h3>✍️ 사전 숙제 <small>${P.hw.filter((h) => st.c[h.id]).length}/${P.hw.length}</small></h3>
       ${P.hw.map((h) => ck(h.id, h.t, esc(h.how)) + (h.link ? `<div class="jgin"><a class="jgbtn" href="${esc(h.link[0])}" target="_blank" rel="noopener">${esc(h.link[1])}</a></div>` : "") + (h.ref ? `<div class="jgin">${refBox(h.ref)}</div>` : "")).join("")}</div>
-      ${quiz()}${subBox()}`;
+      ${quiz()}${opts.standalone ? subBox() : ""}`;
   }
 
   function quiz(on) { // 📝 4일차에만 (사전 준비 탭엔 안 보임)
@@ -145,7 +159,8 @@
     if (SUB.teams || !cli()) return;
     const { data } = await cli().rpc("jo_hw_teams"); SUB.teams = data ?? [];
     st.sub ||= {};
-    if (!st.sub.team) { const t = new URLSearchParams(location.search).get("t") || LV.team; if (t && SUB.teams.some((x) => String(x.id) === String(t))) st.sub.team = String(t); }
+    if (INV?.team) st.sub.team = String(INV.team); // 키에 지점이 있으면 그 지점 고정
+    if (!st.sub.team) { const t = LV.team; if (t && SUB.teams.some((x) => String(x.id) === String(t))) st.sub.team = String(t); }
     if (tab === "pre") render();
   }
   function subBox() {
@@ -156,7 +171,7 @@
     return `<div class="jgcard jgsub" id="jgsub"><h3>📤 사전 숙제 제출 <small>${done ? `✅ ${esc(new Date(done.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }))} 제출함 · 고쳐서 다시 내도 돼요` : "다 쓰면 마지막으로 여기서 제출"}</small></h3>
       <p class="jgmut">제출하면 우리 지점 매니저님이 플래너에서 봐요.</p>
       <div class="jgfrow"><label>이름<input data-jgs="name" maxlength="30" value="${esc(d.name || "")}" placeholder="홍길동"></label>
-        <label>지점<select data-jgs="team"><option value="">지점 고르기</option>${(SUB.teams || []).map((t) => `<option value="${t.id}"${String(t.id) === String(d.team) ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label></div>
+        <label${INV?.team ? " hidden" : ""}>지점<select data-jgs="team"><option value="">지점 고르기</option>${(SUB.teams || []).map((t) => `<option value="${t.id}"${String(t.id) === String(d.team) ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label></div>
       <label class="jgfld"><b>① TED 독후감 파일</b> <small class="jgmut">PDF·워드·한글·사진 · 10MB까지</small>
         <input type="file" data-jgs="file" accept="${S.ext.map((x) => "." + x).join(",")}"><span class="jgmut" data-jgfile>${fl}</span></label>
       <label class="jgfld"><b>② ${esc(S.q)}</b><textarea data-jgs="answer" rows="5" maxlength="3000" placeholder="1가지와 그 이유를 적어 주세요">${esc(d.answer || "")}</textarea></label>
@@ -173,9 +188,9 @@
     if (!answer) return say("② 질문에 답을 적어 주세요");
     if (!cli()) return say("인터넷 연결을 확인해 주세요");
     SUB.busy = true; render(); el.querySelector("#jgsub")?.scrollIntoView({ block: "center" });
-    const path = `${team}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extOf(f)}`; // 저장소 경로는 ASCII 만
+    const path = `${team}/${Date.now()}_${KEY_Q}.${extOf(f)}`; // 저장소 경로는 ASCII 만 · 키가 살아 있어야 올라감 (jo_hw_path_ok)
     const up = await cli().storage.from("jo-hw").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
-    const r = up.error ? up : await cli().rpc("jo_hw_submit", { p_team: team, p_name: name, p_answer: answer, p_path: path, p_file_name: f.name });
+    const r = up.error ? up : await cli().rpc("jo_hw_submit", { p_key: KEY_Q, p_team: team, p_name: name, p_answer: answer, p_path: path, p_file_name: f.name });
     SUB.busy = false;
     if (r.error) { render(); return say("제출 실패: " + r.error.message); }
     SUB.file = null; st.subDone = { at: new Date().toISOString() }; st.c["hw-ted"] = true; save(); push(); render();
@@ -214,6 +229,7 @@
 
   function render() {
     if (!el) return;
+    if (!JG) { el.innerHTML = `<div class="jg"><div class="jgcard jglock"><p>${esc(lockMsg || "불러오는 중…")}</p></div></div>`; return; }
     const d = JG.DAYS.find((x) => `d${x.day}` === tab);
     el.innerHTML = `<div class="jg">${head()}${tab === "hire" && canHire() ? hire() : tab === "ref" ? ref() : d ? day(d) : pre()}
       <p class="jgfoot">${live() && isJo() && LV.meId ? "체크는 이 기기와 플래너(매니저 화면)에 저장돼요." : "체크는 이 기기에만 저장돼요."} <button class="jglink" data-jgreset>체크 모두 지우기</button></p></div>`;
@@ -241,9 +257,11 @@
       }
       if (e.target.closest("[data-jgreset]") && confirm("체크와 퀴즈 점수를 모두 지울까요?")) { st = { c: {} }; save(); push(); return render(); }
       if (e.target.closest("[data-jgcopy]")) {
-        const qs = new URLSearchParams(); if (lang === "ja") qs.set("lang", "ja"); if (LV.team) qs.set("t", LV.team); // t = 제출 칸 지점 미리 골라 둠
-        const url = new URL("guide.html", location.href.split("?")[0]).href + (qs.toString() ? "?" + qs : "");
-        try { await navigator.clipboard.writeText(url); (window.toast || alert)(`🔗 ${lang === "ja" ? "일본어 " : ""}사전숙제 링크를 복사했어요 — 카톡에 붙여 보내세요`); } catch { prompt("이 링크를 복사해 보내세요", url); }
+        const { data: k, error } = await sb.rpc("jo_invite_new", { p_team: LV.team || null }); // 🔒 7일짜리 키 (지점 = 제출 칸 지점)
+        if (error) return (window.toast || alert)("링크 만들기 실패: " + error.message);
+        const qs = new URLSearchParams({ k }); if (lang === "ja") qs.set("lang", "ja");
+        const url = new URL("guide.html", location.href.split("?")[0]).href + "?" + qs;
+        try { await navigator.clipboard.writeText(url); (window.toast || alert)(`🔗 ${lang === "ja" ? "일본어 " : ""}사전숙제 링크를 복사했어요 — 7일 동안 열려요. 카톡에 붙여 보내세요`); } catch { prompt("이 링크를 복사해 보내세요 (7일 동안 열려요)", url); }
       }
     });
     el.addEventListener("toggle", (e) => { if (e.target.classList?.contains("jgme")) LV.progOpen = e.target.open; }, true); // 👥 진행표 펼침 기억 (toggle 은 버블 안 됨)
@@ -269,6 +287,6 @@
   }
 
   window.JGUIDE = {
-    mount(target, o = {}) { if (el !== target) { el = target; opts = o; bind(); } if (o.standalone) tab = "pre"; render(); liveLoad(); },
+    mount(target, o = {}) { if (el !== target) { el = target; opts = o; bind(); } if (o.standalone) tab = "pre"; render(); loadDoc(); liveLoad(); },
   };
 })();
