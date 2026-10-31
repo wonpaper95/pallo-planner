@@ -5,12 +5,12 @@
   if (typeof module === "object" && module.exports) module.exports = api; else root.SNSCORE = api;
 })(typeof self !== "undefined" ? self : globalThis, function () {
 
-// 1단계는 넷 다 수동(복사·사진 받기). 2단계에서 instagram, 3단계에서 google 의 auto 를 true 로 바꾼다.
+// 당근은 맥미니 매일 자동 게시(pallo-daangn-daily)라 탭에서 뺐다(10-31). normalize·LIMITS의 daangn 은 예전 글 호환용.
+// 1단계는 셋 다 수동(복사·사진 받기). 2단계에서 instagram, 3단계에서 google 의 auto 를 true 로 바꾼다.
 const CHANNELS = [
   { key: "instagram", label: "📸 인스타", auto: false, open: "https://www.instagram.com/" },
   { key: "google", label: "🔎 구글", auto: false, open: "https://business.google.com/" },
   { key: "naver", label: "🟢 네이버", auto: false, open: "https://new.smartplace.naver.com/" },
-  { key: "daangn", label: "🥕 당근", auto: false, open: "https://business.daangn.com/" },
 ];
 const LIMITS = {
   instagram: { body: 2200, tagsMin: 15, tagsMax: 20, tagsHard: 30, photosMax: 10 },

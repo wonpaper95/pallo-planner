@@ -7,7 +7,11 @@ body:not(.jgv) #jgView { display: none; }
 .jg h4 { margin: 16px 0 6px; font-size: 13.5px; color: var(--sub); }
 .jg p { margin: 6px 0; }
 .jg ul { margin: 6px 0; padding-left: 20px; } .jg li { margin: 2px 0; }
-.jgmut, .jgsub { color: var(--sub); font-size: 13.5px; }
+.jgmut { color: var(--sub); font-size: 13.5px; }
+/* 머리 안내 문구 — 진하게 (10-31 "문구 잘 안보여": 제출 칸 .jgsub 테두리가 여기까지 묻어 회색 글씨+보라 테두리였음) */
+p.jgsub { color: var(--text); font-size: 15px; font-weight: 600; }
+p.jgsub small { color: var(--sub); font-size: 13px; font-weight: 400; }
+.jglock p { font-size: 15px; font-weight: 600; }
 .jgwarn { color: var(--orange); font-weight: 600; }
 .jggoal { font-weight: 600; font-size: 15px; }
 .jgcard { background: var(--panel); border: 1px solid var(--edge, var(--line)); border-radius: 18px; box-shadow: var(--hi, none); padding: 14px 16px; margin-top: 12px; }
@@ -107,7 +111,7 @@ body:not(.jgv) #jgView { display: none; }
 .jg .jggo { margin: 8px 0 4px; padding: 10px 12px; border: 1.5px solid var(--accent); border-radius: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .jg .jggo > div { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
 /* 📤 사전숙제 제출 (10-31) — guide.html 맨 끝 칸 · 매니저 제출함 */
-.jgsub { border: 2px solid var(--accent); }
+.jgcard.jgsub { border: 2px solid var(--accent); }
 .jgfrow { display: flex; gap: 10px; flex-wrap: wrap; }
 .jgfrow label { flex: 1 1 180px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; font-weight: 600; }
 .jgfld { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 14px; }

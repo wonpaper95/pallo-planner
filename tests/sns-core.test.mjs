@@ -7,7 +7,7 @@ const tags = (n) => Array.from({ length: n }, (_, i) => `태그${i + 1}`);
 const lv = (L, re) => L.find((x) => re.test(x.txt))?.lv;
 
 test("CHANNELS: 네 채널 순서, 1단계는 전부 수동", () => {
-  assert.deepEqual(C.CHANNELS.map((c) => c.key), ["instagram", "google", "naver", "daangn"]);
+  assert.deepEqual(C.CHANNELS.map((c) => c.key), ["instagram", "google", "naver"]);
   assert.ok(C.CHANNELS.every((c) => c.auto === false && /^https:\/\//.test(c.open)));
 });
 
