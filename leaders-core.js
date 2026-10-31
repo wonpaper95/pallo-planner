@@ -136,8 +136,10 @@ const LDC = {
   // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
   langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
   timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
-  // 레벨 정렬: 숫자(0 · 0.5 · 패턴1 · 2) 순, 숫자 없으면(프토 · 땜빵리더) 뒤
-  lvNum(lv) { const m = String(lv ?? "").match(/\d+(\.\d+)?/); return m ? +m[0] : 99; },
+  // 레벨 정렬: 숫자(0 · 0.5 · 패턴1 · 2) 순, 같은 숫자면 - → 그대로 → + (패턴2-- < 패턴2- < 패턴2 < 패턴2+), 그다음 프토(프리토킹), 숫자 없으면(땜빵리더) 맨 뒤
+  lvNum(lv) { const s = String(lv ?? "").trim(), m = s.match(/\d+(\.\d+)?/);
+    if (/^(프토|프리)/.test(s)) return 50;
+    return m ? +m[0] + ((s.match(/\+/g) ?? []).length - (s.match(/-/g) ?? []).length) * 0.01 : 99; },
   // 전산 수업 이름('월수 오전', '월수 오후6', '일본어 월수 18시', '영어 화목 11:00') → 반·시간대. 그 반에 비슷한 시간(±90분)·같은 언어 칸이 있으면 그걸 씀
   courseSlot(course, rows) {
     const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0], lang = (c.match(/일본어|중국어/) ?? [""])[0];
