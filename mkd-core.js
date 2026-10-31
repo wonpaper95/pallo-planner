@@ -23,7 +23,11 @@ const METRICS = {
   reach: { label: "도달", agg: "sum", good: "up" },
   ctr: { label: "CTR", agg: "ratio", of: ["clicks", "impressions"], good: "up", unit: "pct" },
   cpc: { label: "CPC", agg: "ratio", of: ["spend", "clicks"], good: "down", unit: "krw" },
-  rank: { label: "순위", agg: "avg", good: "down", unit: "rank" },
+  rank: { label: "통합검색 순위", agg: "avg", good: "down", unit: "rank" },
+  tab_rank: { label: "블로그탭 순위", agg: "avg", good: "down", unit: "rank" },
+  kw_tracked: { label: "추적 키워드", agg: "last", good: "up" },
+  kw_top: { label: "통합검색에 걸린 키워드", agg: "last", good: "up" },
+  kw_tab: { label: "블로그탭 30위 안 키워드", agg: "last", good: "up" },
   visitors: { label: "방문자", agg: "sum", good: "up" },
   views: { label: "조회", agg: "sum", good: "up" },
   followers: { label: "단골", agg: "last", good: "up" },
@@ -36,7 +40,7 @@ const CHANNEL_METRICS = {
   naver_ad: ["impressions", "clicks", "spend", "ctr", "cpc"],
   google_ad: ["impressions", "clicks", "spend", "conversions", "ctr", "cpc"],
   meta_ad: ["impressions", "reach", "clicks", "leads", "spend"],
-  blog: ["rank", "visitors", "views"],
+  blog: ["kw_tracked", "kw_top", "kw_tab", "rank", "tab_rank", "visitors", "views"],
   daangn: ["views", "followers", "chats"],
   jeonsan: ["inquiries", "enrolls"],
 };
@@ -108,8 +112,8 @@ function buildTable(rows, end) {
   return CHANNELS.map((channel) => {
     const cr = rows.filter((r) => r.channel === channel); if (!cr.length) return null;
     const total = totalRows(cr);
-    // 순위는 키워드마다 봐야 의미가 있어서 채널 합계에선 뺀다
-    const totalMetrics = present(channel, total).filter((m) => !(channel === "blog" && m === "rank"));
+    // 순위는 키워드마다 봐야 의미가 있어서 채널 합계에선 뺀다 (합계 줄은 '전체' 행의 키워드 수)
+    const totalMetrics = present(channel, total).filter((m) => !(channel === "blog" && (m === "rank" || m === "tab_rank")));
     return { channel, label: CHANNEL_LABEL[channel], metrics: totalMetrics.map((m) => line(total, m)),
       // unit 은 이름으로 묶는다 — 지점이 달라도 같은 이름이면 한 줄로 합쳐진다(키워드·캠페인 이름은 지점마다 다르게 쓰는 게 전제). 전부 실패해 지표가 없는 unit 은 뺀다.
       units: unitsOf(cr).map((u) => { const ur = cr.filter((r) => r.unit === u); return { unit: u, metrics: present(channel, ur).map((m) => line(ur, m)) }; }).filter((u) => u.metrics.length) };
@@ -167,9 +171,10 @@ function flags(rows, end) {
   // 4 문의 급감: 주간 문의가 4주 주평균 대비 ▼40%↑ (전산 데이터가 14일 이상, 이번 주엔 4일 이상일 때만). 주간도 데이터 있는 날 수로 7일 환산해 비교한다.
   const jt = totalRows(chRows("jeonsan")), w1 = cell(jt, "inquiries", end, 7), w4 = cell(jt, "inquiries", end, 28), r1 = (x) => Math.round(x * 10) / 10;
   if (w4.days >= 14 && w1.days >= 4 && w1.value !== null && w4.value) { const wk = w1.value / w1.days * 7, avg = w4.value / (w4.days / 7); if (avg > 0 && (wk - avg) / avg <= -0.4) push("yellow", "inquiry_drop", "jeonsan", ALL, `주간 문의 ${r1(wk)}건 — 4주 주평균 ${r1(avg)}건보다 ${pct(1 - wk / avg)}% 적어요`); }
-  // 5 순위 하락: 키워드 순위 3계단↑ 하락(마지막으로 안 순위와 비교) 또는 1페이지 이탈(rank→null, 직전 쓸 수 있는 행에 순위가 있던 첫날만).
+  // 5 순위 하락(통합검색 rank): 키워드 순위 3계단↑ 하락(마지막으로 안 순위와 비교) 또는 1페이지 이탈(rank→null, 직전 쓸 수 있는 행에 순위가 있던 첫날만).
+  //   오늘 행에 rank 키가 없으면(통합검색 화면을 못 읽은 partial) 판단하지 않는다 — null(1페이지 밖)과 다르다.
   for (const u of unitsOf(chRows("blog")).filter((u) => u !== "방문자")) {
-    const ur = chRows("blog").filter((r) => r.unit === u && usable(r)).sort(byDate), today = ur.find((r) => r.date === end); if (!today) continue;
+    const ur = chRows("blog").filter((r) => r.unit === u && usable(r)).sort(byDate), today = ur.find((r) => r.date === end); if (!today || !Object.hasOwn(today.metrics ?? {}, "rank")) continue;
     const before = [...ur].reverse().filter((r) => r.date < end), last = before[0], prevR = before.find((r) => num(r.metrics?.rank) !== null); if (!prevR) continue;
     const cur = num(today.metrics?.rank), prev = num(prevR.metrics?.rank);
     if (cur === null) { if (last === prevR) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`); }
