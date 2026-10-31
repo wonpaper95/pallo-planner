@@ -73,7 +73,7 @@ body:not(.eduv) #eduView { display: none; }
 /* 평가서 — 평소엔 숨기고, 열면 인쇄용 흰 종이 */
 #eduReport { display: none; background: #fff; color: #111; padding: 28px; border-radius: 10px; margin-top: 16px; }
 body.edurep #eduReport { display: block; }
-body.edurep #eduView > .card, body.edurep #eduView > .eduweek { display: none; }
+body.edurep #eduView > .card, body.edurep #eduView > .eduweek, body.edurep #eduView > .edusplit { display: none; }   /* 대표 화면은 2단(.edusplit) 안에 카드가 들어 있다 — 빼먹으면 평가서가 화면 맨 아래에 묻힌다 */
 #eduReport h2 { font-size: 17px; border-bottom: 2px solid #111; padding-bottom: 6px; margin: 18px 0 8px; }
 #eduReport table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
 #eduReport th, #eduReport td { border: 1px solid #bbb; padding: 6px 8px; text-align: left; }
