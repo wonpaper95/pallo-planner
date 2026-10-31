@@ -230,3 +230,7 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldblk th { white-space: normal; word-break: keep-all; line-height: 1.25; }
 #ldView .ldblk th .agh { font-size: 10px; }
 #ldView .ldblk td.sd { font-size: 12px; }
+#ldView td.sd-soon { background: rgba(224, 209, 32, .4); }
+#ldView td.sd-soon .dp { color: #1f1d2b; }
+#ldView td.sd-day, #ldView td.sd-day:hover { box-shadow: inset 0 0 0 3px #e5484d; background: rgba(229, 72, 77, .08); }
+#ldView td.sd-day .dp { color: #e5484d; }

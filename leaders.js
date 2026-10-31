@@ -68,6 +68,8 @@ const stars = (r, m) => { const c = mon(r, m), all = raps(r, m), mine = myRole !
 // 👋 그만둠 버튼 (줄마다 보임) → 날짜·이유 창. 그만둔 줄은 ↩️ 취소 · 빈자리 줄은 없음
 const endBtn = (r) => `<td class="endc">${r.end_day ? `<button class="endb back" data-endback title="${md(r.end_day)} 그만둠 취소 — 다시 활동">↩️</button>` : r.name === VACANT ? "" : `<button class="endb" data-end title="👋 그만둠 — 그만둔 날·이유 기록 (지우지 않고 남겨요)">👋</button>`}<button class="endb del" data-del title="줄 지우기 — 잘못 넣은 줄만">🗑</button></td>`;
 const goneTag = (r) => r.end_day ? `<span class="gonetag" title="그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}${r.end_note ? ` — ${esc(r.end_note)}` : ""}">👋 ${md(r.end_day)} 그만둠${r.end_reason ? ` · ${esc(r.end_reason)}` : ""}</span>` : "";
+// 첫 시작일 강조: 3일 전부터 노랑, 첫날은 빨간 테두리 — 새 리더 첫 수업 챙기기
+const sdCls = (r) => { const s = LDC.parseDay(r.start_day); if (!s) return ""; const n = Math.round((W.parse(s) - W.parse(today())) / 864e5); return n === 0 ? " sd-day" : n > 0 && n <= 3 ? " sd-soon" : ""; };
 const noteTd = (r) => `<td class="nt ed1" data-f="note" title="누르면 특이사항 적기">${r.note ? `<span class="ntx">${esc(r.note)}</span>` : `<span class="addh">+ 적기</span>`}</td>`;
 const eduBox = (r) => `<button class="edu ${r.edu_done ? "on" : ""}" data-edu title="리더교육 ${r.edu_done ? "했음" : "아직"}${r.edu ? ` · ${esc(r.edu)}` : ""} — 누르면 바뀜">${r.edu_done ? "✓" : ""}</button>`;
 // 🔴 구해야 함 + 며칠째 (구해야 함이 된 날부터, 그날 = 1일째) · 줄 색: 🚨 재관리 주황, 구해야 함 분홍
@@ -169,7 +171,7 @@ function subTable(sm) {
   const rs = LD.rows.filter((r) => isSub(r) && LDC.activeIn(r, from, to)).sort((a, b) => (b.promote - a.promote) || m3.reduce((n, m) => n + cov(b, m) - cov(a, m), 0));
   const body = rs.map((r) => { const c3 = m3.reduce((n, m) => n + cov(r, m), 0);
     return `<tr data-id="${r.id}" class="${r.end_day ? "gone" : ""}">${nameCell(r).replace("</b>", `</b>${r.kind === "wait" ? ` <span class="mut">⏳ 대기</span>` : ""}`)}<td class="nt ed1" data-f="avail" title="누르면 가능 요일·시간 적기">${r.avail ? esc(r.avail) : `<span class="addh">+ 가능 시간</span>`}</td>`
-      + `<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
+      + `<td class="sd ed1${sdCls(r)}" data-f="start_day" title="누르면 첫 시작일 고치기${sdCls(r) ? " — 첫 수업이 곧이에요, 미리 챙기기" : ""}">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
       + `<td>${stars(r, sm)}</td><td class="m"><b>${cov(r, sm)}</b>번 <small class="mut">· 3달 ${c3}</small></td>`
       + `<td><button class="promo ${r.promote ? "on" : ""}" data-promote title="메인 리더 승격 후보 — 누르면 바뀜">${r.promote ? "⭐ 후보" : "☆"}</button> <button class="slotedit" data-ldedit title="메인으로 올리기 = 구분을 리더로, 반·시간대 고르기">⬆️</button></td>`
       + `${certCell(r)}${endBtn(r)}<td class="nt ed1" data-f="note" title="누르면 메모 적기">${r.note ? esc(r.note) : `<span class="addh">+ 적기</span>`}</td></tr>`; }).join("");
@@ -236,7 +238,8 @@ function renderBoard() {
 function renderList() {
   const [from, to] = range(), sm = statMonth(), td = today();
   const months = [LDC.addMonths(LD.anchor, -2), LDC.addMonths(LD.anchor, -1), LDC.monthStart(LD.anchor)];
-  const vis = LD.rows.filter((r) => LDC.passFilter(r, LD.filter) && LDC.activeIn(r, from, to)); // 🔎 평일 오전·오후·주말·월수·화목 필터 · 📅 그 기간에 활동한 리더만 (시작 전·그만둔 뒤 달엔 안 보임)
+  const soon = to >= today() && W.add(today(), 3) > to ? W.add(today(), 3) : to; // 이번 달 끝인데 3일 안에 시작할 리더도 미리 보이게 (첫 시작일 노랑)
+  const vis = LD.rows.filter((r) => LDC.passFilter(r, LD.filter) && LDC.activeIn(r, from, soon)); // 🔎 평일 오전·오후·주말·월수·화목 필터 · 📅 그 기간에 활동한 리더만 (시작 전·그만둔 뒤 달엔 안 보임)
   const leaders = vis.filter(isLeader), staff = vis.filter((r) => r.kind === "staff");
   const live = vis.filter((r) => !r.end_day || r.end_day > LDC.monthEnd(sm)), smEnd = LDC.monthEnd(sm);
   const cnt = { need: live.filter((r) => r.status === "구해야 함").length, re: 0, aw: 0,
@@ -253,7 +256,7 @@ function renderList() {
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th class="sm" title="리더교육 했음/아직 — 누르면 바뀜">교육</th><th class="sm" title="자격증 — 근속 6개월 2급 · 1년 1급">📜</th>` : ""}</tr>`;
       const body = rs.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="level">${myRole !== "assistant" ? `<span class="lddrag" draggable="true" title="끌어서 이 칸 안 순서 바꾸기 (PC)">⠿</span>` : ""}${esc(r.level)}</td><td data-f="seat">${esc(r.seat)}</td>`
-        + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
+        + `${nameCell(r)}<td class="sd ed1${sdCls(r)}" data-f="start_day" title="누르면 첫 시작일 고치기${sdCls(r) ? " — 첫 수업이 곧이에요, 미리 챙기기" : ""}">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
         + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : `<td class="att2">${attGrid(r, ses, g)}</td><td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `${noteTd(r)}<td>${eduBox(r)}</td>${certCell(r)}` : "") + `</tr>`).join("");
@@ -264,7 +267,7 @@ function renderList() {
   if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
     const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th><th>라포 <small class="agh">내 별점 · 밑에 매니저별</small></th><th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
     const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="slot">${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
-      + `${nameCell(r)}<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
+      + `${nameCell(r)}<td class="sd ed1${sdCls(r)}" data-f="start_day" title="누르면 첫 시작일 고치기${sdCls(r) ? " — 첫 수업이 곧이에요, 미리 챙기기" : ""}">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
       + `<td>${stars(r, sm)}</td><td>${stBox(r)}</td>${endBtn(r)}`
       + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("")
         : `<td class="ina">${r.grp ? LDC.sessions(r.grp, from, to).map((d) => attBtn(r, d, `${md(d)}(${dw(d)})`)).join("") : `<span class="mut">–</span>`}</td><td>${flags(r, sm)}</td>`)
