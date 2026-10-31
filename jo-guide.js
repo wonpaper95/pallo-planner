@@ -118,9 +118,11 @@
   }
   const score = (r) => JG.QUIZ.filter((x, i) => r[i] === x.ok).length * 10;
 
+  // 📋 투두리스트 바로가기 — 오늘 근무 시간대를 먼저 골라야 [조교체크리스트] 탭 그 시간대로 넘어감
+  const jcGo = `<div class="jggo"><b>📋 투두리스트 바로가기</b><span class="jgmut">오늘 내 근무 시간대를 먼저 골라요</span><div>${[["am", "평일 오전"], ["pm", "평일 오후"], ["we", "주말"]].map(([k, l]) => `<button class="jgbtn" data-jggo="${k}">${l}</button>`).join("")}</div></div>`;
   function day(d) {
     const step = (s) => `<details class="jgstep ${s.must ? "must" : "add"}"><summary><span class="tag">${s.must ? "🔴" : "🟡"}</span><span class="when">${esc(s.when)}</span><b>${esc(s.t)}</b></summary>
-      ${s.how ? body(s.how.map((x) => "• " + x)) : ""}${refBox(s.ref)}</details>`;
+      ${s.how ? body(s.how.map((x) => "• " + x)) : ""}${s.go === "jc" && !opts.standalone ? jcGo : ""}${refBox(s.ref)}</details>`;
     const must = d.steps.filter((s) => s.must), add = d.steps.filter((s) => !s.must);
     return `<div class="jgcard"><h3>${d.day}일차 · ${esc(d.title)}</h3><p class="jggoal">🎯 ${esc(d.goal)}</p>${d.tip ? `<p class="jgmut">💡 ${esc(d.tip)}</p>` : ""}${(d.files || []).map(([f, n]) => `<a class="jgbtn" href="${f}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`).join(" ")}</div>
       <div class="jgcard"><h3>오늘 순서</h3>${must.map(step).join("")}${add.length ? `<h4>🟡 4시간 근무면 이어서</h4>${add.map(step).join("")}` : ""}</div>
@@ -157,6 +159,7 @@
   function bind() {
     el.addEventListener("click", async (e) => {
       const t = e.target.closest("[data-jgt]"); if (t) return go(t.dataset.jgt);
+      const g = e.target.closest("[data-jggo]"); if (g) { if (window.JC) JC.page = g.dataset.jggo; try { localStorage.setItem("jc-page", g.dataset.jggo); } catch {} return document.querySelector('[data-v="jc"]')?.click(); }
       const w = e.target.closest("[data-jgw]"); if (w) { q = q.trim() === w.dataset.jgw ? "" : w.dataset.jgw; render(); return el.querySelector(".jgsearch")?.focus({ preventScroll: true }); }
       const c = e.target.closest("[data-jgch]"); if (c) return el.querySelector(`#jgch-${c.dataset.jgch}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       const l = e.target.closest("[data-jgl]"); if (l) { lang = l.dataset.jgl; try { localStorage.setItem("jg-lang", lang); } catch {} return render(); }
