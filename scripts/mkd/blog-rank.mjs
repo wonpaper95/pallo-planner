@@ -1,21 +1,23 @@
 // 사용: node scripts/mkd/blog-rank.mjs <YYYY-MM-DD> [--print]
 // 일일 현황의 네이버 블로그 순위. mkd_keywords 에서 켜진 키워드를 읽어 네이버 PC 통합검색·블로그 탭을 헤드리스 크롬으로 열고,
 // 우리 지점 블로그 글이 몇 번째인지 mkd_daily(blog) 에 키워드 행 + 지점 '전체' 행(키워드 수·걸린 수)으로 저장한다. 규칙·행 모양은 blog-rows.mjs(테스트 있음).
+// 같은 '전체' 행에 방문자도 싣는다: 지점 블로그의 모바일 첫 화면(공개, fetch)에서 오늘·전체 방문자·이웃 → 어제까지 누적, 전날 '전체' 행의 누적과 빼서 어제 방문자.
 //   · 공개 검색 화면만 본다 — 로그인·쿠키 없음, 지속 프로필도 안 쓴다(구글·전산 로그인 창과 부딪히지 않게 새 브라우저).
 //   · 순위는 '지금' 검색 결과라 날짜 D 는 어제(한국 시각)만 저장한다. 지난 날짜는 다시 수집할 수 없다(--print 는 아무 날짜나 읽기만).
 //   · 검색 화면이 아닌 게 3번 연달아 나오면(자동 검색 차단·보안 확인) 멈추고 남은 키워드는 실패로 둔다. 보안 확인은 풀지 않는다.
 //   · 화면의 글(제목 등)은 데이터일 뿐 — 링크 주소만 읽고 출력한다.
-// 출력 JSON 한 줄 {ok,date,saved|printed,skipped,teams:{지점:{tracked,top,tab,ranks:[[키워드,통합,탭]],failed,partial}}}. 실패·일부만 행이 있으면 종료코드 1.
+// 출력 JSON 한 줄 {ok,date,saved|printed,skipped,teams:{지점:{tracked,top,tab,visitors,subscribers,ranks:[[키워드,통합,탭]],failed,partial,allStatus?,note?}}}. 실패·일부만 행이 있으면 종료코드 1.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { playwrightCandidates, validDate, isYesterdayKst } from "./browser-rows.mjs";
-import { BLOGS, KINDS, searchUrl, searchPage, blogInput, blogOutput } from "./blog-rows.mjs";
+import { BLOGS, KINDS, searchUrl, searchPage, profileUrl, parseProfile, visitorMetrics, blogInput, blogOutput } from "./blog-rows.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const D = process.argv[2], print = process.argv.includes("--print");
 const CHROME_APP = "/Applications/Google Chrome.app", WORKERS = 4, LIMIT_MS = 100_000, STRIKES = 3;
+const MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.error(`[${new Date().toISOString().slice(11, 19)}]`, ...a);
 
@@ -46,17 +48,37 @@ async function readSearch(page, kind, kw) {
   } catch (e) { return { error: `${KINDS[kind]} ${e?.name === "TimeoutError" ? "시간 초과" : "읽기 오류"}` }; }
 }
 
+// 블로그 첫 화면 하나 → {day,total,subscribers} | null
+async function readProfile(id) {
+  try {
+    const r = await fetch(profileUrl(id), { headers: { "User-Agent": MOBILE_UA, "Accept-Language": "ko-KR" }, signal: AbortSignal.timeout(15_000) });
+    return r.ok ? parseProfile(await r.text()) : null;
+  } catch { return null; }
+}
+// 지점별 방문자 (블로그가 있는 지점만) → Map(team_key → {metrics}|{error}). 전날 누적은 D-1 의 blog '전체' 행 metrics.visitors_cum.
+async function readVisitors(select, teamList, prevDay) {
+  const prev = await select("mkd_daily", `select=team_id,metrics&channel=eq.blog&unit=eq.${encodeURIComponent("전체")}&date=eq.${prevDay}`, "team_id");
+  const idOf = new Map(teamList.map((t) => [t.key, t.id])), out = new Map();
+  await Promise.all(Object.entries(BLOGS).filter(([, ids]) => ids.length).map(async ([key, ids]) => {
+    const prevCum = prev.find((r) => r.team_id === idOf.get(key))?.metrics?.visitors_cum ?? null;
+    out.set(key, visitorMetrics(await Promise.all(ids.map(readProfile)), prevCum));
+  }));
+  return out;
+}
+
 async function main() {
   if (!validDate(D)) { console.error(`날짜는 YYYY-MM-DD 형식이어야 해요: ${D ?? "(없음)"}`); process.exit(2); }
   if (!print && !isYesterdayKst(D)) { console.error("블로그 순위는 '지금' 검색 결과라 어제(한국 시각) 날짜로만 저장해요 — 지난 날짜는 다시 수집할 수 없어요"); process.exit(2); }
   setTimeout(() => { console.error("실패: 시간 초과 — 강제 종료"); process.exit(1); }, 115_000).unref(); // Bash 기본 제한(120초) 안에 끝낸다
 
-  const { select } = await import("../mk/db.mjs"), { teams, toRows, saveRows } = await import("./lib.mjs"); // DB 설정이 없으면 브라우저를 열기 전에 멈춘다
+  const { select } = await import("../mk/db.mjs"), { teams, toRows, saveRows, D: core } = await import("./lib.mjs"); // DB 설정이 없으면 브라우저를 열기 전에 멈춘다
   const teamList = await teams(), keyOf = new Map(teamList.map((t) => [t.id, t.key]));
   const keywords = (await select("mkd_keywords", "select=team_id,keyword,target_url&enabled=is.true", "team_id,keyword"))
     .map((k) => ({ team_key: keyOf.get(k.team_id), keyword: String(k.keyword ?? "").trim(), target_url: k.target_url })).filter((k) => k.team_key && k.keyword);
   const todo = keywords.filter((k) => BLOGS[k.team_key]?.length || k.target_url);
   log(`켜진 키워드 ${keywords.length}개, 검색할 것 ${todo.length}개`);
+  const visitors = await readVisitors(select, teamList, core.addDays(D, -1));
+  log(`방문자: ${[...visitors].map(([k, v]) => `${k} ${v.error ?? (v.metrics.visitors === null ? `누적 ${v.metrics.visitors_cum}(전날 누적 없음)` : `${v.metrics.visitors}명`)}`).join(", ")}`);
 
   const results = new Map();
   if (todo.length) {
@@ -81,7 +103,7 @@ async function main() {
     log(`읽음 ${results.size}/${todo.length}${blocked ? " — 차단으로 멈춤" : ""}`);
   }
 
-  const { input, skipped } = blogInput(keywords, results, blocked ?? "읽기 전에 시간이 다 됐어요");
+  const { input, skipped } = blogInput(keywords, results, blocked ?? "읽기 전에 시간이 다 됐어요", visitors);
   if (!input.rows.length) { console.log(JSON.stringify({ ok: true, date: D, saved: 0, skipped, teams: {}, note: "검색할 키워드가 없어요" })); return 0; }
   const rows = await toRows("blog", D, input);
   let out;

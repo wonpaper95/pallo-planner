@@ -4,6 +4,9 @@
 //   tab_rank 블로그 탭 — 처음 뜨는 30개 중 몇 번째. 없으면 null(= 30위 밖).
 // PC·모바일 검색 결과는 2026-10-31 확인 때 글 순서가 같아서 PC 화면만 읽는다.
 // 한쪽 화면을 못 읽으면 그 키를 아예 빼서(null 아님) "순위 밖"으로 오해되지 않게 하고 행은 partial.
+// 방문자: 모바일 블로그 첫 화면(m.blog.naver.com/아이디)에 든 오늘 방문자(dayVisitorCount)·전체 방문자(totalVisitorCount)·이웃(subscriberCount).
+//   우리 블로그는 방문자 그래프(NVisitorgp4Ajax)가 비공개라 날짜별 숫자를 못 받는다 → '전체 − 오늘' = 어제까지 누적(visitors_cum)을 매일 남기고
+//   어제 하루 방문자 = 오늘 남긴 누적 − 전날 남긴 누적. 전날 누적이 없으면(첫날·전날 결측) null. 지점 '전체' 행에 싣는다.
 
 export const BLOGS = { dsr: ["pallodaegudsr"], jpcn: ["pallodsrjpch"], ulsan: ["palloulsan"], gumi: [] }; // 지점 → 블로그 아이디 (구미점은 아직 블로그 없음)
 export const TAB_DEPTH = 30;
@@ -68,40 +71,61 @@ export function keywordRow(teamKey, k, res) {
 }
 const noteOf = (res) => res.all?.error ?? res.tab?.error ?? "검색 화면을 못 읽었어요";
 
-// 지점 합계('전체' 행): 추적 키워드 수 · 통합검색에 걸린 키워드 수 · 블로그 탭 30위 안 키워드 수 (읽은 것만 센다).
-// 키워드를 하나도 못 읽었으면 failed. 일부만 읽었으면 partial — 세는 수가 실제보다 적을 수 있다는 뜻.
-export function teamAllRow(teamKey, kwRows) {
+export const profileUrl = (id) => `https://m.blog.naver.com/${id}`;
+// 모바일 블로그 첫 화면 HTML → {day, total, subscribers} (셋 다 있어야, 아니면 null)
+export function parseProfile(html) {
+  const get = (k) => { const m = String(html ?? "").match(new RegExp(`"${k}":(\\d+)`)); return m ? +m[1] : null; };
+  const day = get("dayVisitorCount"), total = get("totalVisitorCount"), subscribers = get("subscriberCount");
+  return day === null || total === null || subscribers === null || day > total ? null : { day, total, subscribers };
+}
+// 지점 블로그들의 첫 화면 값([{day,total,subscribers}|null]) + 전날 누적(prevCum, 없으면 null) → {metrics:{visitors_cum, visitors, subscribers}} | {error}
+export function visitorMetrics(profiles, prevCum) {
+  if (!profiles.length || profiles.some((p) => !p)) return { error: "방문자 못 읽음" };
+  const cum = profiles.reduce((a, p) => a + p.total - p.day, 0), subscribers = profiles.reduce((a, p) => a + p.subscribers, 0);
+  const prev = typeof prevCum === "number" && Number.isFinite(prevCum) ? prevCum : null;
+  return { metrics: { visitors_cum: cum, visitors: prev !== null && cum >= prev ? cum - prev : null, subscribers } };
+}
+
+// 지점 합계('전체' 행): 추적 키워드 수 · 통합검색에 걸린 키워드 수 · 블로그 탭 30위 안 키워드 수 (읽은 것만 센다) + 방문자(vis, 블로그가 있으면).
+// 키워드도 방문자도 하나도 못 읽었으면 failed. 일부만 읽었으면 partial — 세는 수가 실제보다 적을 수 있다는 뜻.
+export function teamAllRow(teamKey, kwRows, vis) {
   const read = kwRows.filter((r) => r.status !== "failed");
-  if (!read.length) return { team_key: teamKey, unit: "전체", metrics: { note: kwRows[0]?.metrics?.note ?? "검색 화면을 못 읽었어요" }, status: "failed" };
+  if (!read.length && !vis?.metrics) return { team_key: teamKey, unit: "전체", metrics: { note: kwRows[0]?.metrics?.note ?? vis?.error ?? "검색 화면을 못 읽었어요" }, status: "failed" };
   const cnt = (k) => read.filter((r) => Object.hasOwn(r.metrics, k) && r.metrics[k] !== null).length;
   const has = (k) => read.some((r) => Object.hasOwn(r.metrics, k));
-  const metrics = { kw_tracked: kwRows.length };
-  if (has("rank")) metrics.kw_top = cnt("rank");
-  if (has("tab_rank")) metrics.kw_tab = cnt("tab_rank");
-  return { team_key: teamKey, unit: "전체", metrics, status: kwRows.every((r) => r.status === "ok") ? "ok" : "partial" };
+  const metrics = { ...(vis?.metrics ?? {}) };
+  if (read.length) { metrics.kw_tracked = kwRows.length; if (has("rank")) metrics.kw_top = cnt("rank"); if (has("tab_rank")) metrics.kw_tab = cnt("tab_rank"); }
+  else if (kwRows.length) metrics.note = "키워드 순위 못 읽음";
+  if (vis?.error) metrics.note = vis.error;
+  return { team_key: teamKey, unit: "전체", metrics, status: kwRows.every((r) => r.status === "ok") && !vis?.error ? "ok" : "partial" };
 }
 
 // 켜진 키워드 [{team_key, keyword, target_url}] + 결과 Map(`${team_key}|${keyword}` → res) → save 입력 {rows, status}.
 // 블로그가 없는 지점(구미점) 키워드는 건너뛴다 — 볼 글이 없다. 지점마다 키워드 행 + '전체' 행. 결과가 없는 키워드(시간 초과·차단으로 못 읽음)는 missingNote 로 failed.
-export function blogInput(keywords, results, missingNote = "읽기 전에 시간이 다 됐어요") {
+// visitors = Map(team_key → visitorMetrics 결과). 켜진 키워드가 없어도 방문자가 있으면 '전체' 행을 쓴다.
+export function blogInput(keywords, results, missingNote = "읽기 전에 시간이 다 됐어요", visitors = new Map()) {
   const rows = [], skipped = [];
   for (const key of Object.keys(BLOGS)) {
-    const kws = keywords.filter((k) => k.team_key === key); if (!kws.length) continue;
+    const kws = keywords.filter((k) => k.team_key === key), vis = visitors.get(key); if (!kws.length && !vis) continue;
     if (!BLOGS[key].length && !kws.some((k) => k.target_url)) { skipped.push(key); continue; }
     const kr = kws.map((k) => keywordRow(key, k, results.get(`${key}|${k.keyword}`) ?? { all: { error: missingNote }, tab: { error: missingNote } }));
-    rows.push(...kr, teamAllRow(key, kr));
+    rows.push(...kr, teamAllRow(key, kr, vis));
   }
   return { input: { rows, status: "ok" }, skipped };
 }
 
-// 출력 한 줄: 지점별 [키워드, 통합, 탭] 과 실패 수. 종료코드 1 = 실패·일부만 행이 있음.
+// 출력 한 줄: 지점별 방문자·이웃, [키워드, 통합, 탭] 과 실패 수. 종료코드 1 = 실패·일부만 행이 있음(방문자를 못 읽은 것도).
 export function blogOutput(date, input, skipped, saved) {
   const teams = {};
   for (const r of input.rows) {
     const t = (teams[r.team_key] ??= { ranks: [], failed: 0, partial: 0 });
-    if (r.unit === "전체") { Object.assign(t, { tracked: r.metrics.kw_tracked ?? null, top: r.metrics.kw_top ?? null, tab: r.metrics.kw_tab ?? null }); continue; }
+    if (r.unit === "전체") {
+      Object.assign(t, { tracked: r.metrics.kw_tracked ?? null, top: r.metrics.kw_top ?? null, tab: r.metrics.kw_tab ?? null, visitors: r.metrics.visitors ?? null, subscribers: r.metrics.subscribers ?? null });
+      if (r.status !== "ok") Object.assign(t, { allStatus: r.status, note: r.metrics.note ?? null });
+      continue;
+    }
     if (r.status === "failed") t.failed++; else { if (r.status === "partial") t.partial++; t.ranks.push([r.unit, r.metrics.rank ?? null, r.metrics.tab_rank ?? null]); }
   }
-  const bad = Object.values(teams).some((t) => t.failed || t.partial);
+  const bad = Object.values(teams).some((t) => t.failed || t.partial || t.allStatus);
   return { ok: !bad, date, ...(saved === undefined ? { printed: true } : { saved }), skipped, teams };
 }

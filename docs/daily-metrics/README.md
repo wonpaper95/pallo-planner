@@ -32,7 +32,7 @@
   | 구글 검색광고 | 캠페인별 노출·클릭·비용·전환(신청클릭) + 비승인·결제 경고 | 맥미니 Playwright 자동 브라우저(지속 프로필, 처음 1회 로그인) — `browser.mjs google`. 계정 2개 ocid 6771267051·7116215996 |
   | 메타 광고 | 캠페인별 노출·클릭·리드·비용(USD→원) | 운영 DB `mk_ad_daily`(맥북/맥미니 `pull-meta` 메타 API) → 캠페인별, 환율 frankfurter(ECB). 광고 계정 3542016502769477 은 4개 지점 공용. 도달은 광고끼리 겹쳐 합이 부풀어 싣지 않음. 맥미니에 토큰 파일이 있으면 그날치를 새로 받고, 없으면 맥북 적재 데이터 사용 |
   | 네이버 블로그 순위 | `mkd_keywords` 켜진 키워드별 우리 글 순위 — 통합검색(`rank`)·블로그 탭 30위까지(`tab_rank`) | 맥미니 헤드리스 크롬(로그인·프로필 없이 공개 검색 화면) — `blog-rank.mjs`. 블로그: 대구동성로 `pallodaegudsr` · 대구일중 `pallodsrjpch` · 울산 `palloulsan` · 구미 없음 |
-  | 네이버 블로그 방문자 | 일 방문자·조회수 | (아직) 블로그 통계 — 지점 블로그 3개(위). 구미점은 블로그 없음 |
+  | 네이버 블로그 방문자 | 일 방문자·이웃 수 (조회수는 아직) | `blog-rank.mjs` 가 함께 — 지점 블로그의 모바일 첫 화면(공개, 로그인 없음)에 든 오늘·전체 방문자·이웃. 우리 블로그는 날짜별 방문자 그래프(`NVisitorgp4Ajax`)가 비공개(204)라 '전체 − 오늘' = 어제까지 누적을 매일 남기고 전날 누적과 뺀다 |
   | 당근 | 비즈프로필 조회수·단골(관심)·채팅 문의 | 크롬 확장, 비즈프로필 통계 (지점별 계정 구조는 구현 때 확인해 여기 기록) |
   | 전산(공통) | 지점별·유입경로별 어제 신규 문의 건수 → 등록 | 맥미니 Playwright 자동 브라우저(지속 프로필, 처음 1회 로그인) — `browser.mjs jeonsan`, 데이터보드 3곳 (`scripts/mkd/jeonsan-daily.js` 스니펫) |
 
@@ -70,7 +70,7 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 **metrics 키 (채널별):**
 - `naver_ad`, `google_ad`: impressions, clicks, spend(원), ctr, cpc, conversions(구글만), flags[](비승인·결제 등)
 - `meta_ad` unit=캠페인(없으면 광고세트→광고 이름): impressions, clicks, leads, spend_usd, fx, spend(원). 환율을 못 받으면 spend·fx null + partial + note
-- `blog` unit=키워드: rank(통합검색 첫 화면 블로그 글 중 몇 번째, 없으면 null), tab_rank(블로그 탭 30위까지, 없으면 null), our_url(우리 글 — 통합 우선), top_url(블로그 탭 1위 글). 한쪽 화면을 못 읽으면 그 키를 **빼고**(null 은 '밖'이라는 뜻이라) partial + note / unit='전체'(지점 합계): kw_tracked(추적 키워드 수)·kw_top(통합검색에 걸린 수)·kw_tab(탭 30위 안 수) — 화면 합계 줄은 이 셋(기간 마지막 값, 지점끼리 합) / unit='방문자'(아직): visitors, views
+- `blog` unit=키워드: rank(통합검색 첫 화면 블로그 글 중 몇 번째, 없으면 null), tab_rank(블로그 탭 30위까지, 없으면 null), our_url(우리 글 — 통합 우선), top_url(블로그 탭 1위 글). 한쪽 화면을 못 읽으면 그 키를 **빼고**(null 은 '밖'이라는 뜻이라) partial + note / unit='전체'(지점 합계): visitors(어제 방문자, 전날 누적 없으면 null)·visitors_cum(어제까지 누적, 계산용 — 표에 안 나옴)·subscribers(이웃, 기간 마지막 값)·kw_tracked(추적 키워드 수)·kw_top(통합검색에 걸린 수)·kw_tab(탭 30위 안 수, 키워드 수들은 기간 마지막 값·지점끼리 합). 방문자만 못 읽으면 partial + note '방문자 못 읽음' / views(조회수)는 아직
 - `daangn`: views, followers, chats
 - `jeonsan` unit=유입경로(meta|gads_*|nad_*|homepage|기타): inquiries, enrolls(그 날 등록 전환된 수)
 
@@ -172,3 +172,4 @@ mkd_keywords ( id, team_id, keyword text, enabled bool default true, target_url 
 - 2026-10-30 구글·전산을 Claude in Chrome 에서 맥미니 Playwright 자동 브라우저로 교체: `scripts/mkd/browser.mjs`(login·check·jeonsan·google) + 순수 `browser-rows.mjs`(합격 검사·표 읽기·총계 교차 검사·알림→플래그) + `tests/mkd-browser.test.mjs`. 스킬 §2·§3 은 이 두 명령으로 바뀜. **처음 1회 `login` 필요**(그 전엔 `check` 가 login_required). 구글 화면 구조(role=row/gridcell)·날짜 선택기는 로그인 뒤 `google <어제> --print` 로 한 번 대조해 볼 것.
 - 2026-10-30 메타 광고 추가: 크롬 대신 `scripts/mkd/meta-ad.mjs`(순수 `meta-rows.mjs`, 테스트 `tests/mkd-meta.test.mjs`·`mkd-meta-cli.test.mjs`). 10/29 `--print` 확인 — 3개 지점(대구영어·대구일중·울산) 9캠페인, $334.76, 리드 16. 맥미니에는 메타 토큰 파일이 아직 없어 새로고침은 건너뛰고 맥북 적재분을 쓴다.
 - 2026-10-31 블로그 순위 추가: `scripts/mkd/blog-rank.mjs`(순수 `blog-rows.mjs`, 테스트 `tests/mkd-blog.test.mjs`). 통합검색 순위는 PC·모바일이 같은 순서라 PC 만 본다. 통합검색에서 잡힌 우리 글은 모두 본문 글 목록 칸(`spw_fsolid`)이었다(플레이스 칸 아님). 첫 저장 D=2026-10-30(31개 중 구미 7개 제외 24개, 43초): 대구동성로 8개 중 통합 4·탭 4 · 대구일중 8개 중 통합 5·탭 4 · 울산 8개 중 통합 3·탭 2. 같은 키워드도 몇 분 사이 한두 계단 흔들린다. 화면: 블로그 합계 줄 = 추적·통합검색에 걸린·탭 30위 안 키워드 수, 키워드 줄 = 통합검색 순위·블로그탭 순위(없으면 줄이 안 보임). 순위 하락 플래그는 통합검색 rank 만(탭은 표시만).
+- 2026-10-31 블로그 방문자·이웃 추가(같은 `blog-rank.mjs`, 지점 '전체' 행). 첫 누적(10/30까지): 대구동성로 347 · 대구일중 83 · 울산 179, 이웃 3·0·0. 하루 방문자는 다음 날 수집분(10/31)부터. 같은 키워드의 블로그 탭 순위가 30분 사이 12위→5위로 움직인 적도 있어 하루 값보다 기간 평균을 본다.

@@ -9,7 +9,7 @@
 //   · team_key 는 dsr|jpcn|ulsan|gumi. blog·daangn·jeonsan 채널과 unit '전체' 행은 지점(team_key|team_id)이 필수 — '전체' ok 행 = 그 지점의 그 채널 합계.
 //     광고 채널(naver_ad|google_ad|meta_ad)만 지점이 없으면 unit 이름(MK.teamKeyOf)으로 추정하고, 못 하면 dsr + unit 앞에 '[미분류] '.
 //   · unit 은 문자열(없으면 '전체'), 앞뒤 공백 제거, 접두어를 붙인 뒤 120자로 자른다. 같은 (지점, unit) 이 두 번 나오면 오류 — 같은 이름이면 숫자를 더해 한 행으로 보낸다.
-//   · metrics 숫자 키: impressions clicks spend spend_usd fx ctr cpc avg_rank conversions leads reach rank tab_rank kw_tracked kw_top kw_tab visitors views followers chats inquiries enrolls
+//   · metrics 숫자 키: impressions clicks spend spend_usd fx ctr cpc avg_rank conversions leads reach rank tab_rank kw_tracked kw_top kw_tab visitors visitors_cum subscribers views followers chats inquiries enrolls
 //     ('1,204' '₩18,200' '$12.50' 허용, '--' 는 null, 음수는 rank·avg_rank 만). 문자열 키: status note campaign_id top_url our_url (campaign_id 는 유한한 숫자로 와도 문자열로 바꿔 받는다). 배열 키: flags.
 //   · 행 하나의 오류는 'rows[3]: …' 로 몇 번째 행인지 앞에 붙여 던진다(메시지 본문은 그대로). 봉투·중복 오류는 접두어 없음.
 //   · 전화번호처럼 보이는 값은 unit·note·flags·문자열 지표에서 거부한다(top_url·our_url·campaign_id 는 제외). jeonsan unit 은 이름 규칙까지 본다.
@@ -22,7 +22,7 @@ export const MK = req("../../mk-core.js");
 const FALLBACK_KEY = "dsr"; // 지점을 못 정한 광고 행이 가는 곳(대구영어점) — unit 앞에 [미분류]
 const TEAM_KEYS = ["dsr", "jpcn", "ulsan", "gumi"];
 const TOP_KEYS = new Set(["rows", "status", "note"]), ROW_KEYS = new Set(["team_key", "team_id", "unit", "metrics", "status"]);
-const NUM_KEYS = new Set(["impressions", "clicks", "spend", "spend_usd", "fx", "ctr", "cpc", "avg_rank", "conversions", "leads", "reach", "rank", "tab_rank", "kw_tracked", "kw_top", "kw_tab", "visitors", "views", "followers", "chats", "inquiries", "enrolls"]);
+const NUM_KEYS = new Set(["impressions", "clicks", "spend", "spend_usd", "fx", "ctr", "cpc", "avg_rank", "conversions", "leads", "reach", "rank", "tab_rank", "kw_tracked", "kw_top", "kw_tab", "visitors", "visitors_cum", "subscribers", "views", "followers", "chats", "inquiries", "enrolls"]);
 const STR_KEYS = new Set(["status", "note", "campaign_id", "top_url", "our_url"]);
 const SIGNED = new Set(["rank", "avg_rank"]); // 음수 허용
 const NO_PERSONAL_CHECK = new Set(["top_url", "our_url", "campaign_id"]); // 긴 숫자가 정상인 값

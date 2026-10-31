@@ -30,6 +30,7 @@ const METRICS = {
   kw_tab: { label: "블로그탭 30위 안 키워드", agg: "last", good: "up" },
   visitors: { label: "방문자", agg: "sum", good: "up" },
   views: { label: "조회", agg: "sum", good: "up" },
+  subscribers: { label: "이웃", agg: "last", good: "up" },
   followers: { label: "단골", agg: "last", good: "up" },
   chats: { label: "채팅", agg: "sum", good: "up" },
   inquiries: { label: "문의", agg: "sum", good: "up" },
@@ -40,7 +41,7 @@ const CHANNEL_METRICS = {
   naver_ad: ["impressions", "clicks", "spend", "ctr", "cpc"],
   google_ad: ["impressions", "clicks", "spend", "conversions", "ctr", "cpc"],
   meta_ad: ["impressions", "reach", "clicks", "leads", "spend"],
-  blog: ["kw_tracked", "kw_top", "kw_tab", "rank", "tab_rank", "visitors", "views"],
+  blog: ["visitors", "subscribers", "kw_tracked", "kw_top", "kw_tab", "rank", "tab_rank", "views"], // visitors_cum(방문자 누적)은 계산용이라 표에 안 나온다
   daangn: ["views", "followers", "chats"],
   jeonsan: ["inquiries", "enrolls"],
 };

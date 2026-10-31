@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BLOGS, searchUrl, searchPage, postOf, postsOf, targetOf, rankOf, keywordRow, teamAllRow, blogInput, blogOutput } from "../scripts/mkd/blog-rows.mjs";
+import { BLOGS, searchUrl, searchPage, postOf, postsOf, targetOf, rankOf, keywordRow, teamAllRow, blogInput, blogOutput, profileUrl, parseProfile, visitorMetrics } from "../scripts/mkd/blog-rows.mjs";
 import { toRowsPure } from "../scripts/mkd/rows.mjs";
 import D from "../mkd-core.js";
 
@@ -113,7 +113,7 @@ test("blogInput 결과는 rows.mjs 검증을 통과한다 (tab_rank·kw_* 키 �
 test("blogOutput: 지점별 [키워드, 통합, 탭]·실패 수, 실패·일부만 있으면 ok:false", () => {
   const { input, skipped } = blogInput([{ team_key: "dsr", keyword: "a" }, { team_key: "dsr", keyword: "b" }], new Map([["dsr|a", { all: ok(post("pallodaegudsr", 1)), tab: ok() }]]));
   const out = blogOutput("2026-10-30", input, skipped, 3);
-  assert.deepEqual(out, { ok: false, date: "2026-10-30", saved: 3, skipped: [], teams: { dsr: { ranks: [["a", 1, null]], failed: 1, partial: 0, tracked: 2, top: 1, tab: 0 } } });
+  assert.deepEqual(out, { ok: false, date: "2026-10-30", saved: 3, skipped: [], teams: { dsr: { ranks: [["a", 1, null]], failed: 1, partial: 0, tracked: 2, top: 1, tab: 0, visitors: null, subscribers: null, allStatus: "partial", note: null } } });
   assert.equal(blogOutput("2026-10-30", blogInput([{ team_key: "dsr", keyword: "a" }], new Map([["dsr|a", { all: ok(), tab: ok() }]])).input, []).printed, true);
 });
 
@@ -134,4 +134,50 @@ test("flags 순위 하락: 오늘 통합검색을 못 읽은 partial(rank 키 �
   const kw = "동성로영어회화";
   assert.deepEqual(D.flags([row("2026-10-29", kw, { rank: 4 }), row("2026-10-30", kw, { tab_rank: 5 }, "partial")], "2026-10-30").map((f) => f.code), []);
   assert.deepEqual(D.flags([row("2026-10-29", kw, { rank: 4 }), row("2026-10-30", kw, { rank: null, tab_rank: 5 })], "2026-10-30").map((f) => f.code), ["rank_drop"]);
+});
+
+// ── 방문자 ──
+const HTML = '..."profileImage":{"url":"x"},"dayVisitorCount":5,"subscriberCount":3,"totalVisitorCount":352,"block":false,..."todayVisitor":0,"totalVisitor":0';
+test("profileUrl·parseProfile: 모바일 첫 화면의 오늘·전체 방문자·이웃 (todayVisitor 같은 다른 키는 안 씀), 하나라도 없으면 null", () => {
+  assert.equal(profileUrl("palloulsan"), "https://m.blog.naver.com/palloulsan");
+  assert.deepEqual(parseProfile(HTML), { day: 5, total: 352, subscribers: 3 });
+  assert.equal(parseProfile(HTML.replace('"subscriberCount":3,', "")), null);
+  assert.equal(parseProfile('"dayVisitorCount":9,"subscriberCount":0,"totalVisitorCount":3'), null); // 오늘 > 전체는 이상한 값
+  assert.equal(parseProfile(undefined), null);
+});
+test("visitorMetrics: 누적 = 전체 − 오늘, 어제 방문자 = 누적 − 전날 누적 (전날 없거나 줄면 null), 블로그 여럿이면 더함", () => {
+  assert.deepEqual(visitorMetrics([{ day: 5, total: 352, subscribers: 3 }], 340), { metrics: { visitors_cum: 347, visitors: 7, subscribers: 3 } });
+  assert.deepEqual(visitorMetrics([{ day: 5, total: 352, subscribers: 3 }], null), { metrics: { visitors_cum: 347, visitors: null, subscribers: 3 } });
+  assert.equal(visitorMetrics([{ day: 0, total: 100, subscribers: 0 }], 120).metrics.visitors, null);
+  assert.equal(visitorMetrics([{ day: 0, total: 100, subscribers: 0 }], "100").metrics.visitors, null);
+  assert.deepEqual(visitorMetrics([{ day: 1, total: 10, subscribers: 1 }, { day: 2, total: 20, subscribers: 2 }], 20), { metrics: { visitors_cum: 27, visitors: 7, subscribers: 3 } });
+  assert.deepEqual(visitorMetrics([{ day: 1, total: 10, subscribers: 1 }, null], 5), { error: "방문자 못 읽음" });
+  assert.deepEqual(visitorMetrics([], 5), { error: "방문자 못 읽음" });
+});
+test("teamAllRow + 방문자: 방문자 지표를 함께 싣고, 방문자를 못 읽으면 partial+note, 키워드만 못 읽고 방문자는 읽었으면 partial", () => {
+  const a = keywordRow("dsr", { keyword: "a" }, { all: ok(post("pallodaegudsr", 1)), tab: ok() });
+  const f = keywordRow("dsr", { keyword: "f" }, { all: { error: "e" }, tab: { error: "e" } });
+  const vis = { metrics: { visitors_cum: 347, visitors: 7, subscribers: 3 } };
+  assert.deepEqual(teamAllRow("dsr", [a], vis), { team_key: "dsr", unit: "전체", metrics: { visitors_cum: 347, visitors: 7, subscribers: 3, kw_tracked: 1, kw_top: 1, kw_tab: 0 }, status: "ok" });
+  assert.deepEqual(teamAllRow("dsr", [a], { error: "방문자 못 읽음" }), { team_key: "dsr", unit: "전체", metrics: { kw_tracked: 1, kw_top: 1, kw_tab: 0, note: "방문자 못 읽음" }, status: "partial" });
+  assert.deepEqual(teamAllRow("dsr", [f], vis), { team_key: "dsr", unit: "전체", metrics: { visitors_cum: 347, visitors: 7, subscribers: 3, note: "키워드 순위 못 읽음" }, status: "partial" });
+  assert.deepEqual(teamAllRow("dsr", [f], { error: "방문자 못 읽음" }).status, "failed");
+  assert.deepEqual(teamAllRow("dsr", [], vis), { team_key: "dsr", unit: "전체", metrics: { visitors_cum: 347, visitors: 7, subscribers: 3 }, status: "ok" });
+});
+test("blogInput + 방문자: 켜진 키워드가 없어도 방문자만으로 '전체' 행, rows 검증 통과, 출력에 방문자·이웃", () => {
+  const vis = new Map([["ulsan", { metrics: { visitors_cum: 179, visitors: 4, subscribers: 0 } }]]);
+  const { input, skipped } = blogInput([], new Map(), undefined, vis);
+  assert.deepEqual(input.rows, [{ team_key: "ulsan", unit: "전체", metrics: { visitors_cum: 179, visitors: 4, subscribers: 0 }, status: "ok" }]);
+  assert.deepEqual(toRowsPure("blog", "2026-10-31", input, TEAMS)[0].metrics, { visitors_cum: 179, visitors: 4, subscribers: 0 });
+  const out = blogOutput("2026-10-31", input, skipped, 1);
+  assert.equal(out.ok, true);
+  assert.deepEqual([out.teams.ulsan.visitors, out.teams.ulsan.subscribers], [4, 0]);
+  assert.equal(blogOutput("2026-10-31", blogInput([], new Map(), undefined, new Map([["ulsan", { error: "방문자 못 읽음" }]])).input, [], 1).ok, false);
+});
+test("buildTable: 블로그 합계 줄에 방문자(합)·이웃(마지막 값), 누적(visitors_cum)은 표에 안 나온다", () => {
+  const rows = [row("2026-10-29", "전체", { visitors_cum: 340, visitors: null, subscribers: 3 }), row("2026-10-30", "전체", { visitors_cum: 347, visitors: 7, subscribers: 4, kw_tracked: 8 })];
+  const b = D.buildTable(rows, "2026-10-30").find((c) => c.channel === "blog");
+  assert.deepEqual(b.metrics.map((m) => m.metric), ["visitors", "subscribers", "kw_tracked"]);
+  assert.equal(b.metrics[0].cells.find((c) => c.key === "w1").value, 7);
+  assert.equal(b.metrics[1].cells.find((c) => c.key === "w1").value, 4);
 });
