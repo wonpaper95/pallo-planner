@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildReport, prepareSave, slim, reportFrom, shortSummary, dateMismatch } from "../scripts/mkd/report.mjs";
+import { buildReport, buildWeekly, prepareSave, slim, reportFrom, shortSummary, dateMismatch } from "../scripts/mkd/report.mjs";
 import { toRowsPure, D as DC } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "대구동성로점", key: "dsr" }, { id: 2, name: "대구일본어중국어점", key: "jpcn" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "구미점", key: "gumi" }];
@@ -60,8 +60,9 @@ test("buildReport: 전체 핵심 4개 — d1·d3 (손계산)", () => {
   assert.deepEqual(cell(r, "문의", "d3"), { value: 5, change: null, days: 2, prevDays: 0 });                      // 3+2, 직전 3일 비어 증감 보류
   assert.deepEqual(cell(r, "총 광고비", "d1"), { value: 25300, change: 0.234, days: 1, prevDays: 1 });            // 4800/20500
   assert.deepEqual(cell(r, "총 광고비", "d3"), { value: 45800, change: null, days: 2, prevDays: 0 });             // 25300+20500
-  assert.deepEqual(cell(r, "문의당 비용", "d1"), { value: 8433.33, change: -0.177, days: 1, prevDays: 1 });       // 25300/3 vs 20500/2=10250
-  assert.deepEqual(cell(r, "문의당 비용", "d3"), { value: 9160, change: null, days: 2, prevDays: 0 });            // 45800/5
+  // 문의당 비용은 광고비·문의가 둘 다 있는 (지점·날짜)끼리 — 울산은 전산이 없어 울산 네이버(3000·2500)는 빠진다
+  assert.deepEqual(cell(r, "문의당 비용", "d1"), { value: 7433.33, change: -0.174, days: 1, prevDays: 1 });       // 22300/3 vs 18000/2=9000
+  assert.deepEqual(cell(r, "문의당 비용", "d3"), { value: 8060, change: null, days: 2, prevDays: 0 });            // 40300/5
   assert.deepEqual(cell(r, "문의", "w4"), { value: 5, change: null, days: 2, prevDays: 0 });
 });
 
@@ -185,9 +186,12 @@ test("prepareSave weekly: body 필수, 나머지 필드는 그대로, 컬컴 검
   assert.match(prepareSave("weekly", { body: " " }).error, /body/);
   assert.match(prepareSave("weekly", { body: "컬컴 이야기" }).error, /컬컴|CULCOM/);
   assert.match(prepareSave("weekly", { body: "문의 010 1234 5678" }).error, /전화번호/);
-  const ok = prepareSave("weekly", { body: " 이번 주 요약 ", top: [{ unit: "컬컴 영어 대구점_네이버플레이스", spend: 100 }] });
+  const base = { summary: [], media: [], channels: [{ units: [{ unit: "컬컴 영어 대구점_네이버플레이스" }] }] };
+  const ok = prepareSave("weekly", { ...base, body: " 이번 주 요약 " });
   assert.equal(ok.error, undefined);
-  assert.deepEqual(ok.data, { body: "이번 주 요약", top: [{ unit: "컬컴 영어 대구점_네이버플레이스", spend: 100 }] });
+  assert.deepEqual(ok.data, { ...base, body: "이번 주 요약" });
+  assert.match(prepareSave("weekly", { body: "숫자 없는 글" }).error, /summary·media/); // build-report --weekly 출력이 아닌 파일
+  assert.equal(prepareSave("weekly", { ...base, body: "가".repeat(3500) }).data.body.length, 3000);
 });
 test("prepareSave: 모르는 kind 는 던진다", () => {
   assert.throws(() => prepareSave("monthly", {}), /kind/);
@@ -215,4 +219,30 @@ test("dateMismatch: report.date 가 있고 저장 날짜와 다를 때만 메시
   assert.match(dateMismatch({ date: 20261028 }, "2026-10-28"), /달라요/);
   assert.equal(dateMismatch(null, "2026-10-28"), null); // 객체가 아니면 prepareSave 가 거부한다
   assert.equal(dateMismatch([], "2026-10-28"), null);
+});
+
+// ── 주간 종합 입력 ──
+test("buildWeekly: 7일 핵심 줄(w1)·매체별 문의·등록당 비용(싼 순)·채널·지점, 그 주 일일 리포트 플래그를 모아 며칠 떴는지", () => {
+  const SUN = "2026-11-01", day = (i) => DC.addDays(SUN, -i);
+  const rows = [];
+  for (let i = 0; i < 7; i++) rows.push(
+    ...toRowsPure("meta_ad", day(i), { rows: [{ team_key: "dsr", unit: "대구_리드", metrics: { spend: 10000, clicks: 5, leads: 1 } }] }, TEAMS),
+    ...toRowsPure("naver_ad", day(i), { rows: [{ team_key: "dsr", unit: "대구_검색", metrics: { spend: 2000, clicks: 3, impressions: 100 } }] }, TEAMS),
+    ...toRowsPure("jeonsan", day(i), { rows: [{ team_key: "dsr", unit: "전체", metrics: { inquiries: 2 } }, { team_key: "dsr", unit: "meta", metrics: { inquiries: 1 } }, { team_key: "dsr", unit: "기타", metrics: { inquiries: 1 } }] }, TEAMS));
+  const sales = [{ team_id: 1, day: day(1), signup: true, channel: "메타" }, { team_id: 1, day: day(2), signup: true, channel: "메타" }, { team_id: 1, day: day(3), signup: true, channel: "네이버" }, { team_id: 1, day: day(13), signup: false, channel: "기타" }];
+  const daily = [
+    { date: day(2), data: { flags: [{ level: "yellow", code: "rank_drop", team_id: 1, team: "대구동성로점", unit: "k", msg: "'k' 3위 → 7위" }] } },
+    { date: day(1), data: { flags: [{ level: "yellow", code: "rank_drop", team_id: 1, team: "대구동성로점", unit: "k", msg: "'k' 7위 → 9위" }, { level: "red", code: "account_issue", team_id: 1, team: "대구동성로점", unit: "x", msg: "결제 문제" }] } },
+    { date: day(9), data: { flags: [{ level: "red", code: "old", team_id: 1, team: "대구동성로점", unit: "y", msg: "지난주" }] } },
+  ];
+  const w = buildWeekly(rows, TEAMS, SUN, sales, daily);
+  assert.deepEqual([w.from, w.to], [day(6), SUN]);
+  const v = (label) => w.summary.find((l) => l.label === label).value;
+  assert.deepEqual([v("문의"), v("등록"), v("총 광고비"), v("문의당 비용"), v("등록당 비용")], [14, 3, 84000, 6000, 28000]);
+  assert.deepEqual(w.media.map((m) => [m.name, m.spend, m.inquiries, m.enrolls, m.perInquiry, m.perEnroll]),
+    [["네이버", 14000, null, 1, null, 14000], ["메타", 70000, 7, 2, 10000, 35000], ["구글", null, null, null, null, null]]);
+  assert.deepEqual(w.flags.map((f) => [f.level, f.msg, f.days, f.last]), [["red", "결제 문제", 1, day(1)], ["yellow", "'k' 7위 → 9위", 2, day(1)]]);
+  assert.deepEqual(w.teams.map((t) => t.team), ["대구동성로점"]);
+  assert.ok(w.channels.find((c) => c.channel === "meta_ad").units[0].metrics.some((m) => m.label === "비용" && m.value === 70000));
+  assert.ok(JSON.stringify(w).length < 20000);
 });

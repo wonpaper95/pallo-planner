@@ -144,12 +144,16 @@ function summary(rows, end, enr) {
   const line = (label, rs, metric, good, unit) => ({ label, good, unit, cells: WINDOWS.map((w) => ({ key: w.key, ...cell(rs, metric, end, w.days) })) });
   const inq = line("문의", jt, "inquiries", "up", "int"), enrl = line("등록", enr ?? jt, "enrolls", "up", "int"), sp = line("총 광고비", ads, "spend", "down", "krw");
   const div = (a, b) => (a === null || a === undefined || !b ? null : a / b); // 문의·등록 0 이면 산출 불가(null)
-  // 문의당 비용은 두 칸(광고비·문의)으로 만든 값이라, 증감도 두 칸 중 덜 찬 쪽 기준으로 cell 과 같은 절반 규칙을 따른다
-  const per = (label, q) => ({ label, good: "down", unit: "krw", cells: WINDOWS.map((w, i) => { const s = sp.cells[i], c = q.cells[i], v = div(s.value, c.value), p = div(s.prev, c.prev), pd = Math.min(s.prevDays, c.prevDays); return { key: w.key, value: v, prev: p, change: pd * 2 >= w.days ? pctChange(v, p) : null, days: Math.min(s.days, c.days), prevDays: pd, hold: false }; }) });
-  const out = [inq, enrl, sp, per("문의당 비용", inq)];
-  // 등록당 비용은 광고비를 모은 날(지점·날짜에 쓸 수 있는 광고 행이 있는 날)의 등록만으로 나눈다 — 장부는 몇 달치라 광고비보다 길다
-  const adDays = new Set(ads.filter(usable).map((r) => r.team_id + "|" + r.date));
-  if (enr) out.push(per("등록당 비용", line("등록", enr.filter((r) => adDays.has(r.team_id + "|" + r.date)), "enrolls", "up", "int")), ...ENROLL_UNITS.map((u) => line(`등록 › ${u}`, enr.filter((r) => r.unit === u), "enrolls", "up", "int")));
+  // ~당 비용은 두 칸(광고비·건수)으로 만든 값이라, 증감도 두 칸 중 덜 찬 쪽 기준으로 cell 과 같은 절반 규칙을 따른다.
+  // 두 칸은 같은 날들끼리 — 광고비는 9/1부터 백필돼 있고 전산 문의는 10/29부터라, 둘 다 있는(지점·날짜) 날만 나눈다(등록도 같은 식).
+  const per = (label, s0, q) => ({ label, good: "down", unit: "krw", cells: WINDOWS.map((w, i) => { const s = s0.cells[i], c = q.cells[i], v = div(s.value, c.value), p = div(s.prev, c.prev), pd = Math.min(s.prevDays, c.prevDays); return { key: w.key, value: v, prev: p, change: pd * 2 >= w.days ? pctChange(v, p) : null, days: Math.min(s.days, c.days), prevDays: pd, hold: false }; }) });
+  const key = (r) => r.team_id + "|" + r.date, on = (rs, days) => rs.filter((r) => days.has(key(r)));
+  const jDays = new Set(jt.filter(usable).map(key)), adDays = new Set(ads.filter(usable).map(key));
+  const out = [inq, enrl, sp, per("문의당 비용", line("총 광고비", on(ads, jDays), "spend", "down", "krw"), line("문의", on(jt, adDays), "inquiries", "up", "int"))];
+  if (enr) {
+    const eDays = new Set(enr.map(key));
+    out.push(per("등록당 비용", line("총 광고비", on(ads, eDays), "spend", "down", "krw"), line("등록", on(enr, adDays), "enrolls", "up", "int")), ...ENROLL_UNITS.map((u) => line(`등록 › ${u}`, enr.filter((r) => r.unit === u), "enrolls", "up", "int")));
+  }
   return out;
 }
 

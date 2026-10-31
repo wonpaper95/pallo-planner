@@ -164,12 +164,15 @@ async function renderDaily(admin) {
   const end = last.data.date;
   let kq = sb.from("mkd_keywords").select("id,team_id,keyword,enabled").order("team_id").order("keyword");
   if (team) kq = kq.eq("team_id", team);
-  const [rr, rp, rk, rs] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle(), kq, mkdSales(end, team)]);
+  // 월요일 주간 종합(대표만 — 전 지점 숫자가 함께 있어 DB 도 대표만 읽게 막아 둠): 기준일 이전 가장 최근 것
+  const wq = admin ? sb.from("mkd_reports").select("date,data").eq("kind", "weekly").lte("date", end).order("date", { ascending: false }).limit(1).maybeSingle() : Promise.resolve({ data: null });
+  const [rr, rp, rk, rs, rw] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle(), kq, mkdSales(end, team), wq]);
   if (stale()) return;
   if (fail(rr.error)) return;
   if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
   if (rk.error) console.error(rk.error); // 키워드 카드만 못 그린다
   if (rs.error) console.error(rs.error); // 등록 줄만 비운다
+  if (rw.error) console.error(rw.error); // 주간 종합 카드만 뺀다
   const rep = rp.data?.data;
   const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end, rs.error ? undefined : MKDCORE.enrollRows(rs.sales, end)), st = MKDCORE.status(rows, end);
   // 맥미니는 매일 06:00 에 어제 숫자를 모은다. 한국 시각 07시부터는 마지막 수집일이 어제보다 오래됐으면 수집이 멈춘 것 → 알려 준다. 07시 전엔 수집이 아직 돌고 있을 수 있어 그저께까지는 정상으로 본다.
@@ -184,6 +187,7 @@ async function renderDaily(admin) {
       + (flags.length ? `<div class="card warn"><b>이상 징후 ${flags.length}건</b><ul>${flags.map((f) => `<li>${Object.hasOwn(FLAGICON, f.level) ? FLAGICON[f.level] : ""} ${!team && f.team ? `<span class="tag">${esc(f.team)}</span> ` : ""}${esc(f.msg)}</li>`).join("")}</ul></div>` : `<div class="card"><span class="mut">이상 징후 없음</span></div>`);
   body.innerHTML = `<div class="mkbar">${teamSel}<span><b>${esc(end)}</b> 기준 <span class="mut">(${end < yest ? "마지막 수집일" : "어제까지"})</span></span><div class="mkchips">${chips}</div></div>`
     + (behind ? `<div class="card warn">⚠️ 마지막 수집이 ${n(ago)}일 전(${esc(end)})이에요 — 맥미니 예약 작업을 확인해 주세요</div>` : "")
+    + mkdWeekly(rw.data)
     + repHtml
     + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
        <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요. 등록 = 재무 탭 매출의 '가입'(매체는 가입경로) — 결제를 늦게 입력하면 어제 칸이 나중에 채워져요.</p></div>`
@@ -237,6 +241,15 @@ function mkdKwWire(body, kws, team, admin) {
   };
   body.querySelector("#mkdKwAdd")?.addEventListener("click", add);
   body.querySelector("#mkdKwNew")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) add(); });
+}
+// 이번 주 종합 (접힌 카드): Claude 가 쓴 본문 + 매체별 문의·등록당 비용 (숫자는 build-report --weekly 가 계산한 것)
+function mkdWeekly(r) {
+  const w = r?.data; if (!w || typeof w.body !== "string") return "";
+  const media = (Array.isArray(w.media) ? w.media : []).filter((m) => m && typeof m === "object" && (m.spend || m.inquiries || m.enrolls));
+  const per = (v, cnt) => (cnt ? `${n(cnt)}건 (${v === null || v === undefined ? "–" : won(v)}/건)` : "0건");
+  return `<details class="card"><summary><b>📅 이번 주 종합</b> <span class="mut">${esc(w.from ?? "")} ~ ${esc(w.to ?? r.date)}</span></summary>
+    <p style="white-space:pre-line">${esc(w.body)}</p>
+    ${media.length ? `<div class="tw"><table class="mkd"><thead><tr><th>매체</th><th>광고비</th><th>문의</th><th>등록</th></tr></thead><tbody>${media.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.spend)}</td><td>${per(m.perInquiry, m.inquiries)}</td><td>${per(m.perEnroll, m.enrolls)}</td></tr>`).join("")}</tbody></table></div><p class="mut">~당 비용은 광고비와 건수가 둘 다 있는 날끼리 나눈 값이에요. 등록 매체는 재무 탭 가입경로 기준(구글은 '기타'에 섞여 따로 못 세요).</p>` : ""}</details>`;
 }
 const mkdHead = () => `<thead><tr><th>지표</th>${MKDCORE.WINDOWS.map((w) => `<th>${esc(w.label)}</th>`).join("")}</tr></thead>`;
 const mkdHas = (l) => l.cells.some((c) => c.value !== null && c.value !== undefined); // 5칸 모두 비면 줄을 숨긴다 (예: 아직 데이터가 없는 등록)

@@ -501,3 +501,9 @@ test("summary + 등록: 등록당 비용은 광고비를 모은 날의 등록만
   assert.equal(c("등록", "w2").value, 3);
   assert.equal(c("등록당 비용", "w2").value, 6000); // 6000원 / (광고비 있는 날 등록 1건)
 });
+test("summary: 문의당 비용은 광고비·문의가 둘 다 있는 날끼리 (광고비가 백필돼 문의보다 길어도 부풀지 않게)", () => {
+  const rows = [...days(END, 7, "meta_ad", "c", { spend: 7000 }), ...days(END, 2, "jeonsan", "전체", { inquiries: 7 })];
+  const c = (label, key) => D.summary(rows, END).find((l) => l.label === label).cells.find((x) => x.key === key);
+  assert.equal(c("총 광고비", "w1").value, 49000);   // 광고비 줄 자체는 7일 그대로
+  assert.equal(c("문의당 비용", "w1").value, 1000);  // 14000 / 14 (문의 있는 2일만 — 예전 계산이면 49000/14 = 3500)
+});

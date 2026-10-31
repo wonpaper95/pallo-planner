@@ -180,3 +180,21 @@ test("save-daily: 올바른 JSON 은 저장되고 종료코드 0", async () => {
   assert.equal(JSON.parse(r.out).saved, 1);
   assert.equal(writes.filter((w) => w.table === "mkd_daily" && w.method === "POST").length, 1);
 });
+
+test("build-report --weekly → save-report weekly --body-file: 주간 입력은 파일·stdout 한 줄, body 를 붙여 weekly 로 저장", async () => {
+  const out = join(tmp, "w1.json");
+  const r = await sh("build-report.mjs", END, out, "--weekly");
+  assert.equal(r.code, 0, r.err);
+  const w = JSON.parse(r.out.trim());
+  assert.deepEqual(w, JSON.parse(readFileSync(out, "utf8")));
+  assert.deepEqual([w.date, w.from, w.to], [END, "2026-10-22", END]);
+  assert.ok(Array.isArray(w.media) && Array.isArray(w.summary) && Array.isArray(w.channels));
+  writes.length = 0;
+  const b = file("b1.txt", "\n한 줄 결론: 문의는 늘었어요.\n1. 메타 …\n");
+  const s = await sh("save-report.mjs", END, "weekly", out, "--body-file", b);
+  assert.equal(s.code, 0, s.err);
+  const saved = reportWrites()[0].body[0];
+  assert.deepEqual([saved.date, saved.kind, saved.data.body], [END, "weekly", "한 줄 결론: 문의는 늘었어요.\n1. 메타 …"]);
+  assert.equal((await sh("save-report.mjs", END, "weekly", out, "--comment-file", b)).code, 2);   // weekly 에 comment-file 은 안 됨
+  assert.equal((await sh("save-report.mjs", "2026-10-27", "weekly", out, "--body-file", b)).code, 2); // 날짜가 다르면 저장 안 함
+});
