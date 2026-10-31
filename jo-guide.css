@@ -106,3 +106,16 @@ body:not(.jgv) #jgView { display: none; }
 /* 📋 투두리스트 바로가기 (시간대 고르기) */
 .jg .jggo { margin: 8px 0 4px; padding: 10px 12px; border: 1.5px solid var(--accent); border-radius: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .jg .jggo > div { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+/* 📤 사전숙제 제출 (10-31) — guide.html 맨 끝 칸 · 매니저 제출함 */
+.jgsub { border: 2px solid var(--accent); }
+.jgfrow { display: flex; gap: 10px; flex-wrap: wrap; }
+.jgfrow label { flex: 1 1 180px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; font-weight: 600; }
+.jgfld { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; font-size: 14px; }
+.jgsub input:not([type=file]), .jgsub select, .jgsub textarea { padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+.jgsub textarea { resize: vertical; min-height: 110px; line-height: 1.5; }
+.jgsub input[type=file] { font-size: 14px; }
+.jghwrow { padding: 10px 0; border-top: 1px solid var(--line); }
+.jghwrow:first-of-type { border-top: 0; }
+.jghwrow > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.jghwq { margin: 6px 0 2px; font-size: 12.5px; color: var(--sub); }
+.jghwa { margin: 0; white-space: pre-wrap; font-size: 14.5px; }
