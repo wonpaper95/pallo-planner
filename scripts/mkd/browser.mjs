@@ -1,6 +1,8 @@
-// 사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print
+// 사용: node scripts/mkd/browser.mjs login [daangn | blog <블로그아이디>] | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print
 // 일일 현황의 구글 검색광고·전산 문의를 사람 없이 읽는다 — Claude in Chrome 대신 맥미니 Playwright(크롬, 지속 프로필 ~/.cache/pallo-mkd/profile, 경쟁사 정찰 pallo-mkc 와 따로).
 //   login   처음 1회·로그인이 풀렸을 때. 창이 뜨면 사람이 두 탭(전산 SSO·구글 광고)에서 직접 로그인하고 창을 닫는다. 비밀번호는 절대 입력하지 않는다.
+//           login daangn — 당근 비즈니스(프로필 ~/.cache/pallo-mkd/daangn) / login blog <아이디> — 그 블로그 주인 네이버 계정(프로필 ~/.cache/pallo-mkd/blog-<아이디>, 블로그 통계용).
+//           네이버는 한 프로필에 한 계정만 로그인되므로 블로그마다 프로필을 따로 쓴다. 이 창들은 30분 기다린다.
 //   check   헤드리스로 두 사이트가 로그인된 채인지만 본다(읽기 전용) → {"jeonsan":"ok|login_required|error","google":"…"}, 종료코드 0.
 //   jeonsan 지점 3곳(DAEGUDSR·DAEGUJPCH·ULSAN) 신규 회신 › 데이터 보드에서 D 의 유입경로별 문의 건수(jeonsan-daily.js)를 세어 mkd_daily(jeonsan) 에 저장.
 //   google  계정 2곳(대구·울산) 캠페인 표에서 D 하루치 노출·클릭·비용·전환 + 알림 배너를 읽어 mkd_daily(google_ad) 에 저장.
@@ -18,13 +20,14 @@ import {
   ReadError, acceptJeonsan, jeonsanRows, failRow, jeonsanOutput, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput, parseRange, rangeIs, partitionValid,
   conversionsUrl, conversionStatus, checkRange, googleRangeAccount, googleRangeFail, googleRangeOutput,
 } from "./browser-rows.mjs";
+import { BLOGS } from "./blog-rows.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const [cmd, dateArg, dateArg2] = process.argv.slice(2), print = process.argv.includes("--print");
 const PROFILE = join(homedir(), ".cache", "pallo-mkd", "profile"), CHROME_APP = "/Applications/Google Chrome.app";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.error(`[${new Date().toISOString().slice(11, 19)}]`, ...a); // 진행 상황 — 개인정보 없는 고정 문구만
-const usage = () => { console.error("사용: node scripts/mkd/browser.mjs login | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print"); process.exit(2); };
+const usage = () => { console.error("사용: node scripts/mkd/browser.mjs login [daangn | blog <블로그아이디>] | check | jeonsan <YYYY-MM-DD> [--print] | google <YYYY-MM-DD> [--print] | google-range <from> <to> --print"); process.exit(2); };
 // 작업 p 를 ms 안에 끝내지 못하거나 던지면 fallback(오류) 값으로 — 하나가 멈춰도 나머지를 계속한다
 const within = (p, ms, fallback) => new Promise((resolve) => {
   const t = setTimeout(() => resolve(fallback(null)), ms);
@@ -38,11 +41,11 @@ async function loadChromium() {
   console.error("Playwright 가 없어요: cd scripts/mkc && npm install && npx playwright install chromium"); process.exit(2);
 }
 // 지속 프로필 크롬 — 진짜 Google Chrome 이 있으면 그걸(구글 로그인이 자동화 브라우저로 안 막히게), 없으면 Playwright 크롬. 같은 프로필을 쓰는 창이 열려 있으면 못 연다.
-async function launch(headless) {
+async function launch(headless, dir = PROFILE) {
   const chromium = await loadChromium();
-  mkdirSync(PROFILE, { recursive: true });
+  mkdirSync(dir, { recursive: true });
   try {
-    return await chromium.launchPersistentContext(PROFILE, {
+    return await chromium.launchPersistentContext(dir, {
       ...(existsSync(CHROME_APP) ? { channel: "chrome" } : {}), headless, viewport: { width: 1366, height: 900 }, locale: "ko-KR", timezoneId: "Asia/Seoul",
       args: ["--disable-blink-features=AutomationControlled"], ignoreDefaultArgs: ["--enable-automation"],
     });
@@ -69,7 +72,21 @@ const gridReady = (page) => page.evaluate((cells) => { // 캠페인 머리글 + 
 }, CELLS);
 
 // ── login ──
-async function login() {
+// 당근·블로그 통계용 따로 로그인: 대상 → {프로필, 열 주소, 안내}. 블로그 아이디는 blog-rows.mjs 의 지점 블로그만 받는다.
+function extraLogin(target, id) {
+  if (target === "daangn") return { dir: join(homedir(), ".cache", "pallo-mkd", "daangn"), url: "https://business.daangn.com/", what: "당근 비즈니스(business.daangn.com)" };
+  if (target === "blog" && Object.values(BLOGS).flat().includes(id)) return { dir: join(homedir(), ".cache", "pallo-mkd", `blog-${id}`), url: `https://nid.naver.com/nidlogin.login?url=${encodeURIComponent(`https://admin.blog.naver.com/${id}/stat/today`)}`, what: `네이버(블로그 ${id} 주인 계정)` };
+  console.error(`login 대상은 daangn 또는 blog <${Object.values(BLOGS).flat().join("|")}> 예요`); process.exit(2);
+}
+async function login(target, id) {
+  if (target) {
+    const x = extraLogin(target, id), ctx = await launch(false, x.dir), page = ctx.pages()[0] ?? (await ctx.newPage());
+    page.goto(x.url).catch(() => {});
+    console.log(`${x.what} 에 직접 로그인한 뒤 창을 닫아 주세요. 최대 30분 기다려요.`);
+    await new Promise((res) => { ctx.on("close", res); setTimeout(res, 30 * 60e3); });
+    await within(ctx.close(), 8000, () => {});
+    return;
+  }
   const ctx = await launch(false);
   const first = ctx.pages()[0] ?? (await ctx.newPage()), second = await ctx.newPage();
   first.goto(SSO_URL).catch(() => {}); second.goto(googleUrl(GOOGLE_ACCOUNTS[0].ocid)).catch(() => {});
@@ -339,7 +356,7 @@ async function main() {
   if (cmd === "google-range") needRange();
   if (cmd !== "login") setTimeout(() => { console.error("실패: 시간 초과 — 강제 종료"); process.exit(1); }, 115_000).unref(); // Bash 기본 제한(120초) 안에 반드시 끝낸다 (login 은 사람을 기다린다)
   let code = 0;
-  try { code = (await { login, check, jeonsan: () => jeonsan(dateArg), google: () => google(dateArg), "google-range": () => googleRange(dateArg, dateArg2) }[cmd]()) ?? 0; }
+  try { code = (await { login: () => login(dateArg, dateArg2), check, jeonsan: () => jeonsan(dateArg), google: () => google(dateArg), "google-range": () => googleRange(dateArg, dateArg2) }[cmd]()) ?? 0; }
   catch (e) { console.error(`실패: ${String(e?.message ?? e).split("\n")[0].slice(0, 200)}`); code = 1; }
   process.exitCode = code;
   setTimeout(() => process.exit(code), 3000).unref(); // 브라우저 찌꺼기가 붙잡아도 마무리
