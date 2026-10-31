@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202610311116">
+<meta name="app-version" content="202610311203">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202610311116"></script>
+<script src="theme.js?v=202610311203"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -266,7 +266,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 header #fbBtn { background: #f04438; border-color: #f04438; color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(240, 68, 56, .35); } /* 🐞 신고·제안 눈에 띄게 */
 header #fbBtn:hover { background: #d92d20; }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.wkv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -447,7 +447,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.wkv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 /* 🌱 언젠가 할 일 자리: PC(넓은 화면) = 주간·월간 오른쪽 칸(스크롤해도 따라옴), 폰 = 맨 위 */
@@ -544,27 +544,26 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202610311116">
-<link rel="stylesheet" href="photo.css?v=202610311116">
-<link rel="stylesheet" href="post.css?v=202610311116">
-<link rel="stylesheet" href="marketing.css?v=202610311116">
-<link rel="stylesheet" href="contacts.css?v=202610311116">
-<link rel="stylesheet" href="leaders.css?v=202610311116">
-<link rel="stylesheet" href="links.css?v=202610311116">
-<link rel="stylesheet" href="reports.css?v=202610311116">
-<link rel="stylesheet" href="edu.css?v=202610311116">
-<link rel="stylesheet" href="qna.css?v=202610311116">
-<link rel="stylesheet" href="jo-guide.css?v=202610311116">
-<link rel="stylesheet" href="jc.css?v=202610311116">
-<link rel="stylesheet" href="talkbot.css?v=202610311116">
-<link rel="stylesheet" href="work.css?v=202610311116">
-<link rel="stylesheet" href="fin.css?v=202610311116">
-<link rel="stylesheet" href="gx.css?v=202610311116">
-<link rel="stylesheet" href="att.css?v=202610311116">
-<link rel="stylesheet" href="wiki.css?v=202610311116">
-<link rel="stylesheet" href="glass.css?v=202610311116">
-<link rel="stylesheet" href="sidebar.css?v=202610311116">
-<link rel="stylesheet" href="skins.css?v=202610311116">
+<link rel="stylesheet" href="blog.css?v=202610311203">
+<link rel="stylesheet" href="photo.css?v=202610311203">
+<link rel="stylesheet" href="post.css?v=202610311203">
+<link rel="stylesheet" href="marketing.css?v=202610311203">
+<link rel="stylesheet" href="contacts.css?v=202610311203">
+<link rel="stylesheet" href="leaders.css?v=202610311203">
+<link rel="stylesheet" href="links.css?v=202610311203">
+<link rel="stylesheet" href="reports.css?v=202610311203">
+<link rel="stylesheet" href="edu.css?v=202610311203">
+<link rel="stylesheet" href="qna.css?v=202610311203">
+<link rel="stylesheet" href="jo-guide.css?v=202610311203">
+<link rel="stylesheet" href="jc.css?v=202610311203">
+<link rel="stylesheet" href="talkbot.css?v=202610311203">
+<link rel="stylesheet" href="work.css?v=202610311203">
+<link rel="stylesheet" href="fin.css?v=202610311203">
+<link rel="stylesheet" href="gx.css?v=202610311203">
+<link rel="stylesheet" href="att.css?v=202610311203">
+<link rel="stylesheet" href="glass.css?v=202610311203">
+<link rel="stylesheet" href="sidebar.css?v=202610311203">
+<link rel="stylesheet" href="skins.css?v=202610311203">
 </head>
 <body>
 
@@ -604,7 +603,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="wiki">백과사전</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
   <div id="updBar" class="hidden"></div><!-- 📣 업데이트 소식 (새 것만, 확인하면 사라짐) -->
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
@@ -652,7 +651,6 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="atView"></section>
   <section id="fnView"></section>
   <section id="tkView"></section>
-  <section id="wkView"></section>
   <section id="rpView"></section>
   <section id="qaView"></section>
   <section id="ctView"></section>
@@ -744,9 +742,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202610311116"></script>
-<script src="week.js?v=202610311116"></script>
-<script src="pick.js?v=202610311116"></script>
+<script src="config.js?v=202610311203"></script>
+<script src="week.js?v=202610311203"></script>
+<script src="pick.js?v=202610311203"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -917,7 +915,6 @@ async function boot() {
   if (view === "sim") window.TB?.loadMine(); // 🧠 시뮬레이터 탭
   if (view === "edu") window.EDU?.load(); // 📚 교육 탭에서 새로고침했을 때
   if (view === "jg") window.JGUIDE?.mount($("#jgView"));
-  if (view === "wiki") window.WK?.load(); // 📖 백과사전
   if (view === "jc") window.JC?.load(); // ✅ 조교체크리스트
   if (view === "tk") window.TK?.load(); // 💬 톡톡봇 (대표)
   if (view === "wr") window.WR?.load(); // 🕒 근무기록
@@ -1685,10 +1682,11 @@ addEventListener("appinstalled", () => { installEvt = null; $("#installBtn").cla
 $("#installBtn").onclick = async () => { if (!installEvt) return toast("크롬 주소창 오른쪽 '설치' 아이콘으로 설치할 수 있어요"); installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("#installBtn").classList.add("hidden"); };
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
+if (!document.querySelector(`.seg [data-v="${view}"]`)) view = "week"; // 없앤 탭이 저장돼 있으면 빈 화면이 된다
 const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx", "at"]; // 🧑‍🎓 조교가 볼 수 있는 탭
 function setView(v) {
   if (document.body.classList.contains("is-assist") && !JO_VIEWS.includes(v)) v = "ld";
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("wkv", v === "wiki"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1703,7 +1701,6 @@ function setView(v) {
   if (v === "rp" && me && window.RP) RP.load();
   if (v === "sim" && me && window.TB) TB.loadMine();
   if (v === "jg") window.JGUIDE?.mount($("#jgView")); // 🧑‍🎓 조교 가이드 (DB 없음)
-  if (v === "wiki") window.WK?.load(); // 📖 백과사전 (DB 없음)
   if (v === "jc" && me && window.JC) JC.load(); // ✅ 조교체크리스트
   if (v === "tk" && me && window.TK) TK.load(); // 💬 톡톡봇 (대표)
   if (v === "wr" && me && window.WR) WR.load(); // 🕒 근무기록
@@ -2275,42 +2272,40 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
 boot();
 </script>
-<script src="sales.js?v=202610311116"></script>
-<script src="month-goal.js?v=202610311116"></script>
-<script src="photo.js?v=202610311116"></script>
-<script src="blog.js?v=202610311116"></script>
-<script src="mk-core.js?v=202610311116"></script>
-<script src="mkc-core.js?v=202610311116"></script>
-<script src="mka-core.js?v=202610311116"></script>
-<script src="mkd-core.js?v=202610311116"></script>
-<script src="marketing.js?v=202610311116"></script>
-<script src="sns-core.js?v=202610311116"></script>
-<script src="post.js?v=202610311116"></script>
-<script src="someday.js?v=202610311116"></script>
-<script src="contacts.js?v=202610311116"></script>
-<script src="refs.js?v=202610311116"></script>
-<script src="sim-merge.js?v=202610311116"></script>
-<script src="simtb.js?v=202610311116"></script>
-<script src="leaders-core.js?v=202610311116"></script>
-<script src="leaders.js?v=202610311116"></script>
-<script src="links.js?v=202610311116"></script>
-<script src="edu-data.js?v=202610311116"></script>
-<script src="edu.js?v=202610311116"></script>
-<script src="reports.js?v=202610311116"></script>
-<script src="jo-guide-data.js?v=202610311116"></script>
-<script src="jo-guide-hire.js?v=202610311116"></script>
-<script src="jo-guide.js?v=202610311116"></script>
-<script src="jc.js?v=202610311116"></script>
-<script src="talkbot.js?v=202610311116"></script>
-<script src="work-core.js?v=202610311116"></script>
-<script src="work.js?v=202610311116"></script>
-<script src="fin-core.js?v=202610311116"></script>
-<script src="fin.js?v=202610311116"></script>
-<script src="gx.js?v=202610311116"></script>
-<script src="att.js?v=202610311116"></script>
-<script src="wiki-data.js?v=202610311116"></script>
-<script src="wiki.js?v=202610311116"></script>
-<script src="qna.js?v=202610311116"></script>
-<script src="sidebar.js?v=202610311116"></script>
+<script src="sales.js?v=202610311203"></script>
+<script src="month-goal.js?v=202610311203"></script>
+<script src="photo.js?v=202610311203"></script>
+<script src="blog.js?v=202610311203"></script>
+<script src="mk-core.js?v=202610311203"></script>
+<script src="mkc-core.js?v=202610311203"></script>
+<script src="mka-core.js?v=202610311203"></script>
+<script src="mkd-core.js?v=202610311203"></script>
+<script src="marketing.js?v=202610311203"></script>
+<script src="sns-core.js?v=202610311203"></script>
+<script src="post.js?v=202610311203"></script>
+<script src="someday.js?v=202610311203"></script>
+<script src="contacts.js?v=202610311203"></script>
+<script src="refs.js?v=202610311203"></script>
+<script src="sim-merge.js?v=202610311203"></script>
+<script src="simtb.js?v=202610311203"></script>
+<script src="leaders-core.js?v=202610311203"></script>
+<script src="leaders.js?v=202610311203"></script>
+<script src="links.js?v=202610311203"></script>
+<script src="edu-data.js?v=202610311203"></script>
+<script src="edu.js?v=202610311203"></script>
+<script src="reports.js?v=202610311203"></script>
+<script src="jo-guide-data.js?v=202610311203"></script>
+<script src="jo-guide-hire.js?v=202610311203"></script>
+<script src="jo-guide.js?v=202610311203"></script>
+<script src="jc.js?v=202610311203"></script>
+<script src="talkbot.js?v=202610311203"></script>
+<script src="work-core.js?v=202610311203"></script>
+<script src="work.js?v=202610311203"></script>
+<script src="fin-core.js?v=202610311203"></script>
+<script src="fin.js?v=202610311203"></script>
+<script src="gx.js?v=202610311203"></script>
+<script src="att.js?v=202610311203"></script>
+<script src="qna.js?v=202610311203"></script>
+<script src="sidebar.js?v=202610311203"></script>
 </body>
 </html>
