@@ -178,7 +178,7 @@ async function renderDaily(admin) {
   body.querySelectorAll("tr.ch.has").forEach((tr) => tr.addEventListener("click", () => tr.closest("tbody").classList.toggle("open")));
   mkdKwWire(body, rk.data ?? [], team, admin);
 }
-// 블로그 키워드 카드 (하단): 켜진 키워드마다 기준일의 통합검색·블로그탭 순위(우리 글 링크), 꺼진 건 아래. 켜기·끄기·추가 — 대표는 전 지점, 매니저는 자기 지점(RLS).
+// 블로그 키워드 카드 (하단): 켜진 키워드마다 기준일의 통합검색·블로그탭 순위(누르면 순위에 걸린 우리 글 — 통합 글 우선), 꺼진 건 아래. 켜기·끄기·추가 — 대표는 전 지점, 매니저는 자기 지점(RLS).
 // 맥미니가 매일 새벽 켜진 키워드만 검색한다. 구미점은 블로그가 없어 순위를 안 본다(키워드는 미리 골라 둘 수 있다).
 const noBlog = (teamId) => MKCORE.teamKeyOfTeamName(teams.find((t) => t.id === teamId)?.name ?? "") === "gumi";
 function mkdKwCard(list, end, team, admin) {
@@ -186,7 +186,7 @@ function mkdKwCard(list, end, team, admin) {
   const tname = (id) => teams.find((t) => t.id === id)?.name ?? "";
   const rt = (x, k) => (x.state === "missing" ? "–" : x.state === "failed" || x[k] === undefined ? "못 읽음" : x[k] === null ? "밖" : `${x[k]}위`);
   const line = (x) => `<div class="kwr${x.enabled ? "" : " off"}"><span class="kw"><b>${esc(x.keyword)}</b>${!team ? `<span class="tag">${esc(tname(x.team_id))}</span>` : ""}</span>
-    ${!x.enabled ? "" : noBlog(x.team_id) ? `<span class="mut">블로그 없음</span>` : `<span class="mut">통합 ${x.our_url ? `<a href="${esc(x.our_url)}" target="_blank" rel="noopener">${esc(rt(x, "rank"))}</a>` : esc(rt(x, "rank"))} · 탭 ${esc(rt(x, "tab_rank"))}</span>`}
+    ${!x.enabled ? "" : noBlog(x.team_id) ? `<span class="mut">블로그 없음</span>` : (() => { const t = `통합 ${esc(rt(x, "rank"))} · 탭 ${esc(rt(x, "tab_rank"))}`; return `<span class="mut">${x.our_url ? `<a href="${esc(x.our_url)}" target="_blank" rel="noopener" title="순위에 걸린 우리 글">${t}</a>` : t}</span>`; })()}
     <button class="sm" data-kw="${n(x.id)}" data-on="${x.enabled ? 0 : 1}">${x.enabled ? "끄기" : "켜기"}</button></div>`;
   const on = list.filter((x) => x.enabled), off = list.filter((x) => !x.enabled);
   const teamSel = admin && !team ? `<select id="mkdKwTeam">${teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>` : "";
