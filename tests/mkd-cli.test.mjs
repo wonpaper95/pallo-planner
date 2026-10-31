@@ -21,17 +21,21 @@ const DAILY = [
   ...toRowsPure("jeonsan", END, { rows: [put("dsr", "전체", { inquiries: 3 })] }, TEAMS),
 ];
 
-let server, tmp, envFile, writes;
+// 매출 장부(fin_rows): 거래형태·가입경로만 골라 읽은 모양. 대구동성로 10/27 가입 1(인스타) · 10/28 가입 2(네이버·지인소개) + 환불 1
+const FIN = [{ team_id: 1, day: "2026-10-27", amount: 300000, type: "가입", path: "인스타" }, { team_id: 1, day: END, amount: 250000, type: "가입", path: "네이버" },
+  { team_id: 1, day: END, amount: 250000, type: "가입", path: "지인소개" }, { team_id: 1, day: END, amount: -100000, type: "환불", path: "" }];
+let server, tmp, envFile, writes, gets;
 before(async () => {
-  writes = [];
+  writes = []; gets = [];
   server = createServer((req, res) => {
     const chunks = []; req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
       const u = new URL(req.url, "http://x"), table = u.pathname.split("/").pop(), body = Buffer.concat(chunks).toString();
       if (req.method === "GET") {
+        gets.push({ table, query: decodeURIComponent(u.search) });
         const first = (req.headers.range ?? "0-").startsWith("0-");
         res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify(!first ? [] : table === "teams" ? TEAMS.map(({ id, name }) => ({ id, name })) : table === "mkd_daily" ? DAILY : []));
+        return res.end(JSON.stringify(!first ? [] : table === "teams" ? TEAMS.map(({ id, name }) => ({ id, name })) : table === "mkd_daily" ? DAILY : table === "fin_rows" ? FIN : []));
       }
       writes.push({ method: req.method, table, query: u.search, body: body ? JSON.parse(body) : null });
       res.writeHead(req.method === "DELETE" ? 204 : 201); res.end();
@@ -65,8 +69,17 @@ test("build-report <D> out.json: 전체 JSON 은 파일로, stdout 은 요약 �
   assert.ok(Array.isArray(full.teams) && full.teams.length === 4); // 파일엔 전체
   assert.deepEqual(short, shortSummary(full));                    // 요약은 파일에서 만든 것과 같다
   assert.deepEqual(short.flags.map((f) => f.slice(0, 2)), [["red", "대구동성로점"]]);
-  assert.deepEqual(short.summary.map((x) => x[0]), ["문의", "등록", "총 광고비", "문의당 비용"]);
+  assert.deepEqual(short.summary.map((x) => x[0]), ["문의", "등록", "총 광고비", "문의당 비용", "등록당 비용", "등록 › 메타", "등록 › 네이버", "등록 › 지인·재등록", "등록 › 기타"]);
   assert.ok(line.length < 3000);
+  // 등록 = 매출 장부 '가입' (환불 제외) — 10/28 2건, 3일 3건, 매체별로도
+  const enr = full.summary.find((x) => x.label === "등록").cells;
+  assert.deepEqual([enr.d1.value, enr.d3.value], [2, 3]);
+  assert.deepEqual(["메타", "네이버", "지인·재등록", "기타"].map((u) => full.summary.find((x) => x.label === `등록 › ${u}`).cells.d3.value), [1, 1, 1, 0]);
+  assert.equal(full.summary.find((x) => x.label === "등록당 비용").cells.d1.value, 2850); // (5000+700)/2
+  // 장부는 거래형태·가입경로·매출만 — 이름·전화번호가 든 vals 통째로는 읽지 않는다
+  const q = gets.find((g) => g.table === "fin_rows").query;
+  assert.match(q, /select=team_id,day,amount,type:vals->>거래형태,path:vals->>가입경로/);
+  assert.doesNotMatch(q, /이름|전화번호|select=[^&]*\bvals(,|&|$)/);
 });
 
 test("build-report <D> (out.json 없이): 예전처럼 전체 JSON 을 stdout 으로", async () => {

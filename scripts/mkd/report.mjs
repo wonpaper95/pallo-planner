@@ -18,14 +18,16 @@ export const slim = (line) => ({
 const count = (fs) => fs.reduce((o, f) => ((o[f.level] = (o[f.level] ?? 0) + 1), o), {});
 
 // mkd_daily 행(어느 팀·날짜든) + teams [{id,name,key}] + 기준일 → 리포트 객체. 기준일 밖(미래·56일 전) 행은 무시.
-export function buildReport(allRows, teams, date) {
+// sales([{team_id, day, signup, channel}], 매출 장부 '가입')를 주면 등록·등록당 비용·매체별 등록을 그걸로 센다(D.enrollRows). 없으면 예전처럼.
+export function buildReport(allRows, teams, date, sales) {
   const from = reportFrom(date), rows = allRows.filter((r) => r.date >= from && r.date <= date);
+  const enr = sales ? D.enrollRows(sales, date) : undefined, enrOf = (id) => enr?.filter((r) => r.team_id === id);
   const perTeam = teams.map((t) => {
     const tr = rows.filter((r) => r.team_id === t.id);
-    return { team_id: t.id, team: t.name, days: new Set(tr.map((r) => r.date)).size, status: D.status(tr, date), summary: D.summary(tr, date).map(slim), flags: D.flags(tr, date).map((f) => ({ ...f, team_id: t.id, team: t.name })) };
+    return { team_id: t.id, team: t.name, days: new Set(tr.map((r) => r.date)).size, status: D.status(tr, date), summary: D.summary(tr, date, enrOf(t.id)).map(slim), flags: D.flags(tr, date).map((f) => ({ ...f, team_id: t.id, team: t.name })) };
   });
   const flags = perTeam.flatMap((t) => t.flags);
-  return { date, days: new Set(rows.map((r) => r.date)).size, status: D.status(rows, date), summary: D.summary(rows, date).map(slim), flags, flagCounts: count(flags), teams: perTeam };
+  return { date, days: new Set(rows.map((r) => r.date)).size, status: D.status(rows, date), summary: D.summary(rows, date, enr).map(slim), flags, flagCounts: count(flags), teams: perTeam };
 }
 
 // build-report 를 파일로 낼 때 stdout 에 찍는 짧은 요약: 상태·플래그 수·플래그([수준, 지점, 문장])·핵심 4개([이름, d1 칸, d3 칸]). Claude 는 이것만 보고 comment 를 쓴다.

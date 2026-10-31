@@ -468,3 +468,36 @@ test("flags: 클릭 있는데 문의 0 — 구글도 gads_ 이력이 있어야 �
   assert.deepEqual(codes([...clicks, ...base, row(D.addDays(END, -7), "jeonsan", "gads_x", { inquiries: 1 })]), ["clicks_no_inquiry"]);
   assert.deepEqual(codes([...clicks, ...base, trackedBefore("gads_x")]), ["clicks_no_inquiry"]);           // 이력 있고 이번 주 없음 → 판단
 });
+
+// ── 등록 (매출 장부 '가입') ──
+const sale = (team_id, day, signup, channel) => ({ team_id, day, signup, channel });
+test("enrollRows: 지점마다 장부 첫날(창 안)부터 기준일까지 매일 매체 4개 행(0 포함), 가입만 센다, 모르는 매체는 기타, 창 밖·날짜 없음은 무시", () => {
+  const s = [sale(2, "2026-10-26", true, "메타"), sale(2, "2026-10-26", true, "메타"), sale(2, "2026-10-27", false, "네이버"), sale(2, END, true, "엉뚱"),
+    sale(3, END, true, "네이버"), sale(2, "2026-12-30", true, "메타"), sale(2, null, true, "메타"), sale(4, "2026-08-01", true, "메타")];
+  const r = D.enrollRows(s, END);
+  assert.deepEqual([...new Set(r.map((x) => x.team_id))], [2, 3]); // 4번 지점은 창(56일) 밖뿐
+  assert.deepEqual([...new Set(r.filter((x) => x.team_id === 2).map((x) => x.date))], ["2026-10-26", "2026-10-27", END]);
+  assert.equal(r.filter((x) => x.team_id === 2).length, 12);
+  const at = (t, d, u) => r.find((x) => x.team_id === t && x.date === d && x.unit === u).metrics.enrolls;
+  assert.deepEqual([at(2, "2026-10-26", "메타"), at(2, "2026-10-27", "네이버"), at(2, END, "기타"), at(3, END, "네이버")], [2, 0, 1, 1]);
+  assert.ok(r.every((x) => x.channel === "jeonsan" && x.status === "ok" && D.ENROLL_UNITS.includes(x.unit)));
+  assert.deepEqual(D.enrollRows(undefined, END), []);
+});
+test("summary + 등록: 등록은 장부로(빈 날은 0 이라 하루 평균이 바르다), 등록당 비용·매체별 줄이 뒤에 붙는다, 앞 네 줄 순서는 그대로", () => {
+  const rows = [...days(END, 3, "jeonsan", "전체", { inquiries: 2 }), ...days(END, 3, "naver_ad", "c", { spend: 1000 })];
+  const enr = D.enrollRows([sale(2, "2026-10-26", true, "메타"), sale(2, END, true, "네이버"), sale(2, END, true, "네이버")], END);
+  const s = D.summary(rows, END, enr);
+  assert.deepEqual(s.map((l) => l.label), ["문의", "등록", "총 광고비", "문의당 비용", "등록당 비용", "등록 › 메타", "등록 › 네이버", "등록 › 지인·재등록", "등록 › 기타"]);
+  const c = (label, key) => s.find((l) => l.label === label).cells.find((x) => x.key === key);
+  assert.deepEqual([c("등록", "d1").value, c("등록", "d3").value, c("등록", "d3").days], [2, 3, 3]);
+  assert.equal(c("등록당 비용", "d3").value, 1000);
+  assert.deepEqual([c("등록 › 메타", "d3").value, c("등록 › 네이버", "d1").value, c("등록 › 기타", "d3").value], [1, 2, 0]);
+  assert.deepEqual(D.summary(rows, END).map((l) => l.label), ["문의", "등록", "총 광고비", "문의당 비용"]); // enr 없으면 예전 그대로
+});
+test("summary + 등록: 등록당 비용은 광고비를 모은 날의 등록만으로 (장부가 광고비보다 길어도 부풀지 않게)", () => {
+  const rows = [...days(END, 2, "naver_ad", "c", { spend: 3000 })]; // 광고비는 10/27·10/28 만
+  const enr = D.enrollRows([sale(2, "2026-10-20", true, "메타"), sale(2, "2026-10-21", true, "메타"), sale(2, END, true, "네이버")], END);
+  const c = (label, key) => D.summary(rows, END, enr).find((l) => l.label === label).cells.find((x) => x.key === key);
+  assert.equal(c("등록", "w2").value, 3);
+  assert.equal(c("등록당 비용", "w2").value, 6000); // 6000원 / (광고비 있는 날 등록 1건)
+});

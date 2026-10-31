@@ -121,16 +121,36 @@ function buildTable(rows, end) {
   }).filter(Boolean);
 }
 
-// 핵심 4개 (팀 안에서 채널을 가로지름): 전산 문의·등록, 총 광고비(광고 3채널 합), 문의당 비용. 5칸 모두.
-function summary(rows, end) {
+// 등록 = 매출 장부(플래너 재무 탭 fin_rows)의 '가입'. sales = [{team_id, day, signup, channel}] — 호출 쪽이 MKCORE.saleRow·isSignup·channelOf 로 만든다
+// (거래형태·가입경로·매출만 읽고 이름·전화번호는 읽지 않는다). 장부라 줄이 없는 날은 0 건: 지점마다 그 지점 매출 줄이 처음 나온 날(창 안)부터 end 까지
+// 매일 매체(ENROLL_UNITS)마다 한 행 {team_id, date, channel:"jeonsan", unit:매체, metrics:{enrolls}, status:"ok"} — cell 이 날 수를 바르게 센다. 매출 줄이 없는 지점(구미)은 행이 없다.
+const ENROLL_UNITS = ["메타", "네이버", "지인·재등록", "기타"];
+function enrollRows(sales, end, days = 56) {
+  const from = addDays(end, -(days - 1)), out = [], ok = (sales ?? []).filter((x) => x && typeof x.day === "string" && x.day >= from && x.day <= end);
+  for (const t of [...new Set(ok.map((x) => x.team_id))]) {
+    const ts = ok.filter((x) => x.team_id === t), count = new Map();
+    for (const x of ts) if (x.signup) { const k = x.day + "|" + (ENROLL_UNITS.includes(x.channel) ? x.channel : "기타"); count.set(k, (count.get(k) ?? 0) + 1); }
+    for (let d = ts.map((x) => x.day).sort()[0]; d <= end; d = addDays(d, 1))
+      for (const u of ENROLL_UNITS) out.push({ team_id: t, date: d, channel: "jeonsan", unit: u, metrics: { enrolls: count.get(d + "|" + u) ?? 0 }, status: "ok" });
+  }
+  return out;
+}
+
+// 핵심 (팀 안에서 채널을 가로지름): 전산 문의·등록, 총 광고비(광고 3채널 합), 문의당 비용 — 5칸 모두. 앞 네 줄의 순서는 고정(리포트·스킬이 쓴다).
+// enr(enrollRows 결과)를 주면 등록은 그걸로 세고 등록당 비용·매체별 등록 줄을 뒤에 붙인다. 없으면 예전처럼 전산 행의 enrolls.
+function summary(rows, end, enr) {
   const jt = totalRows(rows.filter((r) => r.channel === "jeonsan"));
   const ads = AD_CHANNELS.flatMap((c) => totalRows(rows.filter((r) => r.channel === c)));
   const line = (label, rs, metric, good, unit) => ({ label, good, unit, cells: WINDOWS.map((w) => ({ key: w.key, ...cell(rs, metric, end, w.days) })) });
-  const inq = line("문의", jt, "inquiries", "up", "int"), enr = line("등록", jt, "enrolls", "up", "int"), sp = line("총 광고비", ads, "spend", "down", "krw");
-  const div = (a, b) => (a === null || a === undefined || !b ? null : a / b); // 문의 0 이면 산출 불가(null)
+  const inq = line("문의", jt, "inquiries", "up", "int"), enrl = line("등록", enr ?? jt, "enrolls", "up", "int"), sp = line("총 광고비", ads, "spend", "down", "krw");
+  const div = (a, b) => (a === null || a === undefined || !b ? null : a / b); // 문의·등록 0 이면 산출 불가(null)
   // 문의당 비용은 두 칸(광고비·문의)으로 만든 값이라, 증감도 두 칸 중 덜 찬 쪽 기준으로 cell 과 같은 절반 규칙을 따른다
-  const cpi = { label: "문의당 비용", good: "down", unit: "krw", cells: WINDOWS.map((w, i) => { const s = sp.cells[i], q = inq.cells[i], v = div(s.value, q.value), p = div(s.prev, q.prev), pd = Math.min(s.prevDays, q.prevDays); return { key: w.key, value: v, prev: p, change: pd * 2 >= w.days ? pctChange(v, p) : null, days: Math.min(s.days, q.days), prevDays: pd, hold: false }; }) };
-  return [inq, enr, sp, cpi];
+  const per = (label, q) => ({ label, good: "down", unit: "krw", cells: WINDOWS.map((w, i) => { const s = sp.cells[i], c = q.cells[i], v = div(s.value, c.value), p = div(s.prev, c.prev), pd = Math.min(s.prevDays, c.prevDays); return { key: w.key, value: v, prev: p, change: pd * 2 >= w.days ? pctChange(v, p) : null, days: Math.min(s.days, c.days), prevDays: pd, hold: false }; }) });
+  const out = [inq, enrl, sp, per("문의당 비용", inq)];
+  // 등록당 비용은 광고비를 모은 날(지점·날짜에 쓸 수 있는 광고 행이 있는 날)의 등록만으로 나눈다 — 장부는 몇 달치라 광고비보다 길다
+  const adDays = new Set(ads.filter(usable).map((r) => r.team_id + "|" + r.date));
+  if (enr) out.push(per("등록당 비용", line("등록", enr.filter((r) => adDays.has(r.team_id + "|" + r.date)), "enrolls", "up", "int")), ...ENROLL_UNITS.map((u) => line(`등록 › ${u}`, enr.filter((r) => r.unit === u), "enrolls", "up", "int")));
+  return out;
 }
 
 // 채널별 기준일 수집 상태: ok / partial / failed / login_required / missing(행 없음)
@@ -234,5 +254,5 @@ function fmt(v, unit) {
   return Math.round(v).toLocaleString("ko-KR");
 }
 
-return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, keywordRanks, cleanKeyword, fmt };
+return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, keywordRanks, cleanKeyword, ENROLL_UNITS, enrollRows, fmt };
 });

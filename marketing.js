@@ -136,6 +136,19 @@ async function mkdRows(end, team) {
     from += data.length;
   }
 }
+// 등록 = 매출 장부(재무 탭 fin_rows)의 '가입' — 거래형태·가입경로·매출만 읽는다(이름·전화번호 안 읽음). 장부라 볼 때마다 새로 세서 늦게 입력한 결제도 반영된다.
+async function mkdSales(end, team) {
+  const out = [], SIZE = 1000;
+  for (let from = 0; ; ) {
+    let q = sb.from("fin_rows").select("id,team_id,day,amount,type:vals->>거래형태,path:vals->>가입경로").eq("kind", "sale").is("deleted_at", null).gte("day", MKDCORE.addDays(end, -55)).lte("day", end).order("day").order("id").range(from, from + SIZE - 1);
+    if (team) q = q.eq("team_id", team);
+    const { data, error } = await q;
+    if (error) return { error };
+    if (!Array.isArray(data) || !data.length) break;
+    out.push(...data); from += data.length;
+  }
+  return { sales: out.map((r) => { const x = MKCORE.saleRow({ day: r.day, amount: r.amount, vals: { 거래형태: r.type, 가입경로: r.path } }); return { team_id: r.team_id, day: r.day, signup: MKCORE.isSignup(x), channel: x.channel }; }) };
+}
 async function renderDaily(admin) {
   const body = $m("#mkBody");
   MK.dteam = admin ? (MK.dteam ?? 0) : MK.team;
@@ -151,13 +164,14 @@ async function renderDaily(admin) {
   const end = last.data.date;
   let kq = sb.from("mkd_keywords").select("id,team_id,keyword,enabled").order("team_id").order("keyword");
   if (team) kq = kq.eq("team_id", team);
-  const [rr, rp, rk] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle(), kq]);
+  const [rr, rp, rk, rs] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle(), kq, mkdSales(end, team)]);
   if (stale()) return;
   if (fail(rr.error)) return;
   if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
   if (rk.error) console.error(rk.error); // 키워드 카드만 못 그린다
+  if (rs.error) console.error(rs.error); // 등록 줄만 비운다
   const rep = rp.data?.data;
-  const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end), st = MKDCORE.status(rows, end);
+  const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end, rs.error ? undefined : MKDCORE.enrollRows(rs.sales, end)), st = MKDCORE.status(rows, end);
   // 맥미니는 매일 06:00 에 어제 숫자를 모은다. 한국 시각 07시부터는 마지막 수집일이 어제보다 오래됐으면 수집이 멈춘 것 → 알려 준다. 07시 전엔 수집이 아직 돌고 있을 수 있어 그저께까지는 정상으로 본다.
   const kst = new Date(Date.now() + 9 * 3600e3), today = kst.toISOString().slice(0, 10), yest = MKDCORE.addDays(today, -1);
   const behind = end < MKDCORE.addDays(today, kst.getUTCHours() < 7 ? -2 : -1), ago = Math.round((Date.parse(today) - Date.parse(end)) / 864e5);
@@ -172,7 +186,7 @@ async function renderDaily(admin) {
     + (behind ? `<div class="card warn">⚠️ 마지막 수집이 ${n(ago)}일 전(${esc(end)})이에요 — 맥미니 예약 작업을 확인해 주세요</div>` : "")
     + repHtml
     + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
-       <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요.</p></div>`
+       <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요. 등록 = 재무 탭 매출의 '가입'(매체는 가입경로) — 결제를 늦게 입력하면 어제 칸이 나중에 채워져요.</p></div>`
     + mkdKwCard(rk.error ? null : MKDCORE.keywordRanks(rk.data ?? [], rows, end), end, team, admin);
   $m("#mkdTeam")?.addEventListener("change", (e) => { MK.dteam = +e.target.value; renderDaily(admin); });
   body.querySelectorAll("tr.ch.has").forEach((tr) => tr.addEventListener("click", () => tr.closest("tbody").classList.toggle("open")));
