@@ -90,8 +90,17 @@
         <p class="jghwq">${esc(JG.PRE.submit?.q || "")}</p><p class="jghwa">${esc(x.answer)}</p></div>`).join("") : `<p class="jgmut">아직 제출한 조교가 없어요. 위 [🔗 사전숙제 링크 복사]로 보내면 우리 지점이 미리 골라져요.</p>`}</details>`;
   }
 
+  // 🔴 채용 프로세스 칸: 대표·매니저만 (조교 링크·사전숙제 링크 X). 내용은 jo-guide-hire.js — 플래너(index.html)만 불러옴
+  const canHire = () => !opts.standalone && !!window.JG_HIRE && typeof myRole !== "undefined" && (myRole === "admin" || myRole === "manager");
+  function hire() {
+    const H = JG_HIRE;
+    return `<div class="jgcard jghire"><h3>🔴 ${esc(H.title)} <small>대표·매니저만 보여요</small></h3><p>${esc(H.intro)}</p></div>
+      ${H.steps.map((x) => `<div class="jgcard jghire"><h3>${esc(x.t)}</h3>${body(x.body)}</div>`).join("")}
+      <div class="jgcard jghire jghirecore"><h3>⭐ ${esc(H.core.t)}</h3>${body(H.core.body)}</div>`;
+  }
+
   function head() {
-    const chips = TABS.map(([k, n]) => {
+    const chips = (canHire() ? [["hire", "🔴 채용"], ...TABS] : TABS).map(([k, n]) => {
       const d = JG.DAYS.find((x) => `d${x.day}` === k);
       const ok = k === "pre" ? JG.PRE.hw.every((h) => st.c[h.id]) : d && doneOf(d) === d.pass.length;
       return `<button data-jgt="${k}" class="${tab === k ? "on" : ""}${ok ? " ok" : ""}">${ok ? "✓ " : ""}${n}</button>`;
@@ -206,7 +215,7 @@
   function render() {
     if (!el) return;
     const d = JG.DAYS.find((x) => `d${x.day}` === tab);
-    el.innerHTML = `<div class="jg">${head()}${tab === "ref" ? ref() : d ? day(d) : pre()}
+    el.innerHTML = `<div class="jg">${head()}${tab === "hire" && canHire() ? hire() : tab === "ref" ? ref() : d ? day(d) : pre()}
       <p class="jgfoot">${live() && isJo() && LV.meId ? "체크는 이 기기와 플래너(매니저 화면)에 저장돼요." : "체크는 이 기기에만 저장돼요."} <button class="jglink" data-jgreset>체크 모두 지우기</button></p></div>`;
   }
   const go = (t) => { tab = t; try { localStorage.setItem("jg-tab", t); } catch {} render(); scrollTo(0, 0); };
