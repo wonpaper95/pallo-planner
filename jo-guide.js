@@ -114,15 +114,17 @@
       ${quiz()}${subBox()}`;
   }
 
-  function quiz() {
-    const r = st.quiz;
-    return `<div class="jgcard" id="jgquiz"><h3>📝 셀프 퀴즈 <small>${st.best != null ? `최고 ${st.best}점` : "10문제 · 80점 이상이면 통과"}</small></h3>
+  function quiz(on) { // 📝 4일차에만 (사전 준비 탭엔 안 보임)
+    if (!on) return "";
+    const r = st.q4;
+    return `<div class="jgcard" id="jgquiz"><h3>📝 4일차 퀴즈 <small>${r ? `제출 · ${score(r)}점` : `1~3일차 복습 ${JG.QUIZ.length}문제`}</small></h3>
+      <p class="jgmut">가이드·찾아보기를 보면서 풀어도 돼요. 틀려도 괜찮아요 — 다 풀면 [제출하기], 틀린 건 해설 보고 매니저와 같이 짚어요.</p>
       ${JG.QUIZ.map((x, i) => {
         const a = r?.[i], res = r ? (a === x.ok ? "ok" : "no") : "";
         return `<div class="jgq ${res}"><b>${i + 1}. ${esc(x.q)}</b>${x.a.map((t, j) => `<label><input type="radio" name="jgq${i}" value="${j}"${a === j ? " checked" : ""}> ${esc(t)}</label>`).join("")}
           ${r ? `<p class="jgwhy">${res === "ok" ? "✓ 정답" : "✗ 정답: " + esc(x.a[x.ok])} — ${esc(x.why)}</p>` : ""}</div>`;
       }).join("")}
-      <div class="jgrow"><button class="jgbtn pri" data-jgscore>채점하기</button>${r ? `<button class="jgbtn" data-jgretry>다시 풀기</button><b class="jgscore">${score(r)}점</b>` : ""}</div></div>`;
+      <div class="jgrow"><button class="jgbtn pri" data-jgscore>${r ? "다시 제출하기" : "제출하기"}</button>${r ? `<button class="jgbtn" data-jgretry>다시 풀기</button><b class="jgscore">${score(r)}점</b>` : ""}</div></div>`;
   }
   const score = (r) => JG.QUIZ.filter((x, i) => r[i] === x.ok).length * 10;
 
@@ -179,7 +181,7 @@
     const must = d.steps.filter((s) => s.must), add = d.steps.filter((s) => !s.must);
     return `<div class="jgcard"><h3>${d.day}일차 · ${esc(d.title)}</h3><p class="jggoal">🎯 ${esc(d.goal)}</p>${d.tip ? `<p class="jgmut">💡 ${esc(d.tip)}</p>` : ""}${(d.files || []).map(([f, n]) => `<a class="jgbtn" href="${f}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`).join(" ")}</div>
       <div class="jgcard"><h3>오늘 순서</h3>${must.map(step).join("")}${add.length ? `<h4>🟡 4시간 근무면 이어서</h4>${add.map(step).join("")}` : ""}</div>
-      <div class="jgcard"><h3>✅ 통과 체크 <small>${doneOf(d)}/${d.pass.length} · 매니저와 같이 확인</small></h3>
+      ${quiz(d.day === 4)}<div class="jgcard"><h3>✅ 통과 체크 <small>${doneOf(d)}/${d.pass.length} · 매니저와 같이 확인</small></h3>
       ${d.pass.map((p, i) => ck(`d${d.day}-${i}`, p)).join("")}</div>
       ${d.after ? `<div class="jgcard jgafter"><h3>🚀 5일차부터</h3><p>${esc(d.after)}</p></div>` : ""}`;
   }
@@ -218,11 +220,11 @@
       const l = e.target.closest("[data-jgl]"); if (l) { lang = l.dataset.jgl; try { localStorage.setItem("jg-lang", lang); } catch {} return render(); }
       if (e.target.closest("[data-jgscore]")) {
         const r = JG.QUIZ.map((_, i) => { const v = el.querySelector(`input[name=jgq${i}]:checked`); return v ? +v.value : null; });
-        if (r.includes(null) && !confirm(`안 푼 문제가 ${r.filter((x) => x == null).length}개 있어요. 그래도 채점할까요?`)) return;
-        st.quiz = r; const s = score(r); st.best = Math.max(st.best ?? 0, s); if (s >= 80) st.c["hw-quiz"] = true;
+        if (r.includes(null) && !confirm(`안 푼 문제가 ${r.filter((x) => x == null).length}개 있어요. 그래도 제출할까요?`)) return;
+        st.q4 = r; st.best = score(r); // 제출 = 마지막 점수 → jc_guide.best (매니저 진행표 "퀴즈 n점")
         save(); push(); render(); el.querySelector("#jgquiz")?.scrollIntoView({ block: "start" }); return;
       }
-      if (e.target.closest("[data-jgretry]")) { delete st.quiz; save(); render(); el.querySelector("#jgquiz")?.scrollIntoView({ block: "start" }); return; }
+      if (e.target.closest("[data-jgretry]")) { delete st.q4; save(); render(); el.querySelector("#jgquiz")?.scrollIntoView({ block: "start" }); return; }
       if (e.target.closest("[data-jgsubmit]")) return subSend();
       const hf = e.target.closest("[data-jghwf]"); if (hf) { // 매니저: 독후감 파일 열기 (서명 주소 10분)
         const w = window.open("about:blank"); const { data, error } = await sb.storage.from("jo-hw").createSignedUrl(hf.dataset.jghwf, 600);
