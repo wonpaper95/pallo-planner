@@ -149,10 +149,13 @@ async function renderDaily(admin) {
   if (fail(last.error)) return;
   if (!last.data) { body.innerHTML = `<div class="card">아직 쌓인 데이터가 없어요. 맥미니가 매일 새벽 6시에 어제 숫자를 모아요. 급하면 Claude에게 "일일 현황 수집해줘"라고 하면 돼요.</div>`; return; }
   const end = last.data.date;
-  const [rr, rp] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle()]);
+  let kq = sb.from("mkd_keywords").select("id,team_id,keyword,enabled").order("team_id").order("keyword");
+  if (team) kq = kq.eq("team_id", team);
+  const [rr, rp, rk] = await Promise.all([mkdRows(end, team), sb.from("mkd_reports").select("data").eq("date", end).eq("kind", "daily").maybeSingle(), kq]);
   if (stale()) return;
   if (fail(rr.error)) return;
   if (rp.error) console.error(rp.error); // 코멘트·이상 징후를 못 읽어도 표는 보여준다
+  if (rk.error) console.error(rk.error); // 키워드 카드만 못 그린다
   const rep = rp.data?.data;
   const rows = rr.rows, table = MKDCORE.buildTable(rows, end), sum = MKDCORE.summary(rows, end), st = MKDCORE.status(rows, end);
   // 맥미니는 매일 06:00 에 어제 숫자를 모은다. 한국 시각 07시부터는 마지막 수집일이 어제보다 오래됐으면 수집이 멈춘 것 → 알려 준다. 07시 전엔 수집이 아직 돌고 있을 수 있어 그저께까지는 정상으로 본다.
@@ -169,9 +172,57 @@ async function renderDaily(admin) {
     + (behind ? `<div class="card warn">⚠️ 마지막 수집이 ${n(ago)}일 전(${esc(end)})이에요 — 맥미니 예약 작업을 확인해 주세요</div>` : "")
     + repHtml
     + `<div class="card"><div class="tw"><table class="mkd">${mkdHead()}<tbody class="core">${sum.filter(mkdHas).map((l) => mkdLine(l, "핵심")).join("")}</tbody>${table.map(mkdChannel).join("")}</table></div>
-       <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요.</p></div>`;
+       <p class="mut">칸 = 그 기간 합계(순위·CPC·CTR 은 평균) · 작은 글씨 = 직전 같은 기간 대비. 초록 = 좋은 방향. "n일" = 비교할 직전 기간이 아직 덜 쌓여 데이터 일수만. 비율은 표본(노출·클릭 30 미만)이 적으면 증감을 보류해요. 채널 이름을 누르면 캠페인·키워드별로 펼쳐요.</p></div>`
+    + mkdKwCard(rk.error ? null : MKDCORE.keywordRanks(rk.data ?? [], rows, end), end, team, admin);
   $m("#mkdTeam")?.addEventListener("change", (e) => { MK.dteam = +e.target.value; renderDaily(admin); });
   body.querySelectorAll("tr.ch.has").forEach((tr) => tr.addEventListener("click", () => tr.closest("tbody").classList.toggle("open")));
+  mkdKwWire(body, rk.data ?? [], team, admin);
+}
+// 블로그 키워드 카드 (하단): 켜진 키워드마다 기준일의 통합검색·블로그탭 순위(우리 글 링크), 꺼진 건 아래. 켜기·끄기·추가 — 대표는 전 지점, 매니저는 자기 지점(RLS).
+// 맥미니가 매일 새벽 켜진 키워드만 검색한다. 구미점은 블로그가 없어 순위를 안 본다(키워드는 미리 골라 둘 수 있다).
+const noBlog = (teamId) => MKCORE.teamKeyOfTeamName(teams.find((t) => t.id === teamId)?.name ?? "") === "gumi";
+function mkdKwCard(list, end, team, admin) {
+  if (!list) return `<div class="card"><b>📝 블로그 키워드</b> <span class="mut">키워드 목록을 못 읽었어요</span></div>`;
+  const tname = (id) => teams.find((t) => t.id === id)?.name ?? "";
+  const rt = (x, k) => (x.state === "missing" ? "–" : x.state === "failed" || x[k] === undefined ? "못 읽음" : x[k] === null ? "밖" : `${x[k]}위`);
+  const line = (x) => `<div class="kwr${x.enabled ? "" : " off"}"><span class="kw"><b>${esc(x.keyword)}</b>${!team ? `<span class="tag">${esc(tname(x.team_id))}</span>` : ""}</span>
+    ${!x.enabled ? "" : noBlog(x.team_id) ? `<span class="mut">블로그 없음</span>` : `<span class="mut">통합 ${x.our_url ? `<a href="${esc(x.our_url)}" target="_blank" rel="noopener">${esc(rt(x, "rank"))}</a>` : esc(rt(x, "rank"))} · 탭 ${esc(rt(x, "tab_rank"))}</span>`}
+    <button class="sm" data-kw="${n(x.id)}" data-on="${x.enabled ? 0 : 1}">${x.enabled ? "끄기" : "켜기"}</button></div>`;
+  const on = list.filter((x) => x.enabled), off = list.filter((x) => !x.enabled);
+  const teamSel = admin && !team ? `<select id="mkdKwTeam">${teams.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select>` : "";
+  return `<div class="card"><b>📝 블로그 키워드</b> <span class="mut">켜진 ${on.length}개 · ${esc(end)} 순위 (통합 = 통합검색 첫 화면 블로그 글 중, 탭 = 블로그 탭 30위까지, 밖 = 안 보임)</span>
+    ${team && noBlog(team) ? `<p class="mut">구미점은 아직 블로그가 없어 순위를 안 봐요. 키워드는 미리 골라 둘 수 있어요.</p>` : ""}
+    ${on.length ? on.map(line).join("") : `<div class="mut">켜진 키워드가 없어요</div>`}
+    <div class="mkbar"><input id="mkdKwNew" maxlength="40" placeholder="키워드 추가 (예: 동성로영어회화)" style="flex:1;min-width:180px">${teamSel}<button class="btn" id="mkdKwAdd">추가</button></div>
+    <p class="mut">추가하거나 켠 키워드는 다음 날 새벽 수집부터 순위가 나와요.</p>
+    ${off.length ? `<details><summary class="mut">꺼진 키워드 ${off.length}개</summary>${off.map(line).join("")}</details>` : ""}</div>`;
+}
+function mkdKwWire(body, kws, team, admin) {
+  const redraw = () => { if (body.isConnected && MK.tab === "daily") renderDaily(admin); };
+  body.querySelectorAll("button[data-kw]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const { error } = await sb.from("mkd_keywords").update({ enabled: b.dataset.on === "1" }).eq("id", +b.dataset.kw);
+    if (fail(error)) { b.disabled = false; return; }
+    redraw();
+  }));
+  const add = async () => {
+    const c = MKDCORE.cleanKeyword(body.querySelector("#mkdKwNew")?.value);
+    if (c.error) return toast(c.error);
+    const tid = team || +(body.querySelector("#mkdKwTeam")?.value ?? 0);
+    if (!tid) return toast("지점을 골라 주세요");
+    const btn = body.querySelector("#mkdKwAdd"); btn.disabled = true;
+    const { error } = await sb.from("mkd_keywords").insert({ team_id: tid, keyword: c.keyword, enabled: true, added_by: me.id });
+    if (error?.code === "23505") { // 이미 있음 — 꺼져 있던 거면 다시 켠다
+      const ex = kws.find((k) => k.team_id === tid && k.keyword === c.keyword);
+      if (ex && !ex.enabled) { const r = await sb.from("mkd_keywords").update({ enabled: true }).eq("id", ex.id); if (!fail(r.error)) { toast("꺼져 있던 키워드를 다시 켰어요"); redraw(); } }
+      else toast("이미 있는 키워드예요");
+      btn.disabled = false; return;
+    }
+    if (fail(error)) { btn.disabled = false; return; }
+    toast(`'${c.keyword}' 추가했어요`); redraw();
+  };
+  body.querySelector("#mkdKwAdd")?.addEventListener("click", add);
+  body.querySelector("#mkdKwNew")?.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) add(); });
 }
 const mkdHead = () => `<thead><tr><th>지표</th>${MKDCORE.WINDOWS.map((w) => `<th>${esc(w.label)}</th>`).join("")}</tr></thead>`;
 const mkdHas = (l) => l.cells.some((c) => c.value !== null && c.value !== undefined); // 5칸 모두 비면 줄을 숨긴다 (예: 아직 데이터가 없는 등록)

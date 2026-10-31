@@ -93,3 +93,9 @@ body:not(.mkv) #mkView { display: none; }
 @media (max-width: 640px) { #mkView .trgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 10px; } #mkView .trc .agig { height: 480px; } }
 /* 📊 월간 리포트: 표 위 코멘트(스킬이 쓴 문장) */
 #mkView .mknote { margin: 6px 0 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 6px; font-size: 14px; line-height: 1.5; }
+/* 📝 블로그 키워드 카드 (일일 현황 하단) */
+#mkView .kwr { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--line); }
+#mkView .kwr .kw { flex: 1; min-width: 0; }
+#mkView .kwr.off { opacity: .6; }
+#mkView .kwr a { color: inherit; text-decoration: underline; }
+@media (max-width: 640px) { #mkView .kwr { flex-wrap: wrap; } #mkView .kwr .kw { flex-basis: 100%; } }

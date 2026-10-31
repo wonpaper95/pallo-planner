@@ -203,6 +203,28 @@ function flags(rows, end) {
   return out;
 }
 
+// 블로그 키워드 카드: mkd_keywords 행 [{id,team_id,keyword,enabled}] + mkd_daily 행 + 기준일 → 켜진 것(통합검색·탭 순위 좋은 순) 먼저, 꺼진 것 뒤(가나다).
+// state: ok | missing(그날 행 없음 — 새로 추가했거나 수집 전·구미처럼 블로그 없음) | failed(못 읽음). rank·tab_rank: 숫자 | null(순위 밖) | undefined(그 화면을 못 읽음)
+function keywordRanks(kws, rows, end) {
+  const list = kws.map((k) => {
+    const r = rows.find((x) => x.channel === "blog" && x.team_id === k.team_id && x.unit === k.keyword && x.date === end), m = r?.metrics ?? {};
+    const state = !r ? "missing" : usable(r) ? "ok" : "failed", pick = (key) => (state === "ok" && Object.hasOwn(m, key) ? num(m[key]) : undefined);
+    return { id: k.id, team_id: k.team_id, keyword: k.keyword, enabled: !!k.enabled, state, rank: pick("rank"), tab_rank: pick("tab_rank"),
+      our_url: typeof m.our_url === "string" && /^https:\/\/blog\.naver\.com\//.test(m.our_url) ? m.our_url : null };
+  });
+  const v = (x) => (typeof x === "number" ? x : 999);
+  return list.sort((a, b) => (+b.enabled - +a.enabled) || (a.enabled ? v(a.rank) - v(b.rank) || v(a.tab_rank) - v(b.tab_rank) : 0) || a.keyword.localeCompare(b.keyword, "ko"));
+}
+// 키워드 입력 검사: 앞뒤 공백 제거·연속 공백 하나로 → {keyword} | {error}. 일일 현황 unit 으로도 쓰이니 '전체'·'방문자'·전화번호 모양은 막는다.
+function cleanKeyword(s) {
+  const k = String(s ?? "").trim().replace(/\s+/g, " ");
+  if (!k) return { error: "키워드를 입력해 주세요" };
+  if (k.length > 40) return { error: "키워드는 40자까지예요" };
+  if (k === ALL || k === "방문자") return { error: `'${k}' 는 키워드로 쓸 수 없어요` };
+  if (/0\d{1,2}[\s.\-)]{0,2}\d{3,4}[\s.\-]{0,2}\d{4}/.test(k)) return { error: "전화번호처럼 보이는 값은 넣을 수 없어요" };
+  return { keyword: k };
+}
+
 // 표기 (화면·보고 공용)
 function fmt(v, unit) {
   if (v === null || v === undefined) return "–";
@@ -212,5 +234,5 @@ function fmt(v, unit) {
   return Math.round(v).toLocaleString("ko-KR");
 }
 
-return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, fmt };
+return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, keywordRanks, cleanKeyword, fmt };
 });

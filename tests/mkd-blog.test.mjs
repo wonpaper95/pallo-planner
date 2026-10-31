@@ -181,3 +181,21 @@ test("buildTable: 블로그 합계 줄에 방문자(합)·이웃(마지막 값),
   assert.equal(b.metrics[0].cells.find((c) => c.key === "w1").value, 7);
   assert.equal(b.metrics[1].cells.find((c) => c.key === "w1").value, 4);
 });
+
+// ── 키워드 카드(mkd-core) ──
+test("keywordRanks: 켜진 것 먼저(통합 순위 좋은 순, 같거나 없으면 탭 순위, 둘 다 없으면 뒤), 꺼진 것은 가나다, 그날 행 없음·실패·한쪽 못 읽음 구분", () => {
+  const kws = [{ id: 1, team_id: 2, keyword: "가", enabled: true }, { id: 2, team_id: 2, keyword: "나", enabled: true }, { id: 3, team_id: 2, keyword: "다", enabled: false },
+    { id: 4, team_id: 2, keyword: "라", enabled: true }, { id: 5, team_id: 2, keyword: "마", enabled: true }, { id: 6, team_id: 2, keyword: "바", enabled: true }];
+  const rows = [row("2026-10-30", "가", { rank: null, tab_rank: 12 }), row("2026-10-30", "나", { rank: 3, tab_rank: 9, our_url: post("pallodaegudsr", 1) }),
+    row("2026-10-30", "라", { note: "e" }, "failed"), row("2026-10-30", "마", { tab_rank: 2 }, "partial"), row("2026-10-29", "바", { rank: 1 }),
+    row("2026-10-30", "다", { rank: 1 }), { ...row("2026-10-30", "가", { rank: 1 }), team_id: 3 }];
+  const out = D.keywordRanks(kws, rows, "2026-10-30");
+  assert.deepEqual(out.map((x) => [x.keyword, x.state, x.rank, x.tab_rank]), [["나", "ok", 3, 9], ["마", "ok", undefined, 2], ["가", "ok", null, 12], ["라", "failed", undefined, undefined], ["바", "missing", undefined, undefined], ["다", "ok", 1, undefined]]);
+  assert.equal(out[0].our_url, post("pallodaegudsr", 1));
+  assert.equal(D.keywordRanks([{ id: 1, team_id: 2, keyword: "x", enabled: true }], [row("2026-10-30", "x", { rank: 1, our_url: "javascript:alert(1)" })], "2026-10-30")[0].our_url, null);
+});
+test("cleanKeyword: 공백 정리, 빈 값·40자 초과·'전체'·'방문자'·전화번호 모양은 거부", () => {
+  assert.deepEqual(D.cleanKeyword("  대구   영어회화 "), { keyword: "대구 영어회화" });
+  assert.deepEqual(D.cleanKeyword("대구JLPT"), { keyword: "대구JLPT" });
+  for (const bad of ["", "   ", undefined, "가".repeat(41), "전체", "방문자", "울산 010 1234 5678"]) assert.ok(D.cleanKeyword(bad).error, String(bad));
+});
