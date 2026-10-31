@@ -35,5 +35,15 @@ const safeUrl = (u) => (typeof u === "string" && /^https:\/\//.test(u) ? u : "")
 // 썸네일은 에이전트가 넣은 JPEG data URL 만 (base64 글자만 허용 → 따옴표·태그 끼어들 틈 없음)
 const safeImg = (s) => typeof s === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s);
 
-return { KINDS, TOPAD_FRESH_HOURS, freshTop, MIN_DAYS, adText, pickCompetitorAds, BRANCH, safeUrl, safeImg };
+// 광고 제안 단계: 승인 대기 → 승인(Claude가 꺼진 초안을 만들면 data.stage=drafted) → 켜줘(status activate) → 게재(data.stage=live).
+// act = 대표 화면 버튼: decide(승인·반려) · activate(켜줘) · cancel(켜기 전 취소) · null(없음)
+function propStage(status, d = {}) {
+  if (d.stage === "live") return { label: "🟢 게재 중", act: null };
+  if (status === "activate") return { label: "⏳ 켜는 중 (30분 안에)", act: "cancel" };
+  if (status === "approved") return d.stage === "drafted" ? { label: "📝 초안 완성 (꺼짐)", act: "activate" } : { label: "✅ 승인 · 초안 만드는 중", act: null };
+  if (status === "rejected") return { label: "⚫ 반려", act: null };
+  return { label: "🟡 승인 대기", act: "decide" };
+}
+
+return { KINDS, TOPAD_FRESH_HOURS, freshTop, MIN_DAYS, adText, pickCompetitorAds, BRANCH, safeUrl, safeImg, propStage };
 });

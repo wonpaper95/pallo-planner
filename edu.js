@@ -105,7 +105,10 @@ EDU.load = async function () {
 function head(d) {
   const all = ITEMS().length, done = ITEMS().filter((i) => d.status[i.id] === "done").length;
   const start = d.meta.started_on;
-  const dday = start ? Math.floor((Date.now() - new Date(start + "T00:00:00+09:00").getTime()) / 86400000) : null;
+  // 달력 날짜끼리 비교한다 — 시 단위로 빼면 시작 당일 오후가 D-1로 보인다.
+  const todayKST = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }) + "T00:00:00+09:00").getTime();
+  const dday = start ? Math.round((todayKST - new Date(start + "T00:00:00+09:00").getTime()) / 86400000) : null;
+  const ddayLabel = dday === null ? "" : dday > 0 ? `D+${dday}` : dday === 0 ? "D-DAY" : `D-${-dday}`;
   const pick = d.admin
     ? `<select id="eduWho">${(EDU.people || []).map((p) => `<option value="${p.user_id}" ${p.user_id === EDU.target ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>`
     : `<b>${esc(myName || "내 교육")}</b>`;
@@ -113,7 +116,7 @@ function head(d) {
     <div class="edubar">
       <div class="eduwho">📚 인턴교육 ${pick}</div>
       <label class="mut edustart">시작일 <input type="date" id="eduStart" value="${start || ""}" ${d.admin ? "disabled" : ""}></label>
-      ${dday === null ? "" : `<span class="mut">D+${dday} / 56일</span>`}
+      ${dday === null ? "" : `<span class="mut">${ddayLabel} / 56일</span>`}
       <span class="grow"></span>
       ${d.admin ? `<button class="btn ghost" id="eduShareBtn" title="로그인 없이 과정 내용만 보는 링크 (진행·평가·자료는 안 보임)">🔗 공유 링크</button><button class="btn ghost" id="eduRepBtn">🧾 평가서</button>` : ""}
     </div>

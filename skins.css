@@ -1,0 +1,212 @@
+/* 🎨 디자인 고르기 (10-31) — 맨 마지막에 불러서 glass.css 위에 덮어씀. html[data-skin] 은 theme.js 가 붙임(리퀴드 글래스=기본이면 안 붙음).
+   디자인마다 화면 모드 하나로 고정(theme.js SKINS) → 🌗 버튼은 숨음. 공통 규칙은 변수만 읽음: --pri(주 색) --onpri(그 위 글씨) --rc(카드 모서리) --rb(버튼 모서리) --font. */
+
+/* ── 공통: 빛번짐 끄고, 주 색·모서리·글꼴을 변수로 ── */
+html[data-skin] body::before { background: var(--bg); }
+html[data-skin], html[data-skin] body, html[data-skin] button, html[data-skin] input, html[data-skin] textarea, html[data-skin] select { font-family: var(--font, -apple-system, "Apple SD Gothic Neo", "Pretendard", sans-serif); }
+[data-skin] .btn { background: var(--pri); color: var(--onpri); border-radius: var(--rb); }
+[data-skin] .btn.ghost { background: var(--fill); color: var(--text); border-radius: var(--rb); }
+[data-skin] .seg div { border-radius: var(--rb); }
+[data-skin] .seg button { border-radius: var(--rb); }
+[data-skin] #routinebox, [data-skin] #simbox, [data-skin] #assignbox, [data-skin] #mustbox, [data-skin] #duebox, [data-skin] .tcard, [data-skin] .slcard, [data-skin] .slkpi,
+[data-skin] .bcard, [data-skin] .card, [data-skin] #briefText, [data-skin] .briefText, [data-skin] .rows, [data-skin] #somedayView details { border-radius: var(--rc); }
+[data-skin] dialog, [data-skin] .pop, [data-skin] #slDlg { border-radius: var(--rc); }
+[data-skin] .briefBtn, [data-skin] .quick button.on, [data-skin] .pop .grid button.on, [data-skin] .dows button.on, [data-skin] .rtnav.wk.on, [data-skin] .bmode button.on { background: var(--pri); border-color: var(--pri); color: var(--onpri); }
+[data-skin] .bar i, [data-skin] .day h3 .dbar i, [data-skin] .rtbar i { background: var(--pri); }
+[data-skin] .day.today h3 .pill, [data-skin] .mgrid .dn b { background: var(--pri); color: var(--onpri); }
+[data-skin] .day.today h3 > span:first-child { color: var(--pri-text, var(--pri)); }
+[data-skin] .row input[type=checkbox]:checked, [data-skin] .rt input:checked, [data-skin] .titem input:checked, [data-skin] #somedayView .sdrow input[type=checkbox]:checked {
+  background-color: var(--pri); border-color: var(--pri); box-shadow: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+[data-skin] .row .star.on { color: var(--orange); }
+[data-skin] ::selection { background: color-mix(in srgb, var(--pri) 30%, transparent); }
+
+/* ── 1. 말랑 파스텔 (치이카와풍): 분홍·민트, 동글동글, 손글씨 느낌 ── */
+:root[data-skin=chiikawa] {
+  --bg: #fff7f4; --panel: #ffffff; --line: #f6dfe0; --hover: #ffeef0; --text: #5b4a4a; --sub: #a08c8c; --accent: #f08ca6;
+  --blue: #7cb7f0; --red: #f2728a; --orange: #f3a96b; --green: #79cfb2; --yellow: #ffe58a; --onyel: #5b4a4a;
+  --edge: #f6dfe0; --hi: none; --shadow: 0 4px 0 #f8e3e3; --bar: #fff7f4; --glass: #ffffff; --float: #ffffff; --mob: #fff7f4;
+  --fill: #fff0ee; --on: #ffdbe3; --ckb: #e8b9c1; --rowhov: #fff3f1;
+  --t-red: #e0566f; --t-ora: #d27a35; --t-blue: #4f8fd0; --t-green: #3a9c7c; --t-yel: #a2860c; --t-pur: #c0608a;
+  --pri: #f497ad; --onpri: #fff; --pri-text: #e0668a; --rc: 26px; --rb: 99px; --font: "Gowun Dodum", "Apple SD Gothic Neo", sans-serif;
+}
+html[data-skin=chiikawa], html[data-skin=chiikawa] body { font-size: 15.5px; }
+[data-skin=chiikawa] #routinebox, [data-skin=chiikawa] #duebox, [data-skin=chiikawa] .rows, [data-skin=chiikawa] .card, [data-skin=chiikawa] .tcard { border: 2px solid var(--line); }
+[data-skin=chiikawa] .day h3 { font-family: "Jua", sans-serif; font-weight: 400; color: #6e5656; }
+[data-skin=chiikawa] .weekhead h1, [data-skin=chiikawa] .mh h1 { font-family: "Jua", sans-serif; font-weight: 400; color: var(--pri-text); }
+[data-skin=chiikawa] .row input[type=checkbox], [data-skin=chiikawa] .rt input { border-width: 2px; }
+[data-skin=chiikawa] .seg button.on { background: var(--on); color: #c0507a; }
+[data-skin=chiikawa] header .logo::after { content: " ♡"; color: var(--pri); }
+
+/* ── 2. 볼드 스포츠 (나이키풍): 흑백 대비, 아주 굵은 대문자 제목, 볼트 형광 포인트, 모서리 거의 없음 ── */
+:root[data-skin=nike] {
+  --bg: #ffffff; --panel: #f5f5f5; --line: #e5e5e5; --hover: #ededed; --text: #111111; --sub: #707072; --accent: #111111;
+  --blue: #1151ff; --red: #d43f21; --orange: #ee6a00; --green: #007d48; --yellow: #d4ff3a; --onyel: #111;
+  --edge: #e5e5e5; --hi: none; --shadow: none; --bar: #ffffff; --glass: #f5f5f5; --float: #ffffff; --mob: #ffffff;
+  --fill: #f5f5f5; --on: #111111; --ckb: #111111; --rowhov: #fafafa;
+  --t-red: #d43f21; --t-ora: #b84e00; --t-blue: #1151ff; --t-green: #007d48; --t-yel: #111; --t-pur: #111;
+  --pri: #111111; --onpri: #fff; --rc: 4px; --rb: 99px; --font: "Inter", "Helvetica Neue", "Apple SD Gothic Neo", sans-serif;
+}
+[data-skin=nike] header, [data-skin=nike] .seg, [data-skin=nike] dialog, [data-skin=nike] .pop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=nike] .weekhead h1, [data-skin=nike] .mh h1 { font-family: "Archivo Black", "Inter", sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: -.03em; font-size: 2.1em; }
+[data-skin=nike] .day h3 { font-weight: 900; text-transform: uppercase; letter-spacing: -.01em; border-bottom: 3px solid #111; padding-bottom: 4px; }
+[data-skin=nike] .seg button.on { background: #111; color: #fff; }
+[data-skin=nike] .day.today h3 .pill { background: var(--yellow); color: #111; }
+[data-skin=nike] .bar i, [data-skin=nike] .day h3 .dbar i, [data-skin=nike] .rtbar i { background: #111; }
+[data-skin=nike] #routinebox, [data-skin=nike] #duebox, [data-skin=nike] .rows { border: 0; background: var(--panel); }
+[data-skin=nike] header .logo { font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; }
+[data-skin=nike] .rate .bar { height: 6px; }
+
+/* ── 3. 클린 핀테크 (토스풍): 회색 바탕 + 흰 카드, 파랑 하나, 테두리 없이 큰 모서리, 굵고 큰 숫자 ── */
+:root[data-skin=toss] {
+  --bg: #f2f4f6; --panel: #ffffff; --line: #e5e8eb; --hover: #f2f4f6; --text: #191f28; --sub: #8b95a1; --accent: #3182f6;
+  --blue: #3182f6; --red: #f04452; --orange: #fe9800; --green: #03b26c; --yellow: #ffc342; --onyel: #191f28;
+  --edge: transparent; --hi: none; --shadow: none; --bar: #f2f4f6; --glass: #ffffff; --float: #ffffff; --mob: #ffffff;
+  --fill: #f2f4f6; --on: #ffffff; --ckb: #d1d6db; --rowhov: #f9fafb;
+  --t-red: #e42939; --t-ora: #d77a00; --t-blue: #1b64da; --t-green: #029359; --t-yel: #a26e00; --t-pur: #3182f6;
+  --pri: #3182f6; --onpri: #fff; --rc: 20px; --rb: 14px; --font: "Pretendard", -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+[data-skin=toss] header, [data-skin=toss] .seg { -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; }
+[data-skin=toss] .weekhead h1, [data-skin=toss] .mh h1 { font-weight: 700; font-size: 1.9em; letter-spacing: -.03em; }
+[data-skin=toss] .day h3 { font-weight: 700; font-size: 1.1em; }
+[data-skin=toss] .seg div { background: #e5e8eb; border: 0; box-shadow: none; }
+[data-skin=toss] .seg button.on { background: #fff; color: #191f28; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+[data-skin=toss] .btn { font-weight: 600; }
+[data-skin=toss] .rows, [data-skin=toss] #routinebox, [data-skin=toss] #duebox { padding-block: 8px; }
+
+/* ── 4. 다크 뮤직 (스포티파이풍): 짙은 검정, 초록 알약 버튼, 굵은 글씨 ── */
+:root[data-skin=spotify] {
+  --bg: #121212; --panel: #181818; --line: #2a2a2a; --hover: #282828; --text: #ffffff; --sub: #a7a7a7; --accent: #1ed760;
+  --blue: #509bf5; --red: #f15e6c; --orange: #ffa42b; --green: #1ed760; --yellow: #1ed760; --onyel: #000;
+  --edge: #2a2a2a; --hi: none; --shadow: none; --bar: #000000; --glass: #121212; --float: #282828; --mob: #121212;
+  --fill: #2a2a2a; --on: #ffffff; --ckb: #727272; --rowhov: #1f1f1f;
+  --t-red: #f3727f; --t-ora: #ffb454; --t-blue: #7db4f8; --t-green: #1ed760; --t-yel: #1ed760; --t-pur: #1ed760;
+  --pri: #1ed760; --onpri: #000; --rc: 8px; --rb: 99px; --font: "Inter", "Apple SD Gothic Neo", sans-serif;
+}
+[data-skin=spotify] header, [data-skin=spotify] .seg { -webkit-backdrop-filter: none; backdrop-filter: none; border: 0; }
+[data-skin=spotify] .seg div { background: transparent; border: 0; box-shadow: none; }
+[data-skin=spotify] .seg button { background: #2a2a2a; margin-right: 6px; }
+[data-skin=spotify] .seg button.on { background: #fff; color: #000; }
+[data-skin=spotify] .weekhead h1, [data-skin=spotify] .mh h1 { font-weight: 800; font-size: 2em; letter-spacing: -.04em; }
+[data-skin=spotify] .day h3 { font-weight: 800; }
+[data-skin=spotify] main { background: linear-gradient(180deg, #1f3b2a 0, var(--bg) 320px); border-radius: 8px; }
+[data-skin=spotify] .row input[type=checkbox]:checked, [data-skin=spotify] .rt input:checked, [data-skin=spotify] .titem input:checked, [data-skin=spotify] #somedayView .sdrow input[type=checkbox]:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+
+/* ── 5. 종이 노트 (노션풍): 흰 종이, 무채색, 세리프 제목, 얇은 선, 장식 없음 ── */
+:root[data-skin=notion] {
+  --bg: #ffffff; --panel: #ffffff; --line: #e9e9e7; --hover: #f1f1ef; --text: #37352f; --sub: #9b9a97; --accent: #37352f;
+  --blue: #2383e2; --red: #e03e3e; --orange: #d9730d; --green: #0f7b6c; --yellow: #dfab01; --onyel: #fff;
+  --edge: #e9e9e7; --hi: none; --shadow: none; --bar: #ffffff; --glass: #ffffff; --float: #ffffff; --mob: #fbfbfa;
+  --fill: #f1f1ef; --on: #ffffff; --ckb: #c7c6c4; --rowhov: #f7f7f5;
+  --t-red: #e03e3e; --t-ora: #d9730d; --t-blue: #0b6e99; --t-green: #0f7b6c; --t-yel: #a37c00; --t-pur: #6940a5;
+  --pri: #2383e2; --onpri: #fff; --pri-text: #37352f; --rc: 4px; --rb: 4px; --font: -apple-system, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+}
+[data-skin=notion] header, [data-skin=notion] .seg, [data-skin=notion] dialog, [data-skin=notion] .pop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=notion] .weekhead h1, [data-skin=notion] .mh h1 { font-family: "Noto Serif KR", Georgia, serif; font-weight: 700; font-size: 2em; letter-spacing: -.01em; }
+[data-skin=notion] .day h3 { font-family: "Noto Serif KR", Georgia, serif; font-weight: 600; }
+[data-skin=notion] .rows, [data-skin=notion] #routinebox, [data-skin=notion] #duebox { border: 0; border-top: 1px solid var(--line); border-radius: 0; }
+[data-skin=notion] .seg div { background: transparent; border: 0; box-shadow: none; }
+[data-skin=notion] .seg button.on { background: var(--hover); }
+[data-skin=notion] .row input[type=checkbox], [data-skin=notion] .rt input, [data-skin=notion] .titem input { border-radius: 3px; width: 17px; height: 17px; }
+[data-skin=notion] .btn { background: var(--pri); }
+[data-skin=notion] .bar i, [data-skin=notion] .day h3 .dbar i, [data-skin=notion] .rtbar i { background: #37352f; }
+
+/* ── 6. 게임 레슨 (듀오링고풍): 연두, 두꺼운 테두리, 아래로 눌리는 3D 버튼, 동글한 굵은 글씨 ── */
+:root[data-skin=duolingo] {
+  --bg: #ffffff; --panel: #ffffff; --line: #e5e5e5; --hover: #f7f7f7; --text: #4b4b4b; --sub: #afafaf; --accent: #58cc02;
+  --blue: #1cb0f6; --red: #ff4b4b; --orange: #ff9600; --green: #58cc02; --yellow: #ffc800; --onyel: #fff;
+  --edge: #e5e5e5; --hi: none; --shadow: 0 2px 0 #e5e5e5; --bar: #ffffff; --glass: #ffffff; --float: #ffffff; --mob: #ffffff;
+  --fill: #ffffff; --on: #ddf4ff; --ckb: #e5e5e5; --rowhov: #f7f7f7;
+  --t-red: #ea2b2b; --t-ora: #e08600; --t-blue: #1899d6; --t-green: #58a700; --t-yel: #c79a00; --t-pur: #ce82ff;
+  --pri: #58cc02; --onpri: #fff; --pri-text: #58a700; --rc: 16px; --rb: 14px; --font: "Jua", "Nunito", "Apple SD Gothic Neo", sans-serif;
+}
+[data-skin=duolingo] header, [data-skin=duolingo] .seg { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=duolingo] #routinebox, [data-skin=duolingo] #duebox, [data-skin=duolingo] .rows, [data-skin=duolingo] .card, [data-skin=duolingo] .tcard { border: 2px solid var(--line); box-shadow: 0 4px 0 var(--line); }
+[data-skin=duolingo] .btn { box-shadow: 0 4px 0 #58a700; font-weight: 400; text-transform: uppercase; letter-spacing: .02em; }
+[data-skin=duolingo] .btn:active { transform: translateY(4px); box-shadow: none; }
+[data-skin=duolingo] .btn.ghost { border: 2px solid var(--line); box-shadow: 0 3px 0 var(--line); }
+[data-skin=duolingo] .seg div { border: 2px solid var(--line); box-shadow: none; }
+[data-skin=duolingo] .seg button.on { background: var(--on); color: #1899d6; box-shadow: inset 0 0 0 2px #84d8ff; }
+[data-skin=duolingo] .weekhead h1, [data-skin=duolingo] .mh h1, [data-skin=duolingo] .day h3 { font-weight: 400; color: #3c3c3c; }
+[data-skin=duolingo] .rate .bar { height: 14px; border-radius: 99px; background: #e5e5e5; } [data-skin=duolingo] .rate .bar i { border-radius: 99px; box-shadow: inset 0 -4px 0 rgba(255,255,255,.3); }
+[data-skin=duolingo] .row input[type=checkbox], [data-skin=duolingo] .rt input { border-width: 2px; border-radius: 8px; }
+
+/* ── 7. 개발툴 다크 (리니어풍, 10-28 후보 2): 어둡고 촘촘, 블러 없음, 모서리 6px, 작은 글씨 ── */
+:root[data-skin=linear] {
+  --bg: #0f0f11; --panel: #16161a; --line: #24242b; --hover: #1c1c22; --text: #e8e8ed; --sub: #8b8b98; --accent: #8b74e0;
+  --blue: #5e9bff; --red: #f2555a; --orange: #f0a43a; --green: #4cc38a; --yellow: #e0d120; --onyel: #1a1600;
+  --edge: #24242b; --hi: none; --shadow: none; --bar: #0f0f11; --glass: #16161a; --float: #18181d; --mob: #0f0f11;
+  --fill: #1c1c22; --on: #23232a; --ckb: #5a5a66; --rowhov: #15151a;
+  --pri: #8b74e0; --onpri: #fff; --pri-text: #b3a3f0; --rc: 8px; --rb: 6px; --font: "Inter", -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+html[data-skin=linear], html[data-skin=linear] body { font-size: 13.5px; }
+[data-skin=linear] header, [data-skin=linear] .seg, [data-skin=linear] dialog, [data-skin=linear] .pop, [data-skin=linear] #toast, [data-skin=linear] aside { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+[data-skin=linear] .seg div { box-shadow: none; background: var(--panel); border-color: var(--line); }
+[data-skin=linear] .seg button.on { background: var(--on); box-shadow: none; }
+[data-skin=linear] .btn.ghost, [data-skin=linear] header .btn { background: transparent; border: 1px solid var(--line); box-shadow: none; }
+[data-skin=linear] .weekhead h1, [data-skin=linear] .mh h1 { font-weight: 600; font-size: 1.5em; }
+
+/* ── 8. 따뜻한 여행 (에어비앤비풍): 흰 바탕, 코랄 하나, 부드럽게 뜬 그림자 카드 ── */
+:root[data-skin=airbnb] {
+  --bg: #ffffff; --panel: #ffffff; --line: #ebebeb; --hover: #f7f7f7; --text: #222222; --sub: #717171; --accent: #ff385c;
+  --blue: #2a6bd1; --red: #e00b41; --orange: #e07912; --green: #008a05; --yellow: #ff385c; --onyel: #fff;
+  --edge: #ebebeb; --hi: none; --shadow: 0 6px 20px rgba(0,0,0,.08); --bar: #ffffff; --glass: #ffffff; --float: #ffffff; --mob: #ffffff;
+  --fill: #f7f7f7; --on: #222222; --ckb: #b0b0b0; --rowhov: #fafafa;
+  --t-red: #c13515; --t-ora: #b4580a; --t-blue: #2a6bd1; --t-green: #008a05; --t-yel: #c13515; --t-pur: #6c3fc4;
+  --pri: #ff385c; --onpri: #fff; --pri-text: #e00b41; --rc: 16px; --rb: 10px; --font: -apple-system, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+}
+[data-skin=airbnb] header, [data-skin=airbnb] .seg { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=airbnb] .btn { background: linear-gradient(90deg, #e61e4d, #d70466); font-weight: 600; }
+[data-skin=airbnb] .seg div { background: #fff; border: 1px solid var(--line); box-shadow: 0 2px 10px rgba(0,0,0,.08); border-radius: 99px; }
+[data-skin=airbnb] .seg button { border-radius: 99px; }
+[data-skin=airbnb] .seg button.on { background: #222; color: #fff; }
+[data-skin=airbnb] .weekhead h1, [data-skin=airbnb] .mh h1 { font-weight: 700; font-size: 1.8em; }
+[data-skin=airbnb] .day h3 { font-weight: 600; }
+
+/* ── 9. 민트 B급 (배민풍): 민트 바탕 띠, 굵은 손글씨 제목, 장난스러운 말투 같은 화면 ── */
+:root[data-skin=baemin] {
+  --bg: #f4fbfb; --panel: #ffffff; --line: #d9eeed; --hover: #e9f7f6; --text: #2b2b2b; --sub: #7d8b8a; --accent: #2ac1bc;
+  --blue: #3b8ee8; --red: #f2564a; --orange: #f39c12; --green: #2ac1bc; --yellow: #2ac1bc; --onyel: #fff;
+  --edge: #d9eeed; --hi: none; --shadow: 0 2px 0 #d9eeed; --bar: #2ac1bc; --glass: #ffffff; --float: #ffffff; --mob: #ffffff;
+  --fill: #ffffff; --on: #2ac1bc; --ckb: #a9d9d6; --rowhov: #f0fafa;
+  --t-red: #e03e30; --t-ora: #c77700; --t-blue: #2a73c4; --t-green: #129a95; --t-yel: #129a95; --t-pur: #129a95;
+  --pri: #2ac1bc; --onpri: #fff; --pri-text: #129a95; --rc: 14px; --rb: 10px; --font: "Pretendard", -apple-system, "Apple SD Gothic Neo", sans-serif;
+}
+[data-skin=baemin] header { background: #2ac1bc; color: #fff; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=baemin] header .btn.ghost { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.35); }
+[data-skin=baemin] header .logo { font-family: "Do Hyeon", sans-serif; font-weight: 400; }
+[data-skin=baemin] .seg { background: #fff; border-bottom: 1px solid var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=baemin] .seg div { background: #fff; border: 0; box-shadow: none; }
+[data-skin=baemin] .seg button.on { background: #2ac1bc; color: #fff; }
+[data-skin=baemin] .weekhead h1, [data-skin=baemin] .mh h1, [data-skin=baemin] .day h3 { font-family: "Do Hyeon", sans-serif; font-weight: 400; letter-spacing: 0; }
+[data-skin=baemin] .weekhead h1, [data-skin=baemin] .mh h1 { font-size: 2.1em; }
+[data-skin=baemin] .day h3 { font-size: 1.2em; }
+
+/* ── 10. 그라디언트 SNS (인스타그램풍): 흰 바탕, 주황→분홍→보라 그라디언트 포인트, 동그란 테두리 ── */
+:root[data-skin=insta] {
+  --bg: #ffffff; --panel: #ffffff; --line: #dbdbdb; --hover: #f5f5f5; --text: #000000; --sub: #737373; --accent: #d62976;
+  --blue: #0095f6; --red: #ed4956; --orange: #f77737; --green: #23a55a; --yellow: #d62976; --onyel: #fff;
+  --edge: #dbdbdb; --hi: none; --shadow: none; --bar: #ffffff; --glass: #ffffff; --float: #ffffff; --mob: #ffffff;
+  --fill: #efefef; --on: #000000; --ckb: #c7c7c7; --rowhov: #fafafa;
+  --t-red: #ed4956; --t-ora: #d9620f; --t-blue: #0095f6; --t-green: #1d8a4b; --t-yel: #c1356f; --t-pur: #962fbf;
+  --pri: #0095f6; --onpri: #fff; --pri-text: #d62976; --rc: 12px; --rb: 8px; --font: -apple-system, "Apple SD Gothic Neo", "Pretendard", sans-serif;
+  --ig: linear-gradient(45deg, #feda75, #fa7e1e 25%, #d62976 50%, #962fbf 75%, #4f5bd5);
+}
+[data-skin=insta] header, [data-skin=insta] .seg { -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-skin=insta] header .logo { font-family: "Grand Hotel", cursive; font-weight: 400; background: var(--ig); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-skin=insta] .seg div { background: transparent; border: 0; box-shadow: none; }
+[data-skin=insta] .seg button.on { background: transparent; color: #000; box-shadow: inset 0 -2px 0 #000; border-radius: 0; font-weight: 700; }
+[data-skin=insta] .bar i, [data-skin=insta] .day h3 .dbar i, [data-skin=insta] .rtbar i, [data-skin=insta] .briefBtn { background: var(--ig); border: 0; color: #fff; }
+[data-skin=insta] .day.today h3 .pill, [data-skin=insta] .mgrid .dn b { background: var(--ig); color: #fff; }
+[data-skin=insta] .weekhead h1, [data-skin=insta] .mh h1 { font-weight: 700; }
+[data-skin=insta] .rows, [data-skin=insta] #routinebox, [data-skin=insta] #duebox { border: 1px solid var(--line); }
+
+/* ── ⚙️ 설정 안 디자인 고르기 칸 (모든 디자인 공통) ── */
+#pop { max-height: calc(100vh - 70px); overflow-y: auto; }
+.pop .skins { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 12px; }
+.pop .skins button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 10px; border: 1px solid var(--line); font-size: 12px; text-align: left; line-height: 1.2; }
+.pop .skins button.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); font-weight: 700; }
+.pop .skins i { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(128,128,128,.35); overflow: hidden; }
+.pop .skins i b { position: absolute; right: 2px; bottom: 2px; width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(128,128,128,.4); }
+.pop label.tg:has(#previewSel) { flex-wrap: wrap; gap: 4px; } #previewSel { width: 100%; } /* 👀 매니저 화면 보기(대표): 선택칸이 넓어 글자가 한 자씩 세로로 깨지던 것 → 선택칸을 아래 줄로 */

@@ -479,9 +479,18 @@ async function renderTrend() {
 }
 
 // ── 🤖 에이전트 (mka_items: 대표는 전부+승인·킬스위치, 매니저는 자기 지점 것만 읽기 — 서버 RLS 가 거름) ──
-// 맥북 에이전트(ad-agent/)가 DB 함수 mka_push 로 올린다(push_to_planner.py). 여기서는 보기 + 광고 제안 승인/반려 + 킬스위치만. 광고 설정 변경은 승인 번호를 받은 Claude가 한다.
-const AST = { proposed: "🟡 승인 대기", approved: "✅ 승인", rejected: "⚫ 반려" };
+// 맥북 에이전트(ad-agent/)가 DB 함수 mka_push 로 올린다(push_to_planner.py). 여기서는 보기 + 광고 제안 승인/반려/켜줘 + 킬스위치만. 광고 생성·게시는 맥북 예약작업(ad-agent-activate, 30분마다)의 Claude가 한다.
 const BR = MKACORE.BRANCH;
+const AP_TOAST = { approved: "승인했어요. 30분 안에 Claude가 꺼진 광고로 만들어 둬요.", rejected: "반려했어요",
+  activate: "켜줘 요청했어요. 30분 안에 Claude가 이 광고만 게시해요.", cancel: "켜기 요청을 취소했어요" };
+// 단계별 대표 버튼 (data-st = 바꿀 status, 취소는 approved 로 되돌림)
+function propBtns(r) {
+  const k = esc(r.key), b = (st, t, sub, more = "") => `<button class="btn" data-ap="${k}" data-st="${st}"${more}${sub ? ' style="background:var(--sub)"' : ""}>${t}</button>`;
+  if (r.st.act === "decide") return `<div class="mkbar">${b("approved", "승인")}${b("rejected", "반려", true)}</div>`;
+  if (r.st.act === "activate") return `<div class="mkbar">${b("activate", "🟢 켜줘")}</div>`;
+  if (r.st.act === "cancel") return `<div class="mkbar">${b("approved", "켜기 취소", true, ' data-cancel="1"')}</div>`;
+  return "";
+}
 async function renderAgent(admin) {
   const [ir, cr, onr] = await Promise.all([
     sb.from("mka_items").select("kind, key, data, status, updated_at").order("updated_at", { ascending: false }).limit(300),
@@ -492,7 +501,8 @@ async function renderAgent(admin) {
   const rows = ir.data ?? [], today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   const kill = rows.some((r) => r.kind === "control" && r.key === "kill" && r.status === "on");
   const top = MKACORE.freshTop(rows);
-  const props = rows.filter((r) => r.kind === "proposal").sort((a, b) => (a.status === "proposed" ? 0 : 1) - (b.status === "proposed" ? 0 : 1) || b.key.localeCompare(a.key));
+  const props = rows.filter((r) => r.kind === "proposal").map((r) => ({ ...r, st: MKACORE.propStage(r.status, r.data ?? {}) }))
+    .sort((a, b) => (a.st.act ? 0 : 1) - (b.st.act ? 0 : 1) || b.key.localeCompare(a.key)); // 대표가 누를 게 있는 카드 먼저
   const threads = rows.filter((r) => r.kind === "thread");
   const posted = threads.filter((r) => r.status === "posted").sort((a, b) => String(b.data?.posted_at).localeCompare(String(a.data?.posted_at))).slice(0, 8);
   const ready = threads.filter((r) => r.status === "ready");
@@ -510,11 +520,12 @@ async function renderAgent(admin) {
 
   const topHtml = top.length ? `<div class="tw"><table><tr><th>광고</th><th>최근 30일 리드</th><th>리드당</th><th>지출</th><th>상태</th></tr>${top.map((r) => { const d = r.data ?? {}; return `<tr><td><div class="agrow">${img(d.image, "agthumb")}${link(d.link, d.name)}</div></td><td>${n(d.leads)}</td><td>${usd(d.cpl)}</td><td>${usd(d.spend)}</td><td class="mut">${esc(d.status ?? "")}</td></tr>`; }).join("")}</table></div><p class="mut">이름을 누르면 광고 미리보기가 열려요. 리드 기준이고, 노출 1,000 미만은 뺐어요.</p>` : `<div class="mut">아직 없어요. 에이전트 동기화가 돌면 채워져요.</div>`;
 
-  const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agprop")}<div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${AST[r.status] ?? esc(r.status)}</span> <span class="mut">#${esc(r.key)}</span></div>
+  const propHtml = props.length ? props.map((r) => { const d = r.data ?? {}; return `<div class="cmp">${img(d.image, "agprop")}<div class="cmp-b"><div><b>${esc(BR[d.branch] ?? d.branch ?? "")}</b> <span class="tag">${r.st.label}</span> <span class="mut">#${esc(r.key)}</span></div>
       <div><b>${esc(d.angle ?? "")}</b></div><div>${esc(d.hook ?? "")}</div><div class="mut">제목: ${esc(d.headline ?? "")}${d.replaces_ad_name ? ` · 교체 대상: ${esc(d.replaces_ad_name)}` : ""}</div>
       <div class="mut">${esc(d.experiment ?? "")}</div>
       ${(d.trend_refs ?? []).length ? `<div class="mut">📈 참고한 트렌드 광고(업종 밖): ${d.trend_refs.map((t) => `${MKACORE.safeImg(t.image) ? `<img class="agref" src="${t.image}" alt="" loading="lazy">` : ""}${link(MKCCORE.libraryUrl(t.library_id), t.page_name || "광고")}${t.why ? ` — ${esc(t.why)}` : ""}`).join(" · ")}</div>` : ""}
-      ${admin && r.status === "proposed" ? `<div class="mkbar"><button class="btn" data-ap="${esc(r.key)}" data-st="approved">승인</button><button class="btn" data-ap="${esc(r.key)}" data-st="rejected" style="background:var(--sub)">반려</button></div>` : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
+      ${d.draft_name ? `<div class="mut">광고관리자 이름: ${esc(d.draft_name)}</div>` : ""}
+      ${admin ? propBtns(r) : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
 
   const compHtml = comp.length ? comp.map((a) => `<div class="cmp">${signed[a.thumb_path] ? `<img class="agthumb" src="${esc(signed[a.thumb_path])}" alt="" loading="lazy">` : ""}<div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
       <div>${esc(MKACORE.adText(a).slice(0, 90))}</div></div></div>`).join("") : `<div class="mut">조건에 맞는 경쟁사 광고가 아직 없어요.</div>`;
@@ -524,7 +535,7 @@ async function renderAgent(admin) {
 
   $m("#mkBody").innerHTML = killCard
     + `<div class="card"><b>🔥 조회·반응 좋은 우리 광고 TOP</b>${topHtml}</div>`
-    + `<div class="card"><b>📣 추천 광고 — 에이전트 제안${admin ? " (승인하면 Claude가 광고관리자에 만들어요)" : ""}</b>${propHtml}</div>`
+    + `<div class="card"><b>📣 추천 광고 — 에이전트 제안${admin ? " (승인 → Claude가 꺼진 광고로 만들어 둠 → [켜줘] 누르면 30분 안에 게시)" : ""}</b>${propHtml}</div>`
     + `<div class="card"><b>🔭 추천 광고 — 경쟁사에서 오래 도는 소재 (눌러서 광고 라이브러리 원문)</b><p class="mut">기준: 한국어 문구가 있는 광고 · 30일 넘게 도는 것만 · 페이지당 1개 · 켜 둔 경쟁사 → 여러 광고로 돌리는 소재 → 오래 도는 순</p>${compHtml}<p class="mut">오래 돌수록 성과가 났을 가능성이 높아요. 문구는 베끼지 말고 구조만 참고해요.</p></div>`
     + `<div class="card"><b>🧵 스레드 — 올라간 글</b>${postedHtml}</div><div class="card"><b>🧵 스레드 — 대기 ${ready.length}</b>${readyHtml}</div>`;
   $m("#agKill")?.addEventListener("click", async () => {
@@ -533,7 +544,7 @@ async function renderAgent(admin) {
   });
   V().querySelectorAll("[data-ap]").forEach((b) => b.addEventListener("click", async () => {
     const { error } = await sb.from("mka_items").update({ status: b.dataset.st, updated_at: new Date().toISOString() }).eq("kind", "proposal").eq("key", b.dataset.ap);
-    if (fail(error)) return; toast(b.dataset.st === "approved" ? "승인했어요. Claude에게 \"승인된 광고 제안 진행해줘\"라고 하면 만들어요." : "반려했어요"); renderAgent(admin);
+    if (fail(error)) return; toast(AP_TOAST[b.dataset.cancel ? "cancel" : b.dataset.st] ?? "바꿨어요"); renderAgent(admin);
   }));
 }
 })();

@@ -99,6 +99,22 @@ end $$;
 
 revoke all on function public.mka_check_key(text) from public, anon, authenticated;
 grant execute on function public.mka_push(text, jsonb), public.mka_state(text) to anon, authenticated;
+-- 🤖 에이전트 광고 제안에 [켜줘] 단계 추가: 승인 → (Claude가 꺼진 초안 생성, data.stage=drafted) → 대표가 켜줘(status 'activate') → 맥북 30분 예약작업이 그 광고만 게시(data.stage=live).
+-- 대표는 'activate' 로 바꾸거나(켜줘) 다시 'approved' 로 되돌릴 수 있다(켜기 전 취소). 맥북은 mka_state 의 activate 목록을 받아 실행한다.
+drop policy if exists mka_items_upd on public.mka_items;
+create policy mka_items_upd on public.mka_items for update using (blog_is_admin() and kind in ('proposal', 'control'))
+  with check (blog_is_admin() and kind in ('proposal', 'control') and status in ('proposed', 'approved', 'rejected', 'activate', 'on', 'off'));
+
+create or replace function public.mka_state(k text) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  if not mka_check_key(k) then raise exception 'bad key' using errcode = '28000'; end if;
+  return jsonb_build_object(
+    'kill', exists (select 1 from mka_items where kind = 'control' and key = 'kill' and status = 'on'),
+    'approved', coalesce((select jsonb_agg(key order by key) from mka_items where kind = 'proposal' and status = 'approved'), '[]'::jsonb),
+    'rejected', coalesce((select jsonb_agg(key order by key) from mka_items where kind = 'proposal' and status = 'rejected'), '[]'::jsonb),
+    'activate', coalesce((select jsonb_agg(key order by key) from mka_items where kind = 'proposal' and status = 'activate'), '[]'::jsonb));
+end $$;
 
 insert into public.mka_push_key values (encode(extensions.digest('k'||repeat('x',40), 'sha256'), 'hex'));
 -- 흉내: 역할·지점 (migration 에서 만든 함수를 설정값 기반으로 바꿔 끼움)
@@ -153,6 +169,15 @@ do $$ declare c int; k text := 'k'||repeat('x',40); st jsonb; begin
   set local role anon;
   st := public.mka_state(k);
   assert (st->>'kill')::boolean and st->'approved' = '["p_new"]'::jsonb and st->'rejected' = '[]'::jsonb, 'state';
+  reset role;
+  update public.mka_items set status='activate' where key='p_new';
+  set local role anon;
+  st := public.mka_state(k);
+  assert st->'activate' = '["p_new"]'::jsonb and st->'approved' = '[]'::jsonb, 'state lists activate';
+  assert public.mka_push(k, '[{"kind":"proposal","key":"p_new","status":"proposed","data":{"branch":"ULSAN","stage":"drafted"}}]'::jsonb) = 1;
+  reset role;
+  assert (select status from public.mka_items where key='p_new') = 'activate', 'activate survives re-push';
+  set local role anon;
   assert public.mka_push(k, '[]'::jsonb) = 0, 'empty push deletes nothing';
   reset role;
   assert (select count(*) from public.mka_items where key='p_new') = 1;
@@ -175,6 +200,7 @@ do $$ declare c int; begin
   assert (select count(*) from public.mk_reports) = 1, 'manager: own team report';
   assert (select count(*) from public.mkc_ads) = 1, 'manager: own group ads';
   update public.mka_items set status='approved' where key='p_dsr'; get diagnostics c = row_count; assert c = 0, 'manager cannot approve';
+  update public.mka_items set status='activate' where key='p_dsr'; get diagnostics c = row_count; assert c = 0, 'manager cannot activate';
   update public.mka_items set status='on' where kind='control'; get diagnostics c = row_count; assert c = 0, 'manager cannot flip kill';
   -- 매니저(구미 등 에이전트 없는 지점): 킬스위치 상태만
   perform set_config('t.team','9',true);
@@ -184,6 +210,7 @@ do $$ declare c int; begin
   assert (select count(*) from public.mka_items) = 5, 'admin sees all';
   assert (select count(*) from public.mk_reports) = 2, 'admin sees all reports';
   update public.mka_items set status='approved' where key='p_dsr'; get diagnostics c = row_count; assert c = 1, 'admin approves';
+  update public.mka_items set status='activate' where key='p_dsr'; get diagnostics c = row_count; assert c = 1, 'admin asks activate';
   update public.mka_items set status='on' where kind='control' and key='kill'; get diagnostics c = row_count; assert c = 1, 'admin flips kill';
   update public.mka_items set status='X' where key='a_none'; get diagnostics c = row_count; assert c = 0, 'admin cannot edit topad';
   begin update public.mka_items set status='whatever' where key='p_dsr'; assert false, 'bad status must be rejected';
