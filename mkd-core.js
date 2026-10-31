@@ -206,7 +206,7 @@ function flags(rows, end) {
     else if (cur - prev >= 3) push("yellow", "rank_drop", "blog", u, `'${u}' ${prev}위 → ${cur}위`);
   }
   // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (이번 주에 쓸 수 있는 전산 날이 4일 이상일 때만).
-  //   그 채널 유입이 전산에서 이번 주 전에 문의 > 0 으로 잡힌 적 있는 채널만 본다 — 추적이 되던 채널이 끊긴 것만 이상. 이력이 없으면(지금 네이버: 전산에 nad_ 태그가 없음) 판단 안 함.
+  //   그 채널 유입이 전산에서 이번 주 전에 문의 > 0 으로 잡힌 적 있는 채널만 본다 — 추적이 되던 채널이 끊긴 것만 이상. 이력이 없으면 판단 안 함(네이버 nad_ 는 2026-11-01 부터 셈 — 그 전엔 홈페이지가 남긴 nads_ 를 못 읽어 기타로 셌다).
   const thisWeekFrom = windowRange(end, 7).from;
   if (cell(jt, "inquiries", end, 7).days >= 4) for (const c of AD_CHANNELS) {
     if (!chRows("jeonsan").some((r) => usable(r) && r.date < thisWeekFrom && channelOfSource(r.unit) === c && num(r.metrics?.inquiries) > 0)) continue;

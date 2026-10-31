@@ -85,7 +85,14 @@ export function checkRange(from, to, now = new Date()) {
 
 // ── 전산: 데이터 보드 스니펫 결과 합격 검사 ──
 // 규칙은 docs/meta-marketing/jeonsan-leads.md "호출한 쪽의 합격 검사". reason 은 note 로 저장되는 짧은 고정 문구(숫자 없음).
-export function acceptJeonsan(r, D) {
+// 전산 데이터 보드는 달을 한국 시각이 아니라 세계 시각(UTC)으로 나누는 것으로 보인다 — 2026-11-01 00시대 문의가 10월 보드 맨 위에 있었다.
+// 그래서 어느 달 보드든 맨 위(newest)가 '다음 달 1일'일 수 있고(한국 0~9시 문의), D 가 1일이면 그날 이른 아침 문의는 전달 보드에만 있다.
+const firstOfNext = (ym) => { const [y, m] = ym.split("-").map(Number); return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`; };
+const prevYm = (ym) => { const [y, m] = ym.split("-").map(Number); return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`; };
+export const isFirstOfMonth = (D) => /-01$/.test(String(D));
+export const prevMonthOf = (D) => prevYm(String(D).slice(0, 7));
+// boardMonth = 지금 읽은 보드의 달(기본 D 의 달). D 가 1일일 때 전달 보드도 읽으면 prevMonthOf(D) 로 검사한다.
+export function acceptJeonsan(r, D, boardMonth = String(D).slice(0, 7)) {
   const no = (reason) => ({ ok: false, reason });
   if (!r || typeof r !== "object") return no("결과 없음");
   if (r.error) return no(/^열 없음/.test(r.error) ? "열 없음" : /시간 형식/.test(r.error) ? "시간 형식 못 읽음" : "전산 오류");
@@ -95,7 +102,7 @@ export function acceptJeonsan(r, D) {
   if (r.stoppedBy === "maxPages") return no("쪽 수 상한");
   if (r.stoppedBy !== "cutoff" && r.stoppedBy !== "lastPage") return no("표 끝을 못 찾음");
   if (r.stoppedBy === "lastPage" && r.pages === 1 && r.lastPageRows >= 20) return no("표 끝을 못 찾음"); // 꽉 찬 쪽인데 다음 쪽 버튼을 못 찾은 것
-  if (typeof r.newest !== "string" || r.newest.slice(0, 7) !== D.slice(0, 7)) return no("달이 안 맞음"); // 표가 D 가 든 달의 맨 앞에서 시작해야 한다
+  if (typeof r.newest !== "string" || (r.newest.slice(0, 7) !== boardMonth && r.newest !== firstOfNext(boardMonth))) return no("달이 안 맞음"); // 표가 그 달 보드의 맨 앞(또는 다음 달 1일)에서 시작해야 한다
   if (r.stoppedBy === "lastPage" && !(typeof r.oldest === "string" && r.oldest <= D)) return no("D 까지 못 내려감");
   const sum = r.bySource && typeof r.bySource === "object" ? Object.values(r.bySource).reduce((a, v) => a + (Number.isFinite(v?.inquiries) ? v.inquiries : 0), 0) : NaN;
   if (!Number.isFinite(r.total) || sum !== r.total) return no("합계 불일치");
@@ -103,6 +110,12 @@ export function acceptJeonsan(r, D) {
 }
 
 // 합격한 결과 → 행. 코멘트·광고명·유입경로 열이 없으면 소스 구분이 뭉개지니 '전체' 한 행만 partial.
+// D 가 1일일 때 D 의 달 보드 결과 a + 전달 보드 결과 b(그날 이른 아침 문의) → 합친 결과 (같은 행은 한 보드에만 있다)
+export function mergeJeonsan(a, b) {
+  const bySource = {};
+  for (const src of [a.bySource ?? {}, b.bySource ?? {}]) for (const [k, v] of Object.entries(src)) { const o = (bySource[k] ??= { inquiries: 0, enrolls: 0 }); o.inquiries += Number.isFinite(v?.inquiries) ? v.inquiries : 0; o.enrolls += Number.isFinite(v?.enrolls) ? v.enrolls : 0; }
+  return { ...a, total: a.total + b.total, bySource, pages: (a.pages ?? 0) + (b.pages ?? 0), scanned: (a.scanned ?? 0) + (b.scanned ?? 0), missingCols: [...new Set([...(a.missingCols ?? []), ...(b.missingCols ?? [])])] };
+}
 export function jeonsanRows(team_key, r) {
   const missing = (r.missingCols ?? []).filter((c) => ["코멘트", "광고명", "유입경로"].includes(c));
   if (missing.length) return [{ team_key, unit: "전체", metrics: { inquiries: r.total, note: `열 없음: ${missing.join(", ")}` }, status: "partial" }];

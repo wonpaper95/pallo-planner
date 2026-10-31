@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   BRANCHES, GOOGLE_ACCOUNTS, jeonsanUrl, googleUrl, needsLogin, kstDate, isYesterdayKst, monthsBack, validDate,
-  acceptJeonsan, jeonsanRows, failRow, jeonsanOutput,
+  acceptJeonsan, isFirstOfMonth, prevMonthOf, mergeJeonsan, jeonsanRows, failRow, jeonsanOutput,
   googleTeamOf, parseStatus, num, parseMoney, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput,
   parseRange, rangeIsDay, rangeText, partitionValid, playwrightCandidates,
   rangeIs, checkRange, conversionsUrl, conversionStatus, googleRangeAccount, googleRangeFail, googleRangeOutput,
@@ -87,10 +87,33 @@ test("acceptJeonsan: lastPage 인데 1쪽이고 마지막 쪽 행이 20 이상�
   rejects({ stoppedBy: "lastPage", pages: 1, lastPageRows: 25 }, "표 끝을 못 찾음");
   assert.equal(acceptJeonsan({ ...GOOD, stoppedBy: "lastPage", pages: 2, lastPageRows: 20, oldest: "2026-10-20" }, D).ok, true); // 2쪽 이상이면 괜찮다
 });
-test("acceptJeonsan: newest 의 달이 D 의 달과 다르면 불합격(표가 그 달 맨 앞에서 시작하지 않음)", () => {
-  rejects({ newest: "2026-11-01" }, "달이 안 맞음");
+test("acceptJeonsan: newest 가 그 보드의 달도 다음 달 1일도 아니면 불합격(표가 그 달 맨 앞에서 시작하지 않음)", () => {
+  rejects({ newest: "2026-11-02" }, "달이 안 맞음");
   rejects({ newest: "2026-09-30" }, "달이 안 맞음");
   rejects({ newest: null }, "달이 안 맞음");
+  // 보드가 세계 시각으로 달을 나눠 다음 달 1일(한국 0~9시) 문의가 맨 위에 올 수 있다 — 2026-11-01 대구일중 10월 보드에서 실제로 봄
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2026-11-01" }, D).ok, true);
+});
+test("acceptJeonsan: 전달 보드(boardMonth) — D 가 1일일 때 전달 보드 맨 위는 D 이거나 전달 날짜", () => {
+  const D1 = "2026-11-01";
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2026-11-01", oldest: "2026-10-31" }, D1, "2026-10").ok, true);
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2026-10-31", oldest: "2026-10-31" }, D1, "2026-10").ok, true); // 그날 이른 아침 문의가 없으면 전달 날짜부터
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2026-11-02" }, D1, "2026-10").reason, "달이 안 맞음");
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2026-12-31" }, "2027-01-01", "2026-12").ok, true);
+  assert.equal(acceptJeonsan({ ...GOOD, newest: "2027-01-01" }, "2027-01-01", "2026-12").ok, true); // 해 넘김
+});
+test("isFirstOfMonth·prevMonthOf", () => {
+  assert.deepEqual(["2026-11-01", "2026-11-02", "2027-01-01"].map(isFirstOfMonth), [true, false, true]);
+  assert.deepEqual(["2026-11-01", "2027-01-01"].map(prevMonthOf), ["2026-10", "2026-12"]);
+});
+test("mergeJeonsan: 두 보드의 합계·유입경로별 건수·쪽·읽은 행을 더한다", () => {
+  const a = { total: 3, bySource: { meta: { inquiries: 2, enrolls: 0 }, 기타: { inquiries: 1, enrolls: 0 } }, pages: 1, scanned: 10, missingCols: [] };
+  const b = { total: 2, bySource: { meta: { inquiries: 1, enrolls: 0 }, nad_daegu_en_naver: { inquiries: 1, enrolls: 0 } }, pages: 1, scanned: 4, missingCols: ["코멘트"] };
+  const m = mergeJeonsan(a, b);
+  assert.equal(m.total, 5);
+  assert.deepEqual(m.bySource, { meta: { inquiries: 3, enrolls: 0 }, 기타: { inquiries: 1, enrolls: 0 }, nad_daegu_en_naver: { inquiries: 1, enrolls: 0 } });
+  assert.deepEqual([m.pages, m.scanned, m.missingCols], [2, 14, ["코멘트"]]);
+  assert.equal(acceptJeonsan({ ...GOOD, ...m, bySource: m.bySource, total: m.total }, D).ok, true); // 합친 결과도 합계 검사를 통과
 });
 test("acceptJeonsan: lastPage 이면 oldest <= D 여야 한다 (D 까지 못 내려간 것이면 불합격)", () => {
   rejects({ stoppedBy: "lastPage", pages: 2, oldest: "2026-10-29" }, "D 까지 못 내려감");

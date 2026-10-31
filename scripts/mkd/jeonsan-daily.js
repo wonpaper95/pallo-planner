@@ -20,10 +20,12 @@ async function __mkdDaily(date, { maxPages = 25, backDays = 1 } = {}) {
   for (const need of ["상태", "지원 시간"]) if (ix(need) < 0) return { error: `열 없음: ${need} (전산 화면이 바뀌었을 수 있어요)`, filterSet, headers: H.filter((h) => !/NAME|전화/.test(h)) };
   const missingCols = ["코멘트", "광고명", "유입경로"].filter((n) => ix(n) < 0); // 빠진 열은 그 신호만 못 쓴다 → 호출한 쪽이 본다
   const TIME = /(\d{4})\.(\d{2})\.(\d{2})/, day = (t) => { const m = (t || "").match(TIME); return m ? `${m[1]}-${m[2]}-${m[3]}` : null; };
-  const TOKEN = /\b(gads_[a-z0-9_]+|nad_[a-z0-9_]+|homepage)(?:-[a-z]+)?\b/i;
+  // 홈페이지(pallo-sites)가 광고 유입을 코멘트에 남기는 꼴: 구글 `gads_<utm_campaign>`, 네이버 `nads_<utm_campaign>[_m<n_media 번호>]` (예 nads_daegu_en_naver_m27758).
+  const TOKEN = /\b(gads_[a-z0-9_]+|nads?_[a-z0-9_]+|homepage)(?:-[a-z]+)?\b/i;
+  // 네이버는 `nad_<캠페인>` 하나로 맞춘다(nads_→nad_, 매체 번호 _m… 는 뗀다 — 캠페인별로 센다).
   // 토큰은 40자까지만, 숫자 3자리 이상 덩어리(전화번호 등)가 있으면 그 앞까지만 쓰고(끝의 _ 는 뗀다), gads_/nad_ 뒤에 남는 글자가 없으면 "기타".
   // rows.mjs 는 `gads_기타` 도 받아 주고 mkd-core 의 channelOfSource 는 gads_ 로 시작하면 구글로 센다 → 이 스니펫이 유일한 방어선이라 `gads_기타` 가 아니라 `기타` 를 돌려준다.
-  const safeToken = (t) => { t = t.slice(0, 40); if (/\d{3,}/.test(t)) t = t.split(/\d{3,}/)[0].replace(/_+$/, ""); return t === "homepage" || /^(gads|nad)_[a-z0-9_]+$/.test(t) ? t : "기타"; };
+  const safeToken = (t) => { t = t.replace(/^nads_/, "nad_"); if (/^nad_/.test(t)) t = t.replace(/_m\d+$/, ""); t = t.slice(0, 40); if (/\d{3,}/.test(t)) t = t.split(/\d{3,}/)[0].replace(/_+$/, ""); return t === "homepage" || /^(gads|nad)_[a-z0-9_]+$/.test(t) ? t : "기타"; };
   const source = (td) => {
     const cell = (n) => (ix(n) < 0 ? "" : (td[ix(n)]?.innerText ?? "").trim());
     const tok = cell("코멘트").match(TOKEN)?.[1]?.toLowerCase(); if (tok) return safeToken(tok);      // 토큰만, 전문은 버림

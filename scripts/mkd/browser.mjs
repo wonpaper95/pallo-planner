@@ -17,7 +17,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   BRANCHES, GOOGLE_ACCOUNTS, SSO_URL, jeonsanUrl, googleUrl, playwrightCandidates, needsLogin, validDate, kstDate, isYesterdayKst, monthsBack,
-  ReadError, acceptJeonsan, jeonsanRows, failRow, jeonsanOutput, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput, parseRange, rangeIs, partitionValid,
+  ReadError, acceptJeonsan, jeonsanRows, isFirstOfMonth, prevMonthOf, mergeJeonsan, failRow, jeonsanOutput, readGrid, checkTotals, noticeFlags, googleRows, googleFailRows, googleOutput, parseRange, rangeIs, partitionValid,
   conversionsUrl, conversionStatus, checkRange, googleRangeAccount, googleRangeFail, googleRangeOutput,
 } from "./browser-rows.mjs";
 
@@ -124,9 +124,16 @@ async function readBranch(ctx, b, D, back, snippet) {
           if (!(await prev.isVisible().catch(() => false))) throw new ReadError("이전 달 버튼 없음");
           await prev.click({ timeout: 10_000 }); await sleep(2500);
         }
-        const result = await within(page.evaluate(`(async () => {\n${snippet}\nreturn await __mkdDaily(${JSON.stringify(D)});\n})()`), 60_000, (e) => (e ? { error: "전산 오류" } : undefined));
-        if (result === undefined) throw new ReadError("전산 시간 초과");
-        const v = acceptJeonsan(result, D);
+        const runSnippet = async () => { const r = await within(page.evaluate(`(async () => {\n${snippet}\nreturn await __mkdDaily(${JSON.stringify(D)});\n})()`), 60_000, (e) => (e ? { error: "전산 오류" } : undefined)); if (r === undefined) throw new ReadError("전산 시간 초과"); return r; };
+        let result = await runSnippet(), v = acceptJeonsan(result, D);
+        // D 가 1일이면 그날 한국 0~9시 문의는 전달 보드에 있다(보드가 세계 시각으로 달을 나눔) → 전달 보드도 읽어 더한다
+        if (v.ok && isFirstOfMonth(D)) {
+          const prev = page.locator("button:not(table button)").filter({ hasText: /^\s*[‹〈]\s*$|chevron_left/ }).first();
+          if (!(await prev.isVisible().catch(() => false))) throw new ReadError("이전 달 버튼 없음");
+          await prev.click({ timeout: 10_000 }); await sleep(2500);
+          const r2 = await runSnippet(), v2 = acceptJeonsan(r2, D, prevMonthOf(D));
+          if (v2.ok) result = mergeJeonsan(result, r2); else v = { ok: false, reason: `전달 보드 ${v2.reason}` };
+        }
         if (v.ok) { const rows = jeonsanRows(key, result); return { team_key: key, status: rows.some((r) => r.status === "partial") ? "partial" : "ok", total: result.total, rows }; }
         reason = v.reason; log(`${key}: 불합격(${attempt}) — ${v.reason}`);
       } catch (e) { reason = reasonOf(e, "전산"); log(`${key}: 오류(${attempt}) — ${reason}`); }
