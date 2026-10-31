@@ -97,7 +97,7 @@
   function pre() {
     const P = JG.PRE;
     const mins = P.read.reduce((a, r) => a + r.min, 0);
-    return `<div class="jgcard"><h3>📖 출근 전에 읽어 오기 <small>약 ${Math.round(mins / 10) * 10}분</small></h3><p class="jgmut">${esc(P.goal)}</p>
+    return `<div class="jgcard"><h3>📖 출근 전에 읽어 오기 <small>약 ${mins}분</small></h3><p class="jgmut">${esc(P.goal)}</p>
       ${P.read.map((r, i) => `<details class="jgread"><summary><b>${"①②③④⑤⑥⑦⑧"[i]} ${esc(r.t)}</b><small>${r.min}분</small></summary>${r.note ? `<p class="jgmut">${esc(r.note)}</p>` : ""}${refBox(r.ref, r.ref.length === 1)}</details>`).join("")}</div>
       <div class="jgcard"><h3>✍️ 사전 숙제 <small>${P.hw.filter((h) => st.c[h.id]).length}/${P.hw.length}</small></h3>
       ${P.hw.map((h) => ck(h.id, h.t, esc(h.how)) + (h.ref ? `<div class="jgin">${refBox(h.ref)}</div>` : "")).join("")}</div>
