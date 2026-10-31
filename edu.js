@@ -12,7 +12,7 @@ const ITEMS = () => {
   const ed = EDU.edits || [], hide = new Set(ed.filter((e) => e.hidden).map((e) => e.id));
   return [...(globalThis.EDU_ITEMS || []), ...ed.filter((e) => e.item).map((e) => ({ ...e.item, id: e.id, week: e.week }))].filter((i) => !hide.has(i.id));
 };
-const byWeek = (w) => ITEMS().filter((i) => i.week === w);
+const byWeek = (w) => ITEMS().filter((i) => i.week === w && !i.long);
 const weekKey = (w) => `week-${w}`;   // 주차 제출물은 edu_submits 에 이 id 로 들어간다
 const LEVELS = [["0", "미달"], ["1", "기본"], ["2", "우수"]];
 const AXES = { ops: "운영정확도", sales: "영업·협상력", data: "데이터 판단력", own: "자기주도", people: "사람관리", mkt: "마케팅 실행력" };
@@ -146,6 +146,7 @@ function mission(d, role) {
             `<li><input data-imp="${k}" value="${esc(list[k] || "")}" placeholder="관찰한 문제 → 제안" maxlength="200"></li>`).join("")}</ol>
         </details>
       </div>
+      ${ITEMS().filter((i) => i.long).map((i) => `<div class="eduimp">${itemRow(i, d, role)}</div>`).join("")}
       <div><b>필독서 ${BOOKS.length}권</b> <span class="mut">자습 · 선택</span>${BOOKS.map(([k, t, why]) => {
         const b = (m.books || {})[k] || {};
         return `<div class="eduline book"><span>${esc(t)} <span class="mut">${why}</span></span>${["start:시작", "done:완독", "summary:요약제출"].map((x) => { const [f, lb] = x.split(":"); return `<label class="mut"><input type="checkbox" data-book="${k}" data-f="${f}" ${b[f] ? "checked" : ""}> ${lb}</label>`; }).join("")}</div>`;
