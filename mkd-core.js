@@ -42,7 +42,7 @@ const CHANNEL_METRICS = {
   google_ad: ["impressions", "clicks", "spend", "conversions", "ctr", "cpc"],
   meta_ad: ["impressions", "reach", "clicks", "leads", "spend"],
   blog: ["visitors", "subscribers", "kw_tracked", "kw_top", "kw_tab", "rank", "tab_rank", "views"], // visitors_cum(방문자 누적)은 계산용이라 표에 안 나온다
-  daangn: ["views", "followers", "chats"],
+  daangn: ["views", "visitors", "followers", "chats"], // 당근: 조회수·방문 고객수·단골(현재)·채팅(아직 못 읽음)
   jeonsan: ["inquiries", "enrolls"],
 };
 

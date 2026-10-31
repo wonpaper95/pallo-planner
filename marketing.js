@@ -180,7 +180,9 @@ async function renderDaily(admin) {
   const behind = end < MKDCORE.addDays(today, kst.getUTCHours() < 7 ? -2 : -1), ago = Math.round((Date.parse(today) - Date.parse(end)) / 864e5);
   // 이상 징후는 선택한 지점 것만, 대표 "전체 합계" 는 전부(지점 이름표 붙여서). 리포트 JSON 은 스킬이 쓴 값이라 모양이 틀려도 죽지 않게 거른다
   const flags = (Array.isArray(rep?.flags) ? rep.flags : []).filter((f) => f && typeof f === "object").filter((f) => !team || Number(f.team_id) === team);
-  const chips = MKDCORE.CHANNELS.map((c) => { const [i, t] = STCHIP[st[c]] ?? STCHIP.missing; return `<span class="mkchip st-${esc(st[c])}" title="${t}">${i} ${esc(MKDCORE.CHANNEL_LABEL[c])}</span>`; }).join("");
+  // 당근은 어제 숫자가 오전 8시에 확정돼 하루 늦게 쌓인다 — 기준일 행이 없고 전날이 수집됐으면 '미수집'이 아니라 '하루 늦게'
+  const late = (c) => c === "daangn" && st[c] === "missing" && MKDCORE.status(rows, MKDCORE.addDays(end, -1)).daangn === "ok";
+  const chips = MKDCORE.CHANNELS.map((c) => { const [i, t] = late(c) ? ["🕗", "당근은 어제 숫자가 오전 8시에 확정돼 하루 늦게 쌓여요"] : STCHIP[st[c]] ?? STCHIP.missing; return `<span class="mkchip st-${esc(late(c) ? "ok" : st[c])}" title="${t}">${i} ${esc(MKDCORE.CHANNEL_LABEL[c])}</span>`; }).join("");
   const teamSel = admin ? `<select id="mkdTeam"><option value="0">전체 합계</option>${teams.map((t) => `<option value="${t.id}" ${t.id === team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : "";
   const repHtml = !rep ? `<div class="card"><span class="mut">${rp.error ? "코멘트·이상 징후를 못 읽었어요" : "이 날짜의 코멘트·이상 징후 리포트가 아직 없어요"}</span></div>`
     : (rep.comment ? `<div class="card"><b>오늘 한 줄</b><p style="white-space:pre-line">${esc(rep.comment)}</p></div>` : "")
