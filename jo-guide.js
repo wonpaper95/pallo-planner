@@ -29,7 +29,8 @@
   const imp = (s) => esc(s).replace(/\(중요!!\)/g, '<b class="jgimp">(중요!!)</b>'); // 전화·회신 강조
   const shots = (r) => (r.img || []).map((f) => `<a class="jgshot" href="img/jg/${f}.jpg" target="_blank" rel="noopener"><img src="img/jg/${f}.jpg" alt="${esc(r.t)} ${r.cap ? "예시" : "실제"} 화면" loading="lazy"></a>`).join("") + (r.img ? `<p class="jgcap">${esc(r.cap || "실제 전산 화면 · 이름·번호·메모는 예시로 바꿨어요 · 누르면 크게")}</p>` : ""); // cap = 예시 화면(가짜 데이터) 설명
   const br = (r) => r.br ? ` <span class="jgbr" title="이 지점 기준이에요 — 우리 지점에 맞게 읽어요">${esc(r.br)} 기준</span>` : "";
-  const refBox = (ids, open) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${esc(r.t)}${br(r)}</summary>${body(txt(r))}${shots(r)}</details>` : ""; }).join("");
+  const hl = (s, k) => k ? esc(s).replace(new RegExp(esc(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`) : esc(s); // 찾아보기: 제목에서 찾은 말 칠하기
+  const refBox = (ids, open, k) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${hl(r.t, k)}${br(r)}</summary>${body(txt(r))}${shots(r)}</details>` : ""; }).join("");
   const ck = (id, label, sub) => `<label class="jgck${st.c[id] ? " on" : ""}"><input type="checkbox" data-jgc="${id}"${st.c[id] ? " checked" : ""}><span><b>${esc(label)}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
   const doneOf = (d, c = st.c) => d.pass.filter((_, i) => c[`d${d.day}-${i}`]).length;
   // 단계별 끝났나 (사전 준비 = 숙제 전부, n일차 = 통과 체크 전부) → 지금 단계 = 처음 안 끝난 단계
@@ -87,11 +88,12 @@
       const ok = k === "pre" ? JG.PRE.hw.every((h) => st.c[h.id]) : d && doneOf(d) === d.pass.length;
       return `<button data-jgt="${k}" class="${tab === k ? "on" : ""}${ok ? " ok" : ""}">${ok ? "✓ " : ""}${n}</button>`;
     }).join("");
-    return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · 1주일${lang === "ja" ? " · 일본어" : ""}</h2>
+    return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · ${opts.standalone ? "사전 준비" : "1주일"}${lang === "ja" ? " · 일본어" : ""}</h2>
       <div class="jglang">${[["en", "🇺🇸 영어"], ["ja", "🇯🇵 일본어"]].map(([k, n]) => `<button data-jgl="${k}" class="${lang === k ? "on" : ""}">${n}</button>`).join("")}</div>
       ${opts.standalone ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 열리는 사전숙제 링크">🔗 사전숙제 링크 복사</button>`}</div>
-      <p class="jgsub">사전 준비 → 1~4일차 → 5일차부터 혼자 근무. <span class="must">🔴 필수</span> = 2시간 30분 근무도 이것만은 · <span class="add">🟡 추가</span> = 4시간 근무면 더</p>
-      <nav class="jgtabs">${chips}</nav>${liveBox()}</div>`;
+      ${opts.standalone ? `<p class="jgsub">출근 첫날 전에 이것만 해 오면 돼요. 1~4일차는 출근해서 매니저와 같이 봐요.</p></div>` // 사전숙제 링크: 1~4일차·찾아보기 탭 숨김 (10-31)
+        : `<p class="jgsub">사전 준비 → 1~4일차 → 5일차부터 혼자 근무. <span class="must">🔴 필수</span> = 2시간 30분 근무도 이것만은 · <span class="add">🟡 추가</span> = 4시간 근무면 더</p>
+      <nav class="jgtabs">${chips}</nav>${liveBox()}</div>`}`;
   }
 
   function pre() {
@@ -127,13 +129,21 @@
       ${d.after ? `<div class="jgcard jgafter"><h3>🚀 5일차부터</h3><p>${esc(d.after)}</p></div>` : ""}`;
   }
 
+  // 📚 찾아보기 (10-31 "백과사전처럼 잘 보이게"): 큰 검색칸(위에 붙음) · 자주 찾는 말 · 목차 바로가기 · 찾은 개수 · 제목 칠하기
+  const QUICK = ["환불", "연기", "결제", "신규 등록", "출석", "차감", "전화 회신", "마감"];
   function ref() {
     const k = q.trim().toLowerCase();
     const hit = (r) => !k || JSON.stringify([r.t, r.ch, txt(r)]).toLowerCase().includes(k);
-    const chs = [...new Set(JG.REF.map((r) => r.ch))];
-    const html = chs.map((c) => { const rs = JG.REF.filter((r) => r.ch === c && hit(r)); return rs.length ? `<h4>${esc(c)}</h4>${refBox(rs.map((r) => r.id), !!k)}` : ""; }).join("");
-    return `<div class="jgcard"><h3>📚 전체 가이드북 — 필요할 때 찾아보기</h3><p class="jgmut">1~4일차에 안 넣은 업무(신규 등록·결제·환불·구멤버·재무 등)도 다 여기 있어요. 처음 하는 건 매니저와 같이.</p>
-      <input class="jgsearch" type="search" placeholder="검색 (예: 환불, 연기, QR)" value="${esc(q)}"><div class="jgres">${html || '<p class="jgmut">찾는 내용이 없어요.</p>'}</div></div>`;
+    const chs = [...new Set(JG.REF.map((r) => r.ch))].map((c, i) => ({ c, i, rs: JG.REF.filter((r) => r.ch === c && hit(r)) })).filter((x) => x.rs.length);
+    const n = chs.reduce((a, x) => a + x.rs.length, 0);
+    const toc = `<nav class="jgtoc">${chs.map((x) => `<button data-jgch="${x.i}">${esc(x.c)} <small>${x.rs.length}</small></button>`).join("")}</nav>`;
+    // 찾은 게 많으면 접어서 제목만 (제목에 그 말이 든 항목 먼저), 3개 이하면 펼침
+    const first = (r) => (r.t.toLowerCase().includes(k) ? 0 : 1);
+    const html = chs.map((x) => `<h4 id="jgch-${x.i}">${esc(x.c)}</h4>${refBox([...x.rs].sort((a, b) => first(a) - first(b)).map((r) => r.id), !!k && n <= 3, k)}`).join("");
+    return `<div class="jgcard jgfind"><h3>📚 전체 가이드북 — 필요할 때 찾아보기</h3><p class="jgmut">1~4일차에 안 넣은 업무(신규 등록·결제·환불·구멤버·재무 등)도 다 여기 있어요. 처음 하는 건 매니저와 같이.</p>
+      <div class="jgsbox"><span aria-hidden="true">🔍</span><input class="jgsearch" type="search" enterkeyhint="search" placeholder="무엇이 궁금해요? (예: 환불, 연기, QR)" aria-label="가이드북 검색" value="${esc(q)}"></div>
+      <div class="jgquick"><span>자주 찾는 말</span>${QUICK.map((w) => `<button data-jgw="${esc(w)}" class="${k === w ? "on" : ""}">${esc(w)}</button>`).join("")}</div>
+      <div class="jgres">${k ? `<p class="jgcount">${n ? `‘${esc(q.trim())}’ ${n}개 찾았어요` : `‘${esc(q.trim())}’ 찾는 내용이 없어요. 다른 말로 찾아보거나 매니저에게 물어봐요.`}</p>` : `<p class="jgcount">목차 — 누르면 그 칸으로 가요</p>`}${toc}${html}</div></div>`;
   }
 
   function render() {
@@ -147,6 +157,8 @@
   function bind() {
     el.addEventListener("click", async (e) => {
       const t = e.target.closest("[data-jgt]"); if (t) return go(t.dataset.jgt);
+      const w = e.target.closest("[data-jgw]"); if (w) { q = q.trim() === w.dataset.jgw ? "" : w.dataset.jgw; render(); return el.querySelector(".jgsearch")?.focus({ preventScroll: true }); }
+      const c = e.target.closest("[data-jgch]"); if (c) return el.querySelector(`#jgch-${c.dataset.jgch}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       const l = e.target.closest("[data-jgl]"); if (l) { lang = l.dataset.jgl; try { localStorage.setItem("jg-lang", lang); } catch {} return render(); }
       if (e.target.closest("[data-jgscore]")) {
         const r = JG.QUIZ.map((_, i) => { const v = el.querySelector(`input[name=jgq${i}]:checked`); return v ? +v.value : null; });
@@ -179,6 +191,6 @@
   }
 
   window.JGUIDE = {
-    mount(target, o = {}) { if (el !== target) { el = target; opts = o; bind(); } render(); liveLoad(); },
+    mount(target, o = {}) { if (el !== target) { el = target; opts = o; bind(); } if (o.standalone) tab = "pre"; render(); liveLoad(); },
   };
 })();
