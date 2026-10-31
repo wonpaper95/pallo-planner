@@ -1,4 +1,4 @@
-// 📸 게시물 탭: 사진 1~10장 + 주제 → AI 공통 원고 + 인스타·구글·네이버·당근 문구 → 채널별 점검 → 복사·사진 받기 → [올렸어요].
+// 📸 게시물 탭: 사진 1~10장 + 주제 → AI 공통 원고 + 인스타·구글·네이버 문구 → 채널별 점검 → 복사·사진 받기 → [올렸어요].
 // 1단계는 네 채널 모두 수동. 인스타(2단계)·구글(3단계) 자동 게시는 Edge Function sns-publish 로 붙인다. 설계: docs/sns-posts/README.md
 // 사진은 이 기기에서 모자이크·자르기(photo.js) → sns 버킷(공개, 무작위 이름)에 올린다: 다른 기기에서 다시 열고, 나중에 API가 공개 주소로 가져가게.
 // 채널 규칙·점검은 sns-core.js(SNSCORE). index.html 전역 sb·me·esc·toast·fail·isBoss·previewTeam·teams 를 씀 → window.PS
@@ -156,7 +156,7 @@ async function generate() {
   if (PS.post && !confirm("지금 문구를 새로 만든 문구로 바꿀까요? (고친 내용은 사라져요)")) return;
   const team = PS.team, X0 = PS.post; // 기다리는 사이 대표가 지점을 바꾸거나 다른 게시물을 열면 결과를 버린다
   const btn = $p("#psGo"); btn.disabled = true; btn.textContent = "✍️ 쓰는 중… (30초 안팎)";
-  $p("#psGoNote").textContent = "공통 원고 → 인스타 · 구글 · 네이버 · 당근 순서로 다시 써요";
+  $p("#psGoNote").textContent = "공통 원고 → 인스타 · 구글 · 네이버 순서로 다시 써요";
   try {
     const r = await call("sns", { photos: PS.photos.map((p) => ({ data: p.ai, media_type: "image/jpeg", note: p.note })), topic: PS.topic, tone: PS.tone });
     if (!r) return;
@@ -187,7 +187,7 @@ function editorHtml(k, ch) {
 function renderOut() {
   const el = $p("#psOut"); if (!el) return;
   const X = PS.post;
-  if (!X) { el.innerHTML = `<div class="card blempty">왼쪽에서 사진을 올리고 <b>✨ 문구 만들기</b>를 누르면<br>인스타 · 구글 · 네이버 · 당근 문구가 한 번에 나와요.<br><br><small>채널마다 고칠 수 있고, 복사해서 각 앱에 붙여넣으면 돼요.</small></div>`; return; }
+  if (!X) { el.innerHTML = `<div class="card blempty">왼쪽에서 사진을 올리고 <b>✨ 문구 만들기</b>를 누르면<br>인스타 · 구글 · 네이버 문구가 한 번에 나와요.<br><br><small>채널마다 고칠 수 있고, 복사해서 각 앱에 붙여넣으면 돼요.</small></div>`; return; }
   const k = PS.ch, ch = X.channels[k], j = jobOf(k), c = chOf(k);
   const doneBtn = !PS.sel.has(k) ? `<span class="mut">이 채널은 이번에 안 올려요 (위에서 체크)</span>`
     : j?.status === "done_manual" ? `<button type="button" class="btn ghost" id="psUndo">↩ 올렸어요 취소</button>` : `<button type="button" class="btn ghost" id="psDone">✓ 올렸어요</button>`;
@@ -298,7 +298,7 @@ async function save() {
   finally { const again = saving.again; saving = null; if (again) save(); }
 }
 const saveSoon = debounce(save, 1200);
-async function loadJobs() { PS.jobs = PS.post?.id ? (await sb.from("sns_jobs").select("*").eq("post_id", PS.post.id)).data ?? [] : []; }
+async function loadJobs() { PS.jobs = PS.post?.id ? ((await sb.from("sns_jobs").select("*").eq("post_id", PS.post.id)).data ?? []).filter((j) => chOf(j.channel)) : []; } // 탭에서 뺀 채널(당근 자동 게시) 작업은 건드리지 않는다
 async function syncJobs(team = PS.team) {
   const X = PS.post; if (!X?.id) return;
   const have = new Set(PS.jobs.map((j) => j.channel));
@@ -322,8 +322,8 @@ async function photosOut() {
   await PHOTO.share(list, `${PS.teamName}_${chOf(PS.ch).label.replace(/^\S+\s/, "")}_${kstDay()}`);
 }
 
-// ── 바로가기: 지점마다 인스타·구글·네이버·당근 주소를 저장해 두고 한 번에 연다 (blog_profiles.data.links — 블로그 지점 설정과 같은 줄) ──
-const LINK_HINT = { instagram: "https://www.instagram.com/지점계정", google: "https://business.google.com/ (프로필 관리 주소)", naver: "https://new.smartplace.naver.com/ (소식 쓰기 주소)", daangn: "https://business.daangn.com/ (비즈프로필 주소)" };
+// ── 바로가기: 지점마다 인스타·구글·네이버 주소를 저장해 두고 한 번에 연다 (blog_profiles.data.links — 블로그 지점 설정과 같은 줄) ──
+const LINK_HINT = { instagram: "https://www.instagram.com/지점계정", google: "https://business.google.com/ (프로필 관리 주소)", naver: "https://new.smartplace.naver.com/ (소식 쓰기 주소)" };
 const okUrl = (u) => /^https?:\/\//i.test(u);
 function renderLinks(edit) {
   const el = $p("#psLinks"); if (!el || !PS.team) return;
@@ -367,7 +367,7 @@ async function renderList() {
   if (fail(error)) return;
   if (PS.tab !== "list") return; // 기다리는 사이 [만들기]로 옮겼으면 덮어쓰지 않는다
   $p("#psBody").innerHTML = data.length ? `<div class="bllist">${data.map((x) => {
-    const jobs = [...x.sns_jobs].sort((a, b) => ORDER[a.channel] - ORDER[b.channel]);
+    const jobs = x.sns_jobs.filter((j) => j.channel in ORDER).sort((a, b) => ORDER[a.channel] - ORDER[b.channel]);
     return `<div class="card">
       ${x.photos?.[0] ? `<img class="psthumb" src="${esc(pub(x.photos[0].path))}" alt="" loading="lazy">` : `<div class="psthumb">📝</div>`}
       <div class="t"><b>${esc(C.titleOf(x))}</b><span class="mut">${new Date(Date.parse(x.created_at) + 9 * 3600e3).toISOString().slice(0, 10)} · 사진 ${x.photos?.length ?? 0}장</span>

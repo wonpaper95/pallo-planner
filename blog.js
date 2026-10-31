@@ -332,7 +332,7 @@ function renderOut() {
     <div class="blacts">
       <button type="button" class="btn" id="blCopy">📋 본문 복사</button><button type="button" class="btn" id="blNextPhoto">${nextLabel()}</button><button type="button" class="btn ghost" id="blCopyTitle">제목 복사</button>
       <button type="button" class="btn ghost" id="blPhotos">🖼 사진 번호대로 받기</button><button type="button" class="btn ghost" id="blTagsCopy"># 해시태그 복사</button>
-      <button type="button" class="btn ghost" id="blConv">🔁 인스타·당근·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
+      <button type="button" class="btn ghost" id="blConv">🔁 인스타·카톡</button><button type="button" class="btn ghost" id="blSave">💾 저장</button>
     </div></div>`;
   check(); similarSoon();
 }
@@ -547,9 +547,9 @@ function renderRes() {
 async function convert() {
   const btn = $b("#blConv"); btn.disabled = true; btn.textContent = "🔁 바꾸는 중…";
   const r = await call("convert", { title: BL.post.titles[BL.post.sel], body: plainText() });
-  btn.disabled = false; btn.textContent = "🔁 인스타·당근·카톡";
+  btn.disabled = false; btn.textContent = "🔁 인스타·카톡";
   if (!r) return; setQuota(r.quota);
-  const C = [["instagram", "📸 인스타그램"], ["daangn", "🥕 당근"], ["kakao", "💬 카카오톡 채널"]];
+  const C = [["instagram", "📸 인스타그램"], ["kakao", "💬 카카오톡 채널"]];
   $b("#blConvBody").innerHTML = C.map(([k, t]) => `<label style="color:var(--text)">${t} <button type="button" class="btn ghost small" data-copyta="${k}">복사</button></label><textarea id="blConv_${k}">${esc(r.channels[k])}</textarea>`).join("");
   $b("#blConvDlg").showModal();
 }
