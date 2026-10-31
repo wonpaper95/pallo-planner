@@ -79,7 +79,7 @@
     const list = (ns) => ns.map((n) => { const r = by.get(n.id), c = r?.c ?? {};
       return `<tr><td><b>${esc(n.name)}</b></td><td>${r ? `<b>${nowTxt(c)}</b>` : `<span class="jgmut">아직 시작 안 함</span>`}</td><td>${steps(c)}</td><td class="jgmut">${r ? `${r.best != null ? `퀴즈 ${r.best}점 · ` : ""}${md(r.updated_at)}` : ""}</td></tr>`; }).join("");
     const groups = LV.boss ? LV.teams.map((t) => [t.name, LV.names.filter((n) => n.team_id === t.id)]).filter(([, ns]) => ns.length) : [["", LV.names]];
-    return `${hwBox()}<details class="jgcard jgprog" open><summary><h3 style="display:inline">👥 우리 조교 진행 <small>조교가 조교 링크에서 '나'를 고르고 체크한 것</small></h3></summary>
+    return `${hwBox()}<details class="jgcard jgprog jgme"${LV.progOpen ? " open" : ""}><summary><h3 style="display:inline">👥 우리 조교 진행 <small>조교가 조교 링크에서 '나'를 고르고 체크한 것</small></h3></summary>
       ${groups.length ? groups.map(([tn, ns]) => `${tn ? `<h4>${esc(tn)}</h4>` : ""}<div class="jgtw"><table class="jgpt">${list(ns)}</table></div>`).join("") : `<p class="jgmut">조교체크리스트에 조교 이름이 아직 없어요.</p>`}</details>`; // 제출함이 진행표 위 (진행표가 길어서)
   }
   function hwBox() { // 📤 사전숙제 제출함 — 매니저·대표
@@ -246,6 +246,7 @@
         try { await navigator.clipboard.writeText(url); (window.toast || alert)(`🔗 ${lang === "ja" ? "일본어 " : ""}사전숙제 링크를 복사했어요 — 카톡에 붙여 보내세요`); } catch { prompt("이 링크를 복사해 보내세요", url); }
       }
     });
+    el.addEventListener("toggle", (e) => { if (e.target.classList?.contains("jgme")) LV.progOpen = e.target.open; }, true); // 👥 진행표 펼침 기억 (toggle 은 버블 안 됨)
     el.addEventListener("change", (e) => {
       const sk = e.target.dataset?.jgs;
       if (sk === "file") { SUB.file = e.target.files?.[0] || null; const s = el.querySelector("[data-jgfile]"); if (s) s.textContent = SUB.file ? `📎 ${SUB.file.name} (${Math.ceil(SUB.file.size / 1024)}KB)` : ""; return; }
