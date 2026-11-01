@@ -5,7 +5,7 @@
 (() => {
 const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, shell: "" });
 const V = () => document.getElementById("fnView");
-const { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily } = FNC;
+const { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, toNum, normDate, summary, daily, amt } = FNC;
 const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 const canEdit = () => !jo();
@@ -91,7 +91,7 @@ function render() {
   const a = document.activeElement, cur = box.contains(a) && a.matches?.("[data-id][data-k]") ? { id: a.dataset.id, k: a.dataset.k, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
   if (cur && composing) { pendingRender = true; return; } // 한글 조합 중엔 조합 끝나고 그림
   const keep = [...V().querySelectorAll(".fnscroll")].map((x) => [x.scrollLeft, x.scrollTop]);
-  box.innerHTML = summaryHtml() + (admin() ? accessHtml() : "") + saleHtml() + costHtml() + dailyHtml();
+  box.innerHTML = summaryHtml() + (admin() ? accessHtml() : "") + saleHtml() + costHtml() + depositHtml() + dailyHtml();
   V().querySelectorAll(".fnscroll").forEach((x, i) => { if (keep[i]) [x.scrollLeft, x.scrollTop] = keep[i]; });
   // pend = 다시 그리기 전에 적던 글자 → 칸 떠날 때 저장 (프로그램으로 넣은 값엔 change 가 안 와서)
   const el = cur && box.querySelector(`[data-id="${cur.id}"][data-k="${cur.k}"]`);
@@ -161,7 +161,7 @@ function saleHtml() {
     <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${SALE_H.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.miss ? "덜 쓴 줄이 없어요 👍" : FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
 }
 function costHtml() {
-  const rows = sorted("cost"), s = summary(rows, 0), fee = summary(visible(), FN.cfg?.fee_pct ?? 5).fee;
+  const rows = sorted("cost").filter((r) => !isDeposit(r)), s = summary(rows, 0), fee = summary(visible(), FN.cfg?.fee_pct ?? 5).fee;
   const secs = [...SECTIONS, ...new Set(rows.map((r) => (r.vals.구분 || "").trim() || "기타").filter((x) => !SECTIONS.includes(x)))];
   const cols = COST_H.filter((k) => k !== "구분");
   const body = secs.map((sec) => {
@@ -174,6 +174,14 @@ function costHtml() {
   }).join("");
   return `<section class="fnpanel"><div class="fngbar"><h3>비용 <small class="mut">${rows.length}건 · ${won(s.cost + fee)} (수수료 포함)</small></h3>${missBtn(visible().filter((r) => r.kind === "cost" && missing(r).length).length)}<small class="mut">행정조교는 근무시간을 적으면 금액 = 시급 ${(FN.cfg?.rate ?? 10320).toLocaleString("ko-KR")}원 × 시간</small></div>
     <div class="fnscroll"><table class="fntbl fncost"><thead><tr>${cols.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>${body}</table></div></section>`;
+}
+// 🧑‍🏫 리더 디파짓: 받으면 +, 돌려주면 − — 위 합계(매출·비용·수익)에 안 들어감
+function depositHtml() {
+  const rows = sorted("cost").filter(isDeposit), cols = ["날짜", "사용처", "금액", "비고"];
+  if (!rows.length && (!canEdit() || FN.miss)) return "";
+  return `<section class="fnpanel"><div class="fngbar"><h3>🧑‍🏫 리더 디파짓 <small class="mut">${rows.length}건 · 이번 달 ${won(rows.reduce((n, r) => n + amt(r), 0))} · 합계에 안 들어가요</small></h3>${canEdit() ? `<button class="btn" data-act="add" data-kind="cost" data-sec="${esc(DEPOSIT)}">+ 디파짓 줄</button>` : ""}<small class="mut">받으면 + 금액, 돌려주면 − 금액으로 적어요</small></div>
+    <div class="fnscroll"><table class="fntbl fncost"><thead><tr>${cols.map((k) => `<th>${k === "사용처" ? "리더 이름" : k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>
+    <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${cols.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${cols.length + 2}" class="mut fnnone">${FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
 }
 function dailyHtml() {
   const d = daily(visible());
@@ -207,7 +215,7 @@ async function saveCell(inp) {
 }
 async function addRow(kind, sec) {
   const d = FN.month === ymNow() ? today() : "";
-  const vals = kind === "sale" ? { 날짜: d } : { 구분: sec, 날짜: ["본사지출", "지점기타지출"].includes(sec) ? d : "" };
+  const vals = kind === "sale" ? { 날짜: d } : { 구분: sec, 날짜: ["본사지출", "지점기타지출", DEPOSIT].includes(sec) ? d : "" };
   const sort = Math.max(FN.lastSort?.[kind] ?? 0, ...FN.rows.filter((r) => r.kind === kind).map((r) => r.sort)) + 1; // [+ 줄] 빨리 두 번 눌러도 같은 번호 안 나오게 (저장 기다리기 전에 잡아 둠)
   (FN.lastSort ??= {})[kind] = sort;
   const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select("id, kind, vals, sort, files, updated_by, updated_at").single();

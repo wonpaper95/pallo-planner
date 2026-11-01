@@ -12,6 +12,9 @@ const OPTS = {
 // 칩 색 (시트와 같게): 환불·시작전환불 = 주황, 가입 = 초록, 나머지 = 회색
 const chip = (k, v) => k !== "거래형태" ? "" : v === "환불" || v === "시작전환불" ? "or" : v === "가입" ? "gr" : "";
 const SECTIONS = ["고정비", "변동비", "광고비", "행정조교", "전일조교", "상담조교", "본사지출", "지점기타지출"];
+// 🧑‍🏫 리더 디파짓: 돌려줄 돈이라 매출·비용·수익에 안 넣음. 줄은 비용표(구분 = 이 값)에 저장 → 시트 비용 탭으로도 복사됨
+const DEPOSIT = "리더 디파짓";
+const isDeposit = (r) => r.kind === "cost" && String(r.vals.구분 ?? "").trim() === DEPOSIT;
 const toNum = (v) => {
   if (typeof v === "number") return v;
   const s = String(v ?? "").replace(/[₩,\s원]/g, "");
@@ -39,7 +42,7 @@ function problems(r) {
   const v = r.vals, need = r.kind === "sale" ? ["날짜", "멤버쉽", "매출", "이름", "거래형태", "결제수단", "상담자"] : ["사용처", "금액"];
   if (r.kind === "sale" && String(v.결제수단 ?? "").trim() === "카드") need.push("카드사", "할부개월");
   if (r.kind === "sale" && String(v.거래형태 ?? "").trim() === "가입") need.push("전화번호", "가입경로");
-  if (r.kind === "cost" && ["본사지출", "지점기타지출"].includes(String(v.구분 ?? "").trim())) need.push("날짜");
+  if (r.kind === "cost" && ["본사지출", "지점기타지출", DEPOSIT].includes(String(v.구분 ?? "").trim())) need.push("날짜");
   const out = need.filter((k) => empty(v[k])).map((k) => [k, "비었어요"]), ak = r.kind === "sale" ? "매출" : "금액";
   if (!empty(v[ak]) && toNum(v[ak]) === null) out.push([ak, "숫자만 적어요 (글자가 섞이면 합계에서 빠져요)"]); // 예: '228000(1/5)'
   else if (isRefund(r) && toNum(v[ak]) > 0) out.push([ak, "환불은 − 금액으로 (합계는 −로 셌어요)"]);
@@ -52,6 +55,7 @@ const amt = (r) => { const a = toNum(r.vals[r.kind === "sale" ? "매출" : "금�
 function summary(rows, feePct) {
   const s = { plus: 0, minus: 0, net: 0, cost: 0, fee: 0, profit: 0, bySec: {} };
   for (const r of rows) {
+    if (isDeposit(r)) continue;
     const a = amt(r);
     if (r.kind === "sale") { if (a >= 0) s.plus += a; else s.minus += a; }
     else { const k = (r.vals.구분 || "").trim() || "기타"; s.bySec[k] = (s.bySec[k] ?? 0) + a; s.cost += a; }
@@ -65,6 +69,7 @@ function summary(rows, feePct) {
 function daily(rows) {
   const m = new Map();
   for (const r of rows) {
+    if (isDeposit(r)) continue;
     const d = /^\d{4}-\d{2}-\d{2}$/.test(r.vals.날짜 || "") ? r.vals.날짜 : "";
     const x = m.get(d) ?? { day: d, sale: 0, cost: 0 }; m.set(d, x);
     if (r.kind === "sale") x.sale += amt(r); else x.cost += amt(r);
@@ -72,5 +77,5 @@ function daily(rows) {
   let acc = 0;
   return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => ({ ...x, profit: x.sale - x.cost, acc: (acc += x.sale - x.cost) }));
 }
-window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, toNum, normDate, summary, daily, amt };
+window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, toNum, normDate, summary, daily, amt };
 })();
