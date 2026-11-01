@@ -24,6 +24,8 @@ FN.load = async function () {
   if (!FN.month) FN.month = ymNow();
   if (!FN.team) { FN.shell = ""; V().innerHTML = `<div class="fnbar"><h2>💼 재무</h2></div><div class="fnpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = FN.team, m = FN.month;
+  await save.catch(() => {}); // 저장 중인 칸이 끝난 뒤에 읽기
+  const e0 = edits;
   const [r, c, a] = await Promise.all([
     sb.from("fin_rows").select("id, kind, vals, sort, files, updated_by, updated_at").eq("team_id", t).eq("month", m).is("deleted_at", null).order("sort").order("updated_at"),
     sb.from("fin_config").select("*").eq("team_id", t).maybeSingle(),
@@ -34,6 +36,7 @@ FN.load = async function () {
     const f = await sb.from("fin_files").select("*").eq("team_id", t).in("row_id", r.data.filter((x) => x.files).map((x) => x.id)).order("created_at");
     if (!f.error) for (const x of f.data) files.set(x.row_id, [...(files.get(x.row_id) ?? []), x]);
   }
+  if (edits !== e0) return FN.load(); // 읽는 사이 칸을 고쳤으면 이 결과는 옛날 것 — 그대로 그리면 방금 쓰고 Tab 으로 떠난 칸이 빈칸으로 보임 (신고 마야)
   Object.assign(FN, { rows: r.data, cfg: c.data, access: a.data, files });
   render();
   listen();
@@ -179,7 +182,7 @@ function dailyHtml() {
     <tbody>${d.map((x) => `<tr><td>${x.day || "날짜 없음"}</td><td class="num">${x.sale.toLocaleString("ko-KR")}</td><td class="num">${x.cost.toLocaleString("ko-KR")}</td><td class="num ${x.profit < 0 ? "neg" : ""}">${x.profit.toLocaleString("ko-KR")}</td><td class="num ${x.acc < 0 ? "neg" : ""}">${x.acc.toLocaleString("ko-KR")}</td></tr>`).join("")}</tbody></table></div></details></section>`;
 }
 
-let save = Promise.resolve();
+let save = Promise.resolve(), edits = 0;
 // ✏️ 칸 저장: 날짜는 YYYY-MM-DD 로, 숫자 칸은 숫자로. 행정조교 근무시간 → 금액 = 시급 × 시간 (금액이 비었거나 전에 자동으로 넣은 값일 때)
 async function saveCell(inp) {
   const r = FN.rows.find((x) => x.id === inp.dataset.id); if (!r) return;
@@ -191,7 +194,7 @@ async function saveCell(inp) {
     const was = toNum(r.vals.금액), auto = toNum(r.vals.근무시간) !== null ? Math.round(rate * toNum(r.vals.근무시간)) : null;
     if (was === null || was === 0 || was === auto) patch.금액 = Math.round(rate * v);
   }
-  r.vals = { ...r.vals, ...patch };
+  edits++; r.vals = { ...r.vals, ...patch };
   inp.value = showOf(k, v); inp.title = String(v);
   // 저장은 차례로, 바뀐 칸만 (fin_patch, 0077) — 줄 전체를 보내면 그사이 시트에서 고친 다른 칸이 되돌아감. 돌아온 vals(서버 최신)로 맞춤
   Object.assign((r._p ??= {}), patch); // 아직 저장 중인 칸 (돌아온 서버 값이 이걸 되돌리지 않게)
@@ -209,7 +212,7 @@ async function addRow(kind, sec) {
   (FN.lastSort ??= {})[kind] = sort;
   const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select("id, kind, vals, sort, files, updated_by, updated_at").single();
   if (fail(error)) return;
-  FN.rows.push(data); FN.q = ""; const q = V().querySelector("#fnQ"); if (q) q.value = ""; render(); // 검색칸 글자도 지움 (검색만 풀리고 글자는 남던 것)
+  edits++; FN.rows.push(data); FN.q = ""; const q = V().querySelector("#fnQ"); if (q) q.value = ""; render(); // 검색칸 글자도 지움 (검색만 풀리고 글자는 남던 것)
   V().querySelector(`input[data-id="${data.id}"][data-k="${kind === "sale" ? "멤버쉽" : "사용처"}"]`)?.focus();
   queueSync();
 }
@@ -219,7 +222,7 @@ async function delRow(id) {
   if (!confirm(`이 줄을 지울까요? 구글 시트에서도 지워져요.\n${what || "(빈 줄)"}`)) return;
   const { error } = await sb.from("fin_rows").update({ deleted_at: new Date().toISOString() }).eq("id", id);
   if (fail(error)) return;
-  FN.rows = FN.rows.filter((x) => x.id !== id); render(); queueSync();
+  edits++; FN.rows = FN.rows.filter((x) => x.id !== id); render(); queueSync();
 }
 
 // 📎 첨부: 대표 = 목록·열기·올리기·지우기 / 매니저 = 올리기만 (올린 뒤에도 못 엶)
