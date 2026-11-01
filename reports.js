@@ -6,7 +6,7 @@
 const RP = (window.RP = { kind: "daily", day: null, row: null, open: new Set(), names: new Map(), ok: false, todo: {} });
 const DAILY_DAYS = [3, 0], WEEKLY_DAY = 0; // 수·일 / 일 (getDay: 0 = 일)
 const V = () => document.getElementById("rpView");
-const CONSULT = ["Premium", "Pro Max", "Pro", "Plus", "미등록"];
+const CONSULT = ["Premium", "Pro Max", "Pro", "Plus", "3M", "2M", "미등록"];
 const MOODS = ["😄 매우 좋음", "🙂 괜찮음", "😐 보통", "😵 지침", "😢 많이 힘듦"];
 const REVIEW_FORM = "https://forms.gle/TQwJQH9xZTpj97XY6";
 const FORMS = {
@@ -128,7 +128,7 @@ RP.renderMine = function () {
   const area = (k, label, hint) => `<label class="rpq"><b>${label}</b><small>${esc(hint)}</small>
     <textarea data-f="${k}" rows="3" maxlength="3000" ${ro ? "readonly" : ""} placeholder="${ro ? "" : "여기에 적어 주세요"}">${esc(b[k] ?? "")}</textarea></label>`;
   const last = RP.kind === "daily"
-    ? `<div class="rpq"><b>5. 오늘 상담 결과</b><small>상품별 등록 인원과 미등록 인원 숫자만 넣어 주세요. 상담 복기 글은 상담복기 폼에 매번 적어 주세요.</small>
+    ? `<div class="rpq"><b>5. 오늘 상담 결과</b><small>상품별 등록 인원과 미등록 인원 숫자만 넣어 주세요 (3M = 3개월, 2M = 2개월). 상담 복기 글은 상담복기 폼에 매번 적어 주세요.</small>
         <div class="rpcons">${CONSULT.map((k) => `<label>${k}<input type="number" min="0" max="99" inputmode="numeric" data-c="${k}" value="${b.consult?.[k] ?? ""}" ${ro ? "readonly" : ""}></label>`).join("")}</div>
         <div class="rpline">📋 <span id="rpLine">${esc(consultLine(b.consult) || "아직 없음")}</span></div>
         <a class="btn ghost rpform" href="${REVIEW_FORM}" target="_blank" rel="noopener">✍️ 상담복기 폼 열기</a></div>`
