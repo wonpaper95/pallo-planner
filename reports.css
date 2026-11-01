@@ -46,3 +46,25 @@ body:not(.rpv) #rpView { display: none; }
 #rpView .rpnow { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 #rpView .rpchip { padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 #rpView .rpchip.ok { border-color: rgba(52, 199, 89, .5); }
+/* 💬 답변 · 📚 히스토리 */
+#rpView .rpreply { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+#rpView .rpans { padding: 10px 12px; margin-bottom: 8px; background: color-mix(in srgb, var(--accent) 9%, transparent); border-left: 3px solid var(--accent); border-radius: 8px; }
+#rpView .rpanshead { display: flex; align-items: center; gap: 8px; }
+#rpView .rpanshead b { margin: 0; font-size: 13px; color: inherit; }
+#rpView .rpanshead .mut { font-size: 12px; }
+#rpView .rpansdel { margin-left: auto; padding: 2px 6px; background: none; border: 0; cursor: pointer; font-size: 13px; opacity: .6; }
+#rpView .rpansdel:hover { opacity: 1; }
+#rpView .rpans p { margin: 4px 0 0; white-space: pre-wrap; line-height: 1.6; overflow-wrap: anywhere; }
+#rpView .rpbox { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#rpView .rpbox .btn { margin-top: 0; }
+#rpView .rpfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+#rpView .rpfilter select { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font: inherit; color: inherit; max-width: 100%; }
+#rpView .rpwait { display: flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+#rpView .rphist { padding: 4px 14px; }
+#rpView .rphday { font-weight: 600; white-space: nowrap; }
+#rpView .rpst.kind { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+#rpView .rph .rphteam { flex: 0 0 auto; }
+#rpView .rph .rpsub { flex: 1 1 0; }
+#rpView .rphwhen { margin: 0; font-size: 12px; }
+#rpView .rpmore { display: block; margin: 0 auto; }
+@media (max-width: 560px) { #rpView .rph .rpsub { flex-basis: 100%; order: 5; } #rpView .rphist .rpar { margin-left: auto; } #rpView .rpkind button { padding: 7px 11px; } }
