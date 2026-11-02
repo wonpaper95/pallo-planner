@@ -96,8 +96,18 @@ function render() {
   // pend = 다시 그리기 전에 적던 글자 → 칸 떠날 때 저장 (프로그램으로 넣은 값엔 change 가 안 와서)
   const el = cur && box.querySelector(`[data-id="${cur.id}"][data-k="${cur.k}"]`);
   if (el) { if (el.value !== cur.v) { el.value = cur.v; el.dataset.pend = 1; } el.focus({ preventScroll: true }); try { if (cur.s != null) el.setSelectionRange(cur.s, cur.e); } catch {} }
-  renderStatus();
+  renderStatus(); pinHeads();
 }
+// 매출·비용 표(.fnfull)는 페이지째 스크롤 → 머리줄을 상단 바 밑에 붙임. 가로 스크롤 칸 안이라 sticky 가 안 먹어서 직접 옮김
+function pinHeads() {
+  const top = Math.max(0, document.querySelector("header").getBoundingClientRect().bottom);
+  V()?.querySelectorAll(".fnfull").forEach((w) => {
+    const th = w.querySelector("thead"), r = w.getBoundingClientRect();
+    th.style.transform = `translateY(${Math.max(0, Math.min(top - r.top, r.height - th.offsetHeight))}px)`;
+  });
+}
+addEventListener("scroll", pinHeads, { passive: true });
+addEventListener("resize", pinHeads);
 function renderStatus() {
   const st = V().querySelector("#fnSync"); if (!st) return;
   const c = FN.cfg;
@@ -157,7 +167,7 @@ function cellIn(r, k, need) {
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
   return `<section class="fnpanel"><div class="fngbar"><h3>매출 <small class="mut">${rows.length}건 · ${won(s.net)}</small></h3>${missBtn(visible().filter((r) => r.kind === "sale" && missing(r).length).length)}${canEdit() ? `<button class="btn" data-act="add" data-kind="sale">+ 매출 줄</button>` : ""}</div>
-    <div class="fnscroll"><table class="fntbl"><thead><tr>${SALE_H.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>
+    <div class="fnscroll fnfull"><table class="fntbl"><thead><tr>${SALE_H.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>
     <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${SALE_H.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.miss ? "덜 쓴 줄이 없어요 👍" : FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
 }
 function costHtml() {
@@ -173,7 +183,7 @@ function costHtml() {
       ${sec === "고정비" ? `<tr class="fnauto"><td></td><td>결제수수료 (순매출 × ${FN.cfg?.fee_pct ?? 5}%) <small class="mut">자동</small></td><td class="num">${fee.toLocaleString("ko-KR")}</td><td colspan="${cols.length - 1}"></td></tr>` : ""}</tbody>`;
   }).join("");
   return `<section class="fnpanel"><div class="fngbar"><h3>비용 <small class="mut">${rows.length}건 · ${won(s.cost + fee)} (수수료 포함)</small></h3>${missBtn(visible().filter((r) => r.kind === "cost" && missing(r).length).length)}<small class="mut">행정조교는 근무시간을 적으면 금액 = 시급 ${(FN.cfg?.rate ?? 10320).toLocaleString("ko-KR")}원 × 시간</small></div>
-    <div class="fnscroll"><table class="fntbl fncost"><thead><tr>${cols.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>${body}</table></div></section>`;
+    <div class="fnscroll fnfull"><table class="fntbl fncost"><thead><tr>${cols.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>${body}</table></div></section>`;
 }
 // 🧑‍🏫 리더 디파짓: 받으면 +, 돌려주면 − — 위 합계(매출·비용·수익)에 안 들어감
 function depositHtml() {

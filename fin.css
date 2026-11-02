@@ -28,6 +28,8 @@ body:not(.fnv) #fnView { display: none; }
 
 /* 표: 가로 스크롤, 칸 = 입력칸 */
 #fnView .fnscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; max-height: 70vh; overflow-y: auto; }
+#fnView .fnfull { max-height: none; } /* 매출·비용 표: 안쪽 세로 스크롤 없이 전체 (머리줄은 fin.js pinHeads) */
+#fnView .fnfull thead { position: relative; z-index: 3; } /* 비용 구분 줄 위로 */
 #fnView .fntbl { border-collapse: separate; border-spacing: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; width: max-content; min-width: 100%; }
 #fnView .fntbl th, #fnView .fntbl td { border-bottom: 1px solid var(--line); padding: 2px 3px; white-space: nowrap; text-align: left; }
 #fnView .fntbl thead th { position: sticky; top: 0; z-index: 1; background: var(--bg); color: var(--sub); font-weight: 600; padding: 6px 5px; }
