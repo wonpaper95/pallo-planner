@@ -292,6 +292,7 @@ body:not(.sv) #salesView { display: none; }
 #salesView textarea.grow { width: 100%; field-sizing: content; min-height: 3.5em; resize: vertical; }
 .mgbar { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 14px; padding: 14px 18px; border-radius: 14px; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; box-shadow: 0 6px 18px rgba(0,0,0,.08); } /* 📮 월말 보고 막대 */
 .mgbar b { font-size: 17px; color: var(--accent); } .mgbar span { font-size: 13.5px; color: var(--sub); } .mgbar i { margin-left: auto; font-style: normal; font-weight: 700; color: var(--accent); } .mgbar:hover { background: var(--hover); }
+#slAll { margin: 0 0 14px; } #salesView #slAll summary { margin-top: 0; } #slAll summary small { color: var(--sub); } #slAll .slt { min-width: 780px; } #slAll .slt th, #slAll .slt td { white-space: nowrap; padding: 7px 8px; } #slAll tr[data-slm] { cursor: pointer; } #slAll tr[data-slm]:hover td { background: var(--hover); } #slAll tr.cur td { font-weight: 700; color: var(--accent); } #slAll .warn { display: block; font-size: 12px; font-weight: 400; color: var(--red); }
 .mgnext { display: block; margin: -6px 0 14px auto; padding: 4px 10px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 #mgDlg { max-width: 760px; } #mgDlg input, #mgDlg textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); } #mgDlg textarea { width: 100%; field-sizing: content; resize: vertical; } #mgDlg .slhint { font-size: 12.5px; color: var(--sub); }
 #mgDlg .u { position: relative; display: block; } #mgDlg .u input { width: 100%; padding-right: 34px; } #mgDlg .u i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--sub); font-style: normal; } #mgDlg h3 { color: var(--accent); font-size: 16px; }
@@ -2275,6 +2276,7 @@ document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 
 </script>
 <script src="sales.js?v=202611021750"></script>
 <script src="month-goal.js?v=202611021750"></script>
+<script src="sales-all.js?v=202611021750"></script>
 <script src="photo.js?v=202611021750"></script>
 <script src="blog.js?v=202611021750"></script>
 <script src="mk-core.js?v=202611021750"></script>
