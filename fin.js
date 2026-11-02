@@ -1,9 +1,9 @@
-// 💼 [재무] 탭 — 지점 재무제표(구글 시트 월 탭)를 플래너로 (DB 0070_fin). 시트 '{YYYYMM} 매출(플래너)'·'{YYYYMM} 비용(플래너)' 탭으로 한 방향 — 플래너가 기준 (planner-fin, 10-29)
+// 💼 [재무] 탭 — 지점 재무제표(구글 시트 월 탭)를 플래너로 (DB 0070_fin). 시트 '{YYYYMM} 매출(플래너)'·'{YYYYMM} 비용(플래너)' 탭과 양방향, 플래너가 기준 (planner-fin, 11-02)
 // 대표 = 전부 + 📎첨부 열람 / 매니저 = 첨부 열람만 빼고 전부(📎 올리기는 됨) / 조교 = [보기 요청] → 대표 승인 동안 보기만
-// 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트는 공유 사본 — 시트에서 고친 건 5분마다 플래너 값으로 되돌림. 다른 기기 실시간
+// 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트에 적은 건 5분마다 들어옴: 새 줄·빈 칸은 플래너로, 플래너 값과 다른 칸은 양쪽에 표시하고 🔀 칸에서 정리. 다른 기기 실시간
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail·today·view 를 씀 → window.FN
 (() => {
-const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, shell: "" });
+const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, diffOnly: false, shell: "" });
 const V = () => document.getElementById("fnView");
 const { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, toNum, normDate, summary, daily, amt } = FNC;
 const admin = () => myRole === "admin";
@@ -15,6 +15,7 @@ const ymNow = () => today().slice(0, 7);
 const ymAdd = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const ymLabel = (m) => `${+m.slice(0, 4)}년 ${+m.slice(5, 7)}월`;
 const NUMK = new Set(["매출", "금액", "근무시간"]);
+const COLS = "id, kind, vals, sort, files, updated_by, updated_at, sheet_diff, sheet_flag";
 const W_ = { 날짜: 52, 멤버쉽: 84, 매출: 88, 이름: 52, 언어: 36, 거래형태: 84, 결제수단: 70, 카드사: 52, 할부개월: 40, 결제상세: 86, 코멘트: 92, 가입경로: 52, Lv: 28, 전화번호: 96, 상담자: 46, 전산입력: 46, 성별: 28, 나이: 28, 사용처: 200, 금액: 100, 비고: 160, 근무시간: 60 }; // 맥북(1440~) 폭에 매출 18칸이 한 화면에
 const safeKey = (name) => { const m = /\.([A-Za-z0-9]{1,8})$/.exec(name || ""); const ext = m ? "." + m[1].toLowerCase() : ""; const base = (name || "file").slice(0, 40).replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9._-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, ""); return `${Date.now()}_${base || "file"}${ext}`; }; // Storage 키는 ASCII 만
 
@@ -27,7 +28,7 @@ FN.load = async function () {
   await save.catch(() => {}); // 저장 중인 칸이 끝난 뒤에 읽기
   const e0 = edits;
   const [r, c, a] = await Promise.all([
-    sb.from("fin_rows").select("id, kind, vals, sort, files, updated_by, updated_at").eq("team_id", t).eq("month", m).is("deleted_at", null).order("sort").order("updated_at"),
+    sb.from("fin_rows").select(COLS).eq("team_id", t).eq("month", m).is("deleted_at", null).order("sort").order("updated_at"),
     sb.from("fin_config").select("*").eq("team_id", t).maybeSingle(),
     sb.from("fin_access").select("*").eq("team_id", t).maybeSingle()]);
   if ([r, c, a].some((x) => fail(x.error)) || t !== FN.team || m !== FN.month) return;
@@ -49,7 +50,7 @@ function listen() {
   if (chan && chanTeam === FN.team) return;
   if (chan) sb.removeChannel(chan);
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => { if (view !== "fn") return; if (V().contains(document.activeElement) && document.activeElement.matches("input")) dirty = true; else FN.load(); }, 400); };
-  const same = (p) => { const n = p.new, r = n?.id && FN.rows.find((x) => x.id === n.id); return p.eventType === "UPDATE" && r && !n.deleted_at && n.month === FN.month && sameVals(n.vals, r.vals); };
+  const same = (p) => { const n = p.new, r = n?.id && FN.rows.find((x) => x.id === n.id); return p.eventType === "UPDATE" && r && !n.deleted_at && n.month === FN.month && sameVals(n.vals, r.vals) && n.sheet_flag === r.sheet_flag && JSON.stringify(n.sheet_diff) === JSON.stringify(r.sheet_diff); };
   const sameVals = (a = {}, b = {}) => { const ka = Object.keys(a).filter((k) => a[k] !== ""), kb = Object.keys(b).filter((k) => b[k] !== ""); return ka.length === kb.length && ka.every((k) => String(a[k]) === String(b[k] ?? "")); }; // DB(jsonb)는 칸 순서가 달라서 칸별로 비교
   chanTeam = FN.team; chan = sb.channel(`fn:${FN.team}`);
   for (const tb of ["fin_rows", "fin_config", "fin_access"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb, filter: `team_id=eq.${FN.team}` }, (p) => { if (tb === "fin_rows" && same(p)) return; soon(); });
@@ -70,15 +71,17 @@ async function syncNow(loud, team = FN.team, month = FN.month) {
   const { data, error } = await sb.functions.invoke("planner-fin", { body: { action: "sync", team, month } });
   const err = error?.message ?? data?.error;
   if (err) { if (st) st.textContent = "⚠️ 시트 연동 실패"; return loud && toast("시트 연동 실패: " + err); }
-  if (loud) { const n = (k) => (data?.sale?.[k] ?? 0) + (data?.cost?.[k] ?? 0); toast(`🔄 플래너 → 시트 ${n("toSheet")}줄${n("removed") ? ` · 시트에만 있던 ${n("removed")}줄 지움` : ""}`); }
+  if (loud) { const n = (k) => (data?.sale?.[k] ?? 0) + (data?.cost?.[k] ?? 0); toast(`🔄 플래너 → 시트 ${n("toSheet")}줄 · 시트 → 플래너 ${n("fromSheet")}줄${n("removed") ? ` · 시트에서 ${n("removed")}줄 지움` : ""}`); }
   FN.load();
 }
 
+const diffKeys = (r) => Object.keys(r.sheet_diff ?? {});
+const hasDiff = (r) => !!r.sheet_flag || diffKeys(r).length > 0;
 const visible = () => {
   const q = FN.q.trim().toLowerCase();
   return q ? FN.rows.filter((r) => Object.values(r.vals).some((v) => String(v).toLowerCase().includes(q))) : FN.rows;
 };
-const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length)).sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); // 같은 순서 번호끼리는 id 로 — 고친 시각(updated_at)으로 하면 칸을 고칠 때마다 줄이 서로 자리를 바꿈 (신고 세연)
+const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length) && (!FN.diffOnly || hasDiff(r))).sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); // 같은 순서 번호끼리는 id 로 — 고친 시각(updated_at)으로 하면 칸을 고칠 때마다 줄이 서로 자리를 바꿈 (신고 세연)
 
 function render() {
   const sk = `${FN.team}|${FN.month}|${myRole}`;
@@ -91,7 +94,7 @@ function render() {
   const a = document.activeElement, cur = box.contains(a) && a.matches?.("[data-id][data-k]") ? { id: a.dataset.id, k: a.dataset.k, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
   if (cur && composing) { pendingRender = true; return; } // 한글 조합 중엔 조합 끝나고 그림
   const keep = [...V().querySelectorAll(".fnscroll")].map((x) => [x.scrollLeft, x.scrollTop]);
-  box.innerHTML = summaryHtml() + (admin() ? accessHtml() : "") + saleHtml() + costHtml() + depositHtml() + dailyHtml();
+  box.innerHTML = summaryHtml() + (canEdit() ? diffHtml() : "") + (admin() ? accessHtml() : "") + saleHtml() + costHtml() + depositHtml() + dailyHtml();
   V().querySelectorAll(".fnscroll").forEach((x, i) => { if (keep[i]) [x.scrollLeft, x.scrollTop] = keep[i]; });
   // pend = 다시 그리기 전에 적던 글자 → 칸 떠날 때 저장 (프로그램으로 넣은 값엔 change 가 안 와서)
   const el = cur && box.querySelector(`[data-id="${cur.id}"][data-k="${cur.k}"]`);
@@ -116,11 +119,11 @@ function renderStatus() {
     : `🔗 <a href="https://docs.google.com/spreadsheets/d/${esc(c.sheet_id)}/edit" target="_blank" rel="noopener">구글 시트</a> ${c.last_sync ? new Date(c.last_sync).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + " 맞춤" : ""}`;
 }
 function shell() {
-  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : "대표·매니저 · 여기가 기준 → 구글 시트로 자동 복사"}</small></h2>
+  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : "대표·매니저 · 여기가 기준 · 구글 시트와 양방향"}</small></h2>
     <div class="fnrow">${admin() ? `<select id="fnTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === FN.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <button class="btn ghost" data-act="prev">‹</button><b class="fnym">${ymLabel(FN.month)}</b><button class="btn ghost" data-act="next">›</button>
       ${FN.month !== ymNow() ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
-  <div class="fnrow fntools"><span id="fnSync" class="mut"></span>${jo() ? "" : `<button class="btn ghost" data-act="sync" title="플래너 내용을 지금 시트에 써요 (시트에서 고친 건 플래너 값으로 돌아가요)">🔄 지금 맞추기</button>`}${admin() ? `<button class="btn ghost" data-act="cfg">⚙️ 시트 설정</button>` : ""}
+  <div class="fnrow fntools"><span id="fnSync" class="mut"></span>${jo() ? "" : `<button class="btn ghost" data-act="sync" title="지금 시트와 맞춰요 (평소엔 5분마다 자동). 플래너에서 고친 건 시트로, 시트의 새 줄·빈 칸은 플래너로, 플래너 값과 다른 칸은 🔀 표시">🔄 지금 맞추기</button>`}${admin() ? `<button class="btn ghost" data-act="cfg">⚙️ 시트 설정</button>` : ""}
     <input id="fnQ" type="search" placeholder="🔍 이름·전화번호·사용처 찾기" value="${esc(FN.q)}"></div>
   <div id="fnBody"></div>`;
 }
@@ -134,6 +137,23 @@ function summaryHtml() {
   const card = (k, v, cls = "") => `<div class="fncard ${cls}"><small>${k}</small><b>${won(v)}</b></div>`;
   return `<section class="fncards">${card("매출 (+)", s.plus)}${card("환불 (−)", s.minus, "neg")}${card("순매출", s.net)}${card("비용 합계", s.cost)}${card(`결제수수료 ${FN.cfg?.fee_pct ?? 5}%`, s.fee)}${card("수익", s.profit, s.profit < 0 ? "neg" : "pos")}</section>`;
 }
+// 🔀 시트와 다른 곳: 칸마다 두 값을 보여 주고 정리. 정리 전 합계는 플래너 값
+const whoOf = (r) => r.kind === "sale" ? `매출 · ${[shortDay(String(r.vals.날짜 ?? "")), r.vals.이름].filter(Boolean).join(" ") || "(이름 없음)"}` : `비용 · ${[r.vals.구분, r.vals.사용처].filter(Boolean).join(" ") || "(사용처 없음)"}`;
+const twoVals = (k, x) => `시트 <mark>${esc(x.sheet === "" ? "(빈 칸)" : showOf(k, x.sheet))}</mark> · 플래너 <mark>${esc(x.planner === "" ? "(빈 칸)" : showOf(k, x.planner))}</mark>`;
+function diffHtml() {
+  const rows = FN.rows.filter(hasDiff), cells = rows.reduce((n, r) => n + diffKeys(r).length, 0), fresh = rows.filter((r) => r.sheet_flag === "new").length;
+  if (!rows.length) { FN.diffOnly = false; return ""; }
+  const li = (r, what, btns) => `<li><span class="fnwho">${esc(whoOf(r))}</span> <span>${what}</span> <span class="fnresb">${btns}</span></li>`;
+  const res = (r, k, use, lab, cls = "ghost") => `<button class="btn ${cls}" data-act="res" data-id="${r.id}" ${k ? `data-k="${esc(k)}"` : ""} ${use ? `data-use="${use}"` : ""}>${lab}</button>`;
+  const items = rows.map((r) => [
+    r.sheet_flag === "new" ? li(r, "시트에서 새로 적은 줄", res(r, null, null, "확인")) : "",
+    r.sheet_flag === "gone" ? li(r, "시트에서 지운 줄 (시트에 다시 붙였어요)", `<button class="btn ghost" data-act="del" data-id="${r.id}">플래너에서도 지우기</button>${res(r, null, null, "유지")}`) : "",
+    ...diffKeys(r).map((k) => li(r, `<b>${esc(k)}</b> ${twoVals(k, r.sheet_diff[k])}`, res(r, k, "sheet", "시트 값으로") + res(r, k, "planner", "플래너 값 유지"))),
+  ].join("")).join("");
+  return `<section class="fnpanel fndiffp"><div class="fngbar"><h3>🔀 시트와 다른 곳 <small class="mut">${cells ? `다른 칸 ${cells}개` : ""} · 합계는 플래너 값 기준</small></h3>
+      <button class="btn ghost fnmissbtn ${FN.diffOnly ? "on" : ""}" data-act="diffonly">${FN.diffOnly ? "✕ 모두 보기" : "이 줄만 표에서 보기"}</button>${fresh > 1 ? `<button class="btn ghost" data-act="resnew">새 줄 ${fresh}개 전부 확인</button>` : ""}</div>
+    <ul class="fndifflist">${items}</ul></section>`;
+}
 function accessHtml() {
   const s = FN.access?.status ?? "closed", name = teams.find((t) => t.id === FN.team)?.name ?? "";
   const lab = { closed: "🔒 꺼짐", requested: "🙋 보기 요청 왔어요", open: "🔓 보는 중" }[s];
@@ -144,7 +164,7 @@ function accessHtml() {
 // 줄 표시: ⚠️ 덜 쓴 줄(주황 띠) + 💚 스탭페이 줄(연두 — 울산 시트에서 손으로 칠하던 색)
 const trOf = (r) => {
   const p = problems(r), m = p.map((x) => x[0]), step = r.kind === "sale" && String(r.vals.결제수단 ?? "").trim() === "스탭페이";
-  const cls = [m.length && "fnmiss", step && "fnstep"].filter(Boolean).join(" ");
+  const cls = [m.length && "fnmiss", step && "fnstep", r.sheet_flag && `fn${r.sheet_flag}`].filter(Boolean).join(" ");
   return [m, `<tr data-row="${r.id}" class="${cls}"${m.length ? ` title="⚠️ 확인할 칸: ${esc(p.map(([k, w]) => `${k}(${w})`).join(", "))}"` : ""}>`];
 };
 const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄 + 금액이 숫자가 아니거나 환불인데 + 금액인 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴·확인할 줄 <b>${n}</b>`}</button>`;
@@ -153,16 +173,17 @@ const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id
 const shortDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v.slice(0, 4) === FN.month.slice(0, 4) ? v.slice(5).replace("-", "/") : v;
 const showOf = (k, v) => NUMK.has(k) ? fmtNum(v) : k === "날짜" ? shortDay(String(v)) : String(v);
 function cellIn(r, k, need) {
-  const nd = need ? " fnneed" : "";
+  const dx = r.sheet_diff?.[k], nd = (need ? " fnneed" : "") + (dx ? " fndiff" : "");
+  const dt = dx ? `🔀 시트: ${dx.sheet === "" ? "(빈 칸)" : showOf(k, dx.sheet)} / 플래너: ${dx.planner === "" ? "(빈 칸)" : showOf(k, dx.planner)}` : "";
   const v = r.vals[k] ?? "", show = showOf(k, v), neg = NUMK.has(k) && (toNum(v) ?? 0) < 0;
   if (OPTS[k]) { // ▾ 시트처럼 고르는 칸
     const c = chip(k, show);
-    if (!canEdit()) return `<td class="${nd}">${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
+    if (!canEdit()) return `<td class="${nd}" title="${esc(dt)}">${show ? `<span class="fnchip ${c}">${esc(show)}</span>` : ""}</td>`;
     const list = show && !OPTS[k].includes(show) ? [...OPTS[k], show] : OPTS[k];
-    return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
+    return `<td class="${nd}" title="${esc(dt)}" style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
   }
-  if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}${nd}">${esc(show)}</td>`;
-  return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
+  if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}${nd}" title="${esc(dt)}">${esc(show)}</td>`;
+  return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(dt || String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
@@ -228,11 +249,19 @@ async function addRow(kind, sec) {
   const vals = kind === "sale" ? { 날짜: d } : { 구분: sec, 날짜: ["본사지출", "지점기타지출", DEPOSIT].includes(sec) ? d : "" };
   const sort = Math.max(FN.lastSort?.[kind] ?? 0, ...FN.rows.filter((r) => r.kind === kind).map((r) => r.sort)) + 1; // [+ 줄] 빨리 두 번 눌러도 같은 번호 안 나오게 (저장 기다리기 전에 잡아 둠)
   (FN.lastSort ??= {})[kind] = sort;
-  const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select("id, kind, vals, sort, files, updated_by, updated_at").single();
+  const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind, vals, sort }).select(COLS).single();
   if (fail(error)) return;
   edits++; FN.rows.push(data); FN.q = ""; const q = V().querySelector("#fnQ"); if (q) q.value = ""; render(); // 검색칸 글자도 지움 (검색만 풀리고 글자는 남던 것)
   V().querySelector(`input[data-id="${data.id}"][data-k="${kind === "sale" ? "멤버쉽" : "사용처"}"]`)?.focus();
   queueSync();
+}
+// 🔀 정리 (0082 fin_resolve): k 있으면 그 칸을 시트 값으로·플래너 값 유지, 없으면 줄 표시만 지움
+async function resolve(id, k, use) {
+  const { error } = await sb.rpc("fin_resolve", { p_id: id, p_col: k, p_use: use });
+  if (fail(error)) return false;
+  const r = FN.rows.find((x) => x.id === id); edits++;
+  if (r && k) { const { [k]: d, ...rest } = r.sheet_diff; if (use === "sheet" && d) r.vals = { ...r.vals, [k]: d.sheet }; r.sheet_diff = rest; } else if (r) r.sheet_flag = null;
+  return true;
 }
 async function delRow(id) {
   const r = FN.rows.find((x) => x.id === id); if (!r) return;
@@ -285,7 +314,7 @@ function cfgDlg() {
     <label>매출 탭 이름 <small class="mut">{YYYYMM} = 202610 처럼 달로 바뀜</small><input name="sale_tab" value="${esc(c.sale_tab ?? "{YYYYMM} 매출(플래너)")}"></label>
     <label>비용 탭 이름<input name="cost_tab" value="${esc(c.cost_tab ?? "{YYYYMM} 비용(플래너)")}"></label>
     <div class="fnrow"><label>조교 시급<input name="rate" type="number" min="1000" max="100000" value="${c.rate ?? 10320}"></label><label>결제수수료 %<input name="fee_pct" type="number" min="0" max="30" step="0.1" value="${c.fee_pct ?? 5}"></label></div>
-    <p class="mut">시트의 플래너 탭은 열 순서를 바꿔도 되고, 다른 열을 더 붙여도 그 열은 안 건드려요. <b>플래너ID 칸</b>만 지우지 마세요. 처음 대표 계정 Apps Script 에 FIN_KEY 가 있어야 해요.</p>
+    <p class="mut">시트의 플래너 탭에 적어도 플래너로 들어와요 (플래너 값과 다른 칸은 양쪽에 표시). 열 순서를 바꿔도 되고, 다른 열을 더 붙여도 그 열은 안 건드려요. <b>플래너ID 칸</b>만 지우지 마세요. 처음 대표 계정 Apps Script 에 FIN_KEY 가 있어야 해요.</p>
     <menu><button class="btn ghost" value="cancel">취소</button><button class="btn" value="ok">저장하고 맞추기</button></menu></form>`;
   dlg.onclose = async () => {
     if (dlg.returnValue !== "ok") return;
@@ -308,6 +337,9 @@ document.addEventListener("click", async (e) => {
   if (a === "del") return delRow(b.dataset.id);
   if (a === "files") return filesDlg(b.dataset.id);
   if (a === "miss") { FN.miss = !FN.miss; return render(); }
+  if (a === "diffonly") { FN.diffOnly = !FN.diffOnly; return render(); }
+  if (a === "res") { if (await resolve(b.dataset.id, b.dataset.k ?? null, b.dataset.use ?? null)) { render(); queueSync(); } return; }
+  if (a === "resnew") { for (const r of FN.rows.filter((x) => x.sheet_flag === "new")) if (!(await resolve(r.id, null, null))) break; render(); return; }
   if (a === "acc") { if (!fail((await sb.from("fin_access").upsert({ team_id: FN.team, status: b.dataset.s })).error)) { toast(b.dataset.s === "open" ? "🔓 조교 링크로 볼 수 있어요" : "🔒 닫았어요"); FN.load(); } return; }
   if (a === "request") {
     const q = FN.access ? sb.from("fin_access").update({ status: "requested" }).eq("team_id", FN.team) : sb.from("fin_access").insert({ team_id: FN.team, status: "requested" });

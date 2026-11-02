@@ -92,3 +92,18 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fnmissbtn { padding: 3px 10px; font-size: 12px; } #fnView .fngbar .fnmissbtn { margin-left: 0; }
 #fnView .fnmissbtn b { color: #d35400; } #fnView .fnmissbtn.on { background: #e67e22; color: #fff; border-color: #e67e22; }
 #fnView .fntbl tr.fnstep td { background: #d9ead3; } [data-theme="dark"] #fnView .fntbl tr.fnstep td { background: color-mix(in srgb, #6aa84f 28%, transparent); }
+
+/* 🔀 시트와 다른 곳: 칸은 시트 표시와 같은 주황, 시트에서 온 줄은 노랑 띠, 시트에서 지운 줄은 빨강 띠 */
+#fnView .fntbl td.fndiff, #fnView .fntbl tbody tr:nth-child(even) td.fndiff, #fnView .fntbl tbody tr:hover td.fndiff { background: #ffd8a8; outline: 2px solid #e8590c; outline-offset: -2px; }
+#fnView .fntbl td.fndiff input, #fnView .fntbl td.fndiff select { color: #3b1d00; }
+[data-theme="dark"] #fnView .fntbl td.fndiff, [data-theme="dark"] #fnView .fntbl tbody tr:nth-child(even) td.fndiff, [data-theme="dark"] #fnView .fntbl tbody tr:hover td.fndiff { background: color-mix(in srgb, #e8590c 42%, transparent); }
+[data-theme="dark"] #fnView .fntbl td.fndiff input, [data-theme="dark"] #fnView .fntbl td.fndiff select { color: inherit; }
+#fnView .fntbl tr.fnnew td:first-child { box-shadow: inset 4px 0 0 #f1c40f; }
+#fnView .fntbl tr.fngone td:first-child { box-shadow: inset 4px 0 0 #e03131; }
+#fnView .fndiffp { border: 1.5px solid #e8590c; }
+#fnView .fndifflist { list-style: none; margin: 6px 0 0; padding: 0; max-height: 260px; overflow-y: auto; font-size: 13px; }
+#fnView .fndifflist li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 5px 2px; border-top: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
+#fnView .fnwho { color: var(--sub); font-size: 12px; }
+#fnView .fndifflist mark { background: #ffd8a8; color: #3b1d00; border-radius: 4px; padding: 0 4px; }
+#fnView .fnresb { display: inline-flex; gap: 4px; margin-left: auto; }
+#fnView .fnresb .btn { padding: 2px 8px; font-size: 12px; }
