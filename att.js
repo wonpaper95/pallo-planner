@@ -8,7 +8,7 @@ const AT = (window.AT = { team: null, list: [] });
 const V = () => document.getElementById("atView");
 const admin = () => myRole === "admin" && !previewTeam;
 const jo = () => myRole === "assistant";
-const ST = { new: "⏳ 맥이 읽는 중 (10~20분)", review: "📝 확인해 주세요", ok: "✅ 확인 완료 · 전산 입력 대기", done: "🎉 전산 입력 완료", error: "⚠️ 문제 있음" };
+const ST = { new: "⏳ 맥이 읽을 차례 (11·17·23시)", review: "📝 확인해 주세요", ok: "✅ 확인 완료 · 전산 입력 대기 (11·17·23시)", done: "🎉 전산 입력 완료", error: "⚠️ 문제 있음" };
 const ACT = { in: "출석 처리", skip: "안 함", ask: "확인 필요" };
 const SLOTS = ["", "오전", "오후 6시", "오후 8시"];
 const CODE = () => Object.fromEntries(Object.entries(window.LDC?.JEONSAN ?? {}).map(([code, name]) => [name, code])); // 플래너 지점 이름 → 전산 지점 코드
@@ -86,7 +86,7 @@ async function upload(files) {
     if (fail(r.error)) { await sb.storage.from("att-photos").remove([path]); break; }
     ok++;
   }
-  if (ok) { toast(`${ok}장 올렸어요 · 10~20분 안에 확인표가 떠요`); AT.load(); }
+  if (ok) { toast(`${ok}장 올렸어요 · 11·17·23시(금 제외)에 읽어서 확인표를 띄워요`); AT.load(); }
 }
 // 긴 변 2000px JPG (손글씨 읽어야 해서 조교체크리스트 1600px 보다 크게)
 async function shrink(img) {

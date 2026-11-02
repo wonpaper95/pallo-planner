@@ -1,12 +1,12 @@
 // 🕒 [근무기록] 탭 — 조교 근무기록지 (구글 시트 대구영어·울산·대구일중 이식). 지점 공용(대표·매니저·조교 링크), 다른 기기 실시간 (DB 0064_work)
-// 달마다 줄(조교·대타 필요·대타 해준) × 날짜 칸(월~목 오전/오후, 금·토·일 한 칸) = 시간 + 사유 + 🔴빠짐/🟢대타. 총시간·급여(시급) 자동, 계좌·연락처는 대표·매니저만
+// 달마다 줄(조교·대타 필요·대타 해준) × 날짜 칸(월~목 오전/오후, 금·토·일 한 칸) = 시간 + 사유 + 🔴빠짐/🟢대타. 총시간·급여(시급) 자동, 합산·시급·계좌·연락처는 대표·매니저만 (조교 링크엔 안 보임)
 // 정해진 시간(근무시간 글, work-core.js)과 다르게 적으면 사유 칸이 빨개짐 — 사유 없으면 칸에 '!' 표시
 // 줄은 시간대(평일 오전·오후·주말·여러·대타)별로 묶어 색칠. 조교체크리스트 대타 명단 → 🟢/🔴 칸 자동(DB 트리거 0066). 📄 근무계약서 = 비공개 버킷 work-docs
 // index.html 의 sb·myRole·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.WR
 (() => {
 const WR = (window.WR = { team: null, ym: null, month: null, rows: [], cells: new Map(), people: [], docs: [], shifts: [], only: null, shell: "" });
 const V = () => document.getElementById("wrView");
-const { KD, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine } = WRC;
+const { KD, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine, dayTag } = WRC;
 const SL = { am: "오전", pm: "오후", d: "" };
 const KIND = { need: "대타 필요한 사람", done: "대타 해준 사람" };
 const admin = () => myRole === "admin";
@@ -63,7 +63,7 @@ function days() {
   const ks = new Set(), d = W.parse(WR.ym);
   for (const x = new Date(d); x.getMonth() === d.getMonth(); x.setDate(x.getDate() + 1)) ks.add(W.ymd(x));
   for (const c of WR.cells.values()) ks.add(c.day);
-  return [...ks].sort().map((k) => { const dw = dowOf(k); return { k, dw, slots: slotsOf(dw), out: ymOf(k) !== WR.ym }; });
+  return [...ks].sort().map((k) => { const dw = dowOf(k); return { k, dw, slots: slotsOf(dw), out: ymOf(k) !== WR.ym, tag: dayTag(k) }; });
 }
 const rowCells = (r) => [...WR.cells.values()].filter((c) => c.row_id === r.id);
 const rowHours = (r) => rowCells(r).reduce((s, c) => s + (num(c.val) ?? 0), 0);
@@ -87,9 +87,9 @@ function shell() {
     <div class="wrhow mut">칸을 누르면 시간을 적어요. <b>정해진 시간과 다르면 사유</b>를 적어 주세요 — 사유가 없으면 칸에 <span class="wrneed-dot">!</span> 표시가 남아요. 🔴 빠짐 = 대타 필요 · 🟢 대타 근무 · 모서리 ◥ = 사유 있음 · 색칠된 칸 = 그 사람의 정해진 근무 칸.<br>
       ✅ 조교체크리스트 <b>대타 명단</b>에 대타 이름을 넣으면 여기에 🟢(대타한 사람·시간)·🔴(빠진 사람)이 자동으로 들어가요.</div></section>
   <section class="wrpanel"><div class="wrgbar"><h3>근무표</h3><span id="wrSum" class="mut"></span><span id="wrLegend" class="wrlegend"></span>
-    <span class="wrrow"><span class="mut">시급</span><input id="wrRate" type="number" min="1000" max="100000" step="10" inputmode="numeric"><span class="mut">원</span>
+    <span class="wrrow">${jo() ? "" : `<span class="mut">시급</span><input id="wrRate" type="number" min="1000" max="100000" step="10" inputmode="numeric"><span class="mut">원</span>`}
     <button class="btn ghost" data-act="today">오늘로</button></span></div>
-    <div id="wrGrid"></div>
+    <div id="wrHol" class="wrhol"></div><div id="wrGrid"></div>
     <form class="wrform" data-f="row"><input name="name" maxlength="40" placeholder="조교 이름"><select name="shiftPick"></select><button type="button" class="btn ghost" data-act="shtoggle" title="근무시간대 추가·지우기">⚙️ 근무시간대</button><button class="btn">조교 추가</button></form>
     <div class="wrshbox" hidden><div class="wrgbar"><h3>⚙️ 근무시간대</h3><span class="mut">지점 공용 · 여기 추가하면 다음 달에도 고르기 목록에 계속 보여요</span><button type="button" class="btn ghost" data-act="shtoggle">닫기</button></div>
       <div id="wrShList" class="wrshlist"></div>
@@ -115,11 +115,11 @@ function renderGrid() {
     const nr = r.kind === "staff" && needReason(plan, d.dw, s, c); if (nr) need++;
     const o = r.kind === "staff" && c ? off(plan, d.dw, s, c.val) : 0;
     const tip = [planned ? `정해진 시간 ${planned}h` : "", c?.reason ? `사유: ${c.reason}` : "", nr ? "⚠️ 정해진 시간과 달라요 — 사유를 적어 주세요" : "", c?.by_name ? `입력: ${c.by_name}` : ""].filter(Boolean).join("\n");
-    return `<td class="wrc ${planned ? "plan" : ""} ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""} ${c?.mark ? "mk-" + c.mark : ""} ${nr ? "need" : ""} ${c?.reason ? "has" : ""} ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""}"
+    return `<td class="wrc ${planned ? "plan" : ""} ${d.tag?.cls ?? ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""} ${c?.mark ? "mk-" + c.mark : ""} ${nr ? "need" : ""} ${c?.reason ? "has" : ""} ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""}"
       ${tip ? `title="${esc(tip)}"` : ""}><button data-act="cell" data-row="${r.id}" data-day="${d.k}" data-slot="${s}">${esc(c?.val ?? "")}${o ? `<i class="${o > 0 ? "up" : "dn"}">${o > 0 ? "+" : ""}${o}</i>` : ""}</button></td>`;
   };
-  const head1 = ds.map((d) => `<th colspan="${d.slots.length}" class="wrd ${d.dw === 1 ? "wrwk" : ""} ${d.dw === 0 || d.dw === 6 ? "wrwe" : ""} ${d.dw === 5 ? "fri" : ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""}" data-day="${d.k}">${+d.k.slice(5, 7)}/${+d.k.slice(8)}<br><small>${KD[d.dw]}</small></th>`).join("");
-  const head2 = ds.map((d) => d.slots.map((s) => `<th class="wrs ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""} ${d.k === tk ? "today" : ""}">${SL[s]}</th>`).join("")).join("");
+  const head1 = ds.map((d) => `<th colspan="${d.slots.length}" class="wrd ${d.dw === 1 ? "wrwk" : ""} ${d.dw === 0 || d.dw === 6 ? "wrwe" : ""} ${d.tag?.cls ?? ""} ${d.out ? "om" : ""} ${d.k === tk ? "today" : ""}" data-day="${d.k}" ${d.tag ? `title="${esc(d.tag.full)}"` : ""}>${+d.k.slice(5, 7)}/${+d.k.slice(8)}<br><small>${KD[d.dw]}</small>${d.tag ? `<em class="wrtag">${d.tag.tag}</em>` : ""}</th>`).join("");
+  const head2 = ds.map((d) => d.slots.map((s) => `<th class="wrs ${d.tag?.cls ?? ""} ${s === "am" || d.slots.length === 1 ? "l" : ""} ${d.dw === 1 && s === "am" ? "wrwk" : ""} ${d.k === tk ? "today" : ""}">${SL[s]}</th>`).join("")).join("");
   const ncol = ds.reduce((n, d) => n + d.slots.length, 0), list = ordered();
   let body = "", lastG = null;
   for (const r of list) {
@@ -127,21 +127,23 @@ function renderGrid() {
     if (r.kind === "staff" && WR.only && g !== WR.only) continue;
     if (r.kind === "staff" && g !== lastG) { // 묶음 머리줄
       const rs = list.filter((x) => x.kind === "staff" && groupOf(x) === g), gh = rs.reduce((n, x) => n + rowHours(x), 0);
-      body += `<tr class="wrgrp g-${g}"><th class="wrname"><span><i></i>${GROUPS.find(([k]) => k === g)[1]} <small>${rs.length}명 · ${hrs(gh)}</small></span></th><td colspan="${ncol}"></td></tr>`;
+      body += `<tr class="wrgrp g-${g}"><th class="wrname"><span><i></i>${GROUPS.find(([k]) => k === g)[1]} <small>${rs.length}명${jo() ? "" : ` · ${hrs(gh)}`}</small></span></th><td colspan="${ncol}"></td></tr>`;
     }
     lastG = g;
     let lab;
     if (r.kind === "staff") { const h = rowHours(r); totH += h; const pt = planText(planOf(r));
-      lab = `<span class="wrn1"><b>${esc(r.name)}</b>${r.memo ? `<span class="wrmemo" title="${esc(r.memo)}">📝</span>` : ""}<span class="wrtot">${hrs(h)}</span></span>
-        <span class="wrshift" title="${esc(r.shift + (pt ? "\n정해진 시간: " + pt : ""))}">${esc(r.shift.split("\n").join(" / ")) || "근무시간 없음"}</span><span class="wrpay">${won(h * rate())}</span>`; }
+      lab = `<span class="wrn1"><b>${esc(r.name)}</b>${r.memo ? `<span class="wrmemo" title="${esc(r.memo)}">📝</span>` : ""}${jo() ? "" : `<span class="wrtot">${hrs(h)}</span>`}</span>
+        <span class="wrshift" title="${esc(r.shift + (pt ? "\n정해진 시간: " + pt : ""))}">${esc(r.shift.split("\n").join(" / ")) || "근무시간 없음"}</span>${jo() ? "" : `<span class="wrpay">${won(h * rate())}</span>`}`; }
     else lab = `<b class="wrk">${esc(r.name || KIND[r.kind])}</b>`;
     body += `<tr class="${r.kind} g-${g}" data-row="${r.id}"><th class="wrname"><button data-act="row">${lab}</button></th>${ds.map((d) => d.slots.map((s) => cell(r, d, s)).join("")).join("")}</tr>`;
   }
   if (WR.only) for (const r of WR.rows) if (r.kind === "staff" && groupOf(r) !== WR.only) totH += rowHours(r); // 합계는 그대로 전체
   box.innerHTML = `<div class="wrscroll"><table class="wrgrid"><thead><tr><th class="wrname" rowspan="2">이름 · 근무시간</th>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody>
-    <tfoot><tr><th class="wrname"><b>합계</b><span class="wrtot">${hrs(totH)} · ${won(totH * rate())}</span></th><td colspan="${ncol}"></td></tr></tfoot></table></div>`;
+    ${jo() ? "" : `<tfoot><tr><th class="wrname"><b>합계</b><span class="wrtot">${hrs(totH)} · ${won(totH * rate())}</span></th><td colspan="${ncol}"></td></tr></tfoot>`}</table></div>`;
+  const hols = ds.filter((d) => d.tag?.cls === "hol" && !d.out);
+  V().querySelector("#wrHol").innerHTML = `${hols.length ? `<span class="hol">공휴일</span> ${hols.map((d) => `${+d.k.slice(5, 7)}/${+d.k.slice(8)}(${KD[d.dw]}) ${esc(d.tag.full)}`).join(" · ")} ` : ""}<span class="fri">금요일</span> 공식 휴무`;
   V().querySelector("#wrLegend").innerHTML = GROUPS.filter(([g]) => staff.some((r) => groupOf(r) === g)).map(([g, l]) => `<button class="g-${g} ${WR.only === g ? "on" : ""} ${WR.only && WR.only !== g ? "dim" : ""}" data-act="only" data-g="${g}" title="눌러서 이 시간대만 보기"><i></i>${l}</button>`).join("");
-  V().querySelector("#wrSum").innerHTML = `조교 ${staff.length}명 · 총 ${hrs(totH)} · ${won(totH * rate())}${need ? ` · <b class="wrneedtxt">사유 필요 ${need}칸</b>` : ""}`;
+  V().querySelector("#wrSum").innerHTML = `조교 ${staff.length}명${jo() ? "" : ` · 총 ${hrs(totH)} · ${won(totH * rate())}`}${need ? ` · <b class="wrneedtxt">사유 필요 ${need}칸</b>` : ""}`;
   const sc = box.querySelector(".wrscroll");
   if (keep === null) setTimeout(() => scrollToday(false)); else sc.scrollLeft = keep;
 }
@@ -179,7 +181,7 @@ function openCell(btn) {
   const dw = dowOf(day), plan = planOf(r), planned = plan[dw + slot], staff = r.kind === "staff";
   ctx = { kind: "cell", row: r.id, day, slot, warned: false };
   const el = pop();
-  el.innerHTML = `<div class="wrpt">${esc(r.name || KIND[r.kind])} · ${+day.slice(5, 7)}/${+day.slice(8)}(${KD[dw]})${SL[slot] ? " " + SL[slot] : ""}</div>
+  el.innerHTML = `<div class="wrpt">${esc(r.name || KIND[r.kind])} · ${+day.slice(5, 7)}/${+day.slice(8)}(${KD[dw]})${SL[slot] ? " " + SL[slot] : ""}${dayTag(day) ? ` <span class="wrpop${dayTag(day).cls}">${esc(dayTag(day).full)}</span>` : ""}</div>
     ${staff ? `<div class="mut wrpl">${Object.keys(plan).length ? (planned ? `정해진 시간 <b>${planned}h</b>` : "정해진 근무가 없는 칸 (적으면 전부 추가근무)") : "정해진 시간 없음 (대타·백업)"}</div>
       <div class="wrrow"><input name="val" inputmode="decimal" maxlength="60" value="${esc(c.val ?? "")}" placeholder="시간 (예: 2.5)">${planned ? `<button type="button" class="btn ghost" data-pick="${planned}">${planned}h 그대로</button>` : ""}</div>
       <div class="wrmk">${[["", "표시 없음"], ["out", "🔴 빠짐 (대타 필요)"], ["sub", "🟢 대타 근무"]].map(([v, l]) => `<label><input type="radio" name="mark" value="${v}" ${(c.mark ?? "") === v ? "checked" : ""}>${l}</label>`).join("")}</div>

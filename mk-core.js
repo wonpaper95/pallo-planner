@@ -184,7 +184,49 @@ const usd = (n) => "$" + Math.round(n).toLocaleString("en-US");
 const MIN_SAMPLE = 5, ZERO_LEAD_SPEND = 70, // 달러
    FATIGUE = 1.3,
    ZERO_WEEK_MIN_SPEND = 5; // 이번 주 리드 0 피로도는 지출 5달러 이상일 때만 (소액은 우연)
-function buildWeekly({ week, ads = [], organic = [], leads = [], sales = null, naver = [], fx = null }) {
+// 광고 이름을 바꾸면(접두어 추가 등) 메타는 지난 기록까지 새 이름으로 주지만 전산 리드는 받을 때 이름 그대로 남아 한 광고가 둘로 갈린다 → 지금 이름으로 통일.
+// 앞쪽 [태그] 를 뗀 본이름이 같고 태그가 포함 관계일 때만 같은 광고. [영어] X 와 [일본어] X 는 다른 광고이고, 둘 다 있으면 X 는 어느 쪽인지 몰라 안 묶는다.
+// 같은 날 지출이 다른 두 이름은 동시에 도는 별개 광고로 본다. 같은 날 지출이 같으면 바꾸기 전에 받아 둔 묵은 줄이라 한 줄만 쓴다.
+// ponytail: 이름으로 추정. 본문까지 바꾼 이름은 못 묶는다. 전산 리드에 광고 ID 가 생기면 ID 로 묶는다.
+function unifyAdNames(ads, leads) {
+  const parts = (name) => { const m = name.match(/^\s*((?:\[[^\]]*\]\s*)+)/); return { tags: m ? m[1].match(/\[[^\]]*\]/g).sort() : [], base: name.slice(m ? m[0].length : 0).trim() }; };
+  const byBase = new Map();
+  for (const name of new Set([...ads, ...leads].map((r) => r.ad_name).filter(Boolean))) {
+    const p = parts(name);
+    if (!byBase.has(p.base)) byBase.set(p.base, []);
+    byBase.get(p.base).push({ name, tags: p.tags });
+  }
+  const covers = (a, b) => b.every((t) => a.includes(t));
+  const groups = new Map(); // 묶음 키 → 이름들
+  for (const [base, vars] of byBase) {
+    const tops = [...new Set(vars.filter((v) => !vars.some((o) => covers(o.tags, v.tags) && !covers(v.tags, o.tags))).map((v) => v.tags.join("")))];
+    for (const v of vars) {
+      const fit = tops.filter((t) => covers(vars.find((o) => o.tags.join("") === t).tags, v.tags));
+      const key = fit.length === 1 ? `${fit[0]}|${base}` : `=${v.name}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(v);
+    }
+  }
+  const lastDay = (name) => ads.reduce((d, r) => (r.ad_name === name && r.date > d ? r.date : d), "");
+  const current = new Map();
+  for (const vars of groups.values()) {
+    const names = vars.map((v) => v.name), day = new Map();
+    let apart = false;
+    for (const r of ads) if (names.includes(r.ad_name) && r.spend) { if (day.has(r.date) && day.get(r.date) !== r.spend) apart = true; day.set(r.date, r.spend); }
+    if (apart) continue;
+    const now = [...vars].sort((a, b) => lastDay(b.name).localeCompare(lastDay(a.name)) || b.tags.length - a.tags.length)[0].name;
+    for (const n of names) current.set(n, now);
+  }
+  const rename = (r) => (current.has(r.ad_name) && current.get(r.ad_name) !== r.ad_name ? { ...r, ad_name: current.get(r.ad_name) } : r);
+  const once = new Map(); // 같은 광고·같은 날은 지출이 있는 줄, 같으면 지금 이름의 줄
+  for (const r of ads) {
+    const n = rename(r), k = `${n.date}|${n.ad_name}`, had = once.get(k);
+    if (!had || (n.spend || 0) > (had.row.spend || 0) || ((n.spend || 0) === (had.row.spend || 0) && r === n)) once.set(k, { row: n });
+  }
+  return { ads: [...once.values()].map((x) => x.row), leads: leads.map(rename) };
+}
+function buildWeekly({ week, ads: rawAds = [], organic = [], leads: rawLeads = [], sales = null, naver = [], fx = null }) {
+  const { ads, leads } = unifyAdNames(rawAds, rawLeads);
   const end = addDays(week, 6), from4 = addDays(week, -21), prevEnd = addDays(week, -1);
   const sum = (rows, f) => rows.reduce((s, r) => s + (r[f] || 0), 0);
   const ads4 = ads.filter((r) => inRange(r.date, from4, end));

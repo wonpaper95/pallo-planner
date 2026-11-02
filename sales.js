@@ -438,10 +438,10 @@ const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log:
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
 SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
 SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
-// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 월말 보고 달(MG.month)을 보고 있을 때만. 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
+// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 이번 달·앞으로의 달만(지난 달은 보기만). 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
 const SEC = { s1: "[1] 월별 목표", s2: "[2] 목표 객단가 비율", s5: "[5] 일일 실행 목표" };
 function renderSec() {
-  const on = !!window.MG && SL.month === MG.month, ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
+  const on = !!window.MG && SL.month >= todayIso().slice(0, 7), ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
   const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
   V().querySelectorAll(".slsec").forEach((el) => {
     const k = el.dataset.sec, d = done[k];
@@ -468,7 +468,10 @@ V().innerHTML = `
   <input type="month" data-k="month" aria-label="목표 월"><a href="https://sso.pallo.co.kr/select?pick=branch" target="_blank" rel="noopener" class="btn ghost">지원자 수 확인 (SSO)</a><button class="btn ghost hidden" id="slSync" type="button">🔄 시트 새로고침</button><small id="slSheet"></small><small id="slSaved"></small></div>
 <div id="slEmpty" class="hidden"></div>
 <div id="slBody">
+<p class="slg">지점·달을 바꾸면 아래 전부 그 기준으로 바뀝니다. 지원자 수 확인 = SSO 신청 화면 · 🔄 = 재무 숫자를 지금 가져오기 (이번 달·지난달은 10분마다 자동)</p>
 <div id="mgCard"></div><!-- 📮 월말 보고 (month-goal.js) -->
+<p class="slg">📮 막대를 열어 이 달 내 목표와 전략을 적고 제출합니다. [1]·[2]·[5]를 칸마다 [저장]해야 제출할 수 있습니다.</p>
+<details class="slcard" id="slAll"><summary><b>📅 전체 달 한눈에</b> <small>(달마다 목표와 실제 순매출)</small></summary><div id="slAllBody"></div></details><!-- sales-all.js -->
 <details class="slcard sldefs"><summary><b>📏 단계별 세는 법</b> <small>(모든 매니저가 같은 기준으로 입력)</small></summary><table>
   <tr><td><b>지원자</b></td><td>그날 SSO 지점 화면에 새로 들어온 신청 수 (하루치, 누계 아님)</td></tr>
   <tr><td><b>회신자</b></td><td>그날 상담 오기로 한 사람 — 연락해서 전산 상담 일정(캘린더)에 잡힌 사람</td></tr>
@@ -480,26 +483,28 @@ V().innerHTML = `
   <section class="slcard"><h3>[1] 월별 목표 — 비율·객단가를 바꾸면 필요 인원이 바로 바뀝니다</h3>
     <div class="slrow"><label>집계 시작일<small>목표 기간 시작 (보통 1일)</small></label><input type="date" data-k="start"></div>
     <div class="slrow sl3 slhead"><span></span><small>목표 (직접 입력)</small><button type="button" class="slcurbtn" id="slCurBtn"></button></div>
-    <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div></div>
-    <div class="slrow sl3"><label>지원자수</label><span class="u"><input type="number" min="0" data-k="appsGoal"><i>명</i></span><div class="slcur" id="slCur_apps"></div></div>
-    <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div></div>
-    <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div></div>
-    <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div></div>
-    <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div></div>
-    <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div></div>
-    <div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
+    <p class="slg">번호 순서대로 정합니다. 펼치기를 누르면 칸 옆에 실제 숫자가 나옵니다. 비율은 지난달 탭의 실제 숫자를 보고 넣습니다.</p>
+    <div class="slrow sl3"><label>월 목표 순매출</label><span class="u"><input data-k="goal" data-money><i>원</i></span><div class="slcur" id="slCur_goal"></div><small class="slg">① 가장 먼저 정합니다. 바꾸면 아래 필요 인원이 전부 다시 계산됩니다.</small></div>
+    <div class="slrow sl3"><label>지원자수</label><span class="u"><input type="number" min="0" data-k="appsGoal"><i>명</i></span><div class="slcur" id="slCur_apps"></div><small class="slg">⑦ 자동 계산 (회신자 ÷ 회신율). 보통 손대지 않습니다. 직접 적으면 지원자 목표만 바뀝니다.</small></div>
+    <div class="slrow sl3"><label>회신율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="reply"><i>%</i></span><div class="slcur" id="slCur_reply"></div><small class="slg">⑥ 지원자 중 상담 오기로 한 비율. 낮추면 필요 지원자가 늘어납니다.</small></div>
+    <div class="slrow sl3"><label>상담률</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="consult"><i>%</i></span><div class="slcur" id="slCur_consult"></div><small class="slg">⑤ 회신자 중 실제 상담한 비율. 낮추면 필요 회신자·지원자가 늘어납니다.</small></div>
+    <div class="slrow sl3"><label>결제율</label><span class="u"><input type="number" step="0.1" min="0.1" data-k="pay"><i>%</i></span><div class="slcur" id="slCur_pay"></div><small class="slg">④ 상담자 중 결제한 비율. 낮추면 필요 상담자·회신자·지원자가 늘어납니다.</small></div>
+    <div class="slrow sl3"><label>객단가</label><span class="u"><input data-k="arpu" data-money><i>원</i></span><div class="slcur" id="slCur_arpu"></div><small class="slg">② 결제자 1명당 금액. 올리면 필요 결제자가 줄어듭니다. [2] 멤버십 비율의 기준입니다.</small></div>
+    <div class="slrow sl3"><label>환불율</label><span class="u"><input type="number" step="0.1" min="0" max="99" data-k="refundRate"><i>%</i></span><div class="slcur" id="slCur_refundRate"></div><small class="slg">③ 결제금액 중 환불 비율. 올리면 필요 결제자가 늘어납니다.</small></div>
+    <p class="slg">⑧ 아래 표는 자동 계산입니다. 📅 회신자 하루 최소 = 캘린더에 매일 잡아야 할 상담 수. 무리면 ②~⑥을 다시 조정합니다.</p><div id="slMonth"></div><div id="slCompare"></div><div class="slsec" data-sec="s1"></div></section>
   <section class="slcard"><h3>[2] 목표 객단가 비율</h3>
     <p class="slhint" style="font-size:13px;margin-top:-4px">[1]에서 정한 목표 객단가를 달성하기 위해, 본인이 해야 하는 멤버십 비율을 보는 칸입니다.</p>
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMem"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemSumP"></th><th id="slMemN"></th><th id="slMemSum"></th></tr><tr id="slMemRf"></tr><tr id="slMemNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>이 구성의 객단가 (합계 금액 ÷ 인원)</small><b id="slMemArpu"></b><div class="slhint" id="slMemCmp"></div></div>
-    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p><div class="slsec" data-sec="s2"></div></section>
+    <div id="slMemNote"></div><p class="slhint">비율은 직접 정합니다. 인원 = 월 목표를 이 비율의 객단가로 나눈 필요 결제자 × 비율. 남은 기간은 [4]에서 같은 비율로 계산합니다.</p><p class="slg">이름·단가·비율은 직접 고치고, 인원·금액은 자동입니다. 비율 합계를 100%로 맞춥니다. 이 구성의 객단가가 [1] 객단가보다 낮으면 필요 결제자가 늘어납니다.</p><div class="slsec" data-sec="s2"></div></section>
   <section class="slcard"><h3>[3] 남은 기간 목표 <button type="button" class="slcurbtn" id="slR2Btn"></button></h3>
     <div class="slr2">
+    <p class="slg">오늘 실적을 빼고 남은 목표를 다시 나눈 계산입니다. 실적이 들어오면 매일 바뀝니다.</p>
     <div class="slrow"><label>현재 순매출</label><span class="u"><input data-k="current" data-money><i>원</i></span></div>
     <p class="slhint" id="slCurHint">⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.</p>
-    <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"></div>
-    <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"></div>
+    <div class="slrow"><label>보고 기준일</label><input type="date" data-k="base"><small class="slg">이 날까지의 매출을 현재 순매출로 봅니다. 재무 연동이면 오늘로 자동입니다.</small></div>
+    <div class="slrow"><label>목표 마감일</label><input type="date" data-k="end"><small class="slg">이 날까지 남은 목표를 채우는 기준입니다. 금요일을 뺀 영업일로 나눕니다.</small></div>
     <p class="slhint" id="slPeriod"></p><div id="slRemain"></div>
     <p class="slhint">필요 인원은 목표 금액에서 거꾸로 계산합니다: 결제자 = 금액 ÷ (객단가 × (1−환불율)), 상담자 = 결제자 ÷ 결제율, 회신자 = 상담자 ÷ 상담률, 지원자 = 회신자 ÷ 회신율 (모두 올림).</p></div></section>
   <section class="slcard"><h3>[4] 남은 기간 멤버십 목표 — 남은 기간 비율 따로 조정</h3>
@@ -507,28 +512,29 @@ V().innerHTML = `
     <div class="slscroll"><table class="slt slmemt"><colgroup><col style="width:26%"><col style="width:24%"><col style="width:17%"><col style="width:11%"><col style="width:22%"></colgroup><thead><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr></thead><tbody id="slMemR"></tbody>
     <tfoot><tr><th>합계 (결제금액)</th><th></th><th id="slMemRSumP"></th><th id="slMemRN"></th><th id="slMemRSum"></th></tr><tr id="slMemRRf"></tr><tr id="slMemRNet"></tr></tfoot></table></div>
     <div class="slkpi" style="margin-top:12px"><small>남은 기간 필요 결제자 · 이 구성의 객단가</small><b id="slMemRArpu"></b><div class="slhint" id="slMemRCmp"></div></div>
-    <div id="slMemRNote"></div></section>
-  <section class="slcard"><h3>[5] 일일 실행 목표</h3><div id="slDaily"></div>
-    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span></div><div class="slsec" data-sec="s5"></div></section>
+    <div id="slMemRNote"></div><p class="slg">비율만 직접 고칩니다. 인원·금액은 [3] 남은 목표로 자동 계산됩니다.</p></section>
+  <section class="slcard"><h3>[5] 일일 실행 목표</h3><p class="slg">[3] 남은 기간 필요 인원을 남은 영업일로 나눈 자동 계산입니다.</p><div id="slDaily"></div>
+    <div class="slrow"><label>첫 연락 목표</label><span class="u"><input type="number" min="1" data-k="firstContact"><i>분</i></span><small class="slg">지원자 신청 후 몇 분 안에 첫 연락할지 직접 정합니다.</small></div><div class="slsec" data-sec="s5"></div></section>
 </div>
 <div class="slgrid">
-  <section class="slcard"><h3>📅 일일 목표 — 날짜별 목표 vs 현재</h3><div id="slDay"></div></section>
-  <section class="slcard"><h3>🗓 주간 목표 — 주별 목표 vs 현재</h3><div id="slWeek"></div></section>
+  <section class="slcard"><h3>📅 일일 목표 — 날짜별 목표 vs 현재</h3><p class="slg">목표는 월 목표를 영업일로 나눈 값, 현재는 들어온 실적입니다. ‹ › 로 날짜를 옮깁니다.</p><div id="slDay"></div></section>
+  <section class="slcard"><h3>🗓 주간 목표 — 주별 목표 vs 현재</h3><p class="slg">목표는 그 주 영업일만큼 합친 값입니다. ‹ › 로 주를 옮깁니다.</p><div id="slWeek"></div></section>
 </div>
-<section class="slcard"><h3>🎯 어디를 올리면 가장 효과적인가 — 개선 효과 순위</h3><div id="slLever"></div></section>
-<section class="slcard"><h3>📈 일일·주간 기준 — 매일 이만큼 채우면 월 목표 달성</h3><div id="slPace"></div></section>
+<section class="slcard"><h3>🎯 어디를 올리면 가장 효과적인가 — 개선 효과 순위</h3><p class="slg">자동 계산입니다. [1] 비율 하나만 올렸을 때 필요 지원자가 많이 줄어드는 순서입니다. 1등부터 손댑니다.</p><div id="slLever"></div></section>
+<section class="slcard"><h3>📈 일일·주간 기준 — 매일 이만큼 채우면 월 목표 달성</h3><p class="slg">자동 계산입니다. 하루 기준 = 월 목표 ÷ 영업일. ✓ 는 기준 이상, ✗ 는 미달입니다.</p><div id="slPace"></div></section>
 <section class="slcard"><h3>📅 일일 실적 달력 — 날짜를 눌러 실적을 입력하세요</h3>
-  <p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
+  <p class="slg">지원자·회신자·상담자는 직접 입력합니다. 결제·환불은 재무 연동 지점이면 재무 숫자가 자동으로 들어갑니다.</p><p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
   <p class="slhint">빨간 칸은 상담자 수가 하루 목표보다 적은 날입니다. 입력한 숫자를 보고 어느 단계가 막혔는지 판단해 행동 요령을 띄웁니다. 아직 오지 않은 날은 예약된 상담 수를 넣어두면 미리 확인할 수 있습니다.</p>
   <div id="slActual"></div></section>
-<section class="slcard"><h3>현재 문제점 (보고문 맨 앞)</h3><pre id="slProblems"></pre>
+<section class="slcard"><h3>현재 문제점 (보고문 맨 앞)</h3><p class="slg">실적이 바뀌면 자동으로 다시 써집니다. 아래 칸에 쓴 내용은 📋 보고문에 같이 들어갑니다.</p><pre id="slProblems"></pre>
   <p class="slhint">위 내용은 달력 실적과 목표를 비교해 자동으로 씁니다. 덧붙일 내용은 아래에 쓰세요.</p>
   <textarea data-k="problems" class="grow" placeholder="예: 주말 상담 예약이 몰려 평일 상담이 비어 있음"></textarea>
   <h3 style="margin-top:14px">실행 전략 (보고문 문제점 다음)</h3><pre id="slStrategy"></pre>
   <p class="slhint">위 전략은 목표와 실적 숫자를 보고 자동으로 씁니다. 덧붙일 실행 전략은 아래에 쓰세요.</p>
   <textarea data-k="strategyAdd" class="grow" placeholder="예: 이번 주 금요일 휴무 전날(목) 상담 예약을 집중 배치"></textarea></section>
-<section class="slcard"><h3>📋 보고문</h3><pre id="slReport" style="max-height:420px;overflow:auto"></pre><button class="btn" id="slCopy" type="button">보고문 복사</button></section>
+<section class="slcard"><h3>📋 보고문</h3><p class="slg">위 숫자와 문제점·전략을 합친 글입니다. 복사해서 보고에 씁니다.</p><pre id="slReport" style="max-height:420px;overflow:auto"></pre><button class="btn" id="slCopy" type="button">보고문 복사</button></section>
 <section class="slcard"><h3>💰 인센티브</h3>
+  <p class="slg">인건비·광고비 목표를 직접 적으면, 월 목표에서 빼고 남는 금액 표가 아래에 나옵니다.</p>
   <div class="slrow"><label>조교 인건비<small>그달 조교 급여 합계 (목표)</small></label><span class="u"><input data-k="labor" data-money><i>원</i></span></div>
   <p class="slhint" id="slCur_labor"></p>
   <div class="slrow"><label>광고비<small>메타·네이버·구글 등 합계</small></label><span class="u"><input data-k="ads" data-money><i>원</i></span></div>
@@ -576,6 +582,7 @@ SL.load = async function () {
   await loadDays();
   render();
   window.MG?.load(); // 📮 월말 보고
+  window.SLA?.load(); // 📅 전체 달 (펼쳐 있을 때만)
 };
 async function loadDays() {
   const s = SL.plan, from = s.base < mStart(s) ? s.base : mStart(s), to = s.end > mEnd(s) ? s.end : mEnd(s);
@@ -653,9 +660,9 @@ function render() {
   setH("slRemain", tbl(c, c.days, "처음 계획 하루 평균") + `<p class="slhint">예상 최종 순매출 <b>${won(c.final)}원</b> (목표 대비 ${pct(c.final / s.goal * 100)}%)</p>`);
   setT("slPeriod", `현재 달성률 ${pct(c.rate)}% · 남은 목표 ${won(c.remain)}원 · ${md(addDays(s.base, 1))}~${md(s.end)}, 영업일 ${c.days}일 (금요일 휴무 제외)`);
 
-  const kp = [["기준일 달성률 (현재 순매출 기준)", pct(c.rate) + "%", c.rate], ["예상 최종 순매출", won(c.final) + "원", c.final / s.goal * 100],
-    ["오늘까지 순매출 (기준일 + 달력 실적)", won(a.net) + "원", a.net / s.goal * 100], ["남은 목표 금액", won(Math.max(0, s.goal - a.net)) + "원"], ["결제자 목표", c.payers + "명"]];
-  setH("slKpis", kp.map(([l, v, b]) => `<div class="slkpi"><small>${l}</small><b>${v}</b>${b != null ? `<div class="bar"><i style="width:${Math.min(100, b || 0)}%"></i></div>` : ""}</div>`).join(""));
+  const kp = [["기준일 달성률 (현재 순매출 기준)", pct(c.rate) + "%", c.rate, "현재 순매출 ÷ 월 목표"], ["예상 최종 순매출", won(c.final) + "원", c.final / s.goal * 100, "현재 순매출 + [3] 남은 계획을 다 채웠을 때"],
+    ["오늘까지 순매출 (기준일 + 달력 실적)", won(a.net) + "원", a.net / s.goal * 100, "오늘까지 결제 − 환불"], ["남은 목표 금액", won(Math.max(0, s.goal - a.net)) + "원", null, "월 목표 − 오늘까지 순매출"], ["결제자 목표", c.payers + "명", null, "남은 목표에 더 필요한 결제자"]];
+  setH("slKpis", kp.map(([l, v, b, h]) => `<div class="slkpi"><small>${l}</small><b>${v}</b>${b != null ? `<div class="bar"><i style="width:${Math.min(100, b || 0)}%"></i></div>` : ""}<small class="slg">${h}</small></div>`).join(""));
 
   const mp = mixPlan(s, c), mix = mp.mixM, mn = mp.pNm, ms = mix.reduce((x, m) => x + m.n * m.price, 0), mArpu = mn ? ms / mn : 0; // [2] 월 목표 기준
   const pctW = (w) => (Math.round(w * 1000) / 10).toLocaleString("ko-KR") + "%";

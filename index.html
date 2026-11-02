@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202611010018">
+<meta name="app-version" content="202611021803">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202611010018"></script>
+<script src="theme.js?v=202611021803"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -292,6 +292,9 @@ body:not(.sv) #salesView { display: none; }
 #salesView textarea.grow { width: 100%; field-sizing: content; min-height: 3.5em; resize: vertical; }
 .mgbar { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 14px; padding: 14px 18px; border-radius: 14px; border: 2px solid var(--accent); background: var(--panel); color: var(--text); cursor: pointer; text-align: left; font: inherit; box-shadow: 0 6px 18px rgba(0,0,0,.08); } /* 📮 월말 보고 막대 */
 .mgbar b { font-size: 17px; color: var(--accent); } .mgbar span { font-size: 13.5px; color: var(--sub); } .mgbar i { margin-left: auto; font-style: normal; font-weight: 700; color: var(--accent); } .mgbar:hover { background: var(--hover); }
+#slAll { margin: 0 0 14px; } #salesView #slAll summary { margin-top: 0; } #slAll summary small { color: var(--sub); } #slAll .slt { min-width: 780px; } #slAll .slt th, #slAll .slt td { white-space: nowrap; padding: 7px 8px; } #slAll tr[data-slm] { cursor: pointer; } #slAll tr[data-slm]:hover td { background: var(--hover); } #slAll tr.cur td { font-weight: 700; color: var(--accent); } #slAll .warn { display: block; font-size: 12px; font-weight: 400; color: var(--red); }
+#salesView .slg { display: block; grid-column: 1 / -1; margin: 0 0 8px; color: var(--red); font-size: 12px; font-weight: 400; line-height: 1.45; } #salesView .slrow .slg { margin: -2px 0 4px; } #salesView .slkpi .slg { margin: 6px 0 0; font-size: 11.5px; }
+.mgnext { display: block; margin: -6px 0 14px auto; padding: 4px 10px; border: 0; background: none; color: var(--accent); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 #mgDlg { max-width: 760px; } #mgDlg input, #mgDlg textarea { padding: 7px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--text); } #mgDlg textarea { width: 100%; field-sizing: content; resize: vertical; } #mgDlg .slhint { font-size: 12.5px; color: var(--sub); }
 #mgDlg .u { position: relative; display: block; } #mgDlg .u input { width: 100%; padding-right: 34px; } #mgDlg .u i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--sub); font-style: normal; } #mgDlg h3 { color: var(--accent); font-size: 16px; }
 .mg { border-color: var(--accent); } .mghead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .mghead h3 { margin: 0 auto 0 0; } /* 📮 월말 보고 */
@@ -544,26 +547,26 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202611010018">
-<link rel="stylesheet" href="photo.css?v=202611010018">
-<link rel="stylesheet" href="post.css?v=202611010018">
-<link rel="stylesheet" href="marketing.css?v=202611010018">
-<link rel="stylesheet" href="contacts.css?v=202611010018">
-<link rel="stylesheet" href="leaders.css?v=202611010018">
-<link rel="stylesheet" href="links.css?v=202611010018">
-<link rel="stylesheet" href="reports.css?v=202611010018">
-<link rel="stylesheet" href="edu.css?v=202611010018">
-<link rel="stylesheet" href="qna.css?v=202611010018">
-<link rel="stylesheet" href="jo-guide.css?v=202611010018">
-<link rel="stylesheet" href="jc.css?v=202611010018">
-<link rel="stylesheet" href="talkbot.css?v=202611010018">
-<link rel="stylesheet" href="work.css?v=202611010018">
-<link rel="stylesheet" href="fin.css?v=202611010018">
-<link rel="stylesheet" href="gx.css?v=202611010018">
-<link rel="stylesheet" href="att.css?v=202611010018">
-<link rel="stylesheet" href="glass.css?v=202611010018">
-<link rel="stylesheet" href="sidebar.css?v=202611010018">
-<link rel="stylesheet" href="skins.css?v=202611010018">
+<link rel="stylesheet" href="blog.css?v=202611021803">
+<link rel="stylesheet" href="photo.css?v=202611021803">
+<link rel="stylesheet" href="post.css?v=202611021803">
+<link rel="stylesheet" href="marketing.css?v=202611021803">
+<link rel="stylesheet" href="contacts.css?v=202611021803">
+<link rel="stylesheet" href="leaders.css?v=202611021803">
+<link rel="stylesheet" href="links.css?v=202611021803">
+<link rel="stylesheet" href="reports.css?v=202611021803">
+<link rel="stylesheet" href="edu.css?v=202611021803">
+<link rel="stylesheet" href="qna.css?v=202611021803">
+<link rel="stylesheet" href="jo-guide.css?v=202611021803">
+<link rel="stylesheet" href="jc.css?v=202611021803">
+<link rel="stylesheet" href="talkbot.css?v=202611021803">
+<link rel="stylesheet" href="work.css?v=202611021803">
+<link rel="stylesheet" href="fin.css?v=202611021803">
+<link rel="stylesheet" href="gx.css?v=202611021803">
+<link rel="stylesheet" href="att.css?v=202611021803">
+<link rel="stylesheet" href="glass.css?v=202611021803">
+<link rel="stylesheet" href="sidebar.css?v=202611021803">
+<link rel="stylesheet" href="skins.css?v=202611021803">
 </head>
 <body>
 
@@ -742,9 +745,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202611010018"></script>
-<script src="week.js?v=202611010018"></script>
-<script src="pick.js?v=202611010018"></script>
+<script src="config.js?v=202611021803"></script>
+<script src="week.js?v=202611021803"></script>
+<script src="pick.js?v=202611021803"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -970,7 +973,7 @@ $("#pwForm").onsubmit = async (e) => {
   if (pwForced) await sb.rpc("clear_temp_pw");
   $("#pwDlg").close(); toast("🔑 비밀번호를 바꿨어요. 다음부터 새 비밀번호로 로그인하세요");
 };
-$("#outBtn").onclick = async () => { try { localStorage.removeItem("jo-token"); } catch {} await sb.auth.signOut({ scope: "local" }); location.reload(); };
+$("#outBtn").onclick = async () => { try { localStorage.removeItem("jo-token"); } catch {} await sb.auth.signOut({ scope: "local" }); location.replace(location.pathname); }; // reload 면 주소창 ?jo= 로 조교 재로그인됨
 
 // ── 불러오기 ──
 async function loadAll(scrollToday) {
@@ -2269,42 +2272,43 @@ async function checkVer() {
   } catch {}
 }
 checkVer(); document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkVer());
-sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.reload());
-boot();
+sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.replace(location.pathname)); // ?jo= 빼고 — 조교 기기는 boot 가 기억한 jo-token 으로 다시 들어감
+document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 다 돈 뒤 — 바로 부르면 데이터가 스크립트보다 빨리 온 첫 로드에 없는 전역(REF 등)을 씀 (뒤 스크립트들은 로드 시점에 me·myRole 안 씀)
 </script>
-<script src="sales.js?v=202611010018"></script>
-<script src="month-goal.js?v=202611010018"></script>
-<script src="photo.js?v=202611010018"></script>
-<script src="blog.js?v=202611010018"></script>
-<script src="mk-core.js?v=202611010018"></script>
-<script src="mkc-core.js?v=202611010018"></script>
-<script src="mka-core.js?v=202611010018"></script>
-<script src="mkd-core.js?v=202611010018"></script>
-<script src="marketing.js?v=202611010018"></script>
-<script src="sns-core.js?v=202611010018"></script>
-<script src="post.js?v=202611010018"></script>
-<script src="someday.js?v=202611010018"></script>
-<script src="contacts.js?v=202611010018"></script>
-<script src="refs.js?v=202611010018"></script>
-<script src="sim-merge.js?v=202611010018"></script>
-<script src="simtb.js?v=202611010018"></script>
-<script src="leaders-core.js?v=202611010018"></script>
-<script src="leaders.js?v=202611010018"></script>
-<script src="links.js?v=202611010018"></script>
-<script src="edu-data.js?v=202611010018"></script>
-<script src="edu.js?v=202611010018"></script>
-<script src="reports.js?v=202611010018"></script>
-<script src="jo-guide-hire.js?v=202611010018"></script>
-<script src="jo-guide.js?v=202611010018"></script>
-<script src="jc.js?v=202611010018"></script>
-<script src="talkbot.js?v=202611010018"></script>
-<script src="work-core.js?v=202611010018"></script>
-<script src="work.js?v=202611010018"></script>
-<script src="fin-core.js?v=202611010018"></script>
-<script src="fin.js?v=202611010018"></script>
-<script src="gx.js?v=202611010018"></script>
-<script src="att.js?v=202611010018"></script>
-<script src="qna.js?v=202611010018"></script>
-<script src="sidebar.js?v=202611010018"></script>
+<script src="sales.js?v=202611021803"></script>
+<script src="month-goal.js?v=202611021803"></script>
+<script src="sales-all.js?v=202611021803"></script>
+<script src="photo.js?v=202611021803"></script>
+<script src="blog.js?v=202611021803"></script>
+<script src="mk-core.js?v=202611021803"></script>
+<script src="mkc-core.js?v=202611021803"></script>
+<script src="mka-core.js?v=202611021803"></script>
+<script src="mkd-core.js?v=202611021803"></script>
+<script src="marketing.js?v=202611021803"></script>
+<script src="sns-core.js?v=202611021803"></script>
+<script src="post.js?v=202611021803"></script>
+<script src="someday.js?v=202611021803"></script>
+<script src="contacts.js?v=202611021803"></script>
+<script src="refs.js?v=202611021803"></script>
+<script src="sim-merge.js?v=202611021803"></script>
+<script src="simtb.js?v=202611021803"></script>
+<script src="leaders-core.js?v=202611021803"></script>
+<script src="leaders.js?v=202611021803"></script>
+<script src="links.js?v=202611021803"></script>
+<script src="edu-data.js?v=202611021803"></script>
+<script src="edu.js?v=202611021803"></script>
+<script src="reports.js?v=202611021803"></script>
+<script src="jo-guide-hire.js?v=202611021803"></script>
+<script src="jo-guide.js?v=202611021803"></script>
+<script src="jc.js?v=202611021803"></script>
+<script src="talkbot.js?v=202611021803"></script>
+<script src="work-core.js?v=202611021803"></script>
+<script src="work.js?v=202611021803"></script>
+<script src="fin-core.js?v=202611021803"></script>
+<script src="fin.js?v=202611021803"></script>
+<script src="gx.js?v=202611021803"></script>
+<script src="att.js?v=202611021803"></script>
+<script src="qna.js?v=202611021803"></script>
+<script src="sidebar.js?v=202611021803"></script>
 </body>
 </html>
