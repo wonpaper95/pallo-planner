@@ -438,10 +438,10 @@ const SL = window.SL = { team: null, teamName: "", month: null, plan: null, log:
 const S = () => applyAuto(compose(SL.plan, SL.log, SL.sheet));
 SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기본값 · 지금 보는 달 목표·순매출
 SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
-// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 월말 보고 달(MG.month)을 보고 있을 때만. 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
+// 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 이번 달·앞으로의 달만(지난 달은 보기만). 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
 const SEC = { s1: "[1] 월별 목표", s2: "[2] 목표 객단가 비율", s5: "[5] 일일 실행 목표" };
 function renderSec() {
-  const on = !!window.MG && SL.month === MG.month, ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
+  const on = !!window.MG && SL.month >= todayIso().slice(0, 7), ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
   const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
   V().querySelectorAll(".slsec").forEach((el) => {
     const k = el.dataset.sec, d = done[k];
