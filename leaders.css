@@ -210,6 +210,7 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .ldcard tr.subrow td.lvc { color: #2563eb; }
 #ldView .sbc { display: inline-block; margin: 1px 6px 1px 0; font-weight: 600; } #ldView .sbc.flash { background: rgba(224, 209, 32, .35); border-radius: 6px; }
 #ldView .tel { margin-left: 4px; text-decoration: none; font-size: 11px; }
+#ldView .tel.num { white-space: nowrap; color: var(--sub); font-size: 12px; } #ldView td.nm > .tel.num { display: block; margin-left: 0; }
 #ldView td.edc { width: 28px; text-align: right; } #ldView .edc .slotedit { border: 0; background: none; cursor: pointer; font-size: 12px; opacity: .35; } #ldView .edc .slotedit:hover { opacity: 1; }
 #ldView .ldpool h3 .btn { margin-left: 6px; } #ldView .ldpool td { text-align: left; }
 @media (max-width: 760px) { #ldView .ldtd2 { grid-template-columns: 1fr; } }

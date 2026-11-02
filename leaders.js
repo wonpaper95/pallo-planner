@@ -192,7 +192,7 @@ function bar(extra = "") {
 // 시간대는 언어를 빼고 묶음 ('일본어 오전'+'중국어 오전' = 오전) · 언어는 이름 옆에 작게
 const lvTxt = (lv) => (/^\d+(\.\d+)?$/.test(lv ?? "") ? `${lv}레벨` : lv ?? "");
 const tags = (r) => `${r.level ? `<span class="lv">${esc(lvTxt(r.level))}</span>` : ""}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}`;
-const tel = (r) => (r.phone ? `<a class="tel" href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}" title="${esc(r.phone)} 전화 걸기">📞</a>` : "");
+const tel = (r) => (r.phone ? `<a class="tel${myRole === "assistant" ? " num" : ""}" href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}" title="${esc(r.phone)} 전화 걸기">📞${myRole === "assistant" ? ` ${esc(r.phone)}` : ""}</a>` : ""); // 조교는 리더 리스트를 못 봐서 보드에 번호까지
 const bySlot = (rs) => { const m = new Map();
   [...rs].sort((a, b) => LDC.slotMin(LDC.timeKey(a.slot)) - LDC.slotMin(LDC.timeKey(b.slot)) || LDC.lvNum(a.level) - LDC.lvNum(b.level) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || a.sort - b.sort)
     .forEach((r) => { const k = LDC.timeKey(r.slot); m.set(k, [...(m.get(k) ?? []), r]); });
