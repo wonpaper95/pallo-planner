@@ -249,6 +249,21 @@ function cleanKeyword(s) {
   return { keyword: k };
 }
 
+// 매출 탭 '지원자' 칸 자동 채우기: 지원자 = 전산 새 신청 = 일일 현황의 전산 문의('전체' 행). 복사하지 않고 볼 때마다 얹는다(재무 시트 결제 칸과 같은 방식).
+// 11월부터만 — 10월은 10/29 부터라 달 계획보다 크게 모자라 보인다. 실패·로그인 필요 날은 비워 둔다(0 이 아니다).
+const APPS_AUTO_FROM = "2026-11-01";
+function appsByDay(rows) {
+  const out = {};
+  for (const r of rows ?? []) { const n = num(r.metrics?.inquiries); if (usable(r) && n !== null && r.date >= APPS_AUTO_FROM) out[r.date] = n; }
+  return out;
+}
+// 달력 실적 log({날짜: 줄})에 자동 지원자를 얹은 새 log. 사람이 적은 apps 가 있으면 그 값이 우선. appsAuto = 자동값, autoOnly = 그날 다른 입력이 없는 칸(입력 일수에 안 센다).
+function withAutoApps(log, apps) {
+  const out = { ...log };
+  for (const [d, n] of Object.entries(apps ?? {})) { const e = out[d]; if (e?.apps !== null && e?.apps !== undefined) continue; out[d] = { ...(e ?? { autoOnly: true }), apps: n, appsAuto: true }; }
+  return out;
+}
+
 // 표기 (화면·보고 공용)
 function fmt(v, unit) {
   if (v === null || v === undefined) return "–";
@@ -258,5 +273,5 @@ function fmt(v, unit) {
   return Math.round(v).toLocaleString("ko-KR");
 }
 
-return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, keywordRanks, cleanKeyword, ENROLL_UNITS, enrollRows, fmt };
+return { CHANNELS, CHANNEL_LABEL, AD_CHANNELS, STATUS, WINDOWS, METRICS, CHANNEL_METRICS, ALL, MIN_SAMPLE, addDays, windowRange, aggregate, pctChange, unitsOf, totalRows, cell, buildTable, summary, status, channelOfSource, flags, keywordRanks, cleanKeyword, ENROLL_UNITS, enrollRows, APPS_AUTO_FROM, appsByDay, withAutoApps, fmt };
 });

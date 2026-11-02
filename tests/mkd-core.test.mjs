@@ -507,3 +507,21 @@ test("summary: 문의당 비용은 광고비·문의가 둘 다 있는 날끼리
   assert.equal(c("총 광고비", "w1").value, 49000);   // 광고비 줄 자체는 7일 그대로
   assert.equal(c("문의당 비용", "w1").value, 1000);  // 14000 / 14 (문의 있는 2일만 — 예전 계산이면 49000/14 = 3500)
 });
+
+// ── 매출 탭 지원자 칸 자동 채우기 ──
+test("appsByDay: 전산 '전체' 문의를 날짜별로, 11월부터만, 실패·로그인 필요·숫자 없는 날은 뺀다(0 이 아니다)", () => {
+  const rows = [{ date: "2026-10-31", metrics: { inquiries: 8 }, status: "ok" }, { date: "2026-11-01", metrics: { inquiries: 12 }, status: "ok" }, { date: "2026-11-02", metrics: { inquiries: 0 }, status: "partial" },
+    { date: "2026-11-03", metrics: { note: "로그인 필요" }, status: "login_required" }, { date: "2026-11-04", metrics: { inquiries: 5 }, status: "failed" }, { date: "2026-11-05", metrics: {}, status: "ok" }];
+  assert.deepEqual(D.appsByDay(rows), { "2026-11-01": 12, "2026-11-02": 0 });
+  assert.deepEqual(D.appsByDay(undefined), {});
+});
+test("withAutoApps: 비어 있는 날에 얹고(사람이 적은 값 우선, 0 도 사람 값), 원본 log 는 그대로, 다른 칸은 유지", () => {
+  const log = { "2026-11-01": { apps: 3, replies: 2 }, "2026-11-02": { apps: null, replies: 4 }, "2026-11-03": { apps: 0 } };
+  const out = D.withAutoApps(log, { "2026-11-01": 12, "2026-11-02": 7, "2026-11-03": 9, "2026-11-04": 5 });
+  assert.deepEqual(out["2026-11-01"], { apps: 3, replies: 2 });
+  assert.deepEqual(out["2026-11-02"], { apps: 7, replies: 4, appsAuto: true });
+  assert.deepEqual(out["2026-11-03"], { apps: 0 });
+  assert.deepEqual(out["2026-11-04"], { autoOnly: true, apps: 5, appsAuto: true });
+  assert.equal(log["2026-11-02"].apps, null);
+  assert.deepEqual(D.withAutoApps(log, undefined), log);
+});

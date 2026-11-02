@@ -47,7 +47,7 @@ function actuals(s) {
   const t = { apps: 0, replies: 0, consults: 0, payers: 0, amount: 0, refund: 0, signup: 0, days: 0, appDays: 0 }, td = todayIso();
   for (const [d, e] of Object.entries(s.log)) {
     if (d <= (s.linked ? addDays(pStart(s), -1) : s.base) || d > s.end || d > td) continue; // 시트 연동이면 집계 시작일부터 (휴무일 매출도 포함)
-    t.days++; if (e.apps != null) t.appDays++;
+    if (!e.autoOnly || e.sheet) t.days++; if (e.apps != null) t.appDays++; // 전산 자동 지원자만 있는 날은 '입력한 날'이 아니다
     for (const k of ["apps", "replies", "consults", "payers", "amount", "refund", "signup"]) t[k] += e[k] || 0;
   }
   t.arpu = t.payers ? (s.linked ? t.signup : t.amount) / t.payers : 0; // 객단가 = 가입 금액 ÷ 가입 인원 (시트 연동)
@@ -72,7 +72,8 @@ function replyPace(s, c) {
 const replyTgt = (s, c, d) => { const rp = replyPace(s, c); return d < todayIso() ? rp.plan : rp.dyn; };
 
 // 재무 시트가 연결된 지점: 결제자·결제금액·환불은 시트 값(직접 입력 안 씀), 현재 순매출 = 시트의 1일~기준일 합계
-function compose(plan, log, sheet) {
+function compose(plan, rawLog, sheet) {
+  const log = MKDCORE.withAutoApps(rawLog, sheet?.apps); // 👥 지원자: 전산 문의 자동 (사람이 적은 값 우선)
   const linked = !!sheet?.sync && !sheet.sync.error;
   if (!linked) return { ...plan, log, linked };
   const out = {};
@@ -195,8 +196,10 @@ function compareFill(s, c) {
   const nd = m.net - planNet;
   setH("slCur_goal", `<b>${won(m.net)}원 (${pct(m.net / s.goal * 100)}%)</b><small class="${nd >= 0 ? "up" : "dn"}">오늘까지 계획 ${won(planNet)}원 대비 ${nd >= 0 ? "▲" : "▼"} ${won(Math.abs(nd))}원</small>`);
   const ag = $v('[data-k="appsGoal"]'); if (ag !== document.activeElement) ag.value = c.month.apps; // 비워 두면 월 목표에서 계산한 값
-  const ap = workDays(addDays(pStart(s), -1), todayIso() < mEnd(s) ? todayIso() : mEnd(s)) * c.month.apps / c.month.days;
-  setH("slCur_apps", m.apps ? `<b>${m.apps.toLocaleString()}명</b><small class="${m.apps >= ap ? "up" : "dn"}">오늘까지 계획 ${Math.round(ap)}명 대비 ${m.apps >= ap ? "▲" : "▼"} ${Math.abs(Math.round(m.apps - ap))}명</small>` : `<b>-</b><small>달력에 지원자 입력 없음</small>`);
+  // 전산 자동 지원자는 다음 날 새벽에 들어온다 → 오늘 숫자가 아직 없으면 어제까지 계획과 비교
+  const apLate = todayIso() <= mEnd(s) && s.log[todayIso()]?.apps == null, apEnd = apLate ? addDays(todayIso(), -1) : todayIso() < mEnd(s) ? todayIso() : mEnd(s);
+  const ap = workDays(addDays(pStart(s), -1), apEnd) * c.month.apps / c.month.days;
+  setH("slCur_apps", m.apps ? `<b>${m.apps.toLocaleString()}명</b><small class="${m.apps >= ap ? "up" : "dn"}">${apLate ? "어제" : "오늘"}까지 계획 ${Math.round(ap)}명 대비 ${m.apps >= ap ? "▲" : "▼"} ${Math.abs(Math.round(m.apps - ap))}명</small>` : `<b>-</b><small>지원자 없음 (11월부터 전산 문의에서 자동)</small>`);
   setH("slCur_reply", cell(s.reply, r(m.replies, m.apps), "%", 1, "reply"));
   setH("slCur_consult", cell(s.consult, r(m.consults, m.replies), "%", 1, "consult"));
   setH("slCur_pay", cell(s.pay, r(m.payers, m.consults), "%", 1, "pay"));
@@ -523,7 +526,7 @@ V().innerHTML = `
 <section class="slcard"><h3>🎯 어디를 올리면 가장 효과적인가 — 개선 효과 순위</h3><p class="slg">자동 계산입니다. [1] 비율 하나만 올렸을 때 필요 지원자가 많이 줄어드는 순서입니다. 1등부터 손댑니다.</p><div id="slLever"></div></section>
 <section class="slcard"><h3>📈 일일·주간 기준 — 매일 이만큼 채우면 월 목표 달성</h3><p class="slg">자동 계산입니다. 하루 기준 = 월 목표 ÷ 영업일. ✓ 는 기준 이상, ✗ 는 미달입니다.</p><div id="slPace"></div></section>
 <section class="slcard"><h3>📅 일일 실적 달력 — 날짜를 눌러 실적을 입력하세요</h3>
-  <p class="slg">지원자·회신자·상담자는 직접 입력합니다. 결제·환불은 재무 연동 지점이면 재무 숫자가 자동으로 들어갑니다.</p><p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
+  <p class="slg">지원자는 전산 문의에서 다음 날 새벽 자동으로 들어옵니다(직접 적으면 그 값 우선). 회신자·상담자는 직접 입력합니다. 결제·환불은 재무 연동 지점이면 재무 숫자가 자동으로 들어갑니다.</p><p class="slhint" id="slCalNote" style="font-size:14px;color:var(--text)"></p><div id="slCal"></div>
   <p class="slhint">빨간 칸은 상담자 수가 하루 목표보다 적은 날입니다. 입력한 숫자를 보고 어느 단계가 막혔는지 판단해 행동 요령을 띄웁니다. 아직 오지 않은 날은 예약된 상담 수를 넣어두면 미리 확인할 수 있습니다.</p>
   <div id="slActual"></div></section>
 <section class="slcard"><h3>현재 문제점 (보고문 맨 앞)</h3><p class="slg">실적이 바뀌면 자동으로 다시 써집니다. 아래 칸에 쓴 내용은 📋 보고문에 같이 들어갑니다.</p><pre id="slProblems"></pre>
@@ -542,7 +545,7 @@ V().innerHTML = `
 </div>
 <dialog id="slDlg"><form method="dialog">
   <h3 id="slDlgTitle"></h3>
-  <div class="slrow"><label>지원자<small>SSO 새 신청, 하루치</small></label><input type="number" min="0" name="apps"></div>
+  <div class="slrow"><label>지원자<small>전산 새 신청 — 비워 두면 자동</small></label><input type="number" min="0" name="apps"></div>
   <div class="slrow"><label>회신자<small>오늘 상담 오기로 한 사람 (캘린더)</small></label><input type="number" min="0" name="replies"></div>
   <div class="slrow"><label>상담자<small>그중 실제 방문·상담한 사람</small></label><input type="number" min="0" name="consults"></div>
   <div class="slrow"><label>결제자<small>이날 결제한 사람 (분납은 첫 결제일)</small></label><input type="number" min="0" name="payers"></div>
@@ -586,12 +589,14 @@ SL.load = async function () {
 };
 async function loadDays() {
   const s = SL.plan, from = s.base < mStart(s) ? s.base : mStart(s), to = s.end > mEnd(s) ? s.end : mEnd(s);
-  const [m, sd, sy] = await Promise.all([sb.from("sales_days").select("*").eq("team_id", SL.team).gte("day", from).lte("day", to),
+  const [m, sd, sy, ja] = await Promise.all([sb.from("sales_days").select("*").eq("team_id", SL.team).gte("day", from).lte("day", to),
     sb.from("sales_sheet_days").select("*").eq("team_id", SL.team).gte("day", mStart(s)).lte("day", mEnd(s)),
-    sb.from("sales_sheet_sync").select("*").eq("team_id", SL.team).eq("month", SL.month).maybeSingle()]);
+    sb.from("sales_sheet_sync").select("*").eq("team_id", SL.team).eq("month", SL.month).maybeSingle(),
+    sb.from("mkd_daily").select("date,metrics,status").eq("team_id", SL.team).eq("channel", "jeonsan").eq("unit", MKDCORE.ALL).gte("date", mStart(s)).lte("date", mEnd(s))]);
   if (fail(m.error || sd.error || sy.error)) return;
+  if (ja.error) console.error(ja.error); // 자동 지원자만 비운다
   SL.log = Object.fromEntries(m.data.map((r) => [r.day, r]));
-  SL.sheet = { days: Object.fromEntries(sd.data.map((r) => [r.day, r])), sync: sy.data };
+  SL.sheet = { days: Object.fromEntries(sd.data.map((r) => [r.day, r])), sync: sy.data, apps: MKDCORE.appsByDay(ja.data) };
   SL.labor = await laborOf(SL.team, SL.month);
 }
 // 💸 조교 인건비 현재 = 🕒 조교 근무기록 그달 칸 시간 합 × 시급 (근무기록 탭과 같은 계산, 기록 없으면 null)
@@ -850,13 +855,15 @@ function openDay(d) {
   editDay = d; const linked = S().linked, e = { ...(SL.log[d] || {}), ...(linked ? S().log[d] || { payers: 0, amount: 0, refund: 0 } : {}) };
   $v("#slDlgTitle").textContent = `${md(d)} 실적 (${SL.teamName})`;
   for (const f of dlg.querySelectorAll("input")) { f.value = e[f.name] == null ? "" : f.hasAttribute("data-money") ? won(e[f.name]) : e[f.name]; f.readOnly = linked && SHEET_F.includes(f.name); }
+  const autoApps = S().log[d]?.appsAuto ? S().log[d].apps : null, appsF = dlg.querySelector('[name="apps"]'); // 자동값은 칸 안 안내로만 — 저장해도 사람이 적은 값이 되지 않게
+  appsF.placeholder = autoApps == null ? "" : `전산 자동 ${autoApps}명`; if (autoApps != null) appsF.value = "";
   $v("#slDlgNote").textContent = (linked ? "📗 결제자·결제금액·환불은 재무 시트에서 자동으로 들어옵니다 (여기서 못 고침). " : "") + (d > todayIso() ? "앞날 입력은 예약으로만 봅니다. 칸 색깔만 바뀌고 실적에는 더해지지 않습니다. 그날이 지나면 실제 숫자로 고쳐주세요." : "");
   $v("#slDlgWho").textContent = e.updated_at ? `마지막 저장 ${new Date(e.updated_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "";
   showTips(); dlg.showModal();
 }
 const readDlg = () => Object.fromEntries([...dlg.querySelectorAll("input")].filter((f) => f.value !== "").map((f) => [f.name, num(f.value)]));
 function showTips() {
-  const s = S(), c = calc(s), g = diagnose(s, c, readDlg(), replyTgt(s, c, editDay));
+  const s = S(), c = calc(s), au = s.log[editDay]?.appsAuto ? { apps: s.log[editDay].apps } : {}, g = diagnose(s, c, { ...au, ...readDlg() }, replyTgt(s, c, editDay));
   $v("#slTips").innerHTML = !g ? "" : g.why.length
     ? `<div class="sltip">${g.low ? `<h4>캘린더 회신 최소 ${g.tgt}명보다 부족합니다</h4>` : ""}${g.why.map(([w, k]) => `<b>${w}</b><ul>${tipList(s, k).map((t) => `<li>${t}</li>`).join("")}</ul>`).join("")}</div>`
     : `<div class="sltip ok"><b>캘린더 회신 최소 달성 ✓</b></div>`;
