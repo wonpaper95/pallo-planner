@@ -58,7 +58,7 @@ JC.load = async function () {
 let chan = null;
 function listen() {
   if (chan) return;
-  const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "jc" && JC.load(), 300); };
+  const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "jc" && !JC.editTask && JC.load(), 300); }; // 할일 고치는 중엔 표를 다시 안 그림 (끝날 때 다시 읽음)
   chan = sb.channel("jc");
   for (const tb of ["jc_names", "jc_tasks", "jc_cells", "jc_memos", "jc_subs", "jc_links", "jc_photos"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
   chan.subscribe();
@@ -159,8 +159,8 @@ function renderGrid(toToday) {
     return `<td class="jccell ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}"><button class="jccb" data-act="cell" data-task="${t.id}" data-day="${d.k}">${ns.slice(0, 2).map(chip).join("")}${ns.length > 2 ? `<span class="jcmore">+${ns.length - 2}</span>` : ""}${ns.length ? "" : `<span class="jcplus">+</span>`}</button></td>`;
   };
   box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}" ${d.h ? `title="${esc(d.h)}"` : ""}>${d.label}</th>`).join("")}</tr></thead>
-    <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><b>${esc(t.body.slice(1).trim())}</b><button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
-      : `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><span class="jcgrow">${esc(t.body)}</span><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
+    <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jctasktxt" data-act="taskedit" title="눌러서 내용 고치기"><b>${esc(t.body.slice(1).trim())}</b></button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
+      : `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
   const sc = box.querySelector(".jcscrollx");
   if (toToday || keep === null) setTimeout(() => scrollToday(V().querySelector(".jcscrollx"), false)); else sc.scrollLeft = keep; // 그 사이 다시 그렸으면 새 표 기준
 }
@@ -310,6 +310,18 @@ function bind() {
       const row = b.closest(".jcsub"), q = (n) => row.querySelector(`[name=${n}]`).value, start = q("start"), end = q("end");
       JC.editSub = null; row.classList.remove("editing");
       if (!fail((await sb.from("jc_subs").update({ lang: q("lang"), start_day: start, end_day: end < start ? start : end, slot: q("slot"), in_name: q("in") }).eq("id", id)).error)) JC.load();
+      return;
+    }
+    if (act === "taskedit") { // ✏️ 할일 바로 고치기 (신고 원빈): 칸 담당 기록을 그대로 두려고 지우고 새로 만들지 않음. Enter·밖 누르기 = 저장, Esc = 취소
+      const t = JC.tasks.find((x) => x.id === +b.closest("tr[data-task]").dataset.task), sec = t.body.startsWith("■"), old = sec ? t.body.slice(1).trim() : t.body;
+      const inp = Object.assign(document.createElement("textarea"), { className: "jctask-in", value: old, maxLength: sec ? 118 : 120, rows: 3 }); // ■ + 띄어쓰기 2자, DB 는 120자까지
+      b.replaceWith(inp); inp.focus(); inp.select(); JC.editTask = true; let done = false;
+      const end = async (save) => { if (done) return; done = true; JC.editTask = false;
+        const body = inp.value.trim().replace(/\s*\n\s*/g, " ");
+        if (save && body && body !== old) { t.body = sec ? `■ ${body}` : body; renderGrid(); fail((await sb.from("jc_tasks").update({ body: t.body }).eq("id", t.id)).error); } else renderGrid();
+        JC.load(); };
+      inp.onblur = () => end(true);
+      inp.onkeydown = (ev) => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); inp.blur(); } else if (ev.key === "Escape") end(false); };
       return;
     }
     if (act === "rename") {
