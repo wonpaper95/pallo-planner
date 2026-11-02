@@ -27,6 +27,11 @@ const W = {
     return (!!b.done - !!a.done) || (!!a.start_time - !!b.start_time) || String(a.start_time ?? "").localeCompare(String(b.start_time ?? ""))
       || ((a.sort ?? 0) - (b.sort ?? 0)) || ((a.id ?? 0) - (b.id ?? 0));
   },
+  // 팀 업무 순서: 날짜 → 그날 안에서 daySort (팀 업무는 시작시간이 없어 마감 시각을 대신 씀)
+  teamSort(a, b) {
+    const v = (k) => ({ done: k.done_by, start_time: k.deadline, id: k.id });
+    return String(a.day).localeCompare(String(b.day)) || W.daySort(v(a), v(b));
+  },
   // 데드라인 상태: over(지남) / soon(24시간 안) / ok
   due(deadline, now = new Date()) {
     const ms = new Date(deadline) - now, h = Math.abs(ms) / 3600000;
