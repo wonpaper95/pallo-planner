@@ -6,6 +6,8 @@
 // 당근은 "어제 데이터는 매일 오전 8시에 갱신" — 그 전엔 어제가 0 으로 보인다. 그래서 확정된 날(한국 시각 8시 전이면 그저께까지, 뒤면 어제까지)만 쓴다.
 // 이미 ok 로 저장된 날은 다시 쓰지 않는다(그날 찍어 둔 현재 단골 수를 지우지 않게). 단골(followers)은 이번에 쓰는 가장 최근 날에만 '지금 값'으로 싣는다.
 // 채팅·전화 수는 아직 못 읽는다(비즈프로필 홈은 다른 도메인이라 자동 로그인이 안 이어짐).
+// 당근 광고(전문가모드, 2026-11-02 시작): 광고 계정이 지점마다 하나. 홈에서 그 계정으로 들어가고 '디스플레이 광고 관리' 화면이 받는 시계열(최근 7일, 쓴 날만 줄이 있음)을 읽는다.
+//   비즈프로필과 달리 약 10분마다 갱신돼 하루 늦지 않다 → 그날(D)을 바로 쓴다. 줄이 없는 날은 0 원. 비용은 VAT 포함. 어제면 홈의 '어제 총 소진 비용'과 맞춰 보고 다르면 partial.
 
 export const DAANGN_TEAMS = ["dsr", "jpcn", "ulsan"]; // 비즈프로필이 있는 지점 (구미점은 없음)
 export const LOGIN_URL = "https://business.daangn.com/profile/login";
@@ -66,3 +68,23 @@ export function teamInputs(teamKey, detailJson, followersNow, dates) {
   return out;
 }
 export const failInputs = (teamKey, dates, note, status = "failed") => Object.fromEntries(dates.map((d) => [d, { rows: [{ team_key: teamKey, unit: "전체", metrics: { note }, status }] }]));
+
+// ── 당근 광고 ──
+export const ADVERTISERS = { dsr: "3550500", jpcn: "4039007", ulsan: "3550506" };
+export const adsHomeUrl = (id) => `https://ads-pro.business.daangn.com/?advertiserId=${encodeURIComponent(id)}&advertiser_id=${encodeURIComponent(id)}`;
+export const ADS_LIST_URL = "https://ads-pro.business.daangn.com/display-home";
+export const ADS_WINDOW = 7; // 화면 기본 기간 '최근 7일' (오늘 포함)
+export const onSignIn = (url) => { try { const u = new URL(url); return u.hostname === "accounts.daangn.com" && u.pathname.startsWith("/sign-in"); } catch { return false; } };
+export const adsAccountId = (text) => String(text ?? "").match(/ID\s*(\d{6,8})/)?.[1] ?? null;
+export const homeYesterday = (text) => { const m = String(text ?? "").match(/어제 총 소진 비용\(VAT 포함\)\s*([\d,]+)원/); return m ? +m[1].replace(/,/g, "") : null; };
+const kstDay = (iso) => { const t = new Date(iso); return isNaN(t) ? null : new Date(t.getTime() + 9 * 3600e3).toISOString().slice(0, 10); };
+// 시계열 JSON + 날짜 D → save 입력. 그날 줄이 없으면 0(광고를 안 쓴 날). homeCost = 홈의 어제 소진 비용(D 가 어제일 때만).
+export function adsInput(teamKey, json, D, homeCost = null) {
+  const row = (metrics, status) => ({ rows: [{ team_key: teamKey, unit: "전체", metrics, status }] });
+  if (!Array.isArray(json?.data)) return row({ note: "광고 숫자 못 읽음" }, "failed");
+  const x = json.data.find((r) => kstDay(r?.duration) === D), p = x?.performance ?? {}, chat = p.conversions?.chat ?? 0;
+  const metrics = x ? { impressions: int(p.impression), clicks: int(p.click), spend: int(p.cost), chats: int(chat) } : { impressions: 0, clicks: 0, spend: 0, chats: 0 };
+  if (Object.values(metrics).some((v) => v === null)) return row({ note: "광고 숫자 형식 이상" }, "failed");
+  if (homeCost !== null && homeCost !== metrics.spend) return row({ ...metrics, note: "홈의 어제 소진 비용과 달라요 — 검색 광고 등 다른 유형이 돌 수 있어요" }, "partial");
+  return row(metrics, "ok");
+}

@@ -236,7 +236,7 @@ test("summary: 문의·등록·총 광고비·문의당 비용", () => {
 test("status: 채널별 기준일 수집 상태", () => {
   const rows = [row(END, "naver_ad", "a", { clicks: 1 }), row(END, "google_ad", "전체", { note: "로그인" }, "login_required"),
     row(END, "blog", "k1", { rank: 1 }), row(END, "blog", "k2", {}, "failed"), row("2026-10-27", "daangn", "전체", { views: 3 })];
-  assert.deepEqual(D.status(rows, END), { naver_ad: "ok", google_ad: "login_required", meta_ad: "missing", blog: "partial", daangn: "missing", jeonsan: "missing" });
+  assert.deepEqual(D.status(rows, END), { naver_ad: "ok", google_ad: "login_required", meta_ad: "missing", daangn_ad: "missing", blog: "partial", daangn: "missing", jeonsan: "missing" });
 });
 
 test("channelOfSource", () => {
@@ -554,4 +554,16 @@ test("flags: 그날 캠페인이 전부 일시중지면 [안내] 는 빼고, 막
   assert.deepEqual(fl([paused("대구_영어", [n]), paused("대구_일본어")]), []);
   assert.deepEqual(fl([paused("대구_영어", [n, "[계정] 계정 정지"]), paused("대구_일본어")]), [["red", "account_issue"]]);
   assert.deepEqual(fl([paused("대구_영어", [n]), row(END, "google_ad", "대구_일본어", { status: "운영 가능", impressions: 5 })]), [["gray", "account_notice"]]);
+});
+
+// ── 당근 광고 채널 ──
+test("당근 광고: 총 광고비에 더해지고, 표에 비용·클릭이 나오며, '전체' 행이라 광고 멈춤 경고 대상이 아니다", () => {
+  const rows = [row(END, "meta_ad", "c", { spend: 10000, clicks: 5 }), row(END, "daangn_ad", "전체", { impressions: 646, clicks: 12, spend: 3758, chats: 0 }), row(END, "jeonsan", "전체", { inquiries: 2 })];
+  const cell = (label) => D.summary(rows, END).find((l) => l.label === label).cells.find((c) => c.key === "d1").value;
+  assert.equal(cell("총 광고비"), 13758);
+  assert.equal(cell("문의당 비용"), 6879);
+  assert.deepEqual(D.buildTable(rows, END).find((c) => c.channel === "daangn_ad").metrics.map((m) => m.metric), ["impressions", "clicks", "spend", "ctr", "cpc", "chats"]);
+  assert.equal(D.CHANNEL_LABEL.daangn_ad, "당근 광고");
+  const stop = ["2026-10-22", "2026-10-26", "2026-10-27", END].map((d, i) => row(d, "daangn_ad", "전체", { impressions: i ? 0 : 500, spend: 0 }));
+  assert.deepEqual(D.flags(stop, END).filter((f) => f.code === "ad_stopped"), []);
 });

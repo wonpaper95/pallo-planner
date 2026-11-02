@@ -46,11 +46,11 @@ test("buildReport: 모양 — date·days·status·summary·flags·flagCounts·te
 
 test("buildReport: 채널 상태 — 전체와 팀별", () => {
   const r = buildReport(fixture(), TEAMS, END);
-  assert.deepEqual(r.status, { naver_ad: "ok", google_ad: "ok", meta_ad: "login_required", blog: "missing", daangn: "missing", jeonsan: "ok" });
+  assert.deepEqual(r.status, { naver_ad: "ok", google_ad: "ok", meta_ad: "login_required", daangn_ad: "missing", blog: "missing", daangn: "missing", jeonsan: "ok" });
   const t = (id) => r.teams.find((x) => x.team_id === id);
   assert.deepEqual(t(1).status, r.status);
-  assert.deepEqual(t(2).status, { naver_ad: "missing", google_ad: "missing", meta_ad: "login_required", blog: "missing", daangn: "missing", jeonsan: "missing" });
-  assert.deepEqual(t(3).status, { naver_ad: "ok", google_ad: "missing", meta_ad: "login_required", blog: "missing", daangn: "missing", jeonsan: "missing" });
+  assert.deepEqual(t(2).status, { naver_ad: "missing", google_ad: "missing", meta_ad: "login_required", daangn_ad: "missing", blog: "missing", daangn: "missing", jeonsan: "missing" });
+  assert.deepEqual(t(3).status, { naver_ad: "ok", google_ad: "missing", meta_ad: "login_required", daangn_ad: "missing", blog: "missing", daangn: "missing", jeonsan: "missing" });
 });
 
 // 손계산 — 전체: 광고비 D = 네이버 (10000+5000)+3000 + 구글 7300 = 25300, 전날 = (8000+4000)+2500 + 6000 = 20500. 문의 D 3, 전날 2.
@@ -111,7 +111,7 @@ test("buildReport: 기준일 밖(미래·56일 전) 행은 무시", () => {
 test("buildReport: 데이터가 하나도 없으면 전부 missing·null, 죽지 않는다", () => {
   const r = buildReport([], TEAMS, END);
   assert.equal(r.days, 0);
-  assert.deepEqual(Object.values(r.status), Array(6).fill("missing"));
+  assert.deepEqual(Object.values(r.status), Array(7).fill("missing"));
   assert.deepEqual(r.flags, []);
   assert.deepEqual(r.flagCounts, {});
   assert.equal(cell(r, "문의", "d1").value, null);
@@ -241,7 +241,7 @@ test("buildWeekly: 7일 핵심 줄(w1)·매체별 문의·등록당 비용(싼 �
   const v = (label) => w.summary.find((l) => l.label === label).value;
   assert.deepEqual([v("문의"), v("등록"), v("총 광고비"), v("문의당 비용"), v("등록당 비용")], [14, 3, 84000, 6000, 28000]);
   assert.deepEqual(w.media.map((m) => [m.name, m.spend, m.inquiries, m.enrolls, m.perInquiry, m.perEnroll]),
-    [["네이버", 14000, 2, 1, 7000, 14000], ["메타", 70000, 7, 2, 10000, 35000], ["구글", null, null, null, null, null]]);
+    [["네이버", 14000, 2, 1, 7000, 14000], ["메타", 70000, 7, 2, 10000, 35000], ["구글", null, null, null, null, null], ["당근", null, null, null, null, null]]);
   assert.deepEqual(w.flags.map((f) => [f.level, f.msg, f.days, f.last]), [["red", "결제 문제", 1, day(1)], ["yellow", "'k' 7위 → 9위", 2, day(1)]]);
   assert.deepEqual(w.teams.map((t) => t.team), ["대구동성로점"]);
   assert.ok(w.channels.find((c) => c.channel === "meta_ad").units[0].metrics.some((m) => m.label === "비용" && m.value === 70000));

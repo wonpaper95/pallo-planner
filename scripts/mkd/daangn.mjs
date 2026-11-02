@@ -1,15 +1,16 @@
 // 사용: node scripts/mkd/daangn.mjs <YYYY-MM-DD> [--days N] [--print]
-// 일일 현황의 당근 비즈프로필(조회수·방문 고객수·단골)을 맥미니 자동 브라우저(Playwright 지속 프로필 ~/.cache/pallo-mkd/daangn)로 읽어 mkd_daily(daangn) 에 지점별 '전체' 행으로 저장한다.
+// 일일 현황의 당근 비즈프로필(조회수·방문 고객수·단골)과 당근 광고(전문가모드 비용·노출·클릭)를 맥미니 자동 브라우저(Playwright 지속 프로필 ~/.cache/pallo-mkd/daangn)로 읽어
+// mkd_daily(daangn · daangn_ad) 에 지점별 '전체' 행으로 저장한다. 광고는 D 하루치를 바로 쓴다(D 가 최근 7일 안일 때만 — 화면 기간 밖은 0 으로 잘못 쓰게 되어 건너뛴다).
 //   · 당근비즈니스 화면이 스스로 받는 JSON(계정 목록·통계 일별 상세·단골 요약)을 응답에서 읽는다 — 쿠키·토큰은 읽지 않고, 화면에서 아무것도 누르지 않는다.
 //   · 당근은 어제 숫자가 오전 8시에 확정돼서 확정된 날만, 아직 ok 로 없는 날만 쓴다: [D-(N-1), D] ∩ 확정된 날(기본 N=7 — 06:00 실행이면 그저께까지). 규칙은 daangn-rows.mjs(테스트 있음).
 //   · 로그인이 풀렸으면(당근 계정 로그인 화면) 비밀번호를 넣지 않고 지점마다 login_required — 사람이 `node scripts/mkd/browser.mjs login daangn` 으로 다시 로그인한다.
-// 출력 JSON 한 줄 {ok,date,final,wrote:{지점:[날짜…]},followers:{지점:n},status:{지점:ok|failed|login_required},note?}. 실패·로그인 필요가 있으면 종료코드 1.
+// 출력 JSON 한 줄 {ok,date,final,wrote:{지점:[날짜…]},followers:{지점:n},status:{지점:ok|failed|login_required},ads:{지점:{status,spend,clicks,chats,note?}}}. 실패·로그인 필요가 있으면 종료코드 1.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { playwrightCandidates, validDate, kstDate } from "./browser-rows.mjs";
-import { DAANGN_TEAMS, LOGIN_URL, dashboardUrl, accountsFrom, daangnLogin, lastFinal, datesToWrite, teamInputs, failInputs } from "./daangn-rows.mjs";
+import { playwrightCandidates, validDate, kstDate, isYesterdayKst } from "./browser-rows.mjs";
+import { DAANGN_TEAMS, LOGIN_URL, dashboardUrl, accountsFrom, daangnLogin, lastFinal, datesToWrite, teamInputs, failInputs, ADVERTISERS, ADS_LIST_URL, ADS_WINDOW, adsHomeUrl, onSignIn, adsAccountId, homeYesterday, adsInput } from "./daangn-rows.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const D = process.argv[2], print = process.argv.includes("--print");
@@ -29,6 +30,25 @@ async function gotoFor(page, url, part, ms = 30_000) {
   return got;
 }
 
+// 광고 계정 하나: 홈에서 그 계정으로 들어가(화면의 ID 확인) 어제 소진 비용을 읽고, 광고 관리 화면이 받는 시계열로 D 하루치 입력을 만든다. → save 입력
+async function readAds(page, key, D) {
+  const id = ADVERTISERS[key], one = (note, status = "failed") => ({ rows: [{ team_key: key, unit: "전체", metrics: { note }, status }] });
+  await page.goto(adsHomeUrl(id), { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {});
+  let text = "";
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    if (onSignIn(page.url())) return one("로그인 필요", "login_required");
+    text = await page.evaluate(() => document.body?.innerText ?? "").catch(() => "");
+    if (adsAccountId(text) === id && homeYesterday(text) !== null) break;
+  }
+  if (adsAccountId(text) !== id) return one("광고 계정 화면을 못 열었어요");
+  const wait = page.waitForResponse((r) => r.url().includes("/advertisement/time-series") && r.status() === 200, { timeout: 25_000 }).then((r) => r.json()).catch(() => null);
+  await page.goto(ADS_LIST_URL, { waitUntil: "domcontentloaded", timeout: 30_000 }).catch(() => {});
+  const json = await wait;
+  if (!json) return one("광고 숫자 못 읽음");
+  return adsInput(key, json, D, isYesterdayKst(D) ? homeYesterday(text) : null);
+}
+
 async function main() {
   if (!validDate(D) || D >= kstDate()) { console.error(`날짜는 어제 이전 YYYY-MM-DD 여야 해요: ${D ?? "(없음)"}`); process.exit(2); }
   if (!(DAYS >= 1 && DAYS <= 30)) { console.error("--days 는 1~30"); process.exit(2); }
@@ -39,9 +59,12 @@ async function main() {
   const have = await select("mkd_daily", `select=team_id,date&channel=eq.daangn&status=eq.ok&date=gte.${from}&date=lte.${D}`, "date,team_id");
   const haveOf = (key) => new Set(have.filter((r) => keyOf.get(r.team_id) === key).map((r) => r.date));
   const plan = Object.fromEntries(DAANGN_TEAMS.map((k) => [k, datesToWrite(D, DAYS, final, haveOf(k))]));
-  if (DAANGN_TEAMS.every((k) => !plan[k].length)) { console.log(JSON.stringify({ ok: true, date: D, final, wrote: {}, note: "쓸 날이 없어요(이미 저장됐거나 아직 확정 전)" })); return 0; }
+  // 광고는 화면 기간(최근 7일, 오늘 포함) 안의 날만 — 밖이면 줄이 없어 0 으로 잘못 쓰게 된다
+  const adsFrom = (() => { const t = new Date(kstDate() + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() - (ADS_WINDOW - 1)); return t.toISOString().slice(0, 10); })(), wantAds = D >= adsFrom;
+  const wantBiz = DAANGN_TEAMS.some((k) => plan[k].length);
+  if (!wantBiz && !wantAds) { console.log(JSON.stringify({ ok: true, date: D, final, wrote: {}, note: "쓸 날이 없어요(이미 저장됐거나 아직 확정 전, 광고는 최근 7일만)" })); return 0; }
 
-  const inputs = {}, status = {}, followers = {};
+  const inputs = {}, status = {}, followers = {}, adInputs = {};
   const fail = (k, note, st = "failed") => { status[k] = st; const ds = st === "login_required" ? plan[k].slice(-1) : plan[k]; Object.assign((inputs[k] = {}), failInputs(k, ds, note, st)); };
   const ctx = await (await loadChromium()).launchPersistentContext(PROFILE, {
     ...(existsSync(CHROME_APP) ? { channel: "chrome" } : {}), headless: true, viewport: { width: 1366, height: 900 }, locale: "ko-KR", timezoneId: "Asia/Seoul",
@@ -49,9 +72,9 @@ async function main() {
   }).catch((e) => { console.error(`브라우저를 못 열었어요 — 당근 로그인 창이 아직 열려 있나요? (${String(e?.message).split("\n")[0].slice(0, 100)})`); process.exit(1); });
   try {
     const page = ctx.pages()[0] ?? (await ctx.newPage());
-    const list = await gotoFor(page, LOGIN_URL, "/business_accounts/search");
-    if (list === "login" || list === null) for (const k of DAANGN_TEAMS) if (plan[k].length) fail(k, list === "login" ? "로그인 필요" : "계정 목록 못 읽음", list === "login" ? "login_required" : "failed");
-    if (list && list !== "login") {
+    const list = wantBiz ? await gotoFor(page, LOGIN_URL, "/business_accounts/search") : undefined;
+    if (wantBiz && (list === "login" || list === null)) for (const k of DAANGN_TEAMS) if (plan[k].length) fail(k, list === "login" ? "로그인 필요" : "계정 목록 못 읽음", list === "login" ? "login_required" : "failed");
+    if (wantBiz && list && list !== "login") {
       const accounts = accountsFrom(list);
       for (const k of DAANGN_TEAMS) {
         if (!plan[k].length) continue;
@@ -68,13 +91,16 @@ async function main() {
         log(`${k}: ${plan[k].join(",")} 읽음`);
       }
     }
+    if (wantAds) for (const k of DAANGN_TEAMS) { adInputs[k] = await readAds(page, k, D); log(`${k}: 광고 ${adInputs[k].rows[0].status}`); }
   } finally { await ctx.close().catch(() => {}); }
 
   // 날짜별로 검증·저장 (toRows 는 한 번에 한 날짜)
   const out = [];
   for (const [k, byDate] of Object.entries(inputs)) for (const [d, input] of Object.entries(byDate)) out.push(...(await toRows("daangn", d, input)).filter((r) => r.team_id === idOf.get(k)));
+  for (const input of Object.values(adInputs)) out.push(...(await toRows("daangn_ad", D, input)));
   const wrote = Object.fromEntries(Object.entries(inputs).map(([k, v]) => [k, Object.keys(v)]));
-  const res = { ok: Object.values(status).every((s) => s === "ok"), date: D, final, wrote, followers, status };
+  const ads = Object.fromEntries(Object.entries(adInputs).map(([k, v]) => { const r = v.rows[0]; return [k, { status: r.status, spend: r.metrics.spend ?? null, clicks: r.metrics.clicks ?? null, chats: r.metrics.chats ?? null, ...(r.metrics.note ? { note: r.metrics.note } : {}) }]; }));
+  const res = { ok: Object.values(status).every((s) => s === "ok") && Object.values(ads).every((a) => a.status === "ok" || a.status === "partial"), date: D, final, wrote, followers, status, ads };
   if (print) { console.log(JSON.stringify(out, null, 1)); console.error(JSON.stringify(res)); }
   else { await saveRows(out); console.log(JSON.stringify(res)); }
   return res.ok ? 0 : 1;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DAANGN_TEAMS, dashboardUrl, teamOfProfile, accountsFrom, daangnLogin, lastFinal, datesToWrite, teamInputs, failInputs } from "../scripts/mkd/daangn-rows.mjs";
+import { DAANGN_TEAMS, dashboardUrl, teamOfProfile, accountsFrom, daangnLogin, lastFinal, datesToWrite, teamInputs, failInputs, ADVERTISERS, adsHomeUrl, onSignIn, adsAccountId, homeYesterday, adsInput } from "../scripts/mkd/daangn-rows.mjs";
 import { toRowsPure } from "../scripts/mkd/rows.mjs";
 
 const TEAMS = [{ id: 1, name: "구미점", key: "gumi" }, { id: 2, name: "대구영어점", key: "dsr" }, { id: 3, name: "울산점", key: "ulsan" }, { id: 4, name: "대구일중점", key: "jpcn" }];
@@ -43,4 +43,36 @@ test("failInputs: 날짜마다 실패·로그인 필요 '전체' 행 — rows �
   const f = failInputs("ulsan", ["2026-10-29"], "로그인 필요", "login_required");
   assert.deepEqual(f, { "2026-10-29": { rows: [{ team_key: "ulsan", unit: "전체", metrics: { note: "로그인 필요" }, status: "login_required" }] } });
   assert.equal(toRowsPure("daangn", "2026-10-29", f["2026-10-29"], TEAMS)[0].status, "login_required");
+});
+
+// ── 당근 광고 ──
+const TS = { data: [{ duration: "2026-11-01T15:00:00Z", performance: { impression: 646, reach: 633, click: 12, cost: 3758, conversions: { chat: 1, call: 0 } } }], total_performance: {} };
+test("광고 계정·주소: 지점마다 하나, 로그인 판정은 sign-in 화면만(자동 인증 경유 주소는 아님)", () => {
+  assert.deepEqual(ADVERTISERS, { dsr: "3550500", jpcn: "4039007", ulsan: "3550506" });
+  assert.equal(adsHomeUrl("3550506"), "https://ads-pro.business.daangn.com/?advertiserId=3550506&advertiser_id=3550506");
+  assert.equal(onSignIn("https://accounts.daangn.com/sign-in?next=x"), true);
+  assert.equal(onSignIn("https://accounts.daangn.com/internal-oidc/authorize?x=1"), false);
+  assert.equal(onSignIn("https://ads-pro.business.daangn.com/"), false);
+  assert.equal(onSignIn("주소아님"), false);
+});
+test("화면 글 읽기: 계정 ID·어제 소진 비용", () => {
+  const t = "전문가모드 팔로울산점 ID 3550506 광고캐시 55,149원 오늘 총 소진 비용(VAT 포함)\n3,758원 더보기 어제 총 소진 비용(VAT 포함)\n1,234원";
+  assert.equal(adsAccountId(t), "3550506");
+  assert.equal(homeYesterday(t), 1234);
+  assert.equal(adsAccountId("없음"), null);
+  assert.equal(homeYesterday("없음"), null);
+});
+test("adsInput: 한국 날짜로 그날 줄을 찾아 노출·클릭·비용·채팅, 줄이 없으면 0, 형식이 이상하면 failed", () => {
+  assert.deepEqual(adsInput("ulsan", TS, "2026-11-02").rows, [{ team_key: "ulsan", unit: "전체", metrics: { impressions: 646, clicks: 12, spend: 3758, chats: 1 }, status: "ok" }]);
+  assert.deepEqual(adsInput("ulsan", TS, "2026-11-01").rows[0].metrics, { impressions: 0, clicks: 0, spend: 0, chats: 0 });
+  assert.equal(adsInput("ulsan", {}, "2026-11-02").rows[0].status, "failed");
+  assert.equal(adsInput("ulsan", { data: [{ duration: "2026-11-01T15:00:00Z", performance: { impression: "x", click: 1, cost: 1 } }] }, "2026-11-02").rows[0].status, "failed");
+});
+test("adsInput: 홈의 어제 소진 비용과 다르면 partial + note, 같으면 ok — rows 검증 통과", () => {
+  assert.equal(adsInput("dsr", TS, "2026-11-02", 3758).rows[0].status, "ok");
+  const p = adsInput("dsr", TS, "2026-11-02", 9999).rows[0];
+  assert.equal(p.status, "partial");
+  assert.equal(p.metrics.spend, 3758);
+  assert.match(p.metrics.note, /홈의 어제 소진 비용과 달라요/);
+  assert.equal(toRowsPure("daangn_ad", "2026-11-02", adsInput("jpcn", TS, "2026-11-02"), TEAMS)[0].team_id, 4);
 });

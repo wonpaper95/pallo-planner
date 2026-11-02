@@ -5,9 +5,9 @@
   if (typeof module === "object" && module.exports) module.exports = api; else root.MKDCORE = api;
 })(typeof self !== "undefined" ? self : globalThis, function () {
 
-const CHANNELS = ["naver_ad", "google_ad", "meta_ad", "blog", "daangn", "jeonsan"];
-const CHANNEL_LABEL = { naver_ad: "네이버 검색광고", google_ad: "구글 검색광고", meta_ad: "메타 광고", blog: "네이버 블로그", daangn: "당근", jeonsan: "전산 문의" };
-const AD_CHANNELS = ["naver_ad", "google_ad", "meta_ad"];
+const CHANNELS = ["naver_ad", "google_ad", "meta_ad", "daangn_ad", "blog", "daangn", "jeonsan"];
+const CHANNEL_LABEL = { naver_ad: "네이버 검색광고", google_ad: "구글 검색광고", meta_ad: "메타 광고", daangn_ad: "당근 광고", blog: "네이버 블로그", daangn: "당근", jeonsan: "전산 문의" };
+const AD_CHANNELS = ["naver_ad", "google_ad", "meta_ad", "daangn_ad"];
 const STATUS = ["ok", "partial", "failed", "login_required"];
 const WINDOWS = [{ key: "d1", label: "매일", days: 1 }, { key: "d3", label: "3일", days: 3 }, { key: "w1", label: "주간", days: 7 }, { key: "w2", label: "2주", days: 14 }, { key: "w4", label: "4주", days: 28 }];
 const ALL = "전체";        // 채널 합계 행 / 채널 통째 실패 표시 행의 unit
@@ -42,6 +42,7 @@ const CHANNEL_METRICS = {
   naver_ad: ["impressions", "clicks", "spend", "ctr", "cpc"],
   google_ad: ["impressions", "clicks", "spend", "conversions", "ctr", "cpc"],
   meta_ad: ["impressions", "reach", "clicks", "leads", "spend"],
+  daangn_ad: ["impressions", "clicks", "spend", "ctr", "cpc", "chats"], // 비용은 VAT 포함(당근 화면 그대로)
   blog: ["visitors", "subscribers", "kw_tracked", "kw_top", "kw_tab", "rank", "tab_rank", "views"], // visitors_cum(방문자 누적)은 계산용이라 표에 안 나온다
   daangn: ["views", "visitors", "followers", "chats"], // 당근: 조회수·방문 고객수·단골(현재)·채팅(아직 못 읽음)
   jeonsan: ["inquiries", "enrolls"],

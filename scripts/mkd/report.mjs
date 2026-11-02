@@ -67,6 +67,7 @@ const MEDIA = [ // 매체별 비용: 광고 채널 · 전산 유입경로(문의
   { name: "메타", channel: "meta_ad", src: (u) => D.channelOfSource(u) === "meta_ad", enroll: "메타" },
   { name: "네이버", channel: "naver_ad", src: (u) => D.channelOfSource(u) === "naver_ad", enroll: "네이버" }, // 문의 = 홈페이지 신청(nad_) + 네이버 예약
   { name: "구글", channel: "google_ad", src: (u) => D.channelOfSource(u) === "google_ad", enroll: null }, // 장부 가입경로 '구글'은 기타로 묶여 따로 못 센다
+  { name: "당근", channel: "daangn_ad", src: () => false, enroll: null }, // 당근 광고는 전산 유입·가입경로에 따로 안 잡혀 비용만 — 문의·등록당 비용은 못 낸다
 ];
 export function buildWeekly(allRows, teams, date, sales, dailyReports = []) {
   const from = D.addDays(date, -6), rows = allRows.filter((r) => r.date >= reportFrom(date) && r.date <= date);
