@@ -13,19 +13,7 @@ const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 try { JC.page = localStorage.getItem("jc-page") || "am"; } catch {}
 
-// 공휴일: 양력 고정(대체공휴일 규칙 2023~) + 음력·임시는 해마다 손으로 (2027년은 정부 달력 나오면 추가)
-const SUB_OK = [[3, 1, "삼일절"], [5, 5, "어린이날"], [8, 15, "광복절"], [10, 3, "개천절"], [10, 9, "한글날"], [12, 25, "성탄절"]];
-const NO_SUB = [[1, 1, "신정"], [6, 6, "현충일"]];
-const LUNAR = { "2026-02-16": "설 연휴", "2026-02-17": "설날", "2026-02-18": "설 연휴", "2026-05-24": "부처님오신날", "2026-05-25": "부처님오신날 대체공휴일",
-  "2026-06-03": "전국동시지방선거(임시공휴일)", "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴", "2026-09-28": "추석 대체공휴일" };
-const holiday = (key) => {
-  if (LUNAR[key]) return LUNAR[key];
-  const y = +key.slice(0, 4), map = {};
-  for (const [m, d, n] of NO_SUB) map[W.ymd(new Date(y, m - 1, d))] = n;
-  for (const [m, d, n] of SUB_OK) { const dt = new Date(y, m - 1, d), dow = dt.getDay(); map[W.ymd(dt)] = n; if (dow === 0 || dow === 6) map[W.ymd(new Date(y, m - 1, d + (dow === 0 ? 1 : 2)))] = n + " 대체공휴일"; }
-  return map[key] ?? null;
-};
-const week = () => { const mon = W.monday(today()); return Array.from({ length: 7 }, (_, i) => { const k = W.add(mon, i), d = W.parse(k), h = holiday(k); return { k, label: `${d.getMonth() + 1}/${d.getDate()}(${KD[d.getDay()]})`, gray: d.getDay() === 5 || !!h, h }; }); }; // 금 = 공식 휴무 회색
+const week = () => { const mon = W.monday(today()); return Array.from({ length: 7 }, (_, i) => { const k = W.add(mon, i), d = W.parse(k); return { k, label: `${d.getMonth() + 1}/${d.getDate()}(${KD[d.getDay()]})`, tag: WRC.dayTag(k) }; }); }; // 금 = 공식 휴무, 공휴일 = 빨강
 const dLabel = (s) => { const d = W.parse(s); return `${d.getMonth() + 1}/${d.getDate()}(${KD[d.getDay()]})`; };
 const ts = (s) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 const opts = (list, sel) => list.map((v) => `<option value="${esc(v)}" ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
@@ -156,9 +144,9 @@ function renderGrid(toToday) {
   const days = week(), tk = today(), keep = box.querySelector(".jcscrollx")?.scrollLeft ?? null;
   const cell = (t, d) => {
     const ids = JC.cells.get(`${t.id}|${d.k}`) ?? [], ns = ids.map((id) => JC.names.find((n) => n.id === id)).filter(Boolean);
-    return `<td class="jccell ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}"><button class="jccb" data-act="cell" data-task="${t.id}" data-day="${d.k}">${ns.slice(0, 2).map(chip).join("")}${ns.length > 2 ? `<span class="jcmore">+${ns.length - 2}</span>` : ""}${ns.length ? "" : `<span class="jcplus">+</span>`}</button></td>`;
+    return `<td class="jccell ${d.tag?.cls ?? ""} ${d.k === tk ? "today" : ""}"><button class="jccb" data-act="cell" data-task="${t.id}" data-day="${d.k}">${ns.slice(0, 2).map(chip).join("")}${ns.length > 2 ? `<span class="jcmore">+${ns.length - 2}</span>` : ""}${ns.length ? "" : `<span class="jcplus">+</span>`}</button></td>`;
   };
-  box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.gray ? "gray" : ""} ${d.k === tk ? "today" : ""}" ${d.h ? `title="${esc(d.h)}"` : ""}>${d.label}</th>`).join("")}</tr></thead>
+  box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.tag?.cls ?? ""} ${d.k === tk ? "today" : ""}">${d.label}${d.tag ? `<em class="jctag">${d.tag.tag}</em>${d.tag.name ? `<small>${esc(d.tag.name)}</small>` : ""}` : ""}</th>`).join("")}</tr></thead>
     <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jctasktxt" data-act="taskedit" title="눌러서 내용 고치기"><b>${esc(t.body.slice(1).trim())}</b></button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
       : `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
   const sc = box.querySelector(".jcscrollx");

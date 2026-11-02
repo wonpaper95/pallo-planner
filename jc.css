@@ -59,8 +59,10 @@ body:not(.jcv) #jcView { display: none; }
 #jcView .jcgrid th, #jcView .jcgrid td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
 #jcView .jcgrid th { background: var(--fill); font-size: 11px; font-weight: 700; color: var(--sub); padding: 8px 6px; }
 #jcView th.jcday { min-width: 92px; font-variant-numeric: tabular-nums; }
+#jcView .jctag { display: block; width: max-content; margin: 3px auto 0; padding: 0 5px; border-radius: 4px; font-style: normal; font-size: 10.5px; color: #fff; background: var(--sub); } #jcView .hol .jctag { background: var(--red); } #jcView .jcday small { display: block; margin-top: 2px; font-weight: 600; white-space: normal; word-break: keep-all; }
 #jcView .jcgrid .today { background: color-mix(in srgb, var(--accent) 16%, transparent); } #jcView th.today { color: var(--accent); }
-#jcView td.gray { background: var(--fill); }
+#jcView .jcgrid .fri { background: color-mix(in srgb, var(--sub) 18%, var(--bg)); } #jcView .jcgrid .hol { background: color-mix(in srgb, var(--red) 12%, var(--bg)); } #jcView th.hol { color: var(--red); } /* 금 = 휴무, 공휴일 = 빨강 (오늘이어도) */
+#jcView .jcgrid .today.fri, #jcView .jcgrid .today.hol { box-shadow: inset 0 0 0 1px var(--accent); }
 #jcView .jcgrid .jctask { position: sticky; left: 0; z-index: 1; background: var(--bg); min-width: 230px; max-width: 230px; padding: 8px 10px; text-align: left; font-size: 13px; line-height: 1.4; }
 #jcView th.jctask { z-index: 2; }
 #jcView tr.jcsec td { background: color-mix(in srgb, var(--accent) 10%, var(--bg)); padding: 6px 10px; font-size: 12.5px; } /* ■ 구간 제목 줄 */

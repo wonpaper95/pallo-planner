@@ -27,7 +27,10 @@ body:not(.wrv) #wrView { display: none; }
 #wrView .wrgrid thead small { font-weight: 400; }
 #wrView .wrgrid .wrd { border-left: 1px solid var(--line); } #wrView .wrgrid .wrs { font-size: 10px; font-weight: 400; padding: 2px; }
 #wrView .wrgrid .l { border-left: 1px solid var(--line); }
-#wrView .wrgrid td.fri, #wrView .wrgrid th.fri { background: color-mix(in srgb, var(--sub) 10%, var(--bg)); } /* 금 = 공식 휴무 */
+#wrView .wrgrid td.fri, #wrView .wrgrid th.fri { background: color-mix(in srgb, var(--sub) 18%, var(--bg)); } /* 금 = 공식 휴무 */
+#wrView .wrgrid td.hol, #wrView .wrgrid th.hol { background: color-mix(in srgb, var(--red) 12%, var(--bg)); } #wrView .wrgrid th.hol { color: var(--red); } /* 공휴일·대체공휴일 */
+#wrView .wrtag { display: block; margin-top: 2px; padding: 0 3px; border-radius: 4px; font-style: normal; font-size: 9.5px; line-height: 1.5; color: #fff; background: var(--sub); } #wrView th.hol .wrtag { background: var(--red); }
+#wrView .wrhol { margin-bottom: 8px; font-size: 12px; line-height: 1.7; } #wrView .wrhol span { padding: 1px 6px; border-radius: 4px; font-weight: 700; color: #fff; font-size: 11px; } #wrView .wrhol .hol { background: var(--red); } #wrView .wrhol .fri { background: var(--sub); margin-left: 4px; }
 #wrView .wrgrid th.om { opacity: .55; } #wrView td.wrc.om { opacity: .75; } /* 달 밖 날짜 (시트에서 옮겨 온 기록) */
 #wrView .wrgrid th.today { color: var(--accent); }
 #wrView .wrname { position: sticky; left: 0; z-index: 2; background: var(--bg); min-width: 170px; max-width: 170px; width: 170px; text-align: left; border-right: 1px solid var(--line); }
@@ -64,7 +67,7 @@ body:not(.wrv) #wrView { display: none; }
 /* 칸 고치는 창 */
 .wrpop { position: fixed; z-index: 60; width: 300px; max-width: calc(100vw - 32px); background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.28); display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
 .wrpop[hidden] { display: none; }
-.wrpop .wrpt { font-weight: 700; }
+.wrpop .wrpt { font-weight: 700; } .wrpop .wrpophol { color: var(--red); } .wrpop .wrpopfri { color: var(--sub); }
 .wrpop .wrpl { font-size: 12px; }
 .wrpop input[name=val] { flex: 1; font-size: 15px; font-weight: 600; }
 .wrpop .wrmk { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; } .wrpop .wrmk label { display: flex; gap: 6px; align-items: center; cursor: pointer; }

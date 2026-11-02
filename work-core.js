@@ -43,5 +43,26 @@ const planText = (plan) => {
 const DAYSETS = [["평일", "평일 (월~목)"], ["월수", "월·수"], ["화목", "화·목"], ["월", "월"], ["화", "화"], ["수", "수"], ["목", "목"], ["주말", "주말 (토·일)"], ["토", "토"], ["일", "일"], ["금", "금"]];
 const mins = (hm) => +hm.slice(0, 2) * 60 + +hm.slice(3, 5);
 const shiftLine = (days, start, end, h, memo = "") => `${days}${/^(주말|토|일|금)$/.test(days) ? "" : mins(start) < 14 * 60 ? " 오전" : " 오후"}${memo.trim() ? ` (${memo.trim().replace(/[()]/g, "")})` : ""} (${start}~${end})(${h}h)`; // 메모는 괄호 안 = 요일로 안 읽음
-window.WRC = { KD, split, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine };
+// 공휴일: 양력 고정(대체공휴일 규칙 2023~, 노동절·제헌절은 2026~) + 음력·임시는 해마다 손으로 (2028년은 정부 달력 나오면 추가)
+const SUB_OK = [[3, 1, "삼일절"], [5, 5, "어린이날"], [8, 15, "광복절"], [10, 3, "개천절"], [10, 9, "한글날"], [12, 25, "성탄절"]];
+const SUB_OK_2026 = [[5, 1, "노동절"], [7, 17, "제헌절"]];
+const NO_SUB = [[1, 1, "신정"], [6, 6, "현충일"]];
+const LUNAR = { "2026-02-16": "설 연휴", "2026-02-17": "설날", "2026-02-18": "설 연휴", "2026-05-24": "부처님오신날", "2026-05-25": "부처님오신날 대체공휴일",
+  "2026-06-03": "전국동시지방선거(임시공휴일)", "2026-09-24": "추석 연휴", "2026-09-25": "추석", "2026-09-26": "추석 연휴",
+  "2027-02-06": "설 연휴", "2027-02-07": "설날", "2027-02-08": "설 연휴", "2027-02-09": "설날 대체공휴일", "2027-05-13": "부처님오신날", "2027-09-14": "추석 연휴", "2027-09-15": "추석", "2027-09-16": "추석 연휴" };
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const holiday = (key) => {
+  if (LUNAR[key]) return LUNAR[key];
+  const y = +key.slice(0, 4), map = {};
+  for (const [m, d, n] of NO_SUB) map[ymd(new Date(y, m - 1, d))] = n;
+  for (const [m, d, n] of y >= 2026 ? [...SUB_OK, ...SUB_OK_2026] : SUB_OK) { const dt = new Date(y, m - 1, d), dow = dt.getDay(); map[ymd(dt)] = n; if (dow === 0 || dow === 6) map[ymd(new Date(y, m - 1, d + (dow === 0 ? 1 : 2)))] = n + " 대체공휴일"; }
+  return map[key] ?? null;
+};
+// 날짜 표시: 공휴일·대체공휴일·임시공휴일 (빨강) / 금요일 = 공식 휴무 (회색) / 그 외 null. 금요일이 공휴일이면 공휴일로
+const dayTag = (key) => {
+  const h = holiday(key);
+  if (h) return { cls: "hol", tag: /대체/.test(h) ? "대체공휴일" : /임시/.test(h) ? "임시공휴일" : "공휴일", name: h.replace(/ 대체공휴일|\(임시공휴일\)/, ""), full: h };
+  return new Date(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8)).getDay() === 5 ? { cls: "fri", tag: "휴무", name: "", full: "공식 휴무" } : null;
+};
+window.WRC = { holiday, dayTag, KD, split, slotsOf, num, parseShift, off, needReason, planText, DAYSETS, mins, shiftLine };
 })();
