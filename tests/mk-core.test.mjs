@@ -122,6 +122,48 @@ test("buildWeekly: 오가닉 bottom 은 top 과 겹치지 않음", () => {
   assert.deepEqual(r.organic.bottom.map((x) => x.post_id), ["e", "d"]);
 });
 
+test("buildWeekly: 이름을 바꿔 접두어가 붙어도 옛 이름 리드를 같은 광고로 센다", () => {
+  const N = "261013 팔로울산점 영어광고 - 자유로운 대화";
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", `[영어] ${N}`, 100, 5)], organic: [],
+    leads: [lead("1", N, "2026-10-10", "consult"), lead("2", N, "2026-10-11", "enroll"), lead("3", `[영어] ${N}`, "2026-10-20", "visit"), lead("4", N, "2026-10-12", "lead")] });
+  assert.deepEqual(r.ads.map((a) => [a.ad_name, a.booked4w]), [[`[영어] ${N}`, 3]]);
+  assert.equal(r.totals.booked4w, 3);
+});
+
+test("buildWeekly: 본이름이 다르면 안 묶는다 (앞부분이 같아도)", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "[영어] 261013 영어광고", 10, 1), day("2026-10-20", "[영어] 261013 영어광고 - 자유로운 대화", 20, 1), day("2026-10-20", "[영어] 261013 영어광고 - 사본", 30, 1)], organic: [],
+    leads: [lead("1", "261013 영어광고", "2026-10-10", "consult"), lead("2", "261013 영어광고 - 자유로운 대화", "2026-10-11", "consult"), lead("3", "261013 영어광고 - 자유로운 대화", "2026-10-12", "consult")] });
+  const b = Object.fromEntries(r.ads.map((a) => [a.ad_name, a.booked4w]));
+  assert.deepEqual(b, { "[영어] 261013 영어광고": 1, "[영어] 261013 영어광고 - 자유로운 대화": 2, "[영어] 261013 영어광고 - 사본": 0 });
+});
+
+test("buildWeekly: 태그가 다른 광고는 안 묶고, 어느 쪽인지 모르는 옛 이름은 어디에도 안 붙인다", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "[영어][멤버모집] X", 10, 1), day("2026-10-20", "[일본어][멤버모집] X", 20, 1), day("2026-10-20", "[영어][리더모집] Y", 30, 1), day("2026-10-20", "[영어][멤버모집] Y", 40, 1)], organic: [],
+    leads: [lead("1", "X", "2026-10-10", "consult"), lead("2", "[일본어][멤버모집] X", "2026-10-11", "consult"), lead("3", "[영어] Y", "2026-10-11", "consult")] });
+  const b = Object.fromEntries(r.ads.map((a) => [a.ad_name, a.booked4w]));
+  assert.deepEqual(b, { "[영어][멤버모집] X": 0, "[일본어][멤버모집] X": 1, "[영어][리더모집] Y": 0, "[영어][멤버모집] Y": 0 });
+  assert.equal(r.totals.booked4w, 1);
+});
+
+test("buildWeekly: 태그를 더 붙인 이름 변경은 묶고, 태그 순서가 달라도 같은 광고", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "[멤버모집][영어] Z", 10, 1)], organic: [],
+    leads: [lead("1", "[영어] Z", "2026-10-10", "consult"), lead("2", "[영어][멤버모집] Z", "2026-10-11", "consult"), lead("3", "Z", "2026-10-12", "consult")] });
+  assert.deepEqual(r.ads.map((a) => [a.ad_name, a.booked4w]), [["[멤버모집][영어] Z", 3]]);
+});
+
+test("buildWeekly: 바꾸기 전 묵은 줄이 남아도 지출을 두 번 세지 않고, 이름은 최신", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-05", "Q", 7, 1), day("2026-10-06", "Q", 10, 1), day("2026-10-06", "[영어] Q", 10, 1), day("2026-10-20", "[영어] Q", 5, 1)], organic: [], leads: [] });
+  assert.deepEqual(r.ads.map((a) => [a.ad_name, a.spend4w, a.leads4w]), [["[영어] Q", 22, 3]]);
+  assert.equal(r.totals.spend4w, 22);
+});
+
+test("buildWeekly: 같은 날 지출이 다른 두 이름은 동시에 도는 별개 광고", () => {
+  const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-20", "Q", 10, 1), day("2026-10-20", "[영어] Q", 25, 1)], organic: [], leads: [lead("1", "Q", "2026-10-10", "consult")] });
+  const a = Object.fromEntries(r.ads.map((x) => [x.ad_name, [x.spend4w, x.booked4w]]));
+  assert.deepEqual(a, { Q: [10, 1], "[영어] Q": [25, 0] });
+  assert.equal(r.totals.spend4w, 35);
+});
+
 test("buildWeekly: 광고 밖 예약(광고명 없음)은 지점 평균·합계에서 뺀다", () => {
   const r = MK.buildWeekly({ week: "2026-10-19", ads: [day("2026-10-01", "A", 30000, 3), day("2026-10-20", "A", 30000, 3)], organic: [],
     leads: [lead("1", "A", "2026-10-20", "enroll"), lead("2", "", "2026-10-20", "enroll"), lead("3", "", "2026-10-10", "enroll")] });
