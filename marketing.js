@@ -251,7 +251,7 @@ function mkdWeekly(r) {
   const per = (v, cnt) => (cnt ? `${n(cnt)}건 (${v === null || v === undefined ? "–" : won(v)}/건)` : "0건");
   return `<details class="card"><summary><b>📅 이번 주 종합</b> <span class="mut">${esc(w.from ?? "")} ~ ${esc(w.to ?? r.date)}</span></summary>
     <p style="white-space:pre-line">${esc(w.body)}</p>
-    ${media.length ? `<div class="tw"><table class="mkd"><thead><tr><th>매체</th><th>광고비</th><th>문의</th><th>등록</th></tr></thead><tbody>${media.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.spend)}</td><td>${per(m.perInquiry, m.inquiries)}</td><td>${per(m.perEnroll, m.enrolls)}</td></tr>`).join("")}</tbody></table></div><p class="mut">~당 비용은 광고비와 건수가 둘 다 있는 날끼리 나눈 값이에요. 등록 매체는 재무 탭 가입경로 기준(구글은 '기타'에 섞여 따로 못 세요).</p>` : ""}</details>`;
+    ${media.length ? `<div class="tw"><table class="mkd"><thead><tr><th>매체</th><th>광고비</th><th>문의</th><th>등록</th></tr></thead><tbody>${media.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.spend)}</td><td>${per(m.perInquiry, m.inquiries)}</td><td>${per(m.perEnroll, m.enrolls)}</td></tr>`).join("")}</tbody></table></div><p class="mut">~당 비용은 광고비와 건수가 둘 다 있는 날끼리 나눈 값이에요. 네이버 문의 = 홈페이지 신청 + 네이버 예약(광고 없이 온 예약도 섞여요). 등록 매체는 재무 탭 가입경로 기준이에요.</p>` : ""}</details>`;
 }
 const mkdHead = () => `<thead><tr><th>지표</th>${MKDCORE.WINDOWS.map((w) => `<th>${esc(w.label)}</th>`).join("")}</tr></thead>`;
 const mkdHas = (l) => l.cells.some((c) => c.value !== null && c.value !== undefined); // 5칸 모두 비면 줄을 숨긴다 (예: 아직 데이터가 없는 등록)

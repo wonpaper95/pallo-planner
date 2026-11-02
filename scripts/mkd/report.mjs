@@ -64,9 +64,9 @@ export function prepareSave(kind, r) {
 const r2 = (v) => (v === null || v === undefined ? null : Math.round(v * 100) / 100);
 const wk = (line) => { const c = line.cells.find((x) => x.key === "w1"); return { label: line.label, unit: line.unit, value: r2(c.value), change: c.change === null ? null : Math.round(c.change * 1000) / 1000, days: c.days, prevDays: c.prevDays }; };
 const MEDIA = [ // 매체별 비용: 광고 채널 · 전산 유입경로(문의) · 장부 가입경로(등록)
-  { name: "메타", channel: "meta_ad", src: (u) => u === "meta", enroll: "메타" },
-  { name: "네이버", channel: "naver_ad", src: (u) => /^nad_/.test(u), enroll: "네이버" },
-  { name: "구글", channel: "google_ad", src: (u) => /^gads_/.test(u), enroll: null }, // 장부 가입경로 '구글'은 기타로 묶여 따로 못 센다
+  { name: "메타", channel: "meta_ad", src: (u) => D.channelOfSource(u) === "meta_ad", enroll: "메타" },
+  { name: "네이버", channel: "naver_ad", src: (u) => D.channelOfSource(u) === "naver_ad", enroll: "네이버" }, // 문의 = 홈페이지 신청(nad_) + 네이버 예약
+  { name: "구글", channel: "google_ad", src: (u) => D.channelOfSource(u) === "google_ad", enroll: null }, // 장부 가입경로 '구글'은 기타로 묶여 따로 못 센다
 ];
 export function buildWeekly(allRows, teams, date, sales, dailyReports = []) {
   const from = D.addDays(date, -6), rows = allRows.filter((r) => r.date >= reportFrom(date) && r.date <= date);

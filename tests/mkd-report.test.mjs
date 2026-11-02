@@ -229,6 +229,7 @@ test("buildWeekly: 7일 핵심 줄(w1)·매체별 문의·등록당 비용(싼 �
     ...toRowsPure("meta_ad", day(i), { rows: [{ team_key: "dsr", unit: "대구_리드", metrics: { spend: 10000, clicks: 5, leads: 1 } }] }, TEAMS),
     ...toRowsPure("naver_ad", day(i), { rows: [{ team_key: "dsr", unit: "대구_검색", metrics: { spend: 2000, clicks: 3, impressions: 100 } }] }, TEAMS),
     ...toRowsPure("jeonsan", day(i), { rows: [{ team_key: "dsr", unit: "전체", metrics: { inquiries: 2 } }, { team_key: "dsr", unit: "meta", metrics: { inquiries: 1 } }, { team_key: "dsr", unit: "기타", metrics: { inquiries: 1 } }] }, TEAMS));
+  rows.push(...toRowsPure("jeonsan", day(1), { rows: [{ team_key: "dsr", unit: "네이버 예약", metrics: { inquiries: 1 } }] }, TEAMS), ...toRowsPure("jeonsan", day(2), { rows: [{ team_key: "dsr", unit: "nad_daegu_en_naver", metrics: { inquiries: 1 } }] }, TEAMS)); // 네이버 문의 = 네이버 예약 + nad_
   const sales = [{ team_id: 1, day: day(1), signup: true, channel: "메타" }, { team_id: 1, day: day(2), signup: true, channel: "메타" }, { team_id: 1, day: day(3), signup: true, channel: "네이버" }, { team_id: 1, day: day(13), signup: false, channel: "기타" }];
   const daily = [
     { date: day(2), data: { flags: [{ level: "yellow", code: "rank_drop", team_id: 1, team: "대구동성로점", unit: "k", msg: "'k' 3위 → 7위" }] } },
@@ -240,7 +241,7 @@ test("buildWeekly: 7일 핵심 줄(w1)·매체별 문의·등록당 비용(싼 �
   const v = (label) => w.summary.find((l) => l.label === label).value;
   assert.deepEqual([v("문의"), v("등록"), v("총 광고비"), v("문의당 비용"), v("등록당 비용")], [14, 3, 84000, 6000, 28000]);
   assert.deepEqual(w.media.map((m) => [m.name, m.spend, m.inquiries, m.enrolls, m.perInquiry, m.perEnroll]),
-    [["네이버", 14000, null, 1, null, 14000], ["메타", 70000, 7, 2, 10000, 35000], ["구글", null, null, null, null, null]]);
+    [["네이버", 14000, 2, 1, 7000, 14000], ["메타", 70000, 7, 2, 10000, 35000], ["구글", null, null, null, null, null]]);
   assert.deepEqual(w.flags.map((f) => [f.level, f.msg, f.days, f.last]), [["red", "결제 문제", 1, day(1)], ["yellow", "'k' 7위 → 9위", 2, day(1)]]);
   assert.deepEqual(w.teams.map((t) => t.team), ["대구동성로점"]);
   assert.ok(w.channels.find((c) => c.channel === "meta_ad").units[0].metrics.some((m) => m.label === "비용" && m.value === 70000));

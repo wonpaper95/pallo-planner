@@ -132,8 +132,9 @@ test("kw_* 는 기간의 마지막 값, 지점끼리는 더한다", () => {
 });
 test("flags 순위 하락: 오늘 통합검색을 못 읽은 partial(rank 키 없음)은 '빠졌어요'로 보지 않는다", () => {
   const kw = "동성로영어회화";
-  assert.deepEqual(D.flags([row("2026-10-29", kw, { rank: 4 }), row("2026-10-30", kw, { tab_rank: 5 }, "partial")], "2026-10-30").map((f) => f.code), []);
-  assert.deepEqual(D.flags([row("2026-10-29", kw, { rank: 4 }), row("2026-10-30", kw, { rank: null, tab_rank: 5 })], "2026-10-30").map((f) => f.code), ["rank_drop"]);
+  const base = [row("2026-10-28", kw, { rank: 4 }), row("2026-10-29", kw, { rank: null, tab_rank: 5 })];
+  assert.deepEqual(D.flags([...base, row("2026-10-30", kw, { tab_rank: 5 }, "partial")], "2026-10-30").map((f) => f.code), []);
+  assert.deepEqual(D.flags([...base, row("2026-10-30", kw, { rank: null, tab_rank: 5 })], "2026-10-30").map((f) => f.code), ["rank_drop"]);
 });
 
 // ── 방문자 ──

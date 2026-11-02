@@ -242,6 +242,9 @@ test("status: 채널별 기준일 수집 상태", () => {
 test("channelOfSource", () => {
   assert.equal(D.channelOfSource("gads_daegu_en_search"), "google_ad");
   assert.equal(D.channelOfSource("nad_ulsan"), "naver_ad");
+  assert.equal(D.channelOfSource("네이버 예약"), "naver_ad");
+  assert.equal(D.channelOfSource("네이버 예약 #"), "naver_ad");
+  assert.equal(D.channelOfSource("네이버 블로그"), null);
   assert.equal(D.channelOfSource("meta"), "meta_ad");
   assert.equal(D.channelOfSource("homepage"), null);
   assert.equal(D.channelOfSource("전체"), null);
@@ -310,15 +313,16 @@ test("flags: 문의 급감은 전산 14일 이상 쌓였을 때만", () => {
   assert.deepEqual(D.flags(steady, END), []);
 });
 
-test("flags: 순위 하락 3계단 또는 1페이지 이탈", () => {
-  const drop3 = [row(END, "blog", "동성로 영어회화", { rank: 6 }), row("2026-10-27", "blog", "동성로 영어회화", { rank: 3 })];
-  assert.deepEqual(D.flags(drop3, END).map((f) => f.code), ["rank_drop"]);
-  const out = [row(END, "blog", "동성로 영어회화", { rank: null }), row("2026-10-26", "blog", "동성로 영어회화", { rank: 4 })];
-  assert.match(D.flags(out, END)[0].msg, /1페이지에서 빠졌/);
-  const fine = [row(END, "blog", "동성로 영어회화", { rank: 4 }), row("2026-10-27", "blog", "동성로 영어회화", { rank: 3 })];
-  assert.deepEqual(D.flags(fine, END), []);
-  const first = [row(END, "blog", "동성로 영어회화", { rank: null })];
-  assert.deepEqual(D.flags(first, END), []);
+test("flags: 순위 하락은 이틀 연속일 때만 — 3계단↑ 낮거나 1페이지 밖", () => {
+  const kw = "동성로 영어회화", rk = (d, rank) => row(d, "blog", kw, { rank }), fl = (rows) => D.flags(rows, END);
+  assert.deepEqual(fl([rk("2026-10-26", 3), rk("2026-10-27", 6), rk(END, 7)]).map((f) => [f.code, f.msg]), [["rank_drop", `'${kw}' 3위 → 7위 (이틀째)`]]);
+  assert.match(fl([rk("2026-10-26", 4), rk("2026-10-27", null), rk(END, null)])[0].msg, /이틀째 1페이지 밖이에요 \(전 4위\)/);
+  assert.match(fl([rk("2026-10-26", 4), rk("2026-10-27", 9), rk(END, null)])[0].msg, /이틀째 1페이지 밖/);
+  // 하루 흔들림은 안 뜬다 — 실제 사례: 울산일본어학원 9→밖→9, 동성로일본어학원 14→밖→14, 대구성인영어회화 11→10→13
+  for (const seq of [[9, null, 9], [14, null, 14], [11, 10, 13], [3, 3, null], [3, 3, 6], [3, 4, 5]]) assert.deepEqual(fl([rk("2026-10-26", seq[0]), rk("2026-10-27", seq[1]), rk(END, seq[2])]), [], String(seq));
+  // 기록이 3일 안 되면 판단 안 함
+  assert.deepEqual(fl([rk(END, null)]), []);
+  assert.deepEqual(fl([rk("2026-10-27", 3), rk(END, null)]), []);
 });
 
 test("flags: 클릭 있는데 전산 문의 0", () => {
@@ -377,17 +381,19 @@ test("flags: 문의 급감 — 전산 실패일이 섞여도 주간을 일수로
   assert.match(f.msg, /주간 문의 7건/);
 });
 
-test("flags: 순위 이탈은 빠진 첫날 한 번만, 숫자 하락은 마지막으로 안 순위와 비교", () => {
-  const kw = "동성로 영어회화", mk = [row("2026-10-25", "blog", kw, { rank: 4 }), row("2026-10-26", "blog", kw, { rank: null }), row("2026-10-27", "blog", kw, { rank: null }), row("2026-10-28", "blog", kw, { rank: null })];
-  assert.deepEqual(codes(mk, "2026-10-26"), ["rank_drop"]);
+test("flags: 순위 하락은 한 번만 뜨고, 실패 행은 건너뛰어 잇는다", () => {
+  const kw = "동성로 영어회화", rk = (d, rank) => row(d, "blog", kw, { rank });
+  const mk = [rk("2026-10-24", 4), rk("2026-10-25", null), rk("2026-10-26", null), rk("2026-10-27", null), rk(END, null)];
+  assert.deepEqual(codes(mk, "2026-10-25"), []);             // 하루째는 아직
+  assert.deepEqual(codes(mk, "2026-10-26"), ["rank_drop"]);  // 이틀째에 한 번
   assert.deepEqual(codes(mk, "2026-10-27"), []);
-  assert.deepEqual(codes(mk, "2026-10-28"), []);
-  // 이탈 중에 실패 행이 끼어도 직전 '쓸 수 있는' 행이 순위 있던 날이면 이탈로 본다
-  const gap = [row("2026-10-26", "blog", kw, { rank: 4 }), row("2026-10-27", "blog", kw, {}, "failed"), row(END, "blog", kw, { rank: null })];
+  assert.deepEqual(codes(mk, END), []);
+  const num = [rk("2026-10-24", 3), rk("2026-10-25", 7), rk("2026-10-26", 7), rk("2026-10-27", 7)];
+  assert.deepEqual(codes(num, "2026-10-26"), ["rank_drop"]);
+  assert.deepEqual(codes(num, "2026-10-27"), []);
+  // 실패 행이 끼어도 쓸 수 있는 행끼리 본다
+  const gap = [rk("2026-10-25", 4), rk("2026-10-26", null), row("2026-10-27", "blog", kw, {}, "failed"), rk(END, null)];
   assert.deepEqual(codes(gap), ["rank_drop"]);
-  // 이탈 뒤 다시 들어왔는데 처음보다 3계단 이상 낮으면 마지막으로 안 순위(4위)와 비교해 잡는다
-  const back = [row("2026-10-26", "blog", kw, { rank: 4 }), row("2026-10-27", "blog", kw, { rank: null }), row(END, "blog", kw, { rank: 8 })];
-  assert.deepEqual(codes(back), ["rank_drop"]);
 });
 
 test("flags: 결측 — 로그인 필요/수집 안 됨 구분과 실제 연속 일수", () => {
@@ -445,14 +451,16 @@ test("flags: 결측 — 첫 행이 오늘 로그인 필요뿐이면 1일째라 �
   assert.equal(f.length, 1); assert.match(f[0].msg, /로그인 필요 2일째/);
 });
 
-test("flags: 클릭 있는데 문의 0 — 네이버: 전산에 nad_ 태그가 없으면(예약·카카오채널뿐) 판단 안 하고, 전에 잡힌 적 있으면 판단", () => {
-  const clicks = days(END, 7, "naver_ad", "a", { impressions: 100, clicks: 10 });                                     // 주간 클릭 70
-  const real = ["전체", "meta", "네이버 예약", "카카오채널"].flatMap((u) => days(END, 7, "jeonsan", u, { inquiries: 2 })); // 실제 전산 모양: nad_ 없음
-  assert.ok(!codes([...clicks, ...real]).includes("clicks_no_inquiry"));
-  // 10일 전 nad_ 문의가 있었는데 이번 주엔 없다 → 추적이 끊긴 것
-  assert.deepEqual(codes([...clicks, ...real, trackedBefore("nad_x")]), ["clicks_no_inquiry"]);
-  // 이번 주에 nad_ 문의가 있으면 정상
-  assert.ok(!codes([...clicks, ...real, trackedBefore("nad_x"), row(END, "jeonsan", "nad_x", { inquiries: 1 })]).includes("clicks_no_inquiry"));
+test("flags: 클릭 있는데 문의 0 — 네이버: 홈페이지 신청(nad_)·네이버 예약을 합쳐 판단, 이력이 없으면 판단 안 함", () => {
+  const clicks = days(END, 7, "naver_ad", "a", { impressions: 100, clicks: 10 });                                  // 주간 클릭 70
+  const noNaver = ["전체", "meta", "카카오채널"].flatMap((u) => days(END, 7, "jeonsan", u, { inquiries: 2 }));      // 네이버로 잡힌 문의 없음
+  assert.ok(!codes([...clicks, ...noNaver]).includes("clicks_no_inquiry"));                                         // 이력 없음
+  // 10일 전 네이버 문의가 있었는데 이번 주엔 없다 → 끊긴 것 (nad_·네이버 예약 어느 쪽 이력이든)
+  assert.deepEqual(codes([...clicks, ...noNaver, trackedBefore("nad_x")]), ["clicks_no_inquiry"]);
+  assert.deepEqual(codes([...clicks, ...noNaver, trackedBefore("네이버 예약")]), ["clicks_no_inquiry"]);
+  // 이번 주에 네이버 문의가 있으면 정상 (nad_·네이버 예약 어느 쪽이든)
+  assert.ok(!codes([...clicks, ...noNaver, trackedBefore("nad_x"), row(END, "jeonsan", "nad_x", { inquiries: 1 })]).includes("clicks_no_inquiry"));
+  assert.ok(!codes([...clicks, ...noNaver, trackedBefore("nad_x"), row(END, "jeonsan", "네이버 예약", { inquiries: 1 })]).includes("clicks_no_inquiry"));
 });
 
 test("flags: 클릭 있는데 문의 0 — 구글도 gads_ 이력이 있어야 판단, 다른 채널 이력은 안 센다", () => {
@@ -524,4 +532,26 @@ test("withAutoApps: 비어 있는 날에 얹고(사람이 적은 값 우선, 0 �
   assert.deepEqual(out["2026-11-04"], { autoOnly: true, apps: 5, appsAuto: true });
   assert.equal(log["2026-11-02"].apps, null);
   assert.deepEqual(D.withAutoApps(log, undefined), log);
+});
+
+// ── 돈은 나가는데 리드 0 ──
+test("flags: 메타 캠페인이 ₩5만↑ 쓰고 리드 0 이면 red — 전에 리드가 있던 캠페인만, 기준 미만·리드 있음·랜딩(이력 없음)은 안 뜸", () => {
+  const u = "대구 영어", before = row("2026-10-27", "meta_ad", u, { spend: 90000, leads: 8 });
+  const fl = (rows) => D.flags(rows, END).filter((f) => f.code === "spend_no_leads");
+  const hit = fl([before, row(END, "meta_ad", u, { spend: 105485, leads: 0 })]);
+  assert.deepEqual(hit.map((f) => [f.level, f.channel, f.unit, f.msg]), [["red", "meta_ad", u, "메타 '대구 영어' ₩105,485을 썼는데 리드가 0건이에요"]]);
+  assert.deepEqual(fl([before, row(END, "meta_ad", u, { spend: 49999, leads: 0 })]), []);
+  assert.deepEqual(fl([before, row(END, "meta_ad", u, { spend: 105485, leads: 3 })]), []);
+  assert.deepEqual(fl([row("2026-10-27", "meta_ad", "대구landing", { spend: 90000, leads: 0 }), row(END, "meta_ad", "대구landing", { spend: 90000, leads: 0 })]), []);
+  assert.deepEqual(fl([before, row(END, "meta_ad", u, { spend: null, leads: 0 }, "partial")]), []); // 환율 못 받아 비용 없음
+  assert.deepEqual(fl([before, row(END, "meta_ad", u, { spend: 105485 })]), []);                    // 리드 칸 없음 ≠ 0
+});
+
+// ── 일부러 멈춘 채널의 안내 ──
+test("flags: 그날 캠페인이 전부 일시중지면 [안내] 는 빼고, 막힌 일(red)은 그대로 — 하나라도 돌면 [안내] 도 보인다", () => {
+  const n = "[안내] [계정] 계정 보안 강화 작업 요청", fl = (rows) => D.flags(rows, END).map((f) => [f.level, f.code]);
+  const paused = (u, flags = []) => row(END, "google_ad", u, { status: "일시중지됨", impressions: 0, flags });
+  assert.deepEqual(fl([paused("대구_영어", [n]), paused("대구_일본어")]), []);
+  assert.deepEqual(fl([paused("대구_영어", [n, "[계정] 계정 정지"]), paused("대구_일본어")]), [["red", "account_issue"]]);
+  assert.deepEqual(fl([paused("대구_영어", [n]), row(END, "google_ad", "대구_일본어", { status: "운영 가능", impressions: 5 })]), [["gray", "account_notice"]]);
 });

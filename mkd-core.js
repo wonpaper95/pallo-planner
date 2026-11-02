@@ -12,6 +12,7 @@ const STATUS = ["ok", "partial", "failed", "login_required"];
 const WINDOWS = [{ key: "d1", label: "매일", days: 1 }, { key: "d3", label: "3일", days: 3 }, { key: "w1", label: "주간", days: 7 }, { key: "w2", label: "2주", days: 14 }, { key: "w4", label: "4주", days: 28 }];
 const ALL = "전체";        // 채널 합계 행 / 채널 통째 실패 표시 행의 unit
 const MIN_SAMPLE = 30;     // 비율 지표(CTR·CPC) 증감을 믿으려면 분모(노출·클릭)가 이만큼은
+const SPEND_NO_LEADS = 50000; // 메타 캠페인이 하루 이만큼(원) 쓰고 리드 0 이면 경고 — 10/11~11/1 22일 중 한 번(10/29 대구 영어 ₩105,485)만 걸린 기준
 
 // 지표 정의. agg: sum(합계) / avg(평균) / last(기간 마지막 값) / ratio(합계끼리 나눔). good: 늘면 좋은지(up) 줄면 좋은지(down). unit: krw|pct|rank|int
 const METRICS = {
@@ -166,8 +167,9 @@ function status(rows, end) {
   }));
 }
 
-// 전산 유입경로(unit) → 광고 채널. 코멘트 토큰 gads_* = 구글, nad_* = 네이버, 광고명 있는 리드폼 = meta.
-function channelOfSource(unit) { const u = String(unit ?? ""); return /^gads_/.test(u) ? "google_ad" : /^nad_/.test(u) ? "naver_ad" : u === "meta" ? "meta_ad" : null; }
+// 전산 유입경로(unit) → 광고 채널. 코멘트 토큰 gads_* = 구글, nad_* = 네이버(홈페이지 신청), 광고명 있는 리드폼 = meta.
+// '네이버 예약'도 네이버 — 플레이스 광고는 홈페이지가 아니라 예약으로 이어진다(광고 없이 온 예약도 섞인다, 대표 결정 2026-11-02).
+function channelOfSource(unit) { const u = String(unit ?? ""); return /^gads_/.test(u) ? "google_ad" : /^nad_/.test(u) || /^네이버\s*예약/.test(u) ? "naver_ad" : u === "meta" ? "meta_ad" : null; }
 
 // 이상 징후 (rows 는 한 팀 것). 결과: [{level: red|yellow|gray, code, channel, unit, msg}]
 function flags(rows, end) {
@@ -182,10 +184,20 @@ function flags(rows, end) {
     const ranBefore = [3, 4, 5, 6, 7, 8, 9].some((i) => num(at(addDays(end, -i))?.metrics?.impressions) > 0);
     if (last3.every((v) => v === 0) && ranBefore) push("red", "ad_stopped", c, u, `${L(c)} '${u}' 노출 0이 3일째예요`);
   }
+  // 1-2 돈은 나가는데 리드 0: 메타 캠페인이 기준일 SPEND_NO_LEADS 이상 썼는데 리드 0. 전에 리드가 있던 캠페인만 본다 — 랜딩(트래픽) 캠페인은 원래 리드가 없다.
+  for (const u of unitsOf(chRows("meta_ad"))) {
+    const ur = chRows("meta_ad").filter((r) => r.unit === u && usable(r)), today = ur.find((r) => r.date === end), sp = num(today?.metrics?.spend);
+    if (sp !== null && sp >= SPEND_NO_LEADS && num(today.metrics?.leads) === 0 && ur.some((r) => r.date < end && num(r.metrics?.leads) > 0)) push("red", "spend_no_leads", "meta_ad", u, `메타 '${u}' ${fmt(sp, "krw")}을 썼는데 리드가 0건이에요`);
+  }
   // 2 승인/결제 문제: 구글·메타 화면에서 읽은 경고 문구(metrics.flags). 막힌 일만 red — '[안내]' 로 시작하는 것(보안 강화 요청 등 알림)은 gray.
-  for (const c of ["google_ad", "meta_ad"]) for (const r of chRows(c).filter((r) => r.date === end)) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) {
-    const notice = /^\s*\[안내\]/.test(String(f));
-    push(notice ? "gray" : "red", notice ? "account_notice" : "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
+  //   그 채널 캠페인이 그날 전부 일시중지면 '[안내]' 는 뺀다 — 일부러 멈춘 채널(구글, 대표 결정 2026-11-02)의 안내가 매일 쌓이지 않게. 막힌 일(red)은 그대로 알린다.
+  for (const c of ["google_ad", "meta_ad"]) {
+    const day = chRows(c).filter((r) => r.date === end), allPaused = day.length > 0 && day.every((r) => /일시\s*중지|paused|중지됨/i.test(String(r.metrics?.status ?? "")));
+    for (const r of day) for (const f of Array.isArray(r.metrics?.flags) ? r.metrics.flags : []) {
+      const notice = /^\s*\[안내\]/.test(String(f));
+      if (notice && allPaused) continue;
+      push(notice ? "gray" : "red", notice ? "account_notice" : "account_issue", c, r.unit, `${L(c)} ${r.unit === ALL ? "" : `'${r.unit}' `}${f}`);
+    }
   }
   // 3 비용 급증: 채널 3일 비용 ▲30%↑ 인데 전체 문의 3일은 ▼ 또는 0. 문의 판단은 쓸 수 있는 전산 날이 3일 중 2일 이상일 때만 — 0건도 감소도 1일 값으로는 안 본다. 전산 결측·실패는 0건이 아니다.
   const inq3 = summary(rows, end)[0].cells.find((c) => c.key === "d3");
@@ -196,17 +208,16 @@ function flags(rows, end) {
   // 4 문의 급감: 주간 문의가 4주 주평균 대비 ▼40%↑ (전산 데이터가 14일 이상, 이번 주엔 4일 이상일 때만). 주간도 데이터 있는 날 수로 7일 환산해 비교한다.
   const jt = totalRows(chRows("jeonsan")), w1 = cell(jt, "inquiries", end, 7), w4 = cell(jt, "inquiries", end, 28), r1 = (x) => Math.round(x * 10) / 10;
   if (w4.days >= 14 && w1.days >= 4 && w1.value !== null && w4.value) { const wk = w1.value / w1.days * 7, avg = w4.value / (w4.days / 7); if (avg > 0 && (wk - avg) / avg <= -0.4) push("yellow", "inquiry_drop", "jeonsan", ALL, `주간 문의 ${r1(wk)}건 — 4주 주평균 ${r1(avg)}건보다 ${pct(1 - wk / avg)}% 적어요`); }
-  // 5 순위 하락(통합검색 rank): 키워드 순위 3계단↑ 하락(마지막으로 안 순위와 비교) 또는 1페이지 이탈(rank→null, 직전 쓸 수 있는 행에 순위가 있던 첫날만).
-  //   오늘 행에 rank 키가 없으면(통합검색 화면을 못 읽은 partial) 판단하지 않는다 — null(1페이지 밖)과 다르다.
+  // 5 순위 하락(통합검색 rank): 이틀 연속일 때만, 그 전 순위(base)보다 3계단↑ 낮거나 1페이지 밖 — 하루 흔들림은 잡음이다(10/31 울산일본어학원 9위→밖→9위).
+  //   쓸 수 있고 rank 키가 있는 행끼리 본다: 통합검색을 못 읽은 partial 은 건너뛰고, null(1페이지 밖)과 구분한다. 떨어진 뒤 그대로면 base 도 낮아져 다시 뜨지 않는다.
   for (const u of unitsOf(chRows("blog")).filter((u) => u !== "방문자")) {
-    const ur = chRows("blog").filter((r) => r.unit === u && usable(r)).sort(byDate), today = ur.find((r) => r.date === end); if (!today || !Object.hasOwn(today.metrics ?? {}, "rank")) continue;
-    const before = [...ur].reverse().filter((r) => r.date < end), last = before[0], prevR = before.find((r) => num(r.metrics?.rank) !== null); if (!prevR) continue;
-    const cur = num(today.metrics?.rank), prev = num(prevR.metrics?.rank);
-    if (cur === null) { if (last === prevR) push("yellow", "rank_drop", "blog", u, `'${u}' 우리 글이 1페이지에서 빠졌어요 (전 ${prev}위)`); }
-    else if (cur - prev >= 3) push("yellow", "rank_drop", "blog", u, `'${u}' ${prev}위 → ${cur}위`);
+    const ur = chRows("blog").filter((r) => r.unit === u && r.date <= end && usable(r) && Object.hasOwn(r.metrics ?? {}, "rank")).sort(byDate), n = ur.length;
+    if (n < 3 || ur[n - 1].date !== end) continue;
+    const base = num(ur[n - 3].metrics.rank), cur = num(ur[n - 1].metrics.rank), v = (r) => num(r.metrics.rank) ?? Infinity; if (base === null) continue;
+    if (v(ur[n - 1]) - base >= 3 && v(ur[n - 2]) - base >= 3) push("yellow", "rank_drop", "blog", u, cur === null ? `'${u}' 우리 글이 이틀째 1페이지 밖이에요 (전 ${base}위)` : `'${u}' ${base}위 → ${cur}위 (이틀째)`);
   }
   // 6 클릭 있는데 문의 0: 채널 주간 클릭 ≥ 50 인데 전산의 그 채널 유입 주간 0 (이번 주에 쓸 수 있는 전산 날이 4일 이상일 때만).
-  //   그 채널 유입이 전산에서 이번 주 전에 문의 > 0 으로 잡힌 적 있는 채널만 본다 — 추적이 되던 채널이 끊긴 것만 이상. 이력이 없으면 판단 안 함(네이버 nad_ 는 2026-11-01 부터 셈 — 그 전엔 홈페이지가 남긴 nads_ 를 못 읽어 기타로 셌다).
+  //   그 채널 유입이 전산에서 이번 주 전에 문의 > 0 으로 잡힌 적 있는 채널만 본다 — 추적이 되던 채널이 끊긴 것만 이상. 이력이 없으면 판단 안 함.
   const thisWeekFrom = windowRange(end, 7).from;
   if (cell(jt, "inquiries", end, 7).days >= 4) for (const c of AD_CHANNELS) {
     if (!chRows("jeonsan").some((r) => usable(r) && r.date < thisWeekFrom && channelOfSource(r.unit) === c && num(r.metrics?.inquiries) > 0)) continue;
