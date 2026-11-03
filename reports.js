@@ -133,7 +133,7 @@ RP.renderMine = function () {
     <textarea data-f="${k}" rows="3" maxlength="3000" ${ro ? "readonly" : ""} placeholder="${ro ? "" : "여기에 적어 주세요"}">${esc(b[k] ?? "")}</textarea></label>`;
   const last = RP.kind === "daily"
     ? `<div class="rpq"><b>5. 오늘 상담 결과</b><small>상품별 등록 인원과 미등록 인원 숫자만 넣어 주세요 (3M = 3개월, 2M = 2개월). 상담 복기 글은 상담복기 폼에 매번 적어 주세요.</small>
-        <div class="rpcons">${CONSULT.map((k) => `<label>${k}<input type="number" min="0" max="99" inputmode="numeric" data-c="${k}" value="${b.consult?.[k] ?? ""}" ${ro ? "readonly" : ""}></label>`).join("")}</div>
+        <div class="rpcons">${CONSULT.map((k) => `<label>${k}<input type="number" min="0" max="99" inputmode="numeric" data-c="${k}" value="${esc(b.consult?.[k] ?? "")}" ${ro ? "readonly" : ""}></label>`).join("")}</div>
         <div class="rpline">📋 <span id="rpLine">${esc(consultLine(b.consult) || "아직 없음")}</span></div>
         <a class="btn ghost rpform" href="${REVIEW_FORM}" target="_blank" rel="noopener">✍️ 상담복기 폼 열기</a></div>`
     : `<div class="rpq"><b>6. 현재 나의 컨디션</b><small>하나 고르고 이유를 적어 주세요.</small>
