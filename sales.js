@@ -469,13 +469,22 @@ const dailyList = (p) => { const ab = (v) => Number.isInteger(+v.toFixed(2)) ? `
   const range = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `${Math.floor(v)}~${Math.ceil(v)}명`;
   return [["신규 지원자", ab(p.apps)], ["회신자", ab(p.replies)], ["상담 진행", range(p.consults)], ["결제", ab(p.payers)]]; };
 const dailyTbl = (p) => `<table class="slt">${dailyList(p).map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`;
+// 📮 개인 폼이 생기기 전 보고: 제출 글에 적힌 숫자만 표로. 안 적은 칸은 계산으로 채우지 않음
+const textFormHtml = (d) => { const ms = d.members || [], n = ms.reduce((t, m) => t + m.n, 0), sum = ms.reduce((t, m) => t + m.n * m.price, 0);
+  const val = [["내 목표", won(d.goal) + "원"], ["달 총 지원자", d.apps + "명"], ["예약 성공률", pct(d.reply) + "%"], ["하루 최소 상담 예약", d.consultMin + "명"], ["결제율", pct(d.pay) + "%"]];
+  return `<div class="mgform"><small class="mut">📝 폼을 따로 저장하지 않아 보고 글에 적힌 숫자로 만들었어요. 단가·금액만 지점 폼 단가로 계산했고, 글에 없는 상담률·객단가·환불율·첫 연락 목표는 비워 뒀어요.</small><div class="mgfgrid">
+    <section><h4>[1] 월별 목표</h4><table class="slt">${val.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join("")}</table></section>
+    <section><h4>[2] 목표 객단가 비율</h4><table class="slt"><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr>
+      ${ms.map((m) => `<tr><td>${esc(m.name)}</td><td>${won(m.price)}</td><td>${pct(m.p)}%</td><td>${m.n}명</td><td>${won(m.n * m.price)}</td></tr>`).join("")}
+      <tr><th>합계</th><th></th><th>${pct(ms.reduce((t, m) => t + m.p, 0))}%</th><th>${n}명</th><th>${won(sum)}</th></tr></table></section></div></div>`; };
 // 📮 대표 창: 제출 순간 저장된 계획(month_goals.plan_snapshot) → [1]·[2]·[5] 읽기 전용. 그달 계획만으로 계산해서 오늘 실적과 무관 ([3]·[4]는 그날 실적이 없어 뺌)
-SL.snapshotHtml = (data, month) => {
+SL.snapshotHtml = (data, month, note) => {
+  if (data.fromText) return textFormHtml(data);
   const s = applyAuto(compose({ ...newPlan(month), ...data, month }, {}, null)), c = calc(s), m = c.month, d = m.days, mp = mixPlan(s, c), rf = (s.refundRate || 0) / 100;
   const mix = mp.mixM, sum = mix.reduce((t, x) => t + x.n * x.price, 0), net = sum * (1 - rf), ok = net >= s.goal - 1, done = data.mgDone || {};
   const stamp = (k) => done[k] ? `<small class="mgfdone">✅ 저장됨 · ${esc(done[k].by)} ${esc(hm(done[k].at))}</small>` : "";
   const val = [["집계 시작일", esc(s.start)], ["월 목표 순매출", won(s.goal) + "원"], ["지원자수", won(m.apps) + "명"], ["회신율", pct(s.reply) + "%"], ["상담률", pct(s.consult) + "%"], ["결제율", pct(s.pay) + "%"], ["객단가", won(s.arpu) + "원"], ["환불율", pct(s.refundRate || 0) + "%"]];
-  return `<div class="mgform"><small class="mut">📸 제출 순간 그대로예요. 나중에 폼을 고쳐도 바뀌지 않아요.</small><div class="mgfgrid">
+  return `<div class="mgform"><small class="mut">${note || (data.personal ? "📸 이 매니저가 직접 쓴 폼이에요. 제출 순간 그대로라 나중에 고쳐도 바뀌지 않아요." : "📸 지점 폼 1장을 같이 쓰던 때의 값이에요. 월 목표는 지점 전체 기준이고, 칸마다 저장한 사람을 확인해 주세요.")}</small><div class="mgfgrid">
     <section><h4>[1] 월별 목표</h4><table class="slt">${val.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join("")}</table>
       <p class="slhint">${md(pStart(s))}~${md(mEnd(s))}, 영업일 ${d}일 (금요일 휴무 제외)</p>${needTbl(s, m, d, "하루 평균")}${stamp("s1")}</section>
     <section><h4>[2] 목표 객단가 비율</h4><table class="slt"><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr>

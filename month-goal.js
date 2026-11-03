@@ -1,6 +1,6 @@
 // 📮 월말 보고 (매출 탭 맨 위 막대 → 창): 팀 목표 = 그달 매출 계획 [1] 월 목표(지점에 하나, 자동), 매니저는 내 목표 + 전략(직접 한 칸).
 // 같은 지점 매니저 내 목표 합 vs 팀 목표 → ✅ 일치 / ⚠ 부족·초과 (제출은 막지 않음, B안). 그달 [1]·[2]·[5] 칸별 [저장] 다 ✅ 여야 [제출] → 대표 푸시+카톡.
-// DB = month_goals (0068), 동료 합계 = team_goal_sum (0071), 제출 순간 폼 = plan_snapshot (0088, 트리거가 저장).
+// DB = month_goals (0068), 동료 합계 = team_goal_sum (0071), 내 폼 = my_plan (0089), 제출 순간 폼 = plan_snapshot (0088, 트리거가 저장).
 // 보고 달 = 매출 탭에서 보는 달(11월 탭 = 11월 목표 보고). 그달에 들어와서 내면 ⏰ 월초 제출, 지난 달은 보기만. 말일 7일 전부터 이번 달 탭에 다음 달 보고 입구.
 (() => {
 const MG = window.MG = { month: null, row: null, subscribed: false };
@@ -15,6 +15,9 @@ const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 const mgBoss = () => isBoss && !previewTeam && !previewUser;
 const mgPast = () => MG.month < todayIso().slice(0, 7);
 MG.late = (month, t) => !!t && new Date(t) >= new Date(`${month}-01T00:00:00+09:00`); // 목표 달에 들어와서 제출 (한국 시간)
+// 내 폼 칸: 비율은 합계 100%, 환불율만 0 가능
+MG.myOk = (p) => { const ms = p?.members; if (!ms?.length) return false; const pos = (k) => p[k] > 0, sum = ms.reduce((t, m) => t + (typeof m.p === "number" ? m.p : NaN), 0);
+  return pos("reply") && pos("consult") && pos("pay") && pos("arpu") && pos("firstContact") && typeof p.refundRate === "number" && p.refundRate >= 0 && Math.abs(sum - 100) <= 0.05; };
 MG.nextDue = (today) => { const [y, m, d] = today.split("-").map(Number); return d > new Date(y, m, 0).getDate() - 7 ? mgNext(today.slice(0, 7)) : null; }; // 말일 포함 마지막 7일
 const LATE = "⏰ 월초 제출";
 
@@ -36,21 +39,38 @@ MG.bar = function () {
     + (nx ? `<button class="mgnext" type="button" data-mgto="${nx}">📮 ${mgMon(nx)} 보고 ${mgBoss() ? "보기" : "쓰기"} ›</button>` : "");
 };
 MG.loadMine = async function () {
+  const dlg = document.getElementById("mgDlg"), top = dlg.scrollTop;
   const ym = MG.month, { data, error } = await sb.from("month_goals").select("*").eq("user_id", me.id).eq("month", ym).maybeSingle();
   if (fail(error) || ym !== MG.month) return; // 그 사이 달을 바꿨으면 버림
   MG.row = data ?? { team_goal: null, my_goal: null, strategy: "", submitted_at: null, updated_at: null };
   const r = MG.row, past = mgPast(), ro = !!(previewTeam || previewUser) || past, dis = ro ? "readonly" : "", mon = mgMon(MG.month);
   const now = (() => { try { const x = SL.now(); return x.month === todayIso().slice(0, 7) ? x : null; } catch { return null; } })();
   mgBody().innerHTML = `<section class="mg"><div class="mghead"><h3>📮 월말 보고 — ${mon} 목표</h3><button class="btn ghost" type="button" id="mgClose">닫기</button><span id="mgState" class="mgstate"></span></div>
-    <p class="slhint">내 목표와 달성 전략을 적고, 매출 계획 [1]·[2]·[5]를 채워 칸마다 [저장]을 누르면 체크가 ✅ — 모두 ✅ 이면 대표님께 제출해요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)} · 지금 제출하면 ${LATE}로 표시돼요` : ""}</p>
+    <p class="slhint">내 목표·달성 전략·내 폼을 적고, 지점 매출 계획 [1]·[2]·[5]를 칸마다 [저장]하면 체크가 ✅ — 모두 ✅ 이면 대표님께 제출해요. 지점 계획은 팀에 1장, 내 폼은 사람마다 1장이에요. 적는 대로 저장돼요.${now ? ` · 참고: 이번 달 목표 ${mgWon(now.goal)} · 지금 순매출 ${mgWon(now.net)} · 지금 제출하면 ${LATE}로 표시돼요` : ""}</p>
     <div class="mggrid"><div class="mgtg"><small>🏢 팀(지점) 목표 — 매출 계획 [1] 월 목표</small><b id="mgTeamGoal">-</b></div>
       <label>🙋 내 목표<span class="u"><input data-mg="my_goal" inputmode="numeric" placeholder="예) 20,000,000" value="${r.my_goal != null ? won(r.my_goal) : ""}" ${dis}><i>원</i></span></label></div>
     <div id="mgSum" class="mgsum"></div>
     <label class="mglab">🧭 달성 전략 — 스스로 어떻게 할지</label>
     <textarea data-mg="strategy" class="grow mgstrat" maxlength="5000" ${dis} placeholder="${GUIDE}">${esc(r.strategy)}</textarea>
+    <label class="mglab">📝 내 폼 — 내 목표 기준 숫자 (처음엔 지점 폼 값이에요. 내 숫자로 고쳐 주세요)</label>
+    <div id="mgMyForm"></div><div id="mgMyPreview"></div>
     <div id="mgChk" class="mgchk"></div>
     <div class="mgfoot">${ro ? `<small class="mut">${past ? "지난 달 보고는 보기만 돼요" : "👀 미리보기 중엔 제출할 수 없어요"}</small>` : `<button class="btn" id="mgSubmit" type="button"></button>`}</div></section>`;
-  MG.state(); MG.recheck();
+  MG.myDrawn = false; MG.state(); await MG.recheck(); dlg.scrollTop = top; // 다시 그려도 쓰던 자리 유지
+};
+const MY_F = [["reply", "회신율", "%"], ["consult", "상담률", "%"], ["pay", "결제율", "%"], ["arpu", "객단가", "원"], ["refundRate", "환불율", "%"], ["firstContact", "첫 연락 목표", "분"]];
+// 내 폼 칸: 저장한 내 폼, 없으면 그달 지점 폼으로 시작
+MG.drawMy = function (branch, ro) {
+  const r = MG.row, b = branch || SL.newPlan(MG.month), dis = ro ? "readonly" : "";
+  r.my_plan ??= { start: b.start, reply: b.reply, consult: b.consult, pay: b.pay, arpu: b.arpu, refundRate: b.refundRate, firstContact: b.firstContact, members: (b.members || []).map((m) => ({ name: m.name, price: m.price, p: m.p })) };
+  const p = r.my_plan, inp = (attr, v, unit) => `<span class="u"><input inputmode="decimal" ${attr} value="${v == null ? "" : unit === "원" ? won(v) : v}" ${dis}><i>${unit}</i></span>`;
+  document.getElementById("mgMyForm").innerHTML = `<div class="mgmy">${MY_F.map(([k, lab, u]) => `<label>${lab}${inp(`data-mgp="${k}"`, p[k], u)}</label>`).join("")}</div>
+    <div class="mgmy">${p.members.map((m, i) => `<label>${esc(m.name)} 비율${inp(`data-mgm="${i}"`, m.p, "%")}</label>`).join("")}</div>`;
+  MG.myDrawn = true; MG.myView();
+};
+MG.myView = function () {
+  const el = document.getElementById("mgMyPreview"), r = MG.row; if (!el || !r.my_plan) return;
+  el.innerHTML = r.my_goal > 0 ? SL.snapshotHtml({ ...r.my_plan, goal: r.my_goal }, MG.month, "👇 대표님께는 이렇게 보여요") : `<small class="mut">내 목표를 적으면 필요 인원이 계산돼요</small>`;
 };
 // 제출 전 체크: 목표 2개 · 전략 · 그달 매출 계획 [1]·[2]·[5] (매출 탭 각 칸 맨 아래 [저장]을 누르면 ✅)
 MG.recheck = async function () {
@@ -59,6 +79,7 @@ MG.recheck = async function () {
   const { data } = team ? await sb.from("sales_plans").select("data").eq("team_id", team).eq("month", ym).maybeSingle() : { data: null };
   if (ym !== MG.month) return;
   const pc = data ? SL.planCheck(data.data, ym) : null, r = MG.row;
+  if (!MG.myDrawn) MG.drawMy(data?.data, !!(previewTeam || previewUser) || mgPast());
   MG.planGoal = pc?.goal > 0 ? pc.goal : null;
   // 팀 목표 = 내 목표들의 합? (내 것은 지금 입력값으로)
   const { data: ppl } = await sb.rpc("team_goal_sum", { p_month: ym });
@@ -73,6 +94,7 @@ MG.recheck = async function () {
   const items = [
     [r.my_goal > 0, "내 목표"],
     [(r.strategy || "").trim().length >= 10, "달성 전략"],
+    [MG.myOk(r.my_plan), "내 폼 (비율 합계 100%)"],
     [pc && !pc.s1.length && !!pc.done.s1, `${mon} [1] 월별 목표`],
     [pc && !pc.s2.length && !!pc.done.s2, `${mon} [2] 목표 객단가 비율`],
     [pc && !pc.s5.length && !!pc.done.s5, `${mon} [5] 일일 실행 목표`],
@@ -92,15 +114,23 @@ MG.state = function (msg) {
 };
 let mgT, chkT;
 MG.save = async function (extra = {}) {
-  const r = MG.row, { data, error } = await sb.from("month_goals").upsert({ month: MG.month, team_goal: MG.planGoal ?? r.team_goal, my_goal: r.my_goal, strategy: r.strategy, updated_at: new Date().toISOString(), ...extra }, { onConflict: "user_id,month" }).select().single();
+  const r = MG.row, { data, error } = await sb.from("month_goals").upsert({ month: MG.month, team_goal: MG.planGoal ?? r.team_goal, my_goal: r.my_goal, strategy: r.strategy, my_plan: r.my_plan ?? null, updated_at: new Date().toISOString(), ...extra }, { onConflict: "user_id,month" }).select().single();
   if (fail(error)) return false;
   MG.row = data; MG.state(); return true;
 };
 document.addEventListener("input", (e) => {
+  const pf = e.target.closest?.("#mgBody [data-mgp], #mgBody [data-mgm]");
+  if (pf) { if (pf.readOnly) return;
+    const k = pf.dataset.mgp, txt = String(pf.value).replace(/[^\d.]/g, ""), n = txt === "" ? null : +txt, p = MG.row.my_plan;
+    if (k) { p[k] = n; if (k === "arpu") pf.value = n == null ? "" : won(n); } else p.members[+pf.dataset.mgm].p = n;
+    MG.myView(); MG.state("저장 중…"); clearTimeout(mgT); mgT = setTimeout(() => MG.save(), 700);
+    clearTimeout(chkT); chkT = setTimeout(() => MG.recheck(), 400); return;
+  }
   const el = e.target.closest?.("#mgBody [data-mg]"); if (!el || el.readOnly) return;
   const k = el.dataset.mg;
   if (k === "strategy") MG.row.strategy = el.value;
   else { const n = String(el.value).replace(/[^\d]/g, ""); MG.row[k] = n ? +n : null; el.value = n ? won(+n) : ""; }
+  MG.myView();
   MG.state("저장 중…"); clearTimeout(mgT); mgT = setTimeout(() => MG.save(), 700);
   clearTimeout(chkT); chkT = setTimeout(() => MG.recheck(), 400);
 });
@@ -149,7 +179,7 @@ MG.loadBoss = async function () {
   }).join("");
   MG.barTxt = `제출 ${done}/${mgrs.length}명${lates ? ` (⏰ 월초 ${lates}명)` : ""}`; MG.bar();
   mgBody().innerHTML = `<section class="mg"><div class="mghead"><h3>📮 월말 보고 — ${mgMon(MG.month)} 목표 (제출 ${done}/${mgrs.length})</h3><button class="btn ghost" type="button" id="mgClose">닫기</button></div>
-    <p class="slhint">팀 목표 = 지점 매출 계획 ${mgMon(MG.month)} [1] 월 목표. 매니저 내 목표 합이 팀 목표와 맞는지(✅/⚠)와 [1]·[2]·[5] 저장 여부를 지점마다 봐요. 제출한 사람 줄을 누르면 전략 전문과 제출 당시 폼 [1]·[2]·[5].</p>${teamHtml || `<p class="mut">매니저가 없어요</p>`}</section>`;
+    <p class="slhint">팀 목표 = 지점 매출 계획 ${mgMon(MG.month)} [1] 월 목표. 매니저 내 목표 합이 팀 목표와 맞는지(✅/⚠)와 [1]·[2]·[5] 저장 여부를 지점마다 봐요. 제출한 사람 줄을 누르면 전략 전문과 그 사람 폼 [1]·[2]·[5].</p>${teamHtml || `<p class="mut">매니저가 없어요</p>`}</section>`;
   dlg.scrollTop = top;
 };
 })();
