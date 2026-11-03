@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>팔로플래너 체험판</title>
+</head>
+<body style="background:#0b0a14;color:#fff;font:16px system-ui;text-align:center;padding-top:40vh">체험판 준비 중…
+<script>
+// 🧪 체험판: 운영 화면(../index.html)을 그대로 읽어, 실제 서버 대신 demo/sb.js(브라우저 안 가짜 서버)로 돌린다.
+// 실제 지점·사람 이름은 글자 바꾸기로 가상 이름으로 — 지점 판별 정규식도 같이 바뀌어 로직은 그대로 돈다.
+const SWAP = [["https://magical-buttercream-d5b901.netlify.app/", "https://demo.invalid/"], ["https://pallo-training.netlify.app/training/progress", "https://demo.invalid/"],
+  ["대구동성로", "서울강남"], ["동성로", "강남"], ["대구", "서울"], ["울산", "부산"], ["삼산", "서면"], ["달동", "전포"], ["구미", "수원"], ["옥계", "영통"], ["인동", "매탄"], ["반월당", "역삼"], ["중앙로", "선릉"], ["공평동", "논현동"],
+  ["마야", "수아"], ["민주", "지연"], ["윌리", "제이"], ["올리비아", "하나"], ["준석", "도윤"], ["박혁", "태오"], ["원빈", "서준"], ["해민", "유진"], ["헤이즐", "소피"]];
+const swap = (s) => SWAP.reduce((t, [a, b]) => t.split(a).join(b), s);
+const DEMO_FILES = ["sb.js", "seed-core.js", "seed-money.js", "seed-growth.js", "seed-market.js"];
+(async () => {
+  const blob = (text) => URL.createObjectURL(new Blob([text], { type: "text/javascript" }));
+  const page = await (await fetch("../index.html", { cache: "no-cache" })).text();
+  const tags = [...page.matchAll(/<script src="([^"]+)"><\/script>/g)];
+  const urls = new Map(await Promise.all(tags.filter((m) => !m[1].startsWith("http")).map(async (m) => {
+    const name = m[1].split("?")[0];
+    if (name === "config.js") return [m[1], blob("globalThis.CONFIG = { SUPABASE_URL: 'https://demo.invalid', SUPABASE_KEY: 'demo' };")];
+    return [m[1], blob(swap(await (await fetch("../" + name, { cache: "no-cache" })).text()))];
+  })));
+  const demo = (await Promise.all(DEMO_FILES.map(async (f) => {
+    const r = await fetch(f, { cache: "no-cache" });
+    return r.ok ? `<script src="${blob(await r.text())}"><\/script>` : "";
+  }))).join("\n");
+  const html = swap(page)
+    .replace(/<script src="([^"]+)"><\/script>/g, (all, src) => {
+      if (src.includes("supabase-js")) return demo; // 진짜 Supabase 라이브러리 대신 가짜 서버
+      return urls.has(src) ? `<script src="${urls.get(src)}"><\/script>` : all;
+    })
+    .replace("<head>", '<head><base href="../"><meta name="robots" content="noindex">');
+  document.open(); document.write(html); document.close();
+})();
+</script>
+</body>
+</html>
