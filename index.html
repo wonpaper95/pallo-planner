@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202611031226">
+<meta name="app-version" content="202611031611">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202611031226"></script>
+<script src="theme.js?v=202611031611"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -176,9 +176,10 @@ body.is-admin #assignbox { display: block; }
 
 /* 요일 칸 (노션 MON~SUN) */
 .day { margin-bottom: 26px; scroll-margin-top: 60px; }
-.day h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 20px; letter-spacing: .02em; }
+.day h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 20px; letter-spacing: .02em; }
 .day h3 .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--hover); color: var(--text); font-weight: 600; }
 .day h3 small { color: var(--sub); font-size: 13px; font-weight: 400; }
+.day h3 small.estSum { color: var(--text); font-weight: 600; }
 .day h3 .dbar { width: 90px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .day h3 .dbar i { display: block; height: 100%; background: var(--green); }
 .day.sat h3 > span:first-child { color: var(--blue); } .day.sun h3 > span:first-child { color: var(--red); }
@@ -548,26 +549,26 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202611031226">
-<link rel="stylesheet" href="photo.css?v=202611031226">
-<link rel="stylesheet" href="post.css?v=202611031226">
-<link rel="stylesheet" href="marketing.css?v=202611031226">
-<link rel="stylesheet" href="contacts.css?v=202611031226">
-<link rel="stylesheet" href="leaders.css?v=202611031226">
-<link rel="stylesheet" href="links.css?v=202611031226">
-<link rel="stylesheet" href="reports.css?v=202611031226">
-<link rel="stylesheet" href="edu.css?v=202611031226">
-<link rel="stylesheet" href="qna.css?v=202611031226">
-<link rel="stylesheet" href="jo-guide.css?v=202611031226">
-<link rel="stylesheet" href="jc.css?v=202611031226">
-<link rel="stylesheet" href="talkbot.css?v=202611031226">
-<link rel="stylesheet" href="work.css?v=202611031226">
-<link rel="stylesheet" href="fin.css?v=202611031226">
-<link rel="stylesheet" href="gx.css?v=202611031226">
-<link rel="stylesheet" href="att.css?v=202611031226">
-<link rel="stylesheet" href="glass.css?v=202611031226">
-<link rel="stylesheet" href="sidebar.css?v=202611031226">
-<link rel="stylesheet" href="skins.css?v=202611031226">
+<link rel="stylesheet" href="blog.css?v=202611031611">
+<link rel="stylesheet" href="photo.css?v=202611031611">
+<link rel="stylesheet" href="post.css?v=202611031611">
+<link rel="stylesheet" href="marketing.css?v=202611031611">
+<link rel="stylesheet" href="contacts.css?v=202611031611">
+<link rel="stylesheet" href="leaders.css?v=202611031611">
+<link rel="stylesheet" href="links.css?v=202611031611">
+<link rel="stylesheet" href="reports.css?v=202611031611">
+<link rel="stylesheet" href="edu.css?v=202611031611">
+<link rel="stylesheet" href="qna.css?v=202611031611">
+<link rel="stylesheet" href="jo-guide.css?v=202611031611">
+<link rel="stylesheet" href="jc.css?v=202611031611">
+<link rel="stylesheet" href="talkbot.css?v=202611031611">
+<link rel="stylesheet" href="work.css?v=202611031611">
+<link rel="stylesheet" href="fin.css?v=202611031611">
+<link rel="stylesheet" href="gx.css?v=202611031611">
+<link rel="stylesheet" href="att.css?v=202611031611">
+<link rel="stylesheet" href="glass.css?v=202611031611">
+<link rel="stylesheet" href="sidebar.css?v=202611031611">
+<link rel="stylesheet" href="skins.css?v=202611031611">
 </head>
 <body>
 
@@ -746,9 +747,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202611031226"></script>
-<script src="week.js?v=202611031226"></script>
-<script src="pick.js?v=202611031226"></script>
+<script src="config.js?v=202611031611"></script>
+<script src="week.js?v=202611031611"></script>
+<script src="pick.js?v=202611031611"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -1960,18 +1961,23 @@ function dayRate(list) {
   const done = list.filter((t) => t.done).length, pct = Math.round((done / list.length) * 100);
   return `<span class="dbar"><i style="width:${pct}%"></i></span><small>${pct}% (${done}/${list.length})</small>`;
 }
+// ⏳ 해결목표 합계 글자: 일부 끝냈으면 '남은 / 총', 아니면 '총'. 해결목표 없으면 빈칸
+function estText(list) {
+  const { total, left } = W.estSum(list);
+  return !total ? "" : `⏳ ${left && left < total ? `남은 ${minLabel(left)} / 총 ${minLabel(total)}` : `총 ${minLabel(total)}`}`;
+}
 function renderWeek() {
   const wk = W.isoWeek(monday);
   $("#wkTitle").textContent = `Week ${String(wk.week).padStart(2, "0")}`;
   $("#wkRange").textContent = `${monday.replaceAll("-", "/")} → ${W.add(monday, 6).replaceAll("-", "/")}`;
   const done = tasks.filter((t) => t.done).length, pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   $("#rateBar").style.width = pct + "%";
-  $("#rateTxt").textContent = `이번주 완료율 ${pct}% (${done}/${tasks.length})`;
+  $("#rateTxt").textContent = `이번주 완료율 ${pct}% (${done}/${tasks.length})${estText(tasks) && ` · ${estText(tasks)}`}`;
   $("#days").innerHTML = DAYS.map((name, i) => {
     const day = W.add(monday, i), list = tasks.filter((t) => t.day === day).sort(W.daySort), tlist = teamTasks.filter((k) => k.day === day).sort(W.teamSort);
     const cls = ["day", i === 5 ? "sat" : i === 6 ? "sun" : "", day === today() ? "today" : ""].join(" ");
     return `<section class="${cls}" id="d-${day}" data-day="${day}">
-      <h3><span>${name}</span><span class="pill">${md(day)}</span>${briefBtnHtml(day)}${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}</h3>
+      <h3><span>${name}</span><span class="pill">${md(day)}</span>${briefBtnHtml(day)}${dayRate([...list, ...tlist.map((k) => ({ done: !!k.done_by }))])}${estText(list) && `<small class="estSum">${estText(list)}</small>`}</h3>
       ${briefPanelHtml(day)}
       <div class="rows">${list.map(rowHtml).join("")}${tlist.map(teamRowHtml).join("")}</div>
       <button class="add" data-act="add">+ 새로 만들기</button></section>`;
@@ -2288,40 +2294,40 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.replace(location.pathname)); // ?jo= 빼고 — 조교 기기는 boot 가 기억한 jo-token 으로 다시 들어감
 document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 다 돈 뒤 — 바로 부르면 데이터가 스크립트보다 빨리 온 첫 로드에 없는 전역(REF 등)을 씀 (뒤 스크립트들은 로드 시점에 me·myRole 안 씀)
 </script>
-<script src="sales.js?v=202611031226"></script>
-<script src="month-goal.js?v=202611031226"></script>
-<script src="sales-all.js?v=202611031226"></script>
-<script src="photo.js?v=202611031226"></script>
-<script src="blog.js?v=202611031226"></script>
-<script src="mk-core.js?v=202611031226"></script>
-<script src="mkc-core.js?v=202611031226"></script>
-<script src="mka-core.js?v=202611031226"></script>
-<script src="mkd-core.js?v=202611031226"></script>
-<script src="marketing.js?v=202611031226"></script>
-<script src="sns-core.js?v=202611031226"></script>
-<script src="post.js?v=202611031226"></script>
-<script src="someday.js?v=202611031226"></script>
-<script src="contacts.js?v=202611031226"></script>
-<script src="refs.js?v=202611031226"></script>
-<script src="sim-merge.js?v=202611031226"></script>
-<script src="simtb.js?v=202611031226"></script>
-<script src="leaders-core.js?v=202611031226"></script>
-<script src="leaders.js?v=202611031226"></script>
-<script src="links.js?v=202611031226"></script>
-<script src="edu-data.js?v=202611031226"></script>
-<script src="edu.js?v=202611031226"></script>
-<script src="reports.js?v=202611031226"></script>
-<script src="jo-guide-hire.js?v=202611031226"></script>
-<script src="jo-guide.js?v=202611031226"></script>
-<script src="jc.js?v=202611031226"></script>
-<script src="talkbot.js?v=202611031226"></script>
-<script src="work-core.js?v=202611031226"></script>
-<script src="work.js?v=202611031226"></script>
-<script src="fin-core.js?v=202611031226"></script>
-<script src="fin.js?v=202611031226"></script>
-<script src="gx.js?v=202611031226"></script>
-<script src="att.js?v=202611031226"></script>
-<script src="qna.js?v=202611031226"></script>
-<script src="sidebar.js?v=202611031226"></script>
+<script src="sales.js?v=202611031611"></script>
+<script src="month-goal.js?v=202611031611"></script>
+<script src="sales-all.js?v=202611031611"></script>
+<script src="photo.js?v=202611031611"></script>
+<script src="blog.js?v=202611031611"></script>
+<script src="mk-core.js?v=202611031611"></script>
+<script src="mkc-core.js?v=202611031611"></script>
+<script src="mka-core.js?v=202611031611"></script>
+<script src="mkd-core.js?v=202611031611"></script>
+<script src="marketing.js?v=202611031611"></script>
+<script src="sns-core.js?v=202611031611"></script>
+<script src="post.js?v=202611031611"></script>
+<script src="someday.js?v=202611031611"></script>
+<script src="contacts.js?v=202611031611"></script>
+<script src="refs.js?v=202611031611"></script>
+<script src="sim-merge.js?v=202611031611"></script>
+<script src="simtb.js?v=202611031611"></script>
+<script src="leaders-core.js?v=202611031611"></script>
+<script src="leaders.js?v=202611031611"></script>
+<script src="links.js?v=202611031611"></script>
+<script src="edu-data.js?v=202611031611"></script>
+<script src="edu.js?v=202611031611"></script>
+<script src="reports.js?v=202611031611"></script>
+<script src="jo-guide-hire.js?v=202611031611"></script>
+<script src="jo-guide.js?v=202611031611"></script>
+<script src="jc.js?v=202611031611"></script>
+<script src="talkbot.js?v=202611031611"></script>
+<script src="work-core.js?v=202611031611"></script>
+<script src="work.js?v=202611031611"></script>
+<script src="fin-core.js?v=202611031611"></script>
+<script src="fin.js?v=202611031611"></script>
+<script src="gx.js?v=202611031611"></script>
+<script src="att.js?v=202611031611"></script>
+<script src="qna.js?v=202611031611"></script>
+<script src="sidebar.js?v=202611031611"></script>
 </body>
 </html>

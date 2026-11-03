@@ -27,6 +27,10 @@ const W = {
     return (!!b.done - !!a.done) || (!!a.start_time - !!b.start_time) || String(a.start_time ?? "").localeCompare(String(b.start_time ?? ""))
       || ((a.sort ?? 0) - (b.sort ?? 0)) || ((a.id ?? 0) - (b.id ?? 0));
   },
+  // ⏳ 해결목표 합계(분): total 전부, left 안 끝낸 일만
+  estSum(list) {
+    return list.reduce((o, t) => { const m = t.estimate_min || 0; o.total += m; if (!t.done) o.left += m; return o; }, { total: 0, left: 0 });
+  },
   // 팀 업무 순서: 날짜 → 그날 안에서 daySort (팀 업무는 시작시간이 없어 마감 시각을 대신 씀)
   teamSort(a, b) {
     const v = (k) => ({ done: k.done_by, start_time: k.deadline, id: k.id });
