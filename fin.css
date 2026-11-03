@@ -19,6 +19,9 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fncard small { color: var(--sub); font-size: 12px; } #fnView .fncard b { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #fnView .fncard.neg b { color: var(--red); } #fnView .fncard.pos b { color: var(--green); }
 @media (max-width: 1150px) { #fnView .fncards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* 📚 교재값 카드가 있으면 7칸: 수익 카드가 혼자 떨어지지 않게 */
+@media (min-width: 1151px) { #fnView .fncards:has(> :nth-child(7)) { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+@media (min-width: 521px) and (max-width: 1150px) { #fnView .fncards:has(> :nth-child(7)) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 520px) { #fnView { padding: 12px 16px 100px; } #fnView .fncards { grid-template-columns: repeat(2, minmax(0, 1fr)); } #fnView .fntools #fnQ { width: 100%; } }
 
 #fnView .fnacc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; }

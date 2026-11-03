@@ -411,7 +411,7 @@ function mixHtml() { // 🔀 접었다 폈다 (기본 접힘 · 기기마다 기
   const m = LD.mix; if (!m) return "";
   const at = m.at && new Date(m.at), lines = m.body.split("\n").filter((l) => l.trim()).length;
   return `<details class="ldmix" ${LD.mixOpen ? "open" : ""}><summary><h3>🔀 팀 믹싱 <span class="mut">${ym(m.month)} · ${lines ? `${lines}줄` : "비어 있음"} · 매니저·조교 같이 · 실시간</span> <small id="mixWho">${at ? `${md(W.ymd(at))} ${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")} ${esc(m.by)} 저장` : "아직 없음"}</small></h3></summary>
-    <div class="mixleg"></div><div class="mixw"><div class="tbbk" aria-hidden="true">${TB.bk(m.body, m.who)}</div><textarea id="ldMix" spellcheck="false" placeholder="팀 믹싱 계획을 같이 적어요 — 예: 월수 11AM 3팀 ↔ 화목 8PM 2팀 리더 교체 / 신규 리더 OO님 → 패턴1 반 …">${esc(m.body)}</textarea></div></details>`;
+    <div class="mixleg"></div><div class="mixw"><div class="tbbk" aria-hidden="true">${TB.bk(m.body, m.who)}</div><textarea id="ldMix" spellcheck="false" placeholder="팀 믹싱 계획을 같이 적어요 — 예: 월수 11AM 3팀 ↔ 화목 8PM 2팀 리더 교체 / 신규 리더 OO님 → 레벨1 반 …">${esc(m.body)}</textarea></div></details>`;
 }
 function mixPaint() {
   const m = LD.mix, v = V(), bk = v?.querySelector(".ldmix .tbbk"), leg = v?.querySelector(".ldmix .mixleg"); if (!bk) return;

@@ -15,6 +15,9 @@ const SECTIONS = ["고정비", "변동비", "광고비", "행정조교", "전일
 // 🧑‍🏫 리더 디파짓: 돌려줄 돈이라 매출·비용·수익에 안 넣음. 줄은 비용표(구분 = 이 값)에 저장 → 시트 비용 탭으로도 복사됨
 const DEPOSIT = "리더 디파짓";
 const isDeposit = (r) => r.kind === "cost" && String(r.vals.구분 ?? "").trim() === DEPOSIT;
+// 📚 교재값: 회원에게 받은 교재 판매 금액 (신고 은서). 수익에는 더하고 매출·수수료·목표엔 안 넣음. 줄은 디파짓처럼 비용표(구분 = 이 값)에 저장
+const BOOK = "교재값";
+const isBook = (r) => r.kind === "cost" && String(r.vals.구분 ?? "").trim() === BOOK;
 const toNum = (v) => {
   if (typeof v === "number") return v;
   const s = String(v ?? "").replace(/[₩,\s원]/g, "");
@@ -42,7 +45,7 @@ function problems(r) {
   const v = r.vals, need = r.kind === "sale" ? ["날짜", "멤버쉽", "매출", "이름", "거래형태", "결제수단", "상담자"] : ["사용처", "금액"];
   if (r.kind === "sale" && String(v.결제수단 ?? "").trim() === "카드") need.push("카드사", "할부개월");
   if (r.kind === "sale" && String(v.거래형태 ?? "").trim() === "가입") need.push("전화번호", "가입경로");
-  if (r.kind === "cost" && ["본사지출", "지점기타지출", DEPOSIT].includes(String(v.구분 ?? "").trim())) need.push("날짜");
+  if (r.kind === "cost" && ["본사지출", "지점기타지출", DEPOSIT, BOOK].includes(String(v.구분 ?? "").trim())) need.push("날짜");
   const out = need.filter((k) => empty(v[k])).map((k) => [k, "비었어요"]), ak = r.kind === "sale" ? "매출" : "금액";
   if (!empty(v[ak]) && toNum(v[ak]) === null) out.push([ak, "숫자만 적어요 (글자가 섞이면 합계에서 빠져요)"]); // 예: '228000(1/5)'
   else if (isRefund(r) && toNum(v[ak]) > 0) out.push([ak, "환불은 − 금액으로 (합계는 −로 셌어요)"]);
@@ -51,18 +54,19 @@ function problems(r) {
 const missing = (r) => problems(r).map((x) => x[0]);
 // 금액: 환불·시작전환불인데 + 로 적었으면 − 로 셈 (+ 로 세면 순매출이 두 배로 틀림)
 const amt = (r) => { const a = toNum(r.vals[r.kind === "sale" ? "매출" : "금액"]) ?? 0; return isRefund(r) && a > 0 ? -a : a; };
-// 매출(+)·환불(−)·순매출·구분별 비용·결제수수료(순매출 × %)·수익
+// 매출(+)·환불(−)·순매출·구분별 비용·결제수수료(순매출 × %)·교재값·수익
 function summary(rows, feePct) {
-  const s = { plus: 0, minus: 0, net: 0, cost: 0, fee: 0, profit: 0, bySec: {} };
+  const s = { plus: 0, minus: 0, net: 0, cost: 0, fee: 0, book: 0, profit: 0, bySec: {} };
   for (const r of rows) {
     if (isDeposit(r)) continue;
     const a = amt(r);
+    if (isBook(r)) { s.book += a; continue; }
     if (r.kind === "sale") { if (a >= 0) s.plus += a; else s.minus += a; }
     else { const k = (r.vals.구분 || "").trim() || "기타"; s.bySec[k] = (s.bySec[k] ?? 0) + a; s.cost += a; }
   }
   s.net = s.plus + s.minus;
   s.fee = Math.round(Math.max(0, s.net) * (feePct ?? 0) / 100);
-  s.profit = s.net - s.cost - s.fee;
+  s.profit = s.net - s.cost - s.fee + s.book;
   return s;
 }
 // 관리자 체크: 날짜(YYYY-MM-DD)마다 매출·비용·수익·누적 — 날짜 없는 비용(월세 등)은 '날짜 없음' 한 줄
@@ -71,11 +75,11 @@ function daily(rows) {
   for (const r of rows) {
     if (isDeposit(r)) continue;
     const d = /^\d{4}-\d{2}-\d{2}$/.test(r.vals.날짜 || "") ? r.vals.날짜 : "";
-    const x = m.get(d) ?? { day: d, sale: 0, cost: 0 }; m.set(d, x);
-    if (r.kind === "sale") x.sale += amt(r); else x.cost += amt(r);
+    const x = m.get(d) ?? { day: d, sale: 0, cost: 0, book: 0 }; m.set(d, x);
+    if (isBook(r)) x.book += amt(r); else if (r.kind === "sale") x.sale += amt(r); else x.cost += amt(r);
   }
   let acc = 0;
-  return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => ({ ...x, profit: x.sale - x.cost, acc: (acc += x.sale - x.cost) }));
+  return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => { const profit = x.sale - x.cost + x.book; return { ...x, profit, acc: (acc += profit) }; });
 }
-window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, toNum, normDate, summary, daily, amt };
+window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt };
 })();

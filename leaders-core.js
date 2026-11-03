@@ -61,7 +61,7 @@ const LDC = {
       if (c.length < 5 || c[3] === "리더" || c[1] === "레벨" || (!c[1] && !c[3])) continue; // 제목·머리줄·빈 줄
       if (!cur.grp) continue;
       const { name, rapport } = LDC.splitName(c[3] || "구해야됨");
-      rows.push({ kind: "leader", grp: cur.grp, slot: cur.slot, level: c[1] ?? "", seat: c[2] ?? "", name, rapport,
+      rows.push({ kind: "leader", grp: cur.grp, slot: cur.slot, level: (c[1] ?? "").replace(/패턴/g, "레벨"), seat: c[2] ?? "", name, rapport,
         status: /구해야/.test(c[4] + c[3]) ? "구해야 함" : "확정", start_day: c[5] ?? "", phone: c[6] ?? "", note: c[7] ?? "",
         edu: [c[18], c[19]].filter(Boolean).join(" · "), memo: c[20] ?? "", att: c.slice(8, 18) }); // att: 1주①~5주② 칸 그대로 (저장 땐 뺌)
     }
@@ -136,7 +136,7 @@ const LDC = {
   // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
   langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
   timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
-  // 레벨 정렬: 숫자(0 · 0.5 · 패턴1 · 2) 순, 같은 숫자면 - → 그대로 → + (패턴2-- < 패턴2- < 패턴2 < 패턴2+), 그다음 프토(프리토킹), 숫자 없으면(땜빵리더) 맨 뒤
+  // 레벨 정렬: 숫자(0 · 0.5 · 레벨1 · 2) 순, 같은 숫자면 - → 그대로 → + (레벨2-- < 레벨2- < 레벨2 < 레벨2+), 그다음 프토(프리토킹), 숫자 없으면(땜빵리더) 맨 뒤
   lvNum(lv) { const s = String(lv ?? "").trim(), m = s.match(/\d+(\.\d+)?/);
     if (/^(프토|프리)/.test(s)) return 50;
     return m ? +m[0] + ((s.match(/\+/g) ?? []).length - (s.match(/-/g) ?? []).length) * 0.01 : 99; },
