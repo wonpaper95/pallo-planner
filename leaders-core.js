@@ -42,7 +42,9 @@ const LDC = {
     return m && m[1] ? { name: m[1].trim(), rapport: +m[2] } : { name: String(raw ?? "").trim(), rapport: null };
   },
   // 구글시트에서 복사한 줄(탭 구분) → 리더 목록. 시간대 칸이 비면 위(구역 제목·이전 줄) 것을 이어 씀
-  parsePaste(text) {
+  // known: 이 지점 지금 레벨 값. 지점이 패턴 없이 레벨N 만 쓰면 시트의 패턴N 도 레벨N 으로 받음 (지점마다 다름, 울산은 패턴 유지 11-03)
+  parsePaste(text, known = []) {
+    const toLv = known.some((x) => /레벨\d/.test(x)) && !known.some((x) => /패턴/.test(x));
     const rows = [], cur = { grp: "", slot: "" };
     const grpOf = (s) => (s.match(/월수|화목|토일/) ?? [s.includes("주말") ? "토일" : ""])[0];
     const slotOf = (s) => (s.match(/\d{1,2}(:\d{2})?\s*(AM|PM)/i) ?? [""])[0].replace(/\s+/g, "").toUpperCase();
@@ -61,7 +63,7 @@ const LDC = {
       if (c.length < 5 || c[3] === "리더" || c[1] === "레벨" || (!c[1] && !c[3])) continue; // 제목·머리줄·빈 줄
       if (!cur.grp) continue;
       const { name, rapport } = LDC.splitName(c[3] || "구해야됨");
-      rows.push({ kind: "leader", grp: cur.grp, slot: cur.slot, level: (c[1] ?? "").replace(/패턴/g, "레벨"), seat: c[2] ?? "", name, rapport,
+      rows.push({ kind: "leader", grp: cur.grp, slot: cur.slot, level: toLv ? (c[1] ?? "").replace(/패턴/g, "레벨") : c[1] ?? "", seat: c[2] ?? "", name, rapport,
         status: /구해야/.test(c[4] + c[3]) ? "구해야 함" : "확정", start_day: c[5] ?? "", phone: c[6] ?? "", note: c[7] ?? "",
         edu: [c[18], c[19]].filter(Boolean).join(" · "), memo: c[20] ?? "", att: c.slice(8, 18) }); // att: 1주①~5주② 칸 그대로 (저장 땐 뺌)
     }
@@ -136,6 +138,13 @@ const LDC = {
   // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
   langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
   timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
+  // 🏷 레벨 이름 일괄 변경 미리보기: 값마다 { old, next, n, merge } · merge = 이미 있는 다른 값과 합쳐짐(되돌리기 어려움)
+  renames(levels, from, to) {
+    const f = String(from ?? "").trim(), t = String(to ?? "").trim(), c = new Map();
+    if (!f) return [];
+    for (const x of levels) if (x) c.set(x, (c.get(x) ?? 0) + 1);
+    return [...c].filter(([old]) => old.includes(f) && old.split(f).join(t) !== old).map(([old, n]) => { const next = old.split(f).join(t); return { old, next, n, merge: c.has(next) }; }).sort((a, b) => LDC.lvNum(a.old) - LDC.lvNum(b.old) || a.old.localeCompare(b.old));
+  },
   // 레벨 정렬: 숫자(0 · 0.5 · 레벨1 · 2) 순, 같은 숫자면 - → 그대로 → + (레벨2-- < 레벨2- < 레벨2 < 레벨2+), 그다음 프토(프리토킹), 숫자 없으면(땜빵리더) 맨 뒤
   lvNum(lv) { const s = String(lv ?? "").trim(), m = s.match(/\d+(\.\d+)?/);
     if (/^(프토|프리)/.test(s)) return 50;

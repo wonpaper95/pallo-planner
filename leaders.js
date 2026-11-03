@@ -189,7 +189,7 @@ function bar(extra = "") {
       ${admin() ? `<select id="ldTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === LD.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <span class="ldseg ldpage">${[["board", "📌 보드"], ["list", "📋 리더 리스트"]].map(([k, l]) => `<button data-page="${k}" class="${LD.page === k ? "on" : ""}" title="${k === "list" ? `${rapOn() ? "라포 · " : ""}리더교육 · 자격증 · 첫 시작일 · 출석` : "오늘·내일 리더 · 요일별 리더 구성"}">${l}</button>`).join("")}</span>
       ${extra}
-      <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(statMonth())} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button></span></div>`;
+      <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(statMonth())} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button>${myRole !== "assistant" ? `<button class="btn ghost" id="ldRename" title="이 지점 레벨 이름을 한 번에 바꿔요 (예: 패턴 → 레벨)">🏷 레벨 이름 바꾸기</button>` : ""}</span></div>`;
 }
 // 📌 보드: 오늘·내일 리더 → 🔍 찾기 → 🔴 구해야 함 → 🔀 팀 믹싱 → 요일(월수·화목·토일) 한 페이지씩: 시간대 칸 안에 레벨순 리더 + 서브리더, 밑에 서브리더·대기 리더
 // 시간대는 언어를 빼고 묶음 ('일본어 오전'+'중국어 오전' = 오전) · 언어는 이름 옆에 작게
@@ -497,7 +497,7 @@ function pasteDlg() {
   const t = d.querySelector("#ldTxt"), go = d.querySelector("#ldGo");
   let rows = [];
   t.oninput = () => {
-    rows = LDC.parsePaste(t.value); go.disabled = !rows.length; go.textContent = `${rows.length}명 추가`;
+    rows = LDC.parsePaste(t.value, LD.rows.map((x) => x.level ?? "")); go.disabled = !rows.length; go.textContent = `${rows.length}명 추가`;
     const by = {}; rows.forEach((r) => { const k = `${r.grp} ${r.slot}`; by[k] = (by[k] ?? 0) + 1; });
     d.querySelector("#ldPrev").textContent = rows.length ? `읽은 리더: ${Object.entries(by).map(([k, n]) => `${k} ${n}명`).join(" · ")}` : t.value.trim() ? "리더 줄을 못 찾았어요 — 구역 제목(월수 11AM 같은) 줄부터 같이 복사해 주세요" : "";
   };
@@ -508,6 +508,31 @@ function pasteDlg() {
     if (fail(error)) return;
     const rp = added.filter((x) => x.rapport).map((x) => ({ leader_id: x.id, month: LDC.monthStart(today()), rapport: x.rapport, rapport_by: by })); // 시트 별점 → 이번 달 라포
     if (rp.length && fail((await sb.from("leader_months").upsert(rp)).error)) return; d.close(); toast(`${rows.length}명 추가했어요`); LD.load();
+  };
+}
+// 🏷 레벨 이름 한 번에 바꾸기: 이 지점만, 값이 같은 줄끼리 update (리더별 변경 이력에 남음)
+async function renameDlg() {
+  const { data, error } = await sb.from("leaders").select("level").eq("team_id", LD.team);
+  if (fail(error)) return;
+  const levels = data.map((x) => x.level ?? "");
+  const d = dlg(`<div class="ldform"><h2>🏷 레벨 이름 바꾸기</h2>
+    <p class="mut" style="margin:0">이 지점 리더의 레벨 이름을 한 번에 바꿔요. 다른 지점은 안 바뀌어요.</p>
+    <label>바꿀 글자 <input id="ldRnF" placeholder="예: 패턴"></label><label>새 글자 <input id="ldRnT" placeholder="예: 레벨"></label>
+    <div id="ldRnP" class="mut"></div>
+    <div class="row"><span style="flex:1"></span><button type="button" class="btn ghost" id="ldX">취소</button><button class="btn" id="ldGo" disabled>바꾸기</button></div></div>`);
+  const f = d.querySelector("#ldRnF"), t = d.querySelector("#ldRnT"), go = d.querySelector("#ldGo"), p = d.querySelector("#ldRnP");
+  let list = [];
+  f.oninput = t.oninput = () => {
+    list = LDC.renames(levels, f.value, t.value);
+    const n = list.reduce((a, x) => a + x.n, 0), bad = list.some((x) => !x.next || x.next.length > 40);
+    go.disabled = !list.length || bad; go.textContent = n ? `${n}명 바꾸기` : "바꾸기";
+    p.innerHTML = !f.value.trim() ? "" : !list.length ? "바뀌는 레벨이 없어요" : list.map((x) => `<div>${esc(x.old)} → <b>${esc(x.next || "(빈 칸)")}</b> · ${x.n}명${x.merge ? ` <b>⚠️ 이미 있는 '${esc(x.next)}'에 합쳐져요 (되돌리기 어려워요)</b>` : ""}</div>`).join("") + (bad ? "<div><b>레벨 이름이 비거나 40자를 넘으면 바꿀 수 없어요</b></div>" : "");
+  };
+  d.querySelector("#ldX").onclick = () => d.close();
+  go.onclick = async () => {
+    go.disabled = true;
+    for (const x of list) if (fail((await sb.from("leaders").update({ level: x.next }).eq("team_id", LD.team).eq("level", x.old)).error)) { go.disabled = false; return LD.load(); }
+    d.close(); toast(`${list.reduce((a, x) => a + x.n, 0)}명 레벨 이름을 바꿨어요`); LD.load();
   };
 }
 
@@ -533,6 +558,7 @@ document.addEventListener("click", async (e) => {
     const { error } = await setAtt(id, d, s ? "X" : "", s); if (fail(error)) return;
     undoBar(`${md(d)} ${r.name}: ${s ? `대타 ${s}` : "대타 지움"}`, () => setAtt(id, d, st, cur)); return LD.load(); }
   if (b.id === "ldPaste") return pasteDlg();
+  if (b.id === "ldRename") return renameDlg();
   if (b.id === "ldAI") return aiDlg();
   if (b.dataset.goto) { // 현황표 → 보드의 그 줄 (지금 보기 필터·달에 없으면 알려 줌)
     const t = v.querySelector(`.ldblk tr[data-id="${b.dataset.goto}"]`); if (!t) return toast("지금 보기(필터·달)에는 없는 줄이에요 — 전체 · 오늘로 바꿔 보세요");
