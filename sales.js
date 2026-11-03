@@ -443,9 +443,9 @@ SL.newPlan = newPlan; // 📮 월말 보고(month-goal.js)가 씀: 새 달 기�
 SL.now = () => { const s = S(); return { month: s.month, goal: s.goal, net: actuals(s).net }; };
 // 📮 월말 보고: [1]·[2]·[5] 칸 맨 아래 [저장] — 이번 달·앞으로의 달만(지난 달은 보기만). 누르면 data.mgDone[칸] = 누가·언제 → 보고 체크 ✅
 const SEC = { s1: "[1] 월별 목표", s2: "[2] 목표 객단가 비율", s5: "[5] 일일 실행 목표" };
+const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
 function renderSec() {
   const on = !!window.MG && SL.month >= todayIso().slice(0, 7), ro = (isBoss && !previewTeam && !previewUser) || !!(previewTeam || previewUser), done = SL.plan?.mgDone || {};
-  const hm = (t) => { const x = new Date(t); return `${x.getMonth() + 1}/${x.getDate()} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`; };
   V().querySelectorAll(".slsec").forEach((el) => {
     const k = el.dataset.sec, d = done[k];
     el.innerHTML = !on ? "" : `<div class="slsecbar">${d ? `<span class="ok">✅ 저장됨 · ${esc(d.by)} ${hm(d.at)}</span>` : `<span class="mut">📮 월말 보고 — 다 채우고 저장하면 ✅</span>`}`
@@ -453,6 +453,40 @@ function renderSec() {
   });
 }
 SL.renderSec = renderSec;
+// [1] 필요 인원 표 (매출 탭 + 📮 제출 폼)
+const day = (n, d) => (Math.round(n / d * 10) / 10).toLocaleString("ko-KR");
+const mn1 = (n, d) => Math.ceil(n / d - 1e-9); // 하루 최소 = 하루 평균 올림
+const needTbl = (s, x, d, lab) => `<table class="slt"><tr><th>필요</th><th>합계</th><th>하루 최소</th><th>${lab} (${d}일)</th></tr>
+  <tr><td>지원자</td><td><b>${x.apps.toLocaleString()}명</b></td><td>${mn1(x.apps, d)}명</td><td>${day(x.apps, d)}명</td></tr>
+  <tr><td>회신자 (${pct(s.reply)}%)</td><td><b>${x.replies.toLocaleString()}명</b></td><td title="전산 상담 일정(캘린더)에 하루 최소 이만큼 잡혀 있어야 함"><b>📅 ${mn1(x.replies, d)}명</b><small class="mut"> 캘린더</small></td><td>${day(x.replies, d)}명</td></tr>
+  <tr><td>상담자 (${pct(s.consult)}%)</td><td><b>${x.consults.toLocaleString()}명</b></td><td>${mn1(x.consults, d)}명</td><td>${day(x.consults, d)}명</td></tr>
+  <tr><td>결제자 (${pct(s.pay)}%)</td><td><b>${x.payers.toLocaleString()}명</b></td><td>${mn1(x.payers, d)}명</td><td>${day(x.payers, d)}명</td></tr>
+  <tr><td>결제금액</td><td>${won(x.revenue)}원</td><td></td><td></td></tr>
+  ${s.refundRate ? `<tr><td>환불 (${pct(s.refundRate)}%)</td><td>−${won(x.refundAmt)}원</td><td></td><td></td></tr>` : ""}
+  <tr><td>순매출</td><td><b>${won(x.netAdd)}원</b></td><td></td><td></td></tr>
+  <tr><td>하루 평균 목표매출</td><td><b>${won(x.netAdd / d)}원</b></td><td></td><td></td></tr></table>`;
+const dailyList = (p) => { const ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;
+  const range = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `${Math.floor(v)}~${Math.ceil(v)}명`;
+  return [["신규 지원자", ab(p.apps)], ["회신자", ab(p.replies)], ["상담 진행", range(p.consults)], ["결제", ab(p.payers)]]; };
+const dailyTbl = (p) => `<table class="slt">${dailyList(p).map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`;
+// 📮 대표 창: 제출 순간 저장된 계획(month_goals.plan_snapshot) → [1]·[2]·[5] 읽기 전용. 그달 계획만으로 계산해서 오늘 실적과 무관 ([3]·[4]는 그날 실적이 없어 뺌)
+SL.snapshotHtml = (data, month) => {
+  const s = applyAuto(compose({ ...newPlan(month), ...data, month }, {}, null)), c = calc(s), m = c.month, d = m.days, mp = mixPlan(s, c), rf = (s.refundRate || 0) / 100;
+  const mix = mp.mixM, sum = mix.reduce((t, x) => t + x.n * x.price, 0), net = sum * (1 - rf), ok = net >= s.goal - 1, done = data.mgDone || {};
+  const stamp = (k) => done[k] ? `<small class="mgfdone">✅ 저장됨 · ${esc(done[k].by)} ${esc(hm(done[k].at))}</small>` : "";
+  const val = [["집계 시작일", esc(s.start)], ["월 목표 순매출", won(s.goal) + "원"], ["지원자수", won(m.apps) + "명"], ["회신율", pct(s.reply) + "%"], ["상담률", pct(s.consult) + "%"], ["결제율", pct(s.pay) + "%"], ["객단가", won(s.arpu) + "원"], ["환불율", pct(s.refundRate || 0) + "%"]];
+  return `<div class="mgform"><small class="mut">📸 제출 순간 그대로예요. 나중에 폼을 고쳐도 바뀌지 않아요.</small><div class="mgfgrid">
+    <section><h4>[1] 월별 목표</h4><table class="slt">${val.map(([k, v]) => `<tr><td>${k}</td><td><b>${v}</b></td></tr>`).join("")}</table>
+      <p class="slhint">${md(pStart(s))}~${md(mEnd(s))}, 영업일 ${d}일 (금요일 휴무 제외)</p>${needTbl(s, m, d, "하루 평균")}${stamp("s1")}</section>
+    <section><h4>[2] 목표 객단가 비율</h4><table class="slt"><tr><th>멤버십</th><th>단가</th><th>비율</th><th>인원</th><th>금액</th></tr>
+      ${mix.map((x) => `<tr><td>${esc(x.name)}</td><td>${won(x.price)}</td><td>${pct(x.w * 100)}%</td><td>${x.n}명</td><td>${won(x.n * x.price)}</td></tr>`).join("")}
+      <tr><th>합계</th><th></th><th>${pct(mp.sumP)}%</th><th>${mp.pNm}명</th><th>${won(sum)}</th></tr>
+      ${rf ? `<tr><td colspan="4">환불 (${pct(s.refundRate)}%)</td><td>−${won(sum * rf)}</td></tr>` : ""}
+      <tr><th colspan="4">순매출 <small class="${ok ? "up" : "dn"}">월 목표 ${won(s.goal)} ${ok ? "✓ 달성" : "✗ 미달"}</small></th><th class="${ok ? "up" : "dn"}">${won(net)}</th></tr></table>
+      <p class="slhint">이 구성의 객단가 <b>${mp.pNm ? won(sum / mp.pNm) : "-"}원</b> · [1] 목표 객단가 ${won(s.arpu)}원</p>${stamp("s2")}
+      <h4>[5] 일일 실행 목표</h4><p class="slhint">[1] 월 계획을 영업일로 나눈 값</p>${dailyTbl({ apps: m.apps / d, replies: m.replies / d, consults: m.consults / d, payers: m.payers / d })}
+      <table class="slt"><tr><td>첫 연락 목표</td><td><b>${won(s.firstContact)}분</b></td></tr></table>${stamp("s5")}</section></div></div>`;
+};
 // 📮 월말 보고 제출 조건: 그달 계획(sales_plans.data)에서 [1]·[2]·[5] 빈 칸 (지원자수는 비우면 계산값이 칸에 보여서 뺌) + 그 계획의 하루 최소 상담
 SL.planCheck = (data, month) => {
   const d = data || {}, pos = (k) => d[k] > 0, ms = Array.isArray(d.members) ? d.members : [];
@@ -645,17 +679,7 @@ function render() {
     : "⚠ 기준일까지 들어온 순매출만 넣으세요. 기준일 다음 날부터는 달력에 입력합니다 (같은 매출을 두 번 넣지 않게). 기준일을 뒤로 옮기면 그 사이 달력 실적을 더할지 물어봅니다.");
   $v("#slSync").classList.toggle("hidden", !sy);
   setT("slSheet", sy ? (sy.error ? `⚠ 시트: ${sy.error}` : `📗 시트 ${new Date(sy.synced_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 기준${sy.skipped ? ` · 못 읽은 줄 ${sy.skipped}` : ""}`) : "");
-  const day = (n, d) => (Math.round(n / d * 10) / 10).toLocaleString("ko-KR");
-  const mn1 = (n, d) => Math.ceil(n / d - 1e-9); // 하루 최소 = 하루 평균 올림
-  const tbl = (x, d, lab) => `<table class="slt"><tr><th>필요</th><th>합계</th><th>하루 최소</th><th>${lab} (${d}일)</th></tr>
-    <tr><td>지원자</td><td><b>${x.apps.toLocaleString()}명</b></td><td>${mn1(x.apps, d)}명</td><td>${day(x.apps, d)}명</td></tr>
-    <tr><td>회신자 (${pct(s.reply)}%)</td><td><b>${x.replies.toLocaleString()}명</b></td><td title="전산 상담 일정(캘린더)에 하루 최소 이만큼 잡혀 있어야 함"><b>📅 ${mn1(x.replies, d)}명</b><small class="mut"> 캘린더</small></td><td>${day(x.replies, d)}명</td></tr>
-    <tr><td>상담자 (${pct(s.consult)}%)</td><td><b>${x.consults.toLocaleString()}명</b></td><td>${mn1(x.consults, d)}명</td><td>${day(x.consults, d)}명</td></tr>
-    <tr><td>결제자 (${pct(s.pay)}%)</td><td><b>${x.payers.toLocaleString()}명</b></td><td>${mn1(x.payers, d)}명</td><td>${day(x.payers, d)}명</td></tr>
-    <tr><td>결제금액</td><td>${won(x.revenue)}원</td><td></td><td></td></tr>
-    ${s.refundRate ? `<tr><td>환불 (${pct(s.refundRate)}%)</td><td>−${won(x.refundAmt)}원</td><td></td><td></td></tr>` : ""}
-    <tr><td>순매출</td><td><b>${won(x.netAdd)}원</b></td><td></td><td></td></tr>
-    <tr><td>하루 평균 목표매출</td><td><b>${won(x.netAdd / d)}원</b></td><td></td><td></td></tr></table>`;
+  const tbl = (x, d, lab) => needTbl(s, x, d, lab);
   compareFill(s, c);
   setH("slPace", paceHtml(s, c));
   dayWeekCards(s, c);
@@ -702,10 +726,8 @@ function render() {
     : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixA)}원 낮아서 월 결제자가 ${mp.pNm - c.month.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${esc(x.name)} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guide" type="button">가이드대로 맞추기</button></div>`
     : `<div class="sltip">Premium 100%여도 목표 객단가 ${won(s.arpu)}원에 못 미칩니다. [1] 객단가를 낮추거나 단가를 확인해 주세요.</div>`);
 
-  const p = c.perDay, ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;
-  const range = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `${Math.floor(v)}~${Math.ceil(v)}명`;
-  const dailyRows = [["신규 지원자", ab(p.apps)], ["회신자", ab(p.replies)], ["상담 진행", range(p.consults)], ["결제", ab(p.payers)]];
-  setH("slDaily", `<table class="slt">${dailyRows.map((r) => `<tr><td>${r[0]}</td><td><b>하루 평균 ${r[1]}</b></td></tr>`).join("")}</table>`);
+  const dailyRows = dailyList(c.perDay);
+  setH("slDaily", dailyTbl(c.perDay));
 
   renderCal(s, c);
   renderSec();
