@@ -125,6 +125,17 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("pointerdown", (e) => popFor && !e.target.closest("#pop, #tdList [data-act]") && closePop());
 document.addEventListener("keydown", (e) => e.key === "Escape" && popFor && closePop());
 
+// prompt·alert 대신 페이지 안 창: 크롬 확장 팝업은 브라우저 대화창이 뜨면 닫힐 수 있음. 입력칸 있으면 입력값(취소 null), 없으면 안내만
+const ask = (msg, input = true) => new Promise((done) => {
+  const d = document.createElement("dialog");
+  d.style.cssText = "max-width:300px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--text)";
+  d.innerHTML = `<form method="dialog"><div style="white-space:pre-line;margin-bottom:10px">${esc(msg)}</div>`
+    + (input ? `<input style="width:100%;box-sizing:border-box;margin-bottom:10px;padding:7px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text)" autocomplete="off">` : "")
+    + `<button class="lbtn" value="ok" style="padding:7px 16px">확인</button>${input ? ` <button value="" style="padding:7px 12px">취소</button>` : ""}</form>`;
+  d.addEventListener("close", () => { const v = d.returnValue === "ok" ? d.querySelector("input")?.value ?? "" : null; d.remove(); done(v); });
+  document.body.appendChild(d); d.showModal();
+});
+
 // 체크하면 플래너와 같은 DB 에 바로 저장
 document.addEventListener("change", async (e) => {
   const el = e.target, on = el.checked; let r;
@@ -136,11 +147,11 @@ document.addEventListener("change", async (e) => {
       $("#foot").textContent = "📷 인증샷 올리는 중…";
       try { link = await uploadRoutinePhoto(sb, f, +el.dataset.rt); } catch (err) { $("#foot").textContent = "업로드 실패: " + err.message; return; }
     } else if (on && it?.need_count) { // 📅 내일 상담 예약 수 (플래너와 같음)
-      const t = (await sb.rpc("consult_target")).data ?? 8, v = prompt(`📅 내일(다음 근무일) 상담 예약이 몇 명인가요?\n캘린더 보고 숫자만 (목표 ${t}명)`);
+      const t = (await sb.rpc("consult_target")).data ?? 8, v = await ask(`📅 내일(다음 근무일) 상담 예약이 몇 명인가요?\n캘린더 보고 숫자만 (목표 ${t}명)`);
       if (v === null || !/^\s*\d{1,3}\s*$/.test(v)) { el.checked = false; $("#foot").textContent = "숫자를 넣어야 완료돼요"; return; }
-      num = +v; if (num < t) alert(`🔴 내일 상담 ${num}명 — 목표 ${t}명 미달\n퇴근 전에 대표님께 연락해 주세요\n① 회신율 신경 쓰기  ② 광고 더 돌리기`);
+      num = +v; if (num < t) await ask(`🔴 내일 상담 ${num}명 — 목표 ${t}명 미달\n퇴근 전에 대표님께 연락해 주세요\n① 회신율 신경 쓰기  ② 광고 더 돌리기`, false);
     } else if (on && it?.need_link) { // 🔗 링크를 올려야 완료
-      link = (prompt("작성한 글의 링크를 붙여넣어 주세요 (https://...)") || "").trim();
+      link = (await ask("작성한 글의 링크를 붙여넣어 주세요 (https://...)") || "").trim();
       if (!/^https?:\/\/\S+$/i.test(link)) { el.checked = false; $("#foot").textContent = "링크를 올려야 완료돼요"; return; }
     }
     r = await sb.rpc("set_routine_done", { p_item: +el.dataset.rt, p_day: el.dataset.day || day, p_done: on, p_link: link, p_num: num });
@@ -148,7 +159,7 @@ document.addEventListener("change", async (e) => {
   else if (el.dataset.task) r = await sb.from("tasks").update({ done: on }).eq("id", +el.dataset.task);
   else if (el.dataset.team) r = await sb.rpc("set_team_task_done", { p_id: +el.dataset.team, p_done: on });
   else return;
-  if (r.error) { el.checked = !on; $("#foot").textContent = "저장 실패: " + r.error.message; }
+  if (r.error) { el.checked = !on; $("#foot").textContent = "저장 실패: " + r.error.message; return; } // load() 가 안내문을 바로 지우지 않게
   load();
 });
 
