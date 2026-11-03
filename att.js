@@ -65,9 +65,9 @@ function card(s) {
         ${s.note ? `<div class="atnote">${esc(s.note)}</div>` : ""}</div>
       ${jo() ? "" : `<button class="btn ghost atdel" title="지우기">🗑</button>`}</div>
     ${rows.length ? `<div class="atscroll"><table class="att"><thead><tr><th>할 일</th><th>사진에서 읽음</th><th>전산 회원</th><th>테이블</th><th>역할</th>${one ? "" : "<th>수업</th>"}<th>전산 상태</th>${s.status === "done" || s.status === "error" ? "<th>결과</th>" : ""}</tr></thead><tbody>
-      ${rows.map((r, i) => `<tr class="${r.act}" data-i="${i}">
+      ${rows.map((r, i) => `<tr class="${Object.hasOwn(ACT, r.act) ? r.act : ""}" data-i="${i}">
         <td class="atw">${edit ? `<select class="atact">${Object.entries(ACT).map(([k, l]) => `<option value="${k}" ${k === r.act ? "selected" : ""}>${l}</option>`).join("")}</select>` : ACT[r.act] ?? ""}${r.why ? `<div class="mut">${esc(r.why)}</div>` : ""}</td>
-        <td>${esc(r.read)}</td><td>${r.name ? `${esc(r.name)} <span class="mut">${esc(r.phone.slice(-4))}</span>` : `<span class="mut">없음</span>`}</td>
+        <td>${esc(r.read)}</td><td>${r.name ? `${esc(r.name)} <span class="mut">${esc(String(r.phone ?? "").slice(-4))}</span>` : `<span class="mut">없음</span>`}</td>
         <td>${edit ? `<input class="attb" value="${esc(r.table)}" size="3" inputmode="numeric">` : esc(r.table)}</td><td>${esc(r.role)}</td>${one ? "" : `<td>${esc(r.cls)}</td>`}<td>${esc(r.state)}</td>
         ${s.status === "done" || s.status === "error" ? `<td class="atw">${esc(r.res ?? "")}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : ""}
     ${edit ? `<div class="atrow"><button class="btn atok">✅ 이대로 전산에 입력</button><span class="mut">'확인 필요'가 남아 있으면 출석 처리나 안 함으로 골라 주세요</span></div>` : ""}

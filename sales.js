@@ -321,7 +321,7 @@ const TIPS = {
   consult: ["회신자 중 미예약자에게 구체적인 상담 시간 제안", "내일 예약자에게 날짜·시간·위치 다시 안내", "미방문자에게 참여 의사 확인 후 다른 일정 제안"],
   pay: ["상담 후 미결제자에게 24시간 안에 후속 연락", "상담자 목적에 맞는 멤버십 1개를 골라 추천"],
 };
-const tipList = (s, k) => TIPS[k].map((t) => t.replace("{fc}", s.firstContact));
+const tipList = (s, k) => TIPS[k].map((t) => t.replace("{fc}", () => String(+s.firstContact || 0)));
 // 그날 상담이 목표보다 적으면 어느 단계가 막혔는지 보고 행동 요령을 고른다
 function diagnose(s, c, e, tgt) {
   if (!e || e.replies == null) return null;
@@ -694,12 +694,12 @@ function render() {
   { const g = mp.guideR, off = Math.abs(mp.sumPR - 100) > 0.05, back = mp.ownR ? ` <button class="btn ghost" data-mixfix="resetR" type="button">[2] 비율로 되돌리기</button>` : "";
     setH("slMemRNote", (off ? `<div class="sltip">⚠ 비율 합계가 ${pct(mp.sumPR)}%예요. <button class="btn ghost" data-mixfix="sumR" type="button">100%로 맞추기</button></div>`
       : !g ? `<div class="sltip ok">✓ 이 비율이면 목표 객단가 이상입니다 (+${won(mp.mixAR - s.arpu)}원). 남은 목표 달성 가능</div>`
-      : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixAR)}원 낮아서 남은 기간 결제자가 ${rN - c.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${x.name} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guideR" type="button">가이드대로 맞추기</button></div>`
+      : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixAR)}원 낮아서 남은 기간 결제자가 ${rN - c.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${esc(x.name)} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guideR" type="button">가이드대로 맞추기</button></div>`
       : `<div class="sltip">Premium 100%여도 목표 객단가 ${won(s.arpu)}원에 못 미칩니다.</div>`) + (back ? `<p>${back}</p>` : "")); }
   const g = mp.guide, off = Math.abs(mp.sumP - 100) > 0.05;
   setH("slMemNote", off ? `<div class="sltip">⚠ 비율 합계가 ${pct(mp.sumP)}%예요. <button class="btn ghost" data-mixfix="sum" type="button">100%로 맞추기</button></div>`
     : !g ? `<div class="sltip ok">✓ 이 비율이면 목표 객단가 이상입니다 (+${won(mp.mixA - s.arpu)}원). 목표매출 가이드 달성 가능</div>`
-    : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixA)}원 낮아서 월 결제자가 ${mp.pNm - c.month.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${x.name} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guide" type="button">가이드대로 맞추기</button></div>`
+    : g.ok ? `<div class="sltip">이 비율은 목표 객단가보다 ${won(s.arpu - mp.mixA)}원 낮아서 월 결제자가 ${mp.pNm - c.month.payers}명 더 필요합니다.<br>가이드: ${g.moves.map((x) => `${esc(x.name)} ${x.d > 0 ? "+" : ""}${pct(x.d)}%p`).join(", ")} 하면 목표 달성 <button class="btn ghost" data-mixfix="guide" type="button">가이드대로 맞추기</button></div>`
     : `<div class="sltip">Premium 100%여도 목표 객단가 ${won(s.arpu)}원에 못 미칩니다. [1] 객단가를 낮추거나 단가를 확인해 주세요.</div>`);
 
   const p = c.perDay, ab = (v) => Number.isInteger(+v.toFixed(2)) ? `${Math.round(v)}명` : `약 ${Math.ceil(v)}명`;

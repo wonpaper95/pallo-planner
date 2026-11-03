@@ -21,6 +21,7 @@ const opts = (map, sel) => Object.entries(map).map(([v, l]) => `<option value="$
 const brOpts = (sel) => `<option value="">전 지점</option>${opts(BR, sel)}`;
 const active = (k) => (k.gx_matches || []).filter((x) => !x.ended_at);
 const since = (d) => { const n = Math.floor((Date.now() - new Date(d)) / 864e5); return n < 7 ? `${n}일째` : `${Math.floor(n / 7)}주째`; };
+const arr = (v) => (Array.isArray(v) ? v : []); // 공개 폼 값은 배열이 아닐 수도 있음
 const dash = (v) => (v == null || v === "" ? `<span class="mut">—</span>` : esc(v));
 try { GX.sub = localStorage.getItem("gx-sub") || "db"; } catch {}
 
@@ -47,8 +48,8 @@ const LANG_HINT = { 영어: ["english"], 일본어: ["japanese", "japan", "日�
 const ENG = { Native: 3, Advanced: 3, Intermediate: 1, Beginner: 0, None: -2 };
 function score(m, a, k) {
   const d = a.data || {}, why = [];
-  const days = (d.available_days || []).filter((x) => (k.available_days || []).includes(x));
-  const times = (d.available_times || []).filter((x) => (k.available_times || []).includes(x));
+  const days = arr(d.available_days).filter((x) => arr(k.available_days).includes(x));
+  const times = arr(d.available_times).filter((x) => arr(k.available_times).includes(x));
   let s = days.length * 2 + times.length * 2;
   if (days.length) why.push("요일 " + days.join("/")); if (times.length) why.push("시간 " + times.join("/"));
   if (!days.length && !times.length) why.push("스케줄 안 겹침");
@@ -59,7 +60,7 @@ function score(m, a, k) {
     else { s -= 2; why.push("언어 맞는지 모름"); }
   }
   if (m.branch && k.branch) { if (m.branch === k.branch) { s += 2; why.push("같은 지점"); } else { s -= 1; why.push("다른 지점: " + (BR[k.branch] || k.branch)); } }
-  const fm = d.mode || "", km = k.mode || "", fOn = fm.startsWith("Online"), fOff = fm.startsWith("Offline"), kOn = km.startsWith("온라인"), kOff = km.startsWith("오프라인");
+  const fm = String(d.mode || ""), km = String(k.mode || ""), fOn = fm.startsWith("Online"), fOff = fm.startsWith("Offline"), kOn = km.startsWith("온라인"), kOff = km.startsWith("오프라인");
   if ((fOn && kOff) || (fOff && kOn)) { s -= 3; why.push("온/오프라인 다름"); } else if (fm && km) s += 1;
   return { k, s, why };
 }
@@ -97,7 +98,7 @@ const body = () => V().querySelector("#gxBody");
 const openMember = (id) => { GX.sel = GX.members.find((m) => m.id === id) || null; GX.sub = "fm"; render(); showPanel(); };
 const openKorean = (id) => { GX.ksel = GX.koreans.find((k) => k.id === id) || null; GX.sub = "kr"; render(); showPanel(); };
 const apps = () => GX.members.filter(inBr).flatMap((m) => m.gx_applications.map((a) => ({ a, m }))).sort((x, y) => y.a.created_at.localeCompare(x.a.created_at));
-const appTag = (a) => `<span class="gxtag ${a.status}">${esc(APP_ST[a.status] || a.status)}</span>`;
+const appTag = (a) => `<span class="gxtag ${esc(a.status)}">${esc(APP_ST[a.status] || a.status)}</span>`;
 const evApps = (e) => GX.members.flatMap((m) => m.gx_applications.filter((a) => a.event_id === e.id).map((a) => ({ a, m }))); // 이벤트는 전 지점 공용
 
 // ---- 📊 현황: 숫자 · 프로그램별 신청 · 매칭 대기(+1순위 추천) · 최근 신청 · 다가오는 이벤트 · 어디서 뭘 보나
@@ -120,7 +121,7 @@ function renderDash() {
       <section class="card"><h3>📋 프로그램별 신청 <small class="mut">줄을 누르면 아래 목록이 그 프로그램만</small></h3>
         <table class="gxt"><thead><tr><th>프로그램</th><th>전체</th>${Object.values(APP_ST).map((l) => `<th>${l}</th>`).join("")}</tr></thead><tbody>${Object.keys(PROG).map(prow).join("")}</tbody></table></section>
       <section class="card" id="gxWait"><h3>🤝 매칭 기다리는 외국인 <small class="mut">1:1 언어교환 신청 · 1순위 추천</small></h3>
-        ${waiting.map(({ a, m }) => { const r = recommend(m, a)[0]; return `<div class="gxmrow"><span><a href="#" data-m="${m.id}"><b>${esc(m.name)}</b></a> <small class="mut">${esc(BR[m.branch] || "")} · ${day(a.created_at)} · ${((a.data || {}).available_days || []).join("/")} ${((a.data || {}).available_times || []).join("/")}</small><br>
+        ${waiting.map(({ a, m }) => { const r = recommend(m, a)[0]; return `<div class="gxmrow"><span><a href="#" data-m="${m.id}"><b>${esc(m.name)}</b></a> <small class="mut">${esc(BR[m.branch] || "")} · ${day(a.created_at)} · ${esc(arr((a.data || {}).available_days).join("/"))} ${esc(arr((a.data || {}).available_times).join("/"))}</small><br>
           ${r ? `<small>추천 → <b>${esc(r.k.name)}</b> <span class="gxtag ${r.s >= 4 ? "confirmed" : ""}">${r.s}점</span> <span class="mut">${esc(r.why.join(" · "))}</span></small>` : `<small class="mut">비어 있는 한국인 회원이 없어요</small>`}</span>
           ${r ? `<button class="btn d-match" data-a="${a.id}" data-k="${r.k.id}">매칭</button>` : ""}<button class="btn ghost" data-m="${m.id}">추천 더 보기</button></div>`; }).join("") || `<div class="mut">기다리는 사람 없어요</div>`}</section>
       <section class="card gxwide"><h3>📝 신청 목록 <select id="gxFp"><option value="">모든 프로그램</option>${opts(PROG, GX.fp)}</select><select id="gxFs"><option value="">모든 상태</option>${opts(APP_ST, GX.fs)}</select> <small class="mut">${list.length}건 · 이름을 누르면 회원 상세(상태·메모 저장)</small></h3>
@@ -159,7 +160,7 @@ function renderMembers() {
       <div class="card"><table class="gxt"><thead><tr><th>이름</th><th>지점</th><th>연락처</th><th>국적</th><th>가입</th><th>신청</th><th>상태</th></tr></thead><tbody>
       ${list.map((m) => `<tr data-id="${m.id}" class="${GX.sel?.id === m.id ? "on" : ""}"><td><b>${esc(m.name)}</b></td><td>${esc(BR[m.branch] || m.branch || "")}</td>
         <td>${esc(m.phone)}<br><small class="mut">${esc(m.email)}</small></td><td>${esc(m.nationality)}</td><td>${day(m.created_at)}</td>
-        <td>${m.gx_applications.map((a) => { const on = active(a).length; return `<span class="gxtag ${a.status}" title="${APP_ST[a.status] || a.status}">${PROG[a.program]}${a.gx_events ? ": " + esc(a.gx_events.title) : ""}${on ? " ×" + on : ""}</span>`; }).join("") || `<span class="mut">—</span>`}</td>
+        <td>${m.gx_applications.map((a) => { const on = active(a).length; return `<span class="gxtag ${esc(a.status)}" title="${esc(APP_ST[a.status] || a.status)}">${PROG[a.program]}${a.gx_events ? ": " + esc(a.gx_events.title) : ""}${on ? " ×" + on : ""}</span>`; }).join("") || `<span class="mut">—</span>`}</td>
         <td>${esc(M_ST[m.status] || m.status)}</td></tr>`).join("") || `<tr><td colspan="7" class="mut">아직 없어요 — [🔗 신청 링크·QR] 에서 외국인 신청 링크를 보내 주세요</td></tr>`}
       </tbody></table></div></div><div id="gxPanel"></div></div>`;
   const qi = body().querySelector("#gxQ"); qi.oninput = () => { GX.q = qi.value; const at = qi.selectionStart; renderMembers(); const n = body().querySelector("#gxQ"); n.focus(); n.setSelectionRange(at, at); };
@@ -172,8 +173,8 @@ function matchBlock(m, a) {
     ${cur.map((x) => `<div class="gxmrow"><span><b>${esc(x.gx_koreans?.name)}</b> <span class="gxtag">${esc(x.gx_koreans?.membership)}</span> · ${x.started_at}부터 · <b>${since(x.started_at)}</b></span><button class="btn ghost m-end" data-id="${x.id}">끝내기</button></div>`).join("") || `<div class="mut">아직 없어요</div>`}
     ${past.length ? `<small class="mut">지난 매칭: ${past.map((x) => esc(x.gx_koreans?.name) + " (" + x.started_at + "→" + x.ended_at + ")").join(", ")}</small>` : ""}
     <b class="gxh">추천 · 스케줄 겹침 → 언어 → 지점 → 온/오프라인, 같으면 멤버십 순</b>
-    ${rec.map((r) => `<div class="gxmrow"><span><b>${esc(r.k.name)}</b> <span class="gxtag">${esc(r.k.membership)}</span> <span class="gxtag ${r.s >= 4 ? "confirmed" : ""}">${r.s}점</span><br><small class="mut">${esc(r.why.join(" · "))} · ${(r.k.available_days || []).join("/")} ${(r.k.available_times || []).join("/")}</small></span><button class="btn m-add" data-id="${r.k.id}">매칭</button></div>`).join("") || `<div class="mut">비어 있는 한국인 회원이 없어요</div>`}
-    <select class="m-any"><option value="">…또는 직접 고르기 (매칭 안 된 한국인)</option>${free().map((k) => `<option value="${k.id}">${esc(k.name)} · ${esc(k.membership)} · ${esc(k.target_language)} · ${(k.available_days || []).join("/")}</option>`).join("")}</select></div>`;
+    ${rec.map((r) => `<div class="gxmrow"><span><b>${esc(r.k.name)}</b> <span class="gxtag">${esc(r.k.membership)}</span> <span class="gxtag ${r.s >= 4 ? "confirmed" : ""}">${r.s}점</span><br><small class="mut">${esc(r.why.join(" · "))} · ${esc(arr(r.k.available_days).join("/"))} ${esc(arr(r.k.available_times).join("/"))}</small></span><button class="btn m-add" data-id="${r.k.id}">매칭</button></div>`).join("") || `<div class="mut">비어 있는 한국인 회원이 없어요</div>`}
+    <select class="m-any"><option value="">…또는 직접 고르기 (매칭 안 된 한국인)</option>${free().map((k) => `<option value="${k.id}">${esc(k.name)} · ${esc(k.membership)} · ${esc(k.target_language)} · ${esc(arr(k.available_days).join("/"))}</option>`).join("")}</select></div>`;
 }
 function memberPanel() {
   const m = GX.sel, p = body().querySelector("#gxPanel");
@@ -214,7 +215,7 @@ function renderKoreans() {
       <div class="card"><table class="gxt"><thead><tr><th>이름</th><th>멤버십</th><th>번호</th><th>배우고 싶은 언어</th><th>지점</th><th>가능 요일·시간</th><th>가입</th><th>상태</th></tr></thead><tbody>
       ${list.map((k) => `<tr data-id="${k.id}" class="${GX.ksel?.id === k.id ? "on" : ""}"><td><b>${esc(k.name)}</b></td><td><span class="gxtag">${esc(k.membership)}</span></td><td>${esc(k.phone)}</td>
         <td>${esc(k.target_language)} <small class="mut">(${esc(k.target_level)})</small></td><td>${esc(BR[k.branch] || k.branch || "")}</td>
-        <td>${(k.available_days || []).join(",")}<br><small class="mut">${(k.available_times || []).join(",")}</small></td><td>${day(k.created_at)}</td>
+        <td>${esc(arr(k.available_days).join(","))}<br><small class="mut">${esc(arr(k.available_times).join(","))}</small></td><td>${day(k.created_at)}</td>
         <td>${esc(K_ST[k.status] || k.status)}${active(k).map((x) => `<br><span class="gxtag matched">${esc(x.gx_members?.name)} · ${since(x.started_at)}</span>`).join("")}</td></tr>`).join("") || `<tr><td colspan="8" class="mut">아직 없어요 — [🔗 신청 링크·QR] 의 한국인 신청 링크를 보내 주세요</td></tr>`}
       </tbody></table></div></div><div id="gxPanel"></div></div>`;
   const qi = body().querySelector("#gxKQ"); qi.oninput = () => { GX.kq = qi.value; const at = qi.selectionStart; renderKoreans(); const n = body().querySelector("#gxKQ"); n.focus(); n.setSelectionRange(at, at); };
@@ -222,7 +223,7 @@ function renderKoreans() {
   const k = GX.ksel, p = body().querySelector("#gxPanel");
   if (!k) { p.innerHTML = `<div class="card mut gxempty">왼쪽에서 회원을 누르면 자세히 보여요</div>`; return; }
   const F = [["번호", k.phone], ["성별", k.gender], ["나이", k.age_range], ["지점", BR[k.branch] || k.branch], ["배우고 싶은 언어", k.target_language], ["레벨", k.target_level],
-    ["교환 방식", k.exchange_style], ["원하는 상대", k.preferred_partner], ["요일", (k.available_days || []).join(", ")], ["시간", (k.available_times || []).join(", ")],
+    ["교환 방식", k.exchange_style], ["원하는 상대", k.preferred_partner], ["요일", arr(k.available_days).join(", ")], ["시간", arr(k.available_times).join(", ")],
     ["횟수", k.frequency], ["온/오프", k.mode], ["메모(본인)", k.note], ["매칭 상대", active(k).map((x) => `${x.gx_members?.name} (${x.started_at}부터, ${since(x.started_at)})`).join(", ")], ["가입", when(k.created_at)]];
   p.innerHTML = `<div class="card gxpanel"><h3>${esc(k.name)} <button class="btn ghost" id="gxClose">✕</button></h3>
     <dl>${F.map(([l, v]) => `<dt>${l}</dt><dd>${dash(v)}</dd>`).join("")}</dl>
