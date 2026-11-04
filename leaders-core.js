@@ -120,13 +120,19 @@ const LDC = {
     const n = Math.round((D.parse(today) - D.parse(s)) / 864e5);
     return n > 0 ? `D+${n}` : n === 0 ? "D-day" : `D${n}`;
   },
-  // 📜 자격증: 첫 시작일부터 6개월 → 2급, 1년 → 1급. on = 받을 수 있는 날, ok = 오늘(그만뒀으면 그만둔 날)까지 채웠나. 시작일 모르면 []
-  CERTS: [[2, 6], [1, 12]],
-  certs(start, end, today) {
-    const s = LDC.parseDay(start); if (!s) return [];
-    const until = end && end < today ? end : today;
-    return LDC.CERTS.map(([grade, n]) => { const p = D.parse(s), d = p.getDate(); p.setMonth(p.getMonth() + n); if (p.getDate() !== d) p.setDate(0); // 8/31 + 6개월 = 2/28
-      const on = D.ymd(p); return { grade, on, ok: on <= until }; });
+  // 📜 자격증: 참여 2급 48회 · 1급 96회. left = 앞으로 몇 회. 시작일은 판단에 안 씀
+  CERTS: [[2, 48], [1, 96]],
+  certs: (n) => LDC.CERTS.map(([grade, need]) => ({ grade, need, ok: n >= need, left: Math.max(0, need - n) })),
+  // 🔢 참여 횟수 (이름별 — 같은 사람이 여러 줄이면 합침): 이전 횟수 + 출석 O + 대타 해준 날. 그날 이미 O 면 대타는 안 더함(전산 O·대타 이름 이중 집계 방지)
+  // agg = leader_att_counts 뷰 [{ leader_id, state, sub, days }]
+  counts(rows, agg) {
+    const by = new Map(), nameOf = new Map(rows.map((r) => [r.id, r.name])), uniq = [...new Map(rows.map((r) => [r.name, r])).values()]; // matchSub 은 같은 이름이 두 줄이면 못 찾으므로 이름당 한 줄로
+    const get = (name) => by.get(name) ?? by.set(name, { base: 0, o: 0, days: new Set(), sub: new Set(), n: 0 }).get(name);
+    rows.forEach((r) => { const p = get(r.name); p.base = Math.max(p.base, r.att_base || 0); });
+    agg.filter((a) => a.state === "O" && nameOf.has(a.leader_id)).forEach((a) => { const p = get(nameOf.get(a.leader_id)); p.o += a.days.length; a.days.forEach((d) => p.days.add(d)); });
+    agg.filter((a) => a.sub).forEach((a) => { const who = LDC.matchSub(a.sub, uniq); if (who) a.days.forEach((d) => { if (!get(who.name).days.has(d)) get(who.name).sub.add(d); }); });
+    by.forEach((p) => { p.n = p.base + p.o + p.sub.size; });
+    return by;
   },
   // 시간대 정렬용 (11AM < 6PM < 8PM, 오전 < 오후, 대기·스터디는 맨 뒤)
   slotMin(s) {

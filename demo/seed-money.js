@@ -21,7 +21,7 @@ PK("sales_plans", ["team_id", "month"]); PK("sales_days", ["team_id", "day"]); P
 PK("month_goals", ["user_id", "month"]); PK("fin_config", ["team_id"]); PK("fin_access", ["team_id"]);
 PK("work_months", ["team_id", "ym"]); PK("work_cells", ["row_id", "day", "slot"]); PK("work_people", ["team_id", "name"]);
 PK("leader_att", ["leader_id", "day"]); PK("leader_awards", ["leader_id", "month"]); PK("leader_months", ["leader_id", "month"]); PK("leader_certs", ["leader_id", "grade"]);
-PK("leader_rapports", ["leader_id", "month", "user_id"]); PK("leader_confirm", ["leader_id", "day"]); PK("leader_mix", ["team_id", "month"]); PK("leader_ai", ["team_id", "month"]);
+PK("leader_rapports", ["leader_id", "month", "user_id"]); PK("leader_confirm", ["leader_id", "day"]); PK("leader_birth", ["leader_id"]); PK("leader_mix", ["team_id", "month"]); PK("leader_ai", ["team_id", "month"]);
 
 // ───────── 지점별 기준값 ─────────
 const PRICE = [2470000, 1900000, 1140000, 760000], TIER = ["Premium", "Pro Max", "Pro", "Plus"];
@@ -263,7 +263,8 @@ for (const tm of TM) {
     if (p === "b") { [0, 2, 4].forEach((i) => lastM[i] && xs.set(lastM[i], "")); if (thisM[0]) xs.set(thisM[0], ""); if (thisM[1]) xs.set(thisM[1], ""); if (thisM[2]) xs.set(thisM[2], ""); }
     for (const d of sess) att.push({ leader_id: row.id, day: d, state: xs.has(d) ? "X" : "O", sub: xs.get(d) ?? "", by_name: d >= "2026-10-27" ? "전산" : tm.mgr, at: iso(d, "22:00") });
     if (p === "g" && lastM.length && awards.length < 12 && row.id % 2) awards.push({ leader_id: row.id, month: M[2] + "-01", note: "스타벅스 쿠폰 지급", by_name: tm.mgr, at: iso(addD(`${CUR}-01`, 1), "10:00") });
-    // 자격증: 6개월(2급)·1년(1급) — 일부는 아직 발급 전으로 남김
+    // 자격증: 참여 48회(2급)·96회(1급) ≈ 주 2회로 6개월·1년 — 일부는 아직 발급 전으로 남김
+    row.att_base = Math.round(row._ago / 3.5);
     for (const [g, days_] of [[2, 183], [1, 365]]) if (row._ago >= days_ && row.id % 5 !== 2) certs.push({ leader_id: row.id, grade: g, issued_on: addD(row.start_day, days_ + 9), by_name: tm.mgr, at: iso(addD(row.start_day, days_ + 9), "12:00") });
     // 라포: 지난달은 전원, 이번 달은 일부 — 매니저(+대표 일부)
     for (const [mi, m] of [[2, M[2]], [3, CUR]]) { if (mi === 3 && row.id % 3 === 0) continue; if (row.start_day > addD(`${m}-01`, 27)) continue;
@@ -277,6 +278,8 @@ for (const tm of TM) {
     rows.filter((x) => x.kind === "leader" && x.grp === g && x.status === "확정" && !x.end_day && x.start_day <= d).forEach((x, i) => { if (rng("c" + x.id + d)() < share) conf.push({ leader_id: x.id, day: d, by_name: tm.mgr, at: iso(d, "09:3" + (i % 10)), note: d === TD && i === 1 ? "10분 지각" : "" }); }); }
 }
 L.forEach((r) => { delete r._prof; delete r._ago; });
+const attN = new Map(); for (const a of att) if (a.state === "O" || a.sub) { const k = `${a.leader_id}|${a.state}|${a.sub}`; if (!attN.has(k)) attN.set(k, { leader_id: a.leader_id, state: a.state, sub: a.sub, days: [] }); attN.get(k).days.push(a.day); }
+put("leader_att_counts", [...attN.values()]); // 뷰 대신 (샘플)
 put("leaders", L); put("leader_att", att); put("leader_confirm", conf); put("leader_certs", certs); put("leader_awards", awards); put("leader_rapports", raps);
 const syncMonths = () => { // leader_rapports → 평균 라포 (서버 트리거 대신)
   const g = new Map(); for (const x of t.leader_rapports) { const k = x.leader_id + "|" + x.month; g.set(k, [...(g.get(k) ?? []), x]); }
