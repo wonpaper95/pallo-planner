@@ -242,7 +242,7 @@ const bySlot = (rs) => { const m = new Map();
 const grpOn = (d) => LDC.GRPS.find((x) => LDC.DAYS[x].includes(W.parse(d).getDay()));
 // 🔁 그 요일에 올 수 있는 서브리더 (요일 안 적은 사람 포함) · 레벨순
 const workOn = (r, d) => LDC.activeIn(r, d, d) && !LDC.goneBy(r, d); // 그만둔 날부터는 오늘·내일 칸에서 빠짐
-const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && workOn(r, d) && [g, ""].includes(LDC.subWhen(r).grp)).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level));
+const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && workOn(r, d) && [g, ""].includes(LDC.subWhen(r, g).grp)).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level));
 const subLine = (ss, d, hint = "") => (ss.length ? `<div class="tdrow sbline"><b>서브</b><div class="tdc">${hint ? `<span class="mut">${hint}</span>` : ""}${ss.map((s) => { const c = LD.cfm?.get(`${s.id}:${d}`);
   return `<span class="sbc ${c ? "on" : ""}"><button data-cfm="${s.id}" data-day="${d}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "전화해서 와줄 수 있다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(s.name)}</button>${tags(s)}${tel(s)}</span>`; }).join("")}</div></div>` : "");
 // 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 📞 · 🔁 대타 필요 → 🆘 구하는 중 → 🔁 대타 OOO (이름 넣으면 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
@@ -264,7 +264,7 @@ function dayCard(d, label) {
   const attN = (st) => ok.filter((r) => LD.att.get(r.id)?.get(d) === st).length;
   const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
   const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;
-  const pool = subsOn(g, d), subOk = pool.filter((s) => LD.cfm?.has(`${s.id}:${d}`)).length, used = new Set(), times = bySlot(rs).map(([t, list]) => { const ss = pool.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
+  const pool = subsOn(g, d), subOk = pool.filter((s) => LD.cfm?.has(`${s.id}:${d}`)).length, used = new Set(), times = bySlot(rs).map(([t, list]) => { const ss = pool.filter((s) => { const w = LDC.subWhen(s, g); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
     return `<div class="tdrow"><b>${esc(t || "시간 미정")}</b><div class="tdc">${list.map((r) => chip(r, d)).join("")}</div></div>${subLine(ss, d)}`; }).join("");
   return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}${subOk ? ` · 서브 ✅ <b class="on">${subOk}</b>` : ""}${d === today() ? ` · 참 <b class="on">${attN("O")}</b> · 불참 <b class="re">${attN("X")}</b>` : ""}</span>`)}`
     + `${times || `<p class="mut">리더 없음</p>`}${subLine(pool.filter((s) => !used.has(s.id)), d, "시간 무관")}</section>`;
@@ -278,7 +278,7 @@ function dayPage(g) {
   const td = today(), live = (r) => workOn(r, td);
   const subs = subsOn(g, td), used = new Set();
   const cards = bySlot(LD.rows.filter((r) => r.grp === g && isLeader(r) && live(r))).map(([t, rs]) => {
-    const ss = subs.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
+    const ss = subs.filter((s) => { const w = LDC.subWhen(s, g); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
     const need = rs.filter((r) => r.status === "구해야 함").length;
     return `<section class="ldblk ldcard"><h3>${g} ${esc(t || "시간 미정")} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 ${need}</span>` : ""}</h3><table>`
       + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${nameEd(r.name === VACANT ? "빈자리" : esc(r.name))}</span>` : `<b>${nameEd(esc(r.name))}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}${tel(r)}</td>${editTd}</tr>`).join("")
