@@ -40,13 +40,13 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
 #auth .msg { color: var(--red); min-height: 22px; font-size: 14px; }
 
 /* 상단 */
-header { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--bg); border-bottom: 1px solid var(--line); }
+header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--bg); border-bottom: 1px solid var(--line); }
 header .logo { font-weight: 700; margin-right: auto; }
 header .btn { padding: 6px 10px; font-size: 14px; white-space: nowrap; }
 #me { color: var(--sub); font-size: 13px; }
 
 .layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; }
-aside { border-right: 1px solid var(--line); padding: 16px 12px; height: calc(100vh - 53px); position: sticky; top: 53px; overflow: auto; }
+aside { border-right: 1px solid var(--line); padding: 16px 12px; height: calc(100vh - var(--hh, 53px)); position: sticky; top: var(--hh, 53px); overflow: auto; }
 aside .yr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
 aside .yr button { padding: 2px 8px; color: var(--sub); }
 .wk { display: block; width: 100%; text-align: left; padding: 6px 8px; border-radius: 6px; }
@@ -176,7 +176,7 @@ body.is-admin #assignbox { display: block; }
 #mustbox .dl-item span:first-child, #duebox .dl-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 요일 칸 (노션 MON~SUN) */
-.day { margin-bottom: 26px; scroll-margin-top: 60px; }
+.day { margin-bottom: 26px; scroll-margin-top: calc(var(--hh, 53px) + 7px); }
 .day h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 20px; letter-spacing: .02em; }
 .day h3 .pill { font-size: 13px; padding: 2px 10px; border-radius: 99px; background: var(--hover); color: var(--text); font-weight: 600; }
 .day h3 small { color: var(--sub); font-size: 13px; font-weight: 400; }
