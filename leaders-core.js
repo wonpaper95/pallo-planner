@@ -124,6 +124,12 @@ const LDC = {
     const n = Math.round((D.parse(today) - D.parse(s)) / 864e5);
     return n > 0 ? `D+${n}` : n === 0 ? "D-day" : `D${n}`;
   },
+  // 첫 시작일부터 꽉 찬 개월 수 (기간별 보기). 시작일 못 읽으면 null, 앞으로 시작하면 음수
+  monthsSince(start, today) {
+    const s = LDC.parseDay(start); if (!s) return null;
+    const [y, m, d] = s.split("-").map(Number), [Y, M, DD] = today.split("-").map(Number);
+    return (Y - y) * 12 + M - m - (DD < d ? 1 : 0);
+  },
   // 📜 자격증: 참여 2급 48회 · 1급 96회. left = 앞으로 몇 회. 시작일은 판단에 안 씀
   CERTS: [[2, 48], [1, 96]],
   certs: (n) => LDC.CERTS.map(([grade, need]) => ({ grade, need, ok: n >= need, left: Math.max(0, need - n) })),

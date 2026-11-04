@@ -292,8 +292,8 @@ function renderBoard() {
   V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 밑에 그 요일·시간대 서브리더 — 와줄 수 있다고 하면 ⬜ 눌러 ✅ · 오늘 수업 후 [참·불참] 누르면 출석에 바로 들어가요 · 빈자리를 누르면 들어갈 사람(조교 등) 이름을 적어요 · 아래 칸 리더 이름은 눌러서 바로 고쳐요</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
     + `<div class="ldseg lddays">${LDC.GRPS.map((g) => `<button data-dpg="${g}" class="${LD.day === g ? "on" : ""}">${g === "토일" ? "주말 (토일)" : g}</button>`).join("")}</div>${dayPage(LD.day)}`;
 }
-// 📋 리스트 보기: 시간대별(기존) / 📜 횟수별(96회↑·48회↑·미만) / 전체(가나다) — 지금 활동 중인 리더·서브·대기, 이름당 한 줄
-const viewSeg = () => `<span class="ldseg ldview">${[["slot", "시간대별"], ["count", "📜 횟수별"], ["all", "전체"]].map(([k, l]) => `<button data-view="${k}" class="${LD.view === k ? "on" : ""}">${l}</button>`).join("")}</span>`;
+// 📋 리스트 보기: 시간대별(기존) / 📅 기간별(12개월↑·6개월↑·미만, 자격증 기준과 별개) / 📜 횟수별(96회↑·48회↑·미만) / 전체(가나다) — 지금 활동 중인 리더·서브·대기, 이름당 한 줄
+const viewSeg = () => `<span class="ldseg ldview">${[["slot", "시간대별"], ["period", "📅 기간별"], ["count", "📜 횟수별"], ["all", "전체"]].map(([k, l]) => `<button data-view="${k}" class="${LD.view === k ? "on" : ""}">${l}</button>`).join("")}</span>`;
 const KIND_L = { leader: "리더", sub: "서브", wait: "대기" };
 const whereOf = (r, td) => [...new Set(same(r).filter((x) => LDC.activeIn(x, td, td)).map((x) => { const w = LDC.subWhen(x); return (x.kind === "leader" ? [x.grp, x.slot] : [w.grp, w.time]).filter(Boolean).join(" "); }).filter(Boolean))].join(" · ") || "–";
 function renderFlat() {
@@ -303,7 +303,9 @@ function renderFlat() {
     + `<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, td) ? `<b class="dp">${LDC.dPlus(r.start_day, td)}</b>` : ""}</td>${certCell(r)}${noteTd(r)}</tr>`;
   const tbl = (title, list) => `<section class="ldblk ldflat"><h3>${title} <span class="mut">${list.length}명</span></h3>${list.length ? `<div class="ldtw"><table><tr><th>이름</th><th>구분</th><th>반 · 시간대</th><th>레벨</th>${rapOn() ? "<th>생년월일</th>" : ""}<th>첫 시작일</th><th>🔢 참여 · 📜 자격증</th><th>특이사항</th></tr>${list.map(row).join("")}</table></div>` : ""}</section>`;
   const n = (r) => cntOf(r).n, byN = [...rs].sort((a, b) => n(b) - n(a) || a.name.localeCompare(b.name, "ko"));
+  const mo = (r) => LDC.monthsSince(r.start_day, td), byMo = rs.filter((r) => mo(r) != null).sort((a, b) => mo(b) - mo(a) || a.name.localeCompare(b.name, "ko")), noDay = rs.filter((r) => mo(r) == null);
   const body = LD.view === "all" ? tbl("👥 전체", [...rs].sort((a, b) => a.name.localeCompare(b.name, "ko")))
+    : LD.view === "period" ? tbl("🌳 12개월 이상", byMo.filter((r) => mo(r) >= 12)) + tbl("🌿 6개월 이상", byMo.filter((r) => mo(r) >= 6 && mo(r) < 12)) + tbl("🌱 6개월 미만", byMo.filter((r) => mo(r) < 6)) + (noDay.length ? tbl("❓ 첫 시작일 없음", noDay) : "")
     : tbl("🥇 96회 이상 · 1급 기준", byN.filter((r) => n(r) >= 96)) + tbl("🥈 48회 이상 · 2급 기준", byN.filter((r) => n(r) >= 48 && n(r) < 96)) + tbl("🌱 48회 미만", byN.filter((r) => n(r) < 48));
   V().innerHTML = `${bar(viewSeg())}${findHtml()}${certTable()}<p class="mut ldhint">참여 = 이전 횟수 + 출석 O + 대타 해준 날 · 지금 활동 중인 리더·서브·대기 리더 · 날짜별 출석은 [시간대별] 에서 고쳐요${rapOn() ? " · 파란 횟수를 누르면 이전 횟수를 넣어요" : ""}</p>${body}`;
 }
