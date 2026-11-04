@@ -18,7 +18,7 @@ body:not(.eduv) #eduView { display: none; }
 
 /* 장기 미션 */
 #eduView .edumission h3 { margin: 0 0 10px; font-size: 15px; }
-#eduView .edugrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+#eduView .edugrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 18px; }
 #eduView .eduline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; font-size: 13px; }
 #eduView .eduline input[type=number] { width: 70px; }
 #eduView .edukpi { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -96,7 +96,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek, body.edurep #eduV
 /* 대표 화면: 교육 탭 전체를 좌우 2단 (왼쪽 매니저 화면 · 오른쪽 대표 화면) */
 #eduView.wide { max-width: min(1920px, 97vw); }
 #eduView .edusplit { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-@media (max-width: 1200px) { #eduView .edusplit { grid-template-columns: 1fr; } }
+@media (max-width: 1200px) { #eduView .edusplit { grid-template-columns: minmax(0, 1fr); } }
 
 #eduView .educol { min-width: 0; display: grid; gap: 12px; align-content: start;
   border: 2px solid var(--line); border-radius: 14px; padding: 0 12px 12px; }
@@ -122,7 +122,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek, body.edurep #eduV
 #eduView .eduimplist { margin: 8px 0 0; padding-left: 26px; display: grid; gap: 4px; }
 #eduView .eduimplist li { list-style: decimal; }
 #eduView .eduimplist input { width: 100%; }
-#eduView .edumission .edugrid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+#eduView .edumission .edugrid { grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
 #eduView .edutools { margin-top: 14px; }
 
 /* 주차 제출물 — 주차 자료 아래, 항목 목록 위 */
@@ -137,7 +137,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek, body.edurep #eduV
 #eduView .eduimpbox[open] > summary { color: var(--text); }
 
 /* 업무 툴 세팅 — 16줄이라 좁은 칸에서는 두 줄로 흘린다 */
-#eduView .edutools .edutoolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 14px; margin-top: 4px; }
+#eduView .edutools .edutoolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr)); gap: 0 14px; margin-top: 4px; }
 #eduView .edutools .eduline { margin: 2px 0; }
 
 /* 파일을 골랐으면 버튼에 파일 이름이 보이게 — 고른 줄 모르고 추가를 누르던 문제 */
@@ -153,3 +153,7 @@ body.edurep #eduView > .card, body.edurep #eduView > .eduweek, body.edurep #eduV
 #eduView .eduline.book { flex-wrap: nowrap; }
 #eduView .eduline.book > span { flex: 1; min-width: 0; }
 #eduView .eduline.book label { flex: none; white-space: nowrap; }
+@media (max-width: 640px) { /* 책 제목이 체크칸에 밀려 한 글자씩 끊기지 않게 */
+  #eduView .eduline.book { flex-wrap: wrap; }
+  #eduView .eduline.book > span { flex: 1 0 100%; }
+}

@@ -15,7 +15,10 @@ body:not(.ctv) #ctView { display: none; }
 #ctView .ctrow small { grid-column: 1 / -1; margin-top: -4px; }
 #ctView .ctrow .btn { padding: 4px 8px; font-size: 14px; }
 @media (max-width: 560px) {
-  #ctView .ctrow { grid-template-columns: 1fr auto auto auto; grid-template-areas: "name tel edit del" "branch branch branch branch" "note note note note"; gap: 2px 8px; }
+  #ctView .ctrow { grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "name tel edit del" "branch branch branch branch" "note note note note"; gap: 2px 8px; }
   #ctView .ctrow b { grid-area: name; } #ctView .ctrow .mut:nth-child(2) { grid-area: branch; font-size: 12px; }
   #ctView .ctrow a { grid-area: tel; } #ctView .ctrow .ctedit { grid-area: edit; } #ctView .ctrow .ctdel { grid-area: del; } #ctView .ctrow small { grid-area: note; margin: 0; }
+}
+@media (max-width: 430px) { /* 대표: 고치기·지우기 버튼까지 한 줄이면 이름이 한 글자씩 끊겨서 번호를 다음 줄로 */
+  #ctView .ctrow:has(.ctedit) { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name edit del" "tel tel tel" "branch branch branch" "note note note"; }
 }
