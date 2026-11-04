@@ -146,12 +146,13 @@ function needTable() {
 
 // 📜 자격증: 참여 48회 → 2급, 96회 → 1급 (같은 이름 줄은 한 사람). 발급하면 날짜·누가 남김 (누르면 취소) · 아직이면 다음 급까지 남은 횟수
 const isSub = (r) => r.kind === "sub" || r.kind === "wait", isLeader = (r) => r.kind !== "staff" && !isSub(r);
+const isPerson = (r) => r.kind !== "staff" && r.name !== VACANT && !/^구해야/.test(r.name); // '구해야됨 (유정)' 같은 빈자리 줄은 사람이 아님
 const same = (r) => LD.rows.filter((x) => x.name === r.name);
 const people = (rs) => [...new Map([...rs].sort((a, b) => isSub(b) - isSub(a)).map((r) => [r.name, r])).values()]; // 이름당 한 줄 (뒤 값이 이김 → 메인 리더 줄 우선)
 const cntOf = (r) => LD.cnt?.get(r.name) ?? { base: r.att_base || 0, o: 0, sub: new Set(), n: r.att_base || 0 };
 const certOf = (r, g) => same(r).map((x) => LD.certs?.get(`${x.id}:${g}`)).find(Boolean);
 const birthOf = (r) => same(r).map((x) => LD.birth?.get(x.id)).find(Boolean);
-const certDue = (r) => r.name === VACANT || r.kind === "staff" ? [] : LDC.certs(cntOf(r).n).filter((c) => c.ok && !certOf(r, c.grade));
+const certDue = (r) => !isPerson(r) ? [] : LDC.certs(cntOf(r).n).filter((c) => c.ok && !certOf(r, c.grade));
 const saveBirth = async (r, val) => { const id = same(r).find((x) => LD.birth?.has(x.id))?.id ?? r.id;
   const { error } = val ? await sb.from("leader_birth").upsert({ leader_id: id, birth: val }) : await sb.from("leader_birth").delete().eq("leader_id", id);
   if (!error) val ? LD.birth.set(id, val) : LD.birth.delete(id); return error; };
@@ -180,7 +181,7 @@ function cntDlg(r) {
 }
 // 📜 맨 위 발급 대상 표 (지금 받을 수 있는데 아직 안 준 리더 · 8회 안에 받을 리더 — 주 2회면 한 달)
 function certTable() {
-  const live = people(LD.rows.filter((r) => r.kind !== "staff" && r.name !== VACANT && !r.end_day));
+  const live = people(LD.rows.filter((r) => isPerson(r) && !r.end_day));
   const due = live.flatMap((r) => certDue(r).map((c) => ({ r, c })));
   const next = live.flatMap((r) => LDC.certs(cntOf(r).n).filter((c) => !c.ok && c.left <= 8 && !certOf(r, c.grade)).map((c) => ({ r, c })));
   if (!due.length && !next.length) return "";
@@ -274,7 +275,7 @@ const viewSeg = () => `<span class="ldseg ldview">${[["slot", "시간대별"], [
 const KIND_L = { leader: "리더", sub: "서브", wait: "대기" };
 const whereOf = (r, td) => [...new Set(same(r).filter((x) => LDC.activeIn(x, td, td)).map((x) => { const w = LDC.subWhen(x); return (x.kind === "leader" ? [x.grp, x.slot] : [w.grp, w.time]).filter(Boolean).join(" "); }).filter(Boolean))].join(" · ") || "–";
 function renderFlat() {
-  const td = today(), soon = W.add(td, 3), rs = people(LD.rows.filter((r) => r.kind !== "staff" && r.name !== VACANT && LDC.activeIn(r, td, soon)));
+  const td = today(), soon = W.add(td, 3), rs = people(LD.rows.filter((r) => isPerson(r) && LDC.activeIn(r, td, soon)));
   const row = (r) => `<tr data-id="${r.id}">${nameCell(r)}<td>${KIND_L[r.kind] ?? ""}</td><td>${esc(whereOf(r, td))}</td><td>${esc(lvTxt(r.level)) || "–"}</td>`
     + `${rapOn() ? `<td class="ed1" data-f="birth" title="누르면 생년월일 적기">${birthOf(r) ? esc(birthOf(r)) : `<span class="addh">+ 적기</span>`}</td>` : ""}`
     + `<td class="sd ed1" data-f="start_day" title="누르면 첫 시작일 고치기">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, td) ? `<b class="dp">${LDC.dPlus(r.start_day, td)}</b>` : ""}</td>${certCell(r)}${noteTd(r)}</tr>`;
