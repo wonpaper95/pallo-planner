@@ -192,16 +192,17 @@ function certTable() {
     <div class="ldtw"><table><tr><th>리더</th><th>반 · 시간대</th><th>참여</th><th>자격증</th></tr>${due.map((x) => row(x, true)).join("")}${next.map((x) => row(x, false)).join("")}</table></div></details>`;
 }
 // 🔁 서브리더 (대기·대타 풀): 반 없이 빈자리·결석을 채움 · 대타는 출석 칸 '대타' 이름으로 자동 집계 · ⭐ 승격 후보 → ✏️ 에서 구분을 리더로
-function subTable(sm) {
+function subTable(sm, gone = false) { // gone: 👋 그만둔 서브·대기만 (접힌 칸용)
   const [from, to] = range(), m3 = [LDC.addMonths(sm, -2), LDC.addMonths(sm, -1), sm];
-  const rs = LD.rows.filter((r) => isSub(r) && LDC.activeIn(r, from, to)).sort((a, b) => (b.promote - a.promote) || m3.reduce((n, m) => n + cov(b, m) - cov(a, m), 0));
+  const rs = LD.rows.filter((r) => isSub(r) && LDC.activeIn(r, from, to) && LDC.goneBy(r, today(), to) === gone).sort((a, b) => (b.promote - a.promote) || m3.reduce((n, m) => n + cov(b, m) - cov(a, m), 0));
   const body = rs.map((r) => { const c3 = m3.reduce((n, m) => n + cov(r, m), 0);
     return `<tr data-id="${r.id}" class="${r.end_day ? "gone" : ""}">${nameCell(r).replace("</b>", `</b>${r.kind === "wait" ? ` <span class="mut">⏳ 대기</span>` : ""}`)}<td class="nt ed1" data-f="avail" title="누르면 가능 요일·시간 적기">${r.avail ? esc(r.avail) : `<span class="addh">+ 가능 시간</span>`}</td>`
       + `<td class="sd ed1${sdCls(r)}" data-f="start_day" title="누르면 첫 시작일 고치기${sdCls(r) ? " — 첫 수업이 곧이에요, 미리 챙기기" : ""}">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}${birthLine(r)}</td>`
       + `${rapTd(r, sm)}<td class="m"><b>${cov(r, sm)}</b>번 <small class="mut">· 3달 ${c3}</small></td>`
       + `<td><button class="promo ${r.promote ? "on" : ""}" data-promote title="메인 리더 승격 후보 — 누르면 바뀜">${r.promote ? "⭐ 후보" : "☆"}</button> <button class="slotedit" data-ldedit title="메인으로 올리기 = 구분을 리더로, 반·시간대 고르기">⬆️</button></td>`
       + `${certCell(r)}${endBtn(r)}<td class="nt ed1" data-f="note" title="누르면 메모 적기">${r.note ? esc(r.note) : `<span class="addh">+ 적기</span>`}</td></tr>`; }).join("");
-  return `<section class="ldblk ldsubblk"><h3>🔁 서브리더 · ⏳ 대기 리더 <span class="mut">대기·대타 풀 ${rs.filter((r) => !r.end_day).length}명 · 대타는 출석 칸 '대타'에 이름을 적으면 자동으로 세요</span> <button class="btn ghost small" id="ldAddSub">+ 서브리더 추가</button></h3>
+  if (gone && !rs.length) return "";
+  return `<section class="ldblk ldsubblk"><h3>🔁 서브리더 · ⏳ 대기 리더 ${gone ? "" : `<span class="mut">대기·대타 풀 ${rs.filter((r) => !r.end_day).length}명 · 대타는 출석 칸 '대타'에 이름을 적으면 자동으로 세요</span> <button class="btn ghost small" id="ldAddSub">+ 서브리더 추가</button>`}</h3>
     ${rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>가능 요일·시간 <small class="agh">✏️ 눌러서 적기</small></th><th>첫 시작일</th>${rapTh()}<th>${ym(sm)} 대타</th><th>승격 후보</th><th>🔢 참여 · 📜 자격증</th><th>그만둠</th><th>메모</th></tr>${body}</table></div>` : `<div class="card mut" style="padding:12px">아직 서브리더가 없어요 — <b>+ 서브리더 추가</b></div>`}</section>`;
 }
 
@@ -218,14 +219,30 @@ function bar(extra = "") {
 // 시간대는 언어를 빼고 묶음 ('일본어 오전'+'중국어 오전' = 오전) · 언어는 이름 옆에 작게
 const lvTxt = (lv) => (/^\d+(\.\d+)?$/.test(lv ?? "") ? `${lv}레벨` : lv ?? "");
 const tags = (r) => `${r.level ? `<span class="lv">${esc(lvTxt(r.level))}</span>` : ""}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}`;
-const tel = (r) => (r.phone ? `<a class="tel${myRole === "assistant" ? " num" : ""}" href="tel:${r.phone.replace(/[^\d]/g, "").slice(0, 11)}" title="${esc(r.phone)} 전화 걸기">📞${myRole === "assistant" ? ` ${esc(r.phone)}` : ""}</a>` : ""); // 조교 보드엔 번호까지
+const tel = (r) => (r.phone ? `<button type="button" class="tel${myRole === "assistant" ? " num" : ""}" data-tel="${esc(r.phone)}" data-name="${esc(r.name)}" title="눌러서 연락처 보기" aria-label="${esc(r.name)} 연락처 보기">📞${myRole === "assistant" ? ` ${esc(r.phone)}` : ""}</button>` : ""); // 조교 보드엔 번호까지
+// 📞 → 바로 걸지 않고 연락처 창: PC 에서 tel: 은 전화 앱 묻는 창만 뜸(은서 11-04). 밖을 누르거나 Esc 면 닫힘
+function showTel(b) {
+  document.getElementById("ldTelPop")?.remove();
+  const n = b.dataset.tel, p = document.createElement("div"), box = b.getBoundingClientRect();
+  p.id = "ldTelPop"; p.setAttribute("popover", "auto");
+  p.innerHTML = `<button type="button" class="ldtelx" aria-label="닫기">✕</button><b>${esc(b.dataset.name)}</b><div class="ldtelno">${esc(n)}</div><div class="ldtelbtns"><button type="button" class="btn ghost" data-copy>📋 번호 복사</button><a class="btn" href="tel:${n.replace(/[^\d]/g, "").slice(0, 11)}">📞 전화 걸기</a></div>`;
+  document.body.append(p);
+  p.ontoggle = (e) => { if (e.newState === "closed") p.remove(); };
+  p.querySelector(".ldtelx").onclick = () => p.remove();
+  p.querySelector("[data-copy]").onclick = async () => { try { await navigator.clipboard.writeText(n); toast("번호를 복사했어요"); } catch { toast("복사가 안 돼요. 번호를 길게 눌러 복사해 주세요"); } };
+  p.showPopover?.();
+  const w = p.offsetWidth, h = p.offsetHeight, m = 8; // 버튼 밑(자리 없으면 위), 화면 밖으로 안 나가게
+  p.style.left = Math.max(m, Math.min(box.left, innerWidth - w - m)) + "px";
+  p.style.top = (box.bottom + h + m < innerHeight ? box.bottom + 6 : Math.max(m, box.top - h - 6)) + "px";
+}
 const bySlot = (rs) => { const m = new Map();
   [...rs].sort((a, b) => LDC.slotMin(LDC.timeKey(a.slot)) - LDC.slotMin(LDC.timeKey(b.slot)) || LDC.lvNum(a.level) - LDC.lvNum(b.level) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || a.sort - b.sort)
     .forEach((r) => { const k = LDC.timeKey(r.slot); m.set(k, [...(m.get(k) ?? []), r]); });
   return [...m]; };
 const grpOn = (d) => LDC.GRPS.find((x) => LDC.DAYS[x].includes(W.parse(d).getDay()));
 // 🔁 그 요일에 올 수 있는 서브리더 (요일 안 적은 사람 포함) · 레벨순
-const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && LDC.activeIn(r, d, d) && [g, ""].includes(LDC.subWhen(r).grp)).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level));
+const workOn = (r, d) => LDC.activeIn(r, d, d) && !LDC.goneBy(r, d); // 그만둔 날부터는 오늘·내일 칸에서 빠짐
+const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && workOn(r, d) && [g, ""].includes(LDC.subWhen(r).grp)).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level));
 const subLine = (ss, d, hint = "") => (ss.length ? `<div class="tdrow sbline"><b>서브</b><div class="tdc">${hint ? `<span class="mut">${hint}</span>` : ""}${ss.map((s) => { const c = LD.cfm?.get(`${s.id}:${d}`);
   return `<span class="sbc ${c ? "on" : ""}"><button data-cfm="${s.id}" data-day="${d}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "전화해서 와줄 수 있다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(s.name)}</button>${tags(s)}${tel(s)}</span>`; }).join("")}</div></div>` : "");
 // 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 📞 · 🔁 대타 필요 → 🆘 구하는 중 → 🔁 대타 OOO (이름 넣으면 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
@@ -233,16 +250,17 @@ const subLine = (ss, d, hint = "") => (ss.length ? `<div class="tdrow sbline"><b
 const attTog = (r, d) => { const s = LD.att.get(r.id)?.get(d) ?? ""; return `<button class="batt ${s === "O" ? "atton" : s === "X" ? "attoff" : ""}" data-batt="${r.id}" data-day="${d}" title="실제 출석 — 누르면 참 → 불참 → 비움 (잘못 누르면 아래 되돌리기)">${s === "O" ? "⭕ 참" : s === "X" ? "❌ 불참" : "참·불참"}</button>`; };
 const NEED = "대타 필요"; // ponytail: leader_confirm.note 로 표시 (칸 추가 없이) — 통계에 필요해지면 need_sub 칸으로 옮기기
 function chip(r, d) {
-  if (r.status !== "확정") return `<span class="cfm vac ${r.name === VACANT ? "" : "named"}"><button data-vac="${r.id}" title="누르면 이 자리에 들어갈 사람 이름 적기 (조교 등) — 자리는 계속 구하는 중">${r.name === VACANT ? "빈자리" : `<b>${esc(r.name)}</b>`}</button>${tags(r)}</span>`;
+  const td = d === today(), right = (x, y, z) => `<span class="cfr">${x}${td ? `${y || `<i class="sl1"></i>`}${z || `<i class="sl2"></i>`}` : ""}</span>`; // 대타 · 참불참(오늘만) · 지각(오늘만) — 없어도 자리는 비워 둠 (오와열)
+  if (r.status !== "확정") return `<span class="cfm vac ${r.name === VACANT ? "" : "named"}"><span class="vcn"><button data-vac="${r.id}" title="누르면 이 자리에 들어갈 사람 이름 적기 (조교 등) — 자리는 계속 구하는 중">${r.name === VACANT ? "빈자리" : `<b>${esc(r.name)}</b>`}</button>${tags(r)}</span><span class="tel"></span>${right(`<span class="subslot"></span>`)}</span>`;
   const c = LD.cfm?.get(`${r.id}:${d}`), sub = LD.subs.get(r.id)?.get(d) ?? "";
   const need = c?.note === NEED, on = c && !need;
-  return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${tel(r)}`
-    + `<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>${d === today() && !sub ? attTog(r, d) : ""}${on && d === today() ? lateSel(r.id, c.note) : ""}</span>`;
+  return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${tel(r) || `<span class="tel"></span>`}`
+    + right(`<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>`, !sub && attTog(r, d), on && lateSel(r.id, c.note)) + `</span>`;
 }
 function dayCard(d, label) {
   const g = grpOn(d), head = (x = "") => `<h3>${label} <span class="dd">${md(d)}(${dw(d)})${g ? ` · ${g}` : ""}</span>${x}</h3>`;
   if (!g) return `<section class="ldday">${head()}<p class="mut">수업 없음</p></section>`;
-  const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && LDC.activeIn(r, d, d)), ok = rs.filter((r) => r.status === "확정");
+  const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && workOn(r, d)), ok = rs.filter((r) => r.status === "확정");
   const attN = (st) => ok.filter((r) => LD.att.get(r.id)?.get(d) === st).length;
   const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
   const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;
@@ -257,7 +275,7 @@ const poolRow = (r) => `<tr data-id="${r.id}"><td class="nm"><b>${nameEd(esc(r.n
 const poolBlk = (title, hint, rs, kind) => `<section class="ldblk ldpool"><h3>${title} <span class="mut">${rs.length}명 · ${hint}</span> <button class="btn ghost small" data-addk="${kind}">+ 추가</button></h3>`
   + (rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>레벨 · 언어</th><th>요일 · 시간대</th><th>비고</th><th></th></tr>${rs.map(poolRow).join("")}</table></div>` : "") + `</section>`;
 function dayPage(g) {
-  const td = today(), live = (r) => LDC.activeIn(r, td, td);
+  const td = today(), live = (r) => workOn(r, td);
   const subs = subsOn(g, td), used = new Set();
   const cards = bySlot(LD.rows.filter((r) => r.grp === g && isLeader(r) && live(r))).map(([t, rs]) => {
     const ss = subs.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
@@ -302,11 +320,12 @@ function renderList() {
     rp: live.filter((r) => r.status === "확정" && mon(r, sm)?.rapport).length, rpAll: live.filter((r) => r.status === "확정").length, cert: people(LD.rows.filter((r) => !r.end_day)).reduce((n, r) => n + certDue(r).length, 0) };
   vis.forEach((r) => { const s = stat(r, sm); if (s.recheck) cnt.re++; if (s.award || s.onTrack) cnt.aw++; });
   const title = LD.mode === "month" ? `${LD.anchor.slice(0, 4)}년 ${ym(LD.anchor)}` : `${ym(months[0])} ~ ${ym(months[2])}`;
-  const blocks = [];
+  const blocks = [], gone = (r) => LDC.goneBy(r, td, to); // 👋 그만둔 사람은 표 맨 아래 접힌 칸으로 (기록은 그대로)
+  const slotBlocks = (list) => { const out = [];
   for (const g of [...LDC.GRPS, ""]) { // "" = 반 없는 리더 (백업리더 등)
-    const slots = [...new Set(leaders.filter((r) => r.grp === g).map((r) => r.slot))].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
+    const slots = [...new Set(list.filter((r) => r.grp === g).map((r) => r.slot))].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
     for (const s of slots) {
-      const rs = leaders.filter((r) => r.grp === g && r.slot === s).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level) || a.sort - b.sort), need = rs.filter((r) => r.status === "구해야 함").length;
+      const rs = list.filter((r) => r.grp === g && r.slot === s).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level) || a.sort - b.sort), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small>${rapOn() ? ` <small class="agh">· 🎂 생년월일</small>` : ""}</th>${rapTh()}<th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th class="sm" title="리더교육 했음/아직 — 누르면 바뀜">교육</th><th class="sm" title="참여 횟수 · 자격증 — 48회 2급 · 96회 1급">🔢 참여 · 📜</th>` : ""}</tr>`;
@@ -315,11 +334,13 @@ function renderList() {
         + `${rapTd(r, sm)}<td>${stBox(r)}</td>${endBtn(r)}`
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : `<td class="att2">${attGrid(r, ses, g)}</td><td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `${noteTd(r)}<td>${eduBox(r)}</td>${certCell(r)}` : "") + `</tr>`).join("");
-      blocks.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
+      out.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
     }
   }
+  return out; };
+  blocks.push(...slotBlocks(leaders.filter((r) => !gone(r))));
   if (LD.mode === "month") blocks.push(subTable(sm));
-  if (staff.length) { // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
+  const staffBlock = (staff) => { if (!staff.length) return ""; // 🧑‍💼 워킹스텝: 반이 저마다 달라서 출석은 한 칸에 날짜 버튼으로
     const head = `<tr><th>업무</th><th>이름</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small></th>${rapTh()}<th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("") : `<th>출석</th><th>${ym(sm)}</th>`}<th>비고 <small class="agh">✏️ 눌러서 적기</small></th></tr>`;
     const body = staff.map((r) => `<tr data-id="${r.id}" class="${rowCls(r, sm)}"><td data-f="slot">${esc([r.grp, r.slot].filter(Boolean).join(" "))}</td>`
       + `${nameCell(r)}<td class="sd ed1${sdCls(r)}" data-f="start_day" title="누르면 첫 시작일 고치기${sdCls(r) ? " — 첫 수업이 곧이에요, 미리 챙기기" : ""}">${r.start_day ? esc(r.start_day) : `<span class="addh">+ 날짜</span>`}${LDC.dPlus(r.start_day, today()) ? `<b class="dp">${LDC.dPlus(r.start_day, today())}</b>` : ""}</td>`
@@ -327,8 +348,10 @@ function renderList() {
       + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("")
         : `<td class="ina">${r.grp ? LDC.sessions(r.grp, from, to).map((d) => attBtn(r, d, `${md(d)}(${dw(d)})`)).join("") : `<span class="mut">–</span>`}</td><td>${flags(r, sm)}</td>`)
       + `${noteTd(r)}</tr>`).join("");
-    blocks.push(`<section class="ldblk"><h3>🧑‍💼 워킹스텝 <span class="mut">${staff.length}명</span></h3><div class="ldtw"><table>${head}${body}</table></div></section>`);
-  }
+    return `<section class="ldblk"><h3>🧑‍💼 워킹스텝 <span class="mut">${staff.length}명</span></h3><div class="ldtw"><table>${head}${body}</table></div></section>`; };
+  blocks.push(staffBlock(staff.filter((r) => !gone(r))));
+  const goneInner = slotBlocks(leaders.filter(gone)).join("") + (LD.mode === "month" ? subTable(sm, true) : "") + staffBlock(staff.filter(gone));
+  if (goneInner) blocks.push(`<details class="ldgoneb"${LD.goneOpen ? " open" : ""}><summary><h3>👋 그만둔 리더 <span class="mut">표에서 빠졌어요 · 출석·근속 기록은 그대로 남아요 · ↩️ 누르면 다시 활동</span></h3></summary>${goneInner}</details>`);
   V().innerHTML = `${bar(`${viewSeg()}<span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>`)}
@@ -337,6 +360,7 @@ function renderList() {
     <div class="ldsum"><span>리더 <b>${leaders.filter((r) => live.includes(r)).length}</b>팀</span>${staff.length ? `<span>스텝 <b>${staff.length}</b>명</span>` : ""}<span class="ldneed">🔴 구해야 함 <b>${cnt.need}</b></span><span class="re">🚨 재관리 <b>${cnt.re}</b></span><span class="on">🏆 개근 <b>${cnt.aw}</b></span>${rapOn() ? `<span class="${cnt.rp < cnt.rpAll ? "re" : "on"}" title="${ym(sm)} 라포를 매긴 리더 / 확정 리더 — 달마다 전원 다시 매겨요">⭐ 라포 <b>${cnt.rp}/${cnt.rpAll}</b></span>` : ""}${cnt.cert ? `<span class="on" title="참여 48회 2급 · 96회 1급 — 아직 발급 안 함">📜 자격증 발급 <b>${cnt.cert}</b></span>` : ""}${cnt.gone ? `<span class="mut">👋 그만둠 <b>${cnt.gone}</b></span>` : ""}
       <small class="mut">${ym(sm)} 기준 · 한 달에 ${LDC.ABSENT_LIMIT}번 이상 빠지면 🚨 재관리 · 그달 수업을 다 나오면 🏆 개근 → 혜택 · 🔁 다른 리더 대신 와준(대타) 날은 출석으로 인정 · 출석 칸은 누르면 O → X → 대타 → 비움 (잘못 누르면 아래 <b>↩ 되돌리기</b>) · <b>✏️ 첫 시작일·특이사항·전화는 한 번 누르면 바로 고쳐요</b>(레벨·자리·이름은 더블클릭) → Enter 로 저장 · 줄 오른쪽 클릭 → 반·시간대 옮기기·지우기${rapOn() ? ` · ⭐ 1~2 빨강 · 3 주황 · 4~5 초록 · <b>라포는 달마다 · 매니저마다 따로 매겨요</b>(별 = 내 별점, 밑에 매니저 이름별 · 흐린 별 = 내 지난달 · 색·통계는 평균)` : ""} · 리더가 그만두면 상태 옆 <b>👋 그만둠</b> → 날짜·이유 (지우지 마세요 — 근속·이탈 기록이 남아야 해요)</small></div>
     ${blocks.join("") || `<div class="card mut" style="padding:16px">${LD.rows.length ? "이 필터에 맞는 리더가 없어요" : `아직 리더가 없어요 — <b>+ 리더 추가</b> 하거나, 구글시트에서 줄을 복사해 <b>📋 시트에서 붙여넣기</b> 하세요`}</div>`}`;
+  V().querySelector(".ldgoneb")?.addEventListener("toggle", (e) => { LD.goneOpen = e.target.open; }); // 출석 누를 때 다시 그려도 펼친 채로
 };
 
 // ── 고치기 · 붙여넣기 창 ──
@@ -407,7 +431,7 @@ async function delRow(r, d) {
   if (!confirm(`'${r.name}' 줄을 완전히 지울까요?\n잘못 넣은 줄만 지우세요. 그만둔 리더는 👋 그만둠으로 남겨야 근속·이탈 기록이 쌓여요.\n(출석·라포 기록도 같이 지워져요)`)) return;
   const { error } = await sb.from("leaders").delete().eq("id", r.id); if (fail(error)) return; d?.close(); toast("줄을 지웠어요"); LD.load();
 }
-// 👋 그만둠: 그만둔 날·이유 남김 (줄은 그 달까지 보이고 다음 달부터 안 보임) + 그 자리 새로 구할 빈 줄
+// 👋 그만둠: 그만둔 날·이유 남김 (그날부터 표에서 빠지고 맨 아래 접힌 칸에 남음) + 그 자리 새로 구할 빈 줄
 function endDlg(r) {
   const d = dlg(`<form method="dialog" class="ldform"><h2>👋 ${esc(r.name)} 그만둠</h2>
     <p class="mut" style="margin:0">지우지 않고 기록으로 남겨요 — 근속일·이탈 이유·어느 달에 많이 빠지는지 분석에 쓰여요</p>
@@ -423,7 +447,7 @@ function endDlg(r) {
     const { error } = await sb.from("leaders").update({ end_day: f.end_day.value, end_reason: f.end_reason.value, end_note: f.end_note.value.trim() }).eq("id", r.id); if (fail(error)) return;
     if (f.seat?.checked) { const { error: e2 } = await sb.from("leaders").insert({ team_id: r.team_id, kind: r.kind, grp: r.grp, slot: r.slot, level: r.level, seat: r.seat, name: VACANT, status: "구해야 함", note: `${r.name} 자리 (${md(f.end_day.value)} 그만둠)`, sort: r.sort + 0.001 });
       if (fail(e2)) return; }
-    d.close(); toast("👋 그만둠 기록했어요"); LD.load();
+    d.close(); toast("👋 표에서 뺐어요. 기록은 맨 아래 '그만둔 리더'에 남아요"); LD.load();
   };
 }
 // 📜 자격증 발급 기록 (발급일 고름) · 이미 발급했으면 취소
@@ -603,6 +627,7 @@ document.addEventListener("click", async (e) => {
     LD.anchor = !n ? today() : LDC.addMonths(LD.anchor, n);
     return LD.load();
   }
+  if (b.dataset.tel) return showTel(b);
   if (b.id === "ldAdd") return editDlg(null);
   if (b.id === "ldAddSub") return editDlg(null, "sub");
   if (b.dataset.addk) return editDlg(null, b.dataset.addk); // 보드 🔁 서브리더 · ⏳ 대기 리더 + 추가
@@ -764,7 +789,7 @@ function findLeader(q) {
     if (g && g !== LD.day) { LD.day = g; LD.render(); document.getElementById("ldFind").value = q; trs = look(); } }
   if (!trs.length) { const r = hit[0]; return toast(`${r.name}: ${r.end_day ? `${md(r.end_day)} 그만둔 리더 — 그 달로 가 보세요` : "지금 보기(필터·달)에는 없어요 — 전체 · 오늘로 바꿔 보세요"}`); }
   LD.findI = LD.findQ === q ? (LD.findI + 1) % trs.length : 0; LD.findQ = q;
-  const t = trs[LD.findI]; t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 1600);
+  const t = trs[LD.findI]; t.closest("details")?.setAttribute("open", ""); t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); setTimeout(() => t.classList.remove("flash"), 1600);
   if (trs.length > 1) toast(`${LD.findI + 1}/${trs.length}번째 — Enter 누르면 다음`);
 }
 document.addEventListener("keydown", (e) => { if (e.target.id === "ldFind" && e.key === "Enter" && !e.isComposing) { e.preventDefault(); findLeader(e.target.value.trim()); } });

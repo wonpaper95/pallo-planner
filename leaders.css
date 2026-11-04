@@ -69,7 +69,7 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .att.tdy { outline: 2px solid #E0D120; outline-offset: 1px; }
 #ldView th .agh { display: block; font-size: 10.5px; font-weight: 500; opacity: .85; }
 #ldDlg .slotpick { display: flex; gap: 6px; } #ldDlg .slotpick > * { flex: 1; min-width: 0; } #ldDlg .slotpick .hidden { display: none; }
-#ldView tr.gone td { opacity: .55; } /* 👋 그만둔 리더: 그 달까지만 흐리게 보임 */
+#ldView tr.gone td { opacity: .55; } /* 👋 그만둔 리더: 맨 아래 접힌 칸에서 흐리게 */
 #ldView .gonetag { display: block; font-size: 11.5px; color: var(--sub); font-weight: 600; }
 #ldView .ldstars.ghost button { opacity: .35; } /* 지난달 라포 — 이번 달 아직 */
 #ldView .night { width: 28px; height: 28px; border: 1.5px solid var(--line); border-radius: 7px; background: var(--bg); cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
@@ -170,7 +170,7 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .cflate { border: 0; background: transparent; color: var(--sub); font: inherit; font-size: 12px; padding: 2px; max-width: 30px; cursor: pointer; border-radius: 999px; } #ldView .cflate:hover { background: var(--hover); }
 #ldView .ldhint { margin: 2px 0 8px; font-size: 13px; }
 #ldView .cfm.vac.named { color: var(--text); }
-#ldView span.cfm > button.batt { padding: 3px 8px; margin-right: 3px; font-size: 12px; white-space: nowrap; color: var(--text); border: 1px solid var(--line); border-radius: 999px; } #ldView span.cfm > button.atton { color: #1f9d55; border-color: #1f9d55; font-weight: 700; } #ldView span.cfm > button.attoff { color: #e5484d; border-color: #e5484d; font-weight: 700; }
+#ldView .cfr > button.batt { all: unset; cursor: pointer; box-sizing: border-box; width: 64px; padding: 3px 0; text-align: center; font-size: 12px; white-space: nowrap; color: var(--text); border: 1px solid var(--line); border-radius: 999px; } #ldView .cfr > button.atton { color: #1f9d55; border-color: #1f9d55; font-weight: 700; } #ldView .cfr > button.attoff { color: #e5484d; border-color: #e5484d; font-weight: 700; }
 #ldView .sbc button { all: unset; cursor: pointer; } #ldView .sbc.on button { color: #1f9d55; font-weight: 700; }
 #ldView .cntb { all: unset; font-weight: 700; margin-right: 4px; white-space: nowrap; } #ldView button.cntb { cursor: pointer; color: #2563eb; text-decoration: underline dotted; }
 #ldView .bdl { display: block; font-size: 11.5px; color: var(--sub); margin-top: 2px; white-space: nowrap; font-weight: 500; } #ldView .ldflat td { text-align: left; white-space: normal; } #ldView .ldflat td.certc { white-space: nowrap; }
@@ -247,3 +247,38 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .nameed { cursor: text; border-radius: 4px; border-bottom: 1px dashed color-mix(in srgb, currentColor 35%, transparent); }
 #ldView .nameed:hover { background: rgba(73, 48, 135, .08); box-shadow: 0 0 0 1.5px rgba(73, 48, 135, .35); }
 #ldView .nameed .ldin { width: 130px; max-width: 100%; }
+/* 📋 오늘·내일 칩 오와열 (은서 11-04): 칩은 같은 폭 칸, 칩 안은 이름 · 레벨 · 언어 · 📞 · 대타 순서로 같은 자리. 폰은 대타가 다음 줄 */
+#ldView .ldday .tdc { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(350px, 100%), 1fr)); gap: 6px; }
+body.is-assist #ldView .ldday .tdc { grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); }
+#ldView .ldday span.cfm { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 0 6px 0 0; min-width: 0; max-width: none; }
+#ldView .ldday span.cfm > button[data-cfm], #ldView .ldday .vcn { flex: 1 1 200px; display: flex; align-items: center; gap: 4px; min-width: 0; padding: 5px 4px 5px 11px; font-size: 13.5px; }
+#ldView .ldday span.cfm > button[data-cfm] > b:not(.cfnote), #ldView .ldday .vcn > button { flex: 1; min-width: 0; white-space: normal; word-break: keep-all; }
+#ldView .ldday .vcn > button { all: unset; flex: 1; min-width: 0; cursor: pointer; }
+#ldView .ldday .cfm .lv, #ldView .ldday .cfm .lg { flex: none; width: 44px; margin-left: 0; box-sizing: border-box; text-align: center; }
+#ldView .ldday .cfm .tel { flex: none; width: 24px; margin-left: 0; text-align: center; }
+#ldView .ldday .cfm > button.tel { padding: 0; }
+#ldView .ldday .cfm .tel.num { width: 112px; }
+#ldView .ldday .cfr { flex: none; display: flex; align-items: center; gap: 3px; margin-left: auto; }
+#ldView .ldday .cfm [data-sub], #ldView .ldday .cfm .subslot { min-width: 120px; box-sizing: border-box; }
+#ldView .ldday .cfr .sl1 { width: 64px; } #ldView .ldday .cfr .sl2 { width: 30px; }
+#ldView .ldday .cfm .cflate { flex: none; width: 30px; max-width: 30px; }
+#ldView .ldday .sbline .tdc > .mut { grid-column: 1 / -1; }
+#ldView .ldday .sbc { display: flex; align-items: center; gap: 4px; margin: 1px 0; min-width: 0; }
+#ldView .ldday .sbc > button[data-cfm] { flex: 1; min-width: 0; white-space: normal; word-break: keep-all; }
+#ldView .ldday .sbc .lv, #ldView .ldday .sbc .lg { flex: none; margin-left: 0; }
+/* 📞 연락처 창 */
+#ldView button.tel { all: unset; cursor: pointer; margin-left: 4px; font-size: 11px; border-radius: 6px; }
+#ldView button.tel:hover { background: var(--hover); } #ldView button.tel:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#ldView button.tel.num { color: var(--sub); font-size: 12px; white-space: nowrap; }
+#ldTelPop { position: fixed; inset: auto; margin: 0; box-sizing: border-box; width: 240px; max-width: calc(100vw - 16px); padding: 12px 14px; background: var(--float, var(--bg)); -webkit-backdrop-filter: blur(36px) saturate(180%); backdrop-filter: blur(36px) saturate(180%); color: var(--text); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); }
+#ldTelPop > b { display: block; padding-right: 24px; overflow-wrap: anywhere; }
+#ldTelPop .ldtelno { margin: 4px 0 10px; font-size: 20px; font-weight: 700; color: var(--accent); user-select: all; white-space: nowrap; }
+#ldTelPop .ldtelbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+#ldTelPop .ldtelbtns .btn { flex: 1 1 auto; padding: 6px 8px; font-size: 13px; text-align: center; text-decoration: none; white-space: nowrap; }
+#ldTelPop .ldtelx { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; padding: 0; background: none; border: 0; color: var(--sub); font-size: 14px; cursor: pointer; border-radius: 6px; }
+#ldTelPop .ldtelx:hover { background: var(--hover); }
+/* 👋 그만둔 리더 접힌 칸 */
+#ldView .ldgoneb { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
+#ldView .ldgoneb > summary { list-style: none; cursor: pointer; } #ldView .ldgoneb > summary::-webkit-details-marker { display: none; }
+#ldView .ldgoneb > summary h3 { margin: 0; font-size: 15px; } #ldView .ldgoneb > summary h3::before { content: "▸ "; } #ldView .ldgoneb[open] > summary h3::before { content: "▾ "; }
+#ldView .ldgoneb[open] > summary { margin-bottom: 10px; }

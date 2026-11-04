@@ -110,6 +110,10 @@ const LDC = {
   END_REASONS: ["취업·이직", "이사", "학업·시험", "건강", "개인 사정", "불만·갈등", "연락 두절", "기타"],
   SOURCES: ["회원 전환", "지인 추천", "알바몬", "인스타", "당근", "기타"],
   // 그 기간(from~to)에 활동한 리더인가: 시작일이 기간 끝 전 · 그만둔 날이 기간 시작 뒤 (시작일 모르면 있는 걸로)
+  // 👋 그만둔 날이 지났거나 오늘 → 표 본문 말고 접힌 칸으로. upto = 보는 기간 끝 (그 뒤에 그만둔 사람은 그 기간엔 아직 활동 중)
+  goneBy(r, today, upto = today) {
+    return !!r.end_day && r.end_day <= today && r.end_day <= upto;
+  },
   activeIn(r, from, to) {
     const s = LDC.parseDay(r.start_day);
     return (!s || s <= to) && (!r.end_day || r.end_day >= from);
