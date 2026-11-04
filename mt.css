@@ -1,0 +1,79 @@
+/* 📝 전체 회의록 탭 (mt.js) */
+body:not(.mtv) #mtView { display: none; }
+#mtView { max-width: 1120px; margin: 0 auto; padding: 16px 20px 100px; }
+#mtView input, #mtView textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 14px; }
+#mtView textarea { resize: vertical; line-height: 1.6; }
+#mtView label { display: block; font-size: 13px; font-weight: 600; color: var(--sub); }
+#mtView label input, #mtView label textarea { margin-top: 4px; font-weight: 400; }
+#mtView .mut { color: var(--sub); font-weight: 400; font-size: 13px; }
+#mtView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+#mtView .card h3 { margin: 0 0 6px; }
+#mtView .card p { margin: 0 0 8px; }
+#mtView .mtbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+#mtView .mtbar h2 { margin: 0 0 2px; }
+#mtView .mtbar p { margin: 0; }
+#mtView .mtsearch { margin-bottom: 12px; }
+#mtView .mtmon { margin: 14px 0 4px; font-size: 13px; color: var(--sub); }
+#mtView .mtmon:first-child { margin-top: 0; }
+#mtView .mtrow { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding: 4px 0; }
+#mtView .mtmon + .mtrow { border-top: 0; }
+#mtView .mtopen { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 8px 4px; background: none; border: 0; color: var(--text); font: inherit; font-size: 14px; text-align: left; cursor: pointer; border-radius: 8px; }
+#mtView .mtopen:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+#mtView .mtdate { color: var(--sub); font-size: 13px; font-variant-numeric: tabular-nums; }
+#mtView .mttrash { margin-top: 6px; color: var(--sub); font-size: 13px; }
+#mtView .mttrash summary { cursor: pointer; padding: 6px 0; }
+#mtView .mttrash .mtrow { color: var(--text); }
+#mtView .mttrash .mtrow b { flex: 1; }
+#mtView .mtmeta { display: grid; grid-template-columns: 170px 1fr; gap: 10px; }
+#mtView .mtfull { grid-column: 1 / -1; }
+#mtView .mtwork { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; margin-bottom: 14px; align-items: start; }
+#mtView .mtthumbs { display: grid; gap: 8px; max-height: 800px; overflow-y: auto; padding: 2px; }
+#mtView .mtthumb { position: relative; display: block; width: 100%; padding: 0; background: none; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer; }
+#mtView .mtthumb.on { border-color: var(--accent); }
+#mtView .mtthumb > span { position: absolute; z-index: 1; left: 4px; top: 3px; padding: 0 5px; border-radius: 6px; background: rgba(0, 0, 0, .55); color: #fff; font-size: 11px; }
+#mtView .mtadd { width: 100%; }
+#mtView .mtmain { display: grid; gap: 10px; min-width: 0; }
+#mtView #mtPrev { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+#mtView .mtwarn { margin: 0; padding: 8px 10px; border-left: 3px solid #E0D120; background: color-mix(in srgb, #E0D120 14%, transparent); border-radius: 6px; color: var(--text); font-size: 13px; }
+#mtView .mttools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#mtView .mttools label { cursor: pointer; }
+#mtView .mtspace { flex: 1; }
+#mtView .mtrtitle { margin: 4px 0; }
+#mtView .mtgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; margin: 12px 0 14px; }
+#mtView .mtgrid .mtsl { border: 1px solid var(--line); border-radius: 10px; }
+#mtView .mtnotes { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; font-size: 14px; color: var(--text); }
+#mtView .mtrevs summary { cursor: pointer; font-weight: 600; }
+#mtView .mtrev { padding: 10px 0; border-top: 1px solid var(--line); color: var(--text); font-size: 14px; display: grid; gap: 6px; }
+#mtView .mtrev:first-child { margin-top: 8px; }
+#mtView .mthide { margin-top: 2px; }
+/* 슬라이드: 앱 테마와 무관하게 항상 같은 모습 (프로젝터·인쇄 대비 확보) */
+.mtsl { container-type: inline-size; position: relative; display: flex; aspect-ratio: 16 / 9; width: 100%; box-sizing: border-box; overflow: hidden; background: #fff; color: #1d1d1f; text-align: left; }
+.mtsl::before { content: ""; position: absolute; inset: 0 0 auto; height: 1.2cqw; background: #493087; }
+.mtsl-in { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: safe center; padding: 4cqw 5cqw; overflow: hidden; box-sizing: border-box; height: 100%; }
+.mtsl h3, .mtsl li { word-break: keep-all; }
+.mtsl h3 { margin: 0 0 2cqw; color: #493087; font-size: 4.4cqw; line-height: 1.25; font-weight: 800; overflow-wrap: anywhere; }
+.mtsl ul { margin: 0; padding: 0 0 0 1.2em; font-size: var(--fs, 2.8cqw); line-height: 1.5; }
+.mtsl li { margin-bottom: .45em; overflow-wrap: anywhere; }
+.mtsl li::marker { color: #493087; }
+.mtsl > img { flex: 1; min-width: 0; height: 100%; object-fit: contain; padding: 2.5cqw; box-sizing: border-box; }
+.mtsl.cover { background: #493087; }
+.mtsl.cover::before { display: none; }
+.mtsl.cover .mtsl-in { align-items: center; text-align: center; }
+.mtsl.cover h3 { color: #fff; font-size: 6.4cqw; margin-bottom: 1.6cqw; padding-bottom: 1.6cqw; border-bottom: .5cqw solid #E0D120; }
+.mtsl-sub { margin: 0; color: #fff; font-size: 2.4cqw; }
+/* 발표 화면 */
+#mtStage { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: #000; cursor: pointer; outline: 0; }
+.mtstage-sl { width: min(100vw, calc(100vh * 16 / 9)); }
+.mtctl { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, .65); color: #fff; font-size: 14px; opacity: .25; transition: opacity .2s; white-space: nowrap; }
+#mtStage:hover .mtctl, .mtctl:focus-within { opacity: 1; }
+.mtctl button { padding: 4px 10px; background: none; border: 0; color: #fff; font: inherit; font-size: 15px; cursor: pointer; }
+.mtctl button:disabled { opacity: .35; cursor: default; }
+@media (max-width: 720px) {
+  #mtView { padding: 12px 16px 100px; }
+  #mtView .mtmeta { grid-template-columns: 1fr; }
+  #mtView .mtwork { grid-template-columns: 1fr; }
+  #mtView .mtthumbs { grid-template-columns: repeat(3, minmax(0, 1fr)); max-height: none; order: 2; }
+  #mtView .mtgrid { grid-template-columns: 1fr; }
+  .mtctl { opacity: 1; }
+}
+#mtView #mtPrev { max-width: 680px; width: 100%; justify-self: center; }

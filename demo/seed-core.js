@@ -52,6 +52,7 @@
   D.routine_items = () => ({ weeks: null, color: "", sort: Date.now() / 1000, carry: false, need_link: false, need_photo: false, need_count: false, team_id: null, from_day: null, to_day: null });
   D.links = () => ({ user_id: U.boss, scope: "me", team_id: null });
   D.branch_docs = () => ({ uploaded_by: U.boss });
+  D.meetings = () => ({ created_by: U.boss, created_name: "대표", updated_name: "대표", deleted_at: null, attendees: "", notes: "", slides: [] });
   D.contacts = () => ({ branch: "", phone: "", note: "", sort: Date.now() / 1000 });
   D.roster = () => ({ sort: Date.now() / 1000 });
   D.month_goals = () => ({ user_id: U.boss });
@@ -301,6 +302,9 @@
   ];
   let lid = 0;
   const L = (title, url, scope, team, user, off) => ({ id: ++lid, title, url, scope, team_id: team, user_id: user, created_at: at(off), profiles: { name: nameOf(user) } });
+  DEMO.tables.meetings = [{ id: 1, held_on: plus(TODAY, -6), title: "이번 달 전체 회의", attendees: "대표, 지점 매니저 전원", created_by: U.boss, created_name: "대표", updated_name: "대표", created_at: at(-6), updated_at: at(-6), deleted_at: null,
+    slides: [{ title: "", body: "", image: null }, { title: "지난달 돌아보기", body: "지점별 신규 문의 회신 속도 점검\n방문 뒤 결제율이 가장 높았던 지점 사례 공유", image: null }, { title: "이번 달 할 일", body: "지점별 목표를 이번 주 안에 확정\n첫 수업 안내 문구 통일", image: null }],
+    notes: "결정: 문의 회신은 30분 안에 하기\n담당: 각 지점 매니저" }];
   DEMO.tables.links = [
     L("상담 일지 시트", "https://sheets.example.com/en-consult-log", "team", T.en, U.m1, -30), L("신규 문의 회신 현황", "https://sheets.example.com/en-reply", "team", T.en, U.m1, -22), L("월간 스케줄표", "https://docs.example.com/en-schedule", "team", T.en, U.boss, -18),
     L("상담 일지 시트", "https://sheets.example.com/jp-consult-log", "team", T.jp, U.m2, -28), L("레벨테스트 문제 모음", "https://docs.example.com/jp-level-test", "team", T.jp, U.m2, -15), L("입문반 시간표", "https://docs.example.com/jp-timetable", "team", T.jp, U.boss, -9),

@@ -269,7 +269,7 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 header #fbBtn { background: #f04438; border-color: #f04438; color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(240, 68, 56, .35); } /* 🐞 신고·제안 눈에 띄게 */
 header #fbBtn:hover { background: #d92d20; }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout, body.mtv .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
@@ -454,7 +454,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv):not(.mtv) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 /* 🌱 언젠가 할 일 자리: PC(넓은 화면) = 주간·월간 오른쪽 칸(스크롤해도 따라옴), 폰 = 맨 위 */
@@ -558,6 +558,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <link rel="stylesheet" href="contacts.css?v=202611041601">
 <link rel="stylesheet" href="leaders.css?v=202611041601">
 <link rel="stylesheet" href="links.css?v=202611041601">
+<link rel="stylesheet" href="mt.css?v=202611041601">
 <link rel="stylesheet" href="reports.css?v=202611041601">
 <link rel="stylesheet" href="edu.css?v=202611041601">
 <link rel="stylesheet" href="qna.css?v=202611041601">
@@ -610,7 +611,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="mt">회의록</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="gx">언어교환</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
   <div id="updBar" class="hidden"></div><!-- 📣 업데이트 소식 (새 것만, 확인하면 사라짐) -->
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
@@ -650,6 +651,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="blogView"></section>
   <section id="mkView"></section>
   <section id="lkView"></section>
+  <section id="mtView"></section>
   <section id="eduView"></section>
   <section id="jgView"></section>
   <section id="jcView"></section>
@@ -915,6 +917,7 @@ async function boot() {
   if (view === "mk") window.MK?.load();
   if (view === "post") window.PS?.load();
   if (view === "links") window.LK?.load();
+  if (view === "mt") window.MT?.load();
   if (view === "qna") window.QA?.load();
   window.QA?.badge(); // 💬 대표: 확인할 것 개수
   if (view === "ct") window.CT?.load();
@@ -1723,7 +1726,7 @@ if (!document.querySelector(`.seg [data-v="${view}"]`)) view = "week"; // 없앤
 const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx", "at"]; // 🧑‍🎓 조교가 볼 수 있는 탭
 function setView(v) {
   if (document.body.classList.contains("is-assist") && !JO_VIEWS.includes(v)) v = "ld";
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at"); document.body.classList.toggle("mtv", v === "mt");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1731,6 +1734,7 @@ function setView(v) {
   if (v === "mk" && me && window.MK) MK.load();
   if (v === "post" && me && window.PS) PS.load();
   if (v === "links" && me && window.LK) LK.load();
+  if (v === "mt" && me && window.MT) MT.load();
   if (v === "qna" && me && window.QA) QA.load();
   if (v === "ct" && me && window.CT) CT.load();
   if (v === "ld" && me && window.LD) LD.load();
@@ -2307,7 +2311,7 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 async function checkVer() {
   try {
     const v = (await (await fetch("version.txt?" + Date.now(), { cache: "no-store" })).text()).trim(), cur = document.querySelector('meta[name="app-version"]').content;
-    if (/^\d{12}$/.test(v) && v !== cur && sessionStorage.getItem("ver-reload") !== v && !(window.PS?.post || window.BL?.post)) { sessionStorage.setItem("ver-reload", v); location.reload(); } // 블로그·게시물 글을 열어 둔 동안은 새 버전으로 안 바꿈 (다음에 열 때)
+    if (/^\d{12}$/.test(v) && v !== cur && sessionStorage.getItem("ver-reload") !== v && !(window.PS?.post || window.BL?.post || window.MT?.cur || window.MT?.show)) { sessionStorage.setItem("ver-reload", v); location.reload(); } // 블로그·게시물 글, 회의록을 열어 둔 동안은 새 버전으로 안 바꿈 (다음에 열 때)
   } catch {}
 }
 checkVer(); document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkVer());
@@ -2334,6 +2338,7 @@ document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 
 <script src="leaders-core.js?v=202611041601"></script>
 <script src="leaders.js?v=202611041601"></script>
 <script src="links.js?v=202611041601"></script>
+<script src="mt.js?v=202611041601"></script>
 <script src="edu-data.js?v=202611041601"></script>
 <script src="edu.js?v=202611041601"></script>
 <script src="reports.js?v=202611041601"></script>
