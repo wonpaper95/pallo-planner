@@ -10,9 +10,10 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxsub button.on .mut { color: #fff; opacity: .8; }
 #gxView .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; }
 #gxView .gxlay { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px; align-items: start; }
-@media (max-width: 1300px) { #gxView .gxlay { grid-template-columns: 1fr; } }
+@media (max-width: 1300px) { #gxView .gxlay { grid-template-columns: minmax(0, 1fr); } }
 #gxView .gxlist > input { width: 100%; margin-bottom: 10px; }
 #gxView .gxlist .card { overflow-x: auto; padding: 4px 10px; }
+#gxView .card:has(> .gxt) { overflow-x: auto; }
 #gxView .gxt { width: 100%; border-collapse: collapse; font-size: 13px; }
 #gxView .gxt th { text-align: left; color: var(--sub); font-weight: 600; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 #gxView .gxt td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -38,22 +39,28 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxdel { color: #d93025; margin-top: 12px; }
 #gxView .gxempty { padding: 30px; text-align: center; }
 #gxView .gxevf { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 2fr auto; gap: 8px; padding: 12px 14px; }
-@media (max-width: 800px) { #gxView .gxevf { grid-template-columns: 1fr 1fr; } }
-#gxView .gxlinks { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+@media (max-width: 800px) { #gxView .gxevf { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+#gxView .gxlinks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; }
 #gxView .gxlc { display: flex; gap: 12px; align-items: flex-start; margin: 0; }
 #gxView .gxlc > div:last-child { min-width: 0; display: grid; gap: 4px; justify-items: start; }
 #gxView .gxlc code { font-size: 11px; color: var(--sub); word-break: break-all; }
 #gxView .gxqr { flex: none; background: #fff; padding: 6px; border-radius: 8px; width: 122px; height: 122px; }
 /* 📊 현황 */
 #gxView .gxnums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
-@media (max-width: 700px) { #gxView .gxnums { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) {
+  #gxView { padding: 12px 16px 100px; }
+  #gxView .gxnums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #gxView .gxt th, #gxView .gxt td { padding: 6px 4px; }
+  #gxView .gxt th, #gxView .gxt td { white-space: normal; word-break: keep-all; }
+  #gxView .gxsub { flex: 1 0 100%; order: 1; }
+}
 #gxView .gxnum { display: grid; gap: 2px; text-align: left; font: inherit; color: var(--text); cursor: pointer; margin: 0; }
 #gxView .gxnum b { font-size: 26px; } #gxView .gxnum span { font-weight: 600; }
 #gxView .gxnum:hover { border-color: var(--accent); }
 #gxView .gxdash { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-#gxView .gxdash .card { margin: 0; padding: 12px 14px; }
+#gxView .gxdash .card { margin: 0; padding: 12px 14px; min-width: 0; overflow-x: auto; }
 #gxView .gxdash .gxwide { grid-column: 1 / -1; }
-@media (max-width: 1000px) { #gxView .gxdash { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { #gxView .gxdash { grid-template-columns: minmax(0, 1fr); } }
 #gxView .gxdash h3 { font-size: 15px; margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #gxView .gxdash h3 small { font-weight: 400; font-size: 12px; }
 #gxView .gxdash tr[data-p], #gxView .gxdash tr[data-m] { cursor: pointer; }
