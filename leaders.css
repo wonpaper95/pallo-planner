@@ -168,6 +168,9 @@ body:not(.ldv) #ldView { display: none; }
 #ldView span.cfm > button { all: unset; cursor: pointer; padding: 5px 4px 5px 11px; font-size: 13.5px; }
 #ldView .cfnote { color: #d9730d; font-size: 12px; font-weight: 700; }
 #ldView .cflate { border: 0; background: transparent; color: var(--sub); font: inherit; font-size: 12px; padding: 2px; max-width: 30px; cursor: pointer; border-radius: 999px; } #ldView .cflate:hover { background: var(--hover); }
+#ldView .ldhint { margin: 2px 0 8px; font-size: 13px; }
+#ldView .cfm.needsub { border-color: #d97706; background: rgba(217, 119, 6, .1); } #ldView .ldday .needn { color: #d97706; }
+#ldView .ldday .sbline { background: rgba(59, 130, 246, .06); border-radius: 8px; padding: 3px 4px; } #ldView .ldday .sbline > b { color: #2563eb; font-size: 12.5px; } #ldView .ldday .sbline .tdc { align-items: center; font-size: 13px; }
 #ldView .cfm.vac { cursor: default; color: #e5484d; border-style: dashed; }
 #ldView .ldcerttb summary { cursor: pointer; list-style: none; } #ldView .ldcerttb summary::-webkit-details-marker { display: none; }
 #ldView .ldcerttb summary h3::before { content: "▸ "; } #ldView .ldcerttb[open] summary h3::before { content: "▾ "; }
@@ -193,8 +196,8 @@ body:not(.ldv) #ldView { display: none; }
 #ldView .lv, #ldView .lg { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 17px; vertical-align: 1px; white-space: nowrap; }
 #ldView .lv { background: rgba(73, 48, 135, .1); color: var(--accent); }
 #ldView .lg { color: var(--sub); border: 1px solid var(--line); line-height: 15px; }
-#ldView .subadd, #ldView .subtag { all: unset; cursor: pointer; font-size: 12px; padding: 4px 6px; border-radius: 999px; white-space: nowrap; }
-#ldView .subadd { opacity: .45; } #ldView .subadd:hover { opacity: 1; background: var(--hover); }
+#ldView .subadd, #ldView .subtag, #ldView .subneed { all: unset; cursor: pointer; font-size: 12px; padding: 4px 6px; border-radius: 999px; white-space: nowrap; }
+#ldView .subadd { opacity: .8; } #ldView .subadd:hover { opacity: 1; background: var(--hover); }
 #ldView .subtag { background: rgba(59, 130, 246, .14); color: #2563eb; font-weight: 700; margin-right: 2px; }
 #ldView .cfm.hasub > button:first-child b { text-decoration: line-through; opacity: .6; } /* 대타가 들어가는 리더 = 이름 줄 긋기 */
 #ldView .ldmix summary { list-style: none; cursor: pointer; } #ldView .ldmix summary::-webkit-details-marker { display: none; }

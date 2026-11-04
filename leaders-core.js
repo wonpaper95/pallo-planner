@@ -138,6 +138,9 @@ const LDC = {
   // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
   langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
   timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
+  // 🔁 서브리더 요일·시간대: 칸(grp·slot)이 비었거나 '백업리더'처럼 시간이 아니면 가능 시간 글('화목 패턴1', '월수 오전')에서 읽음
+  subWhen(s) { const a = String(s.avail ?? ""), t = LDC.timeKey(s.slot);
+    return { grp: s.grp || (a.match(/월수|화목|토일/) ?? [a.includes("주말") ? "토일" : ""])[0], time: LDC.slotMin(t) < 9999 ? t : (a.match(/오전|오후|저녁|\d{1,2}\s*(?:AM|PM)/i) ?? [""])[0].replace(/\s/g, "").toUpperCase() }; },
   // 🏷 레벨 이름 일괄 변경 미리보기: 값마다 { old, next, n, merge } · merge = 이미 있는 다른 값과 합쳐짐(되돌리기 어려움)
   renames(levels, from, to) {
     const f = String(from ?? "").trim(), t = String(to ?? "").trim(), c = new Map();

@@ -201,30 +201,38 @@ const bySlot = (rs) => { const m = new Map();
     .forEach((r) => { const k = LDC.timeKey(r.slot); m.set(k, [...(m.get(k) ?? []), r]); });
   return [...m]; };
 const grpOn = (d) => LDC.GRPS.find((x) => LDC.DAYS[x].includes(W.parse(d).getDay()));
-// 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 🔁 대타 OOO (누르면 넣기·고치기 — 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
+// 🔁 그 요일에 올 수 있는 서브리더 (요일 안 적은 사람 포함) · 레벨순
+const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && LDC.activeIn(r, d, d) && [g, ""].includes(LDC.subWhen(r).grp)).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level));
+const subLine = (ss, hint = "") => (ss.length ? `<div class="tdrow sbline"><b>서브</b><div class="tdc">${hint ? `<span class="mut">${hint}</span>` : ""}${ss.map((s) => `<span class="sbc">${esc(s.name)}${tags(s)}${tel(s)}</span>`).join("")}</div></div>` : "");
+// 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 📞 · 🔁 대타 필요 → 🆘 구하는 중 → 🔁 대타 OOO (이름 넣으면 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
+const NEED = "대타 필요"; // ponytail: leader_confirm.note 로 표시 (칸 추가 없이) — 통계에 필요해지면 need_sub 칸으로 옮기기
 function chip(r, d) {
   if (r.status !== "확정") return `<span class="cfm vac">🔴 ${tags(r)} 빈자리</span>`;
   const c = LD.cfm?.get(`${r.id}:${d}`), sub = LD.subs.get(r.id)?.get(d) ?? "";
-  return `<span class="cfm ${c ? "on" : ""} ${sub ? "hasub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${c ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${c?.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>`
-    + `<button class="${sub ? "subtag" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : "대타 넣기"}">${sub ? `🔁 대타 ${esc(sub)}` : "🔁"}</button>${c && d === today() ? lateSel(r.id, c.note) : ""}</span>`;
+  const need = c?.note === NEED, on = c && !need;
+  return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${tel(r)}`
+    + `<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>${on && d === today() ? lateSel(r.id, c.note) : ""}</span>`;
 }
 function dayCard(d, label) {
   const g = grpOn(d), head = (x = "") => `<h3>${label} <span class="dd">${md(d)}(${dw(d)})${g ? ` · ${g}` : ""}</span>${x}</h3>`;
   if (!g) return `<section class="ldday">${head()}<p class="mut">수업 없음</p></section>`;
   const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && LDC.activeIn(r, d, d)), ok = rs.filter((r) => r.status === "확정");
-  const done = ok.filter((r) => LD.cfm?.has(`${r.id}:${d}`)).length, subs = ok.filter((r) => LD.subs.get(r.id)?.get(d)).length;
-  return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}</span>`)}`
-    + `${bySlot(rs).map(([t, list]) => `<div class="tdrow"><b>${esc(t || "시간 미정")}</b><div class="tdc">${list.map((r) => chip(r, d)).join("")}</div></div>`).join("") || `<p class="mut">리더 없음</p>`}</section>`;
+  const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
+  const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;
+  const pool = subsOn(g, d), used = new Set(), times = bySlot(rs).map(([t, list]) => { const ss = pool.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
+    return `<div class="tdrow"><b>${esc(t || "시간 미정")}</b><div class="tdc">${list.map((r) => chip(r, d)).join("")}</div></div>${subLine(ss)}`; }).join("");
+  return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}</span>`)}`
+    + `${times || `<p class="mut">리더 없음</p>`}${subLine(pool.filter((s) => !used.has(s.id)), "시간 무관")}</section>`;
 }
 const editTd = `<td class="edc"><button class="slotedit" data-ldedit title="고치기">✏️</button></td>`;
-const poolRow = (r) => `<tr data-id="${r.id}"><td class="nm"><b>${esc(r.name)}</b>${tel(r)}</td><td>${tags(r) || `<span class="mut">–</span>`}</td><td>${esc([r.grp || "요일 무관", LDC.timeKey(r.slot) || "시간 무관"].join(" · "))}</td><td class="nt">${esc(r.note || r.avail || "")}</td>${editTd}</tr>`;
+const poolRow = (r) => `<tr data-id="${r.id}"><td class="nm"><b>${esc(r.name)}</b>${tel(r)}</td><td>${tags(r) || `<span class="mut">–</span>`}</td><td>${esc([LDC.subWhen(r).grp || "요일 무관", LDC.subWhen(r).time || "시간 무관"].join(" · "))}</td><td class="nt">${esc(r.note || r.avail || "")}</td>${editTd}</tr>`;
 const poolBlk = (title, hint, rs, kind) => `<section class="ldblk ldpool"><h3>${title} <span class="mut">${rs.length}명 · ${hint}</span> <button class="btn ghost small" data-addk="${kind}">+ 추가</button></h3>`
   + (rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>레벨 · 언어</th><th>요일 · 시간대</th><th>비고</th><th></th></tr>${rs.map(poolRow).join("")}</table></div>` : "") + `</section>`;
 function dayPage(g) {
   const td = today(), live = (r) => LDC.activeIn(r, td, td);
-  const subs = LD.rows.filter((r) => r.kind === "sub" && live(r) && (!r.grp || r.grp === g)), used = new Set();
+  const subs = subsOn(g, td), used = new Set();
   const cards = bySlot(LD.rows.filter((r) => r.grp === g && isLeader(r) && live(r))).map(([t, rs]) => {
-    const ss = subs.filter((s) => s.grp === g && LDC.timeKey(s.slot) === t); ss.forEach((s) => used.add(s.id));
+    const ss = subs.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
     const need = rs.filter((r) => r.status === "구해야 함").length;
     return `<section class="ldblk ldcard"><h3>${g} ${esc(t || "시간 미정")} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 ${need}</span>` : ""}</h3><table>`
       + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${r.name === VACANT ? "빈자리" : esc(r.name)}</span>` : `<b>${esc(r.name)}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}${tel(r)}</td>${editTd}</tr>`).join("")
@@ -235,7 +243,7 @@ function dayPage(g) {
 }
 function renderBoard() {
   if (!LDC.GRPS.includes(LD.day)) LD.day = grpOn(today()) ?? grpOn(tmr()) ?? "월수";
-  V().innerHTML = bar() + `<div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
+  V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 그 요일·시간대 서브리더가 밑에 떠요</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
     + `<div class="ldseg lddays">${LDC.GRPS.map((g) => `<button data-dpg="${g}" class="${LD.day === g ? "on" : ""}">${g === "토일" ? "주말 (토일)" : g}</button>`).join("")}</div>${dayPage(LD.day)}`;
 }
 function renderList() {
@@ -552,9 +560,12 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.page) { LD.page = b.dataset.page; try { localStorage.setItem("ld-page", LD.page); } catch {} return LD.render(); }
   if (b.dataset.dpg) { LD.day = b.dataset.dpg; return LD.render(); } // 요일 페이지 (월수·화목·토일)
   if (b.dataset.sub) { // 🔁 오늘·내일 대타: 그날 출석 X + 대타 이름 (대타 해준 리더는 출석 인정) · 비우면 기록 지움
-    const id = +b.dataset.sub, d = b.dataset.day, r = LD.rows.find((x) => x.id === id), cur = LD.subs.get(id)?.get(d) ?? "", st = LD.att.get(id)?.get(d) ?? "";
-    const v = prompt(`${md(d)}(${dw(d)}) ${r.name} 대신 들어갈 대타 이름은요?\n(비우고 확인하면 대타를 지워요)`, cur); if (v === null) return;
-    const s = v.trim().slice(0, 40); if (s === cur) return;
+    const id = +b.dataset.sub, d = b.dataset.day, r = LD.rows.find((x) => x.id === id), cur = LD.subs.get(id)?.get(d) ?? "", st = LD.att.get(id)?.get(d) ?? "", k = `${id}:${d}`, need = LD.cfm.get(k)?.note === NEED;
+    if (!cur && !need) { const { data, error } = await sb.from("leader_confirm").upsert({ leader_id: id, day: d, by_name: myName ?? "", at: new Date().toISOString(), note: NEED }).select().single(); if (fail(error)) return; LD.cfm.set(k, data); return LD.render(); }
+    const v = prompt(`${md(d)}(${dw(d)}) ${r.name} 대신 들어갈 대타 이름은요?\n(비우고 확인하면 ${cur ? "대타를" : "'대타 필요' 표시를"} 지워요)`, cur); if (v === null) return;
+    const s = v.trim().slice(0, 40);
+    if (!s && !cur) { const { error } = await sb.from("leader_confirm").delete().match({ leader_id: id, day: d }); if (fail(error)) return; LD.cfm.delete(k); return LD.render(); }
+    if (s === cur) return;
     const { error } = await setAtt(id, d, s ? "X" : "", s); if (fail(error)) return;
     undoBar(`${md(d)} ${r.name}: ${s ? `대타 ${s}` : "대타 지움"}`, () => setAtt(id, d, st, cur)); return LD.load(); }
   if (b.id === "ldPaste") return pasteDlg();
@@ -563,9 +574,9 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.goto) { // 현황표 → 보드의 그 줄 (지금 보기 필터·달에 없으면 알려 줌)
     const t = v.querySelector(`.ldblk tr[data-id="${b.dataset.goto}"]`); if (!t) return toast("지금 보기(필터·달)에는 없는 줄이에요 — 전체 · 오늘로 바꿔 보세요");
     t.scrollIntoView({ behavior: "smooth", block: "center" }); t.classList.add("flash"); return setTimeout(() => t.classList.remove("flash"), 1600); }
-  if (b.dataset.cfm) { const id = +b.dataset.cfm, d = b.dataset.day, k = `${id}:${d}`, c = LD.cfm.get(k); // 📋 오늘·내일 온다 확인 · 다시 누르면 취소
-    const { data, error } = c ? await sb.from("leader_confirm").delete().match({ leader_id: id, day: d }) : await sb.from("leader_confirm").upsert({ leader_id: id, day: d, by_name: myName ?? "", at: new Date().toISOString() }).select().single(); if (fail(error)) return;
-    c ? LD.cfm.delete(k) : LD.cfm.set(k, data); return LD.render(); }
+  if (b.dataset.cfm) { const id = +b.dataset.cfm, d = b.dataset.day, k = `${id}:${d}`, c = LD.cfm.get(k), on = c && c.note !== NEED; // 📋 오늘·내일 온다 확인 · 다시 누르면 취소 · 🆘 대타 필요였으면 온다로 바뀜
+    const { data, error } = on ? await sb.from("leader_confirm").delete().match({ leader_id: id, day: d }) : await sb.from("leader_confirm").upsert({ leader_id: id, day: d, by_name: myName ?? "", at: new Date().toISOString(), note: "" }).select().single(); if (fail(error)) return;
+    on ? LD.cfm.delete(k) : LD.cfm.set(k, data); return LD.render(); }
   const tr = b.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r) return;
   const sm = statMonth();
   if (b.dataset.star) { // 그달 내 라포 · 같은 별 다시 누르면 지움 → 평균은 서버가 leader_months 에
