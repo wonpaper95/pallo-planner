@@ -251,8 +251,9 @@ function dayCard(d, label) {
   return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}${subOk ? ` · 서브 ✅ <b class="on">${subOk}</b>` : ""}${d === today() ? ` · 참 <b class="on">${attN("O")}</b> · 불참 <b class="re">${attN("X")}</b>` : ""}</span>`)}`
     + `${times || `<p class="mut">리더 없음</p>`}${subLine(pool.filter((s) => !used.has(s.id)), d, "시간 무관")}</section>`;
 }
+const nameEd = (txt) => `<span class="ed1 nameed" data-f="name" title="누르면 이름 고치기">${txt}</span>`; // 💡 보드 이름 바로 고치기 (제안 은서·대구일중 11-04)
 const editTd = `<td class="edc"><button class="slotedit" data-ldedit title="고치기">✏️</button></td>`;
-const poolRow = (r) => `<tr data-id="${r.id}"><td class="nm"><b>${esc(r.name)}</b>${tel(r)}</td><td>${tags(r) || `<span class="mut">–</span>`}</td><td>${esc([LDC.subWhen(r).grp || "요일 무관", LDC.subWhen(r).time || "시간 무관"].join(" · "))}</td><td class="nt">${esc(r.note || r.avail || "")}</td>${editTd}</tr>`;
+const poolRow = (r) => `<tr data-id="${r.id}"><td class="nm"><b>${nameEd(esc(r.name))}</b>${tel(r)}</td><td>${tags(r) || `<span class="mut">–</span>`}</td><td>${esc([LDC.subWhen(r).grp || "요일 무관", LDC.subWhen(r).time || "시간 무관"].join(" · "))}</td><td class="nt">${esc(r.note || r.avail || "")}</td>${editTd}</tr>`;
 const poolBlk = (title, hint, rs, kind) => `<section class="ldblk ldpool"><h3>${title} <span class="mut">${rs.length}명 · ${hint}</span> <button class="btn ghost small" data-addk="${kind}">+ 추가</button></h3>`
   + (rs.length ? `<div class="ldtw"><table><tr><th>이름</th><th>레벨 · 언어</th><th>요일 · 시간대</th><th>비고</th><th></th></tr>${rs.map(poolRow).join("")}</table></div>` : "") + `</section>`;
 function dayPage(g) {
@@ -262,15 +263,15 @@ function dayPage(g) {
     const ss = subs.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
     const need = rs.filter((r) => r.status === "구해야 함").length;
     return `<section class="ldblk ldcard"><h3>${g} ${esc(t || "시간 미정")} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 ${need}</span>` : ""}</h3><table>`
-      + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${r.name === VACANT ? "빈자리" : esc(r.name)}</span>` : `<b>${esc(r.name)}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}${tel(r)}</td>${editTd}</tr>`).join("")
-      + (ss.length ? `<tr class="subrow"><td class="lvc">서브</td><td class="nm" colspan="2">${ss.map((s) => `<span class="sbc" data-id="${s.id}">${esc(s.name)}${tags(s)}${tel(s)}</span>`).join("")}</td></tr>` : "") + `</table></section>`; }).join("");
+      + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${nameEd(r.name === VACANT ? "빈자리" : esc(r.name))}</span>` : `<b>${nameEd(esc(r.name))}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}${tel(r)}</td>${editTd}</tr>`).join("")
+      + (ss.length ? `<tr class="subrow"><td class="lvc">서브</td><td class="nm" colspan="2">${ss.map((s) => `<span class="sbc" data-id="${s.id}">${nameEd(esc(s.name))}${tags(s)}${tel(s)}</span>`).join("")}</td></tr>` : "") + `</table></section>`; }).join("");
   const waits = LD.rows.filter((r) => r.kind === "wait" && live(r) && (!r.grp || r.grp === g));
   return `<div class="ldcards">${cards || `<div class="card mut" style="padding:14px">${g} 리더가 아직 없어요</div>`}</div>`
     + poolBlk("🔁 서브리더", "대타 가능 · 요일·시간대가 맞으면 위 칸에도 보여요", subs.filter((s) => !used.has(s.id)), "sub") + poolBlk("⏳ 대기 리더", "팀 배정 기다림", waits, "wait");
 }
 function renderBoard() {
   if (!LDC.GRPS.includes(LD.day)) LD.day = grpOn(today()) ?? grpOn(tmr()) ?? "월수";
-  V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 밑에 그 요일·시간대 서브리더 — 와줄 수 있다고 하면 ⬜ 눌러 ✅ · 오늘 수업 후 [참·불참] 누르면 출석에 바로 들어가요 · 빈자리를 누르면 들어갈 사람(조교 등) 이름을 적어요</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
+  V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 밑에 그 요일·시간대 서브리더 — 와줄 수 있다고 하면 ⬜ 눌러 ✅ · 오늘 수업 후 [참·불참] 누르면 출석에 바로 들어가요 · 빈자리를 누르면 들어갈 사람(조교 등) 이름을 적어요 · 아래 칸 리더 이름은 눌러서 바로 고쳐요</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
     + `<div class="ldseg lddays">${LDC.GRPS.map((g) => `<button data-dpg="${g}" class="${LD.day === g ? "on" : ""}">${g === "토일" ? "주말 (토일)" : g}</button>`).join("")}</div>${dayPage(LD.day)}`;
 }
 // 📋 리스트 보기: 시간대별(기존) / 📜 횟수별(96회↑·48회↑·미만) / 전체(가나다) — 지금 활동 중인 리더·서브·대기, 이름당 한 줄
@@ -736,13 +737,13 @@ document.addEventListener("drop", async (e) => {
 document.addEventListener("dragend", () => { drag = null; V()?.querySelectorAll(".lddragging,.ldover").forEach((x) => x.classList.remove("lddragging", "ldover")); });
 function cellEdit(e) {
   const v = V(); if (!v || !v.contains(e.target)) return;
-  const c = e.target.closest("[data-f]"), tr = c?.closest("tr[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r || c.querySelector("input")) return;
+  const c = e.target.closest("[data-f]"), tr = c?.closest("[data-id]"), r = tr && LD.rows.find((x) => x.id == tr.dataset.id); if (!r || c.querySelector("input")) return;
   const f = c.dataset.f, inp = document.createElement("input");
-  inp.className = "ldin"; if (f === "start_day" || f === "need_since" || f === "birth") inp.type = "date"; inp.value = f === "birth" ? birthOf(r) ?? "" : f === "start_day" ? LDC.parseDay(r[f]) ?? "" : r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무", level: "레벨", seat: "자리", avail: "예) 화목 저녁 · 주말 오전" }[f] ?? "";
+  inp.className = "ldin"; if (f === "start_day" || f === "need_since" || f === "birth") inp.type = "date"; inp.value = f === "birth" ? birthOf(r) ?? "" : f === "start_day" ? LDC.parseDay(r[f]) ?? "" : f === "name" && r.name === VACANT ? "" : r[f] ?? ""; inp.placeholder = { name: "이름", phone: "010-0000-0000", start_day: "2026-10-26", note: "특이사항", slot: "시간대·업무", level: "레벨", seat: "자리", avail: "예) 화목 저녁 · 주말 오전" }[f] ?? "";
   c.replaceChildren(inp); inp.focus(); inp.select();
   let done = false;
   const save = async () => {
-    if (done) return; done = true; const val = inp.value.trim();
+    if (done) return; done = true; const val = inp.value.trim() || (f === "name" && r.status === "구해야 함" ? VACANT : ""); // 빨간 줄 이름을 비우면 다시 빈자리 (이름만으론 확정 안 됨, 오늘·내일 칸과 같음)
     if (f === "birth") { if (val !== (birthOf(r) ?? "") && !fail(await saveBirth(r, val))) toast("저장했어요"); return LD.render(); }
     if (val === (r[f] ?? "") || (f === "name" && !val)) return LD.render();
     const { data: nr, error } = await sb.from("leaders").update({ [f]: f === "need_since" ? val || null : val }).eq("id", r.id).select(f).single(); if (fail(error)) return LD.render(); // 구해야 함 시작일 비우면 서버가 오늘로
