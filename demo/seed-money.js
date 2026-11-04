@@ -21,7 +21,7 @@ PK("sales_plans", ["team_id", "month"]); PK("sales_days", ["team_id", "day"]); P
 PK("month_goals", ["user_id", "month"]); PK("fin_config", ["team_id"]); PK("fin_access", ["team_id"]);
 PK("work_months", ["team_id", "ym"]); PK("work_cells", ["row_id", "day", "slot"]); PK("work_people", ["team_id", "name"]);
 PK("leader_att", ["leader_id", "day"]); PK("leader_awards", ["leader_id", "month"]); PK("leader_months", ["leader_id", "month"]); PK("leader_certs", ["leader_id", "grade"]);
-PK("leader_rapports", ["leader_id", "month", "user_id"]); PK("leader_confirm", ["leader_id", "day"]); PK("leader_birth", ["leader_id"]); PK("leader_mix", ["team_id", "month"]); PK("leader_ai", ["team_id", "month"]);
+PK("leader_rapports", ["leader_id", "month", "user_id"]); PK("leader_confirm", ["leader_id", "day"]); PK("leader_msg", ["leader_id", "day", "kind"]); PK("leader_birth", ["leader_id"]); PK("leader_mix", ["team_id", "month"]); PK("leader_ai", ["team_id", "month"]);
 
 // ───────── 지점별 기준값 ─────────
 const PRICE = [2470000, 1900000, 1140000, 760000], TIER = ["Premium", "Pro Max", "Pro", "Plus"];

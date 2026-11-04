@@ -502,8 +502,8 @@ fn["blog-write"] = (b) => {
       return { result: { draft: sp.draft, self_review: `- 사진 ${(b.photos ?? []).length}장과 주제를 바탕으로 썼어요 (체험판 샘플).\n- 과장·보장 표현은 넣지 않았어요.`, instagram: { caption: sp.ig, hashtags: igTags(tm) }, google: { body: sp.google, type: "standard", button: "learn_more" }, naver: { title: sp.nTitle, body: sp.nBody } }, quota: { ...quota } };
     }
     if (a === "deco") {
-      const L = { en: ["purple", "vivid", "💬", "English Talk"], ja: ["white", "warm", "🌸", "日本語"], zh: ["yellow", "vivid", "🏮", "中文"], es: ["polaroid", "warm", "☀️", "Español"] }[b.lang];
-      return { result: { photos: (b.photos ?? []).map((_, i) => L ? { frame: L[0], filter: L[1], bright: 4, contrast: 4, text: L[3], text_pos: "bottom", text_color: "#ffffff", band: true, emoji: i % 2 ? "" : L[2], emoji_pos: "top-right" } : null) } };
+      const L = { en: ["purple", "vivid", "💬", "English Talk", "fancysky"], ja: ["white", "warm", "🌸", "日本語", "fancy"], zh: ["yellow", "vivid", "🏮", "中文", "fancylemon"], es: ["polaroid", "warm", "☀️", "Español", "fancy"] }[b.lang];
+      return { result: { photos: (b.photos ?? []).map((_, i) => L ? { frame: L[0], filter: L[1], bright: 4, contrast: 4, text: L[3], text_pos: "bottom", text_color: "#ffffff", band: true, emoji: i % 2 ? "" : L[2], emoji_pos: "top-right", title: `${L[3]} Time♡`, bottom: "Let's talk!", bubble1: "Hi!", bubble2: "Nice♡", bubble1_pos: "top-right", bubble2_pos: "bottom-left", fancy_frame: L[4] } : null) } };
     }
     if (a === "hf") return { error: { message: "체험판에서는 AI 다듬기가 실행되지 않아요" } };
     return { error: { message: DEMO.NOTE } };

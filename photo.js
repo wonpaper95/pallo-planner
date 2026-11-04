@@ -19,7 +19,7 @@ const blankEdits = () => ({ ratio: "orig", ox: 0.5, oy: 0.5, bright: 0, contrast
 // ── 꾸미기 ── 필터 값 = [채도, R·G·B 배율, 더할 밝기, 대비]
 const FILTERS = { none: "원본", warm: "따뜻하게", cool: "시원하게", vivid: "선명하게", soft: "부드럽게", mono: "흑백", vintage: "빈티지" };
 const FX = { warm: [1.05, 1.08, 1, 0.88, 6, 1], cool: [1, 0.92, 1, 1.1, 4, 1], vivid: [1.4, 1, 1, 1, 0, 1.08], soft: [0.85, 1, 1, 1, 14, 0.85], mono: [0, 1, 1, 1, 0, 1.05], vintage: [0.55, 1.08, 1, 0.82, 18, 0.88] };
-const FRAMES = { none: ["없음"], white: ["흰 테두리", "#fff"], polaroid: ["폴라로이드", "#fff"], purple: ["퍼플", "#493087"], yellow: ["옐로", "#E0D120"] };
+const FRAMES = { none: ["없음"], white: ["흰 테두리", "#fff"], polaroid: ["폴라로이드", "#fff"], purple: ["퍼플", "#493087"], yellow: ["옐로", "#E0D120"], fancy: ["🎀 핑크", "#FFD3E6", 1], fancysky: ["🎀 하늘", "#CFE9FF", 1], fancylemon: ["🎀 레몬", "#FFF1A8", 1] }; // [이름, 색, 화려한 프레임]
 const COLORS = { "#ffffff": "흰색", "#111111": "검정", "#493087": "퍼플", "#E0D120": "옐로" };
 const EMOJI = ["😊", "😍", "🤣", "👍", "🔥", "✨", "🎉", "❤️", "⭐", "💬", "📚", "☕", "🌸", "🌏"];
 const TEXT_FONT = '"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif', EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
@@ -110,8 +110,48 @@ function tone(ctx, e) {
 // 테두리는 자르기 칸 안쪽에 칠함 → 고른 비율(인스타 4:5 등)이 그대로 유지됨
 function frame(ctx, e, x, y, w, h) {
   const col = FRAMES[e.frame]?.[1]; if (!col) return;
+  if (FRAMES[e.frame][2]) return fancy(ctx, col, x, y, w, h);
   const t = Math.min(w, h) * 0.035, bot = e.frame === "polaroid" ? Math.min(w, h) * 0.16 : t;
   ctx.fillStyle = col; ctx.beginPath(); ctx.rect(x, y, w, h); ctx.rect(x + t, y + t, w - 2 * t, h - t - bot); ctx.fill("evenodd");
+}
+// 🎀 화려한 프레임 (제안 은서 #34): 도트 바탕 · 흰 안쪽 선 · 마스킹테이프 · 별·하트. 위아래 띠는 제목·한 줄(items)이 얹히는 자리. 사진은 안 줄이고 위에 덮음 → 블러 자리가 안 어긋남
+const bands = (m) => ({ side: m * 0.035, top: m * 0.135, bot: m * 0.1 });
+const star = (ctx, x, y, r, c) => { ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, q = i % 2 ? r * 0.28 : r; ctx.lineTo(x + Math.sin(a) * q, y - Math.cos(a) * q); } ctx.closePath(); ctx.fill(); };
+const heart = (ctx, x, y, r, c) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, y + r); ctx.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.7, y - r * 1.2, x, y - r * 0.35); ctx.bezierCurveTo(x + r * 0.7, y - r * 1.2, x + r * 1.6, y - r * 0.2, x, y + r); ctx.fill(); };
+const tape = (ctx, x, y, w, h, deg, c) => { ctx.save(); ctx.translate(x, y); ctx.rotate(deg * Math.PI / 180); ctx.fillStyle = c; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.fillStyle = "rgba(255,255,255,.55)"; for (let i = -w / 2; i < w / 2; i += h * 0.7) ctx.fillRect(i, -h / 2, h * 0.28, h); ctx.restore(); };
+function fancy(ctx, col, x, y, w, h) {
+  const m = Math.min(w, h), { side, top, bot } = bands(m), ix = x + side, iy = y + top, iw = w - 2 * side, ih = h - top - bot, g = m * 0.04;
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.roundRect(ix, iy, iw, ih, m * 0.02); ctx.clip("evenodd");
+  ctx.fillStyle = col; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "rgba(255,255,255,.65)"; for (let j = 0; j * g < h + g; j++) for (let i = 0; i * g < w + g; i++) { ctx.beginPath(); ctx.arc(x + (i + (j % 2) / 2) * g, y + j * g, m * 0.005, 0, 7); ctx.fill(); }
+  ctx.restore();
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = m * 0.009; ctx.beginPath(); ctx.roundRect(ix, iy, iw, ih, m * 0.02); ctx.stroke();
+  const tw = m * 0.17, th = m * 0.035;
+  tape(ctx, ix + m * 0.015, iy + m * 0.02, tw, th, -40, "#7ED9C4"); tape(ctx, ix + iw - m * 0.015, iy + m * 0.02, tw, th, 40, "#FFC15E");
+  tape(ctx, ix + m * 0.015, iy + ih - m * 0.02, tw, th, 40, "#79B8F5"); tape(ctx, ix + iw - m * 0.015, iy + ih - m * 0.02, tw, th, -40, "#F58CB8");
+  star(ctx, x + m * 0.05, y + top * 0.5, m * 0.024, "#F7B500"); star(ctx, x + w - m * 0.05, y + top * 0.5, m * 0.024, "#B98CF0");
+  star(ctx, ix + iw * 0.2, iy + m * 0.045, m * 0.022, "#fff"); star(ctx, ix + iw * 0.87, iy + ih * 0.42, m * 0.02, "#BFE3FF");
+  heart(ctx, ix + iw * 0.4, iy + m * 0.045, m * 0.02, "#FF7DB0"); heart(ctx, ix + m * 0.06, iy + ih * 0.6, m * 0.022, "#FF7DB0");
+  heart(ctx, ix + iw - m * 0.06, iy + ih * 0.78, m * 0.024, "#FF7DB0"); star(ctx, ix + iw * 0.6, iy + ih - m * 0.05, m * 0.024, "#F7B500");
+}
+const RAINBOW = ["#F0569B", "#FF8A3D", "#E9A800", "#22B08F", "#3E97E8", "#9A62E6"];
+// 글자 모양: rainbow 무지개 제목 · pill 알약 띠 · bubble 말풍선 (tail up·down)
+function styled(ctx, it, lines, x, y, fs, lh, w, h) {
+  const ink = it.color === "#ffffff" ? "#D6337F" : it.color;
+  ctx.lineJoin = "round";
+  if (it.style === "rainbow") {
+    let n = 0; lines.forEach((l, i) => { const chars = [...l], tot = chars.reduce((a, c) => a + ctx.measureText(c).width, 0); let cx = x - tot / 2; ctx.textAlign = "left";
+      for (const c of chars) { const yy = y - h / 2 + lh * (i + 0.5), cw = ctx.measureText(c).width; ctx.strokeStyle = "#fff"; ctx.lineWidth = fs * 0.24; ctx.strokeText(c, cx, yy); ctx.fillStyle = RAINBOW[n++ % RAINBOW.length]; ctx.fillText(c, cx, yy); cx += cw; } });
+    return;
+  }
+  const pad = fs * (it.style === "pill" ? 0.75 : 0.5), bh = h + fs * 0.5, bx = x - w / 2 - pad, by = y - bh / 2, bw = w + pad * 2, r = it.style === "pill" ? bh / 2 : fs * 0.3;
+  ctx.shadowColor = "rgba(0,0,0,.18)"; ctx.shadowBlur = fs * 0.2; ctx.fillStyle = "#fff"; ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, fs * 0.09);
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, r);
+  if (it.style === "bubble") { const up = it.tail === "up", ty = up ? by : by + bh, s = up ? -1 : 1, tx = x - w * 0.1; ctx.moveTo(tx - fs * 0.3, ty); ctx.lineTo(tx + fs * 0.05, ty + s * fs * 0.55); ctx.lineTo(tx + fs * 0.35, ty); }
+  ctx.fill(); ctx.shadowColor = "transparent"; ctx.stroke();
+  if (it.style === "bubble") { const up = it.tail === "up", ty = up ? by : by + bh, tx = x - w * 0.1; ctx.fillStyle = "#fff"; ctx.fillRect(tx - fs * 0.25, ty - fs * 0.08, fs * 0.55, fs * 0.16); }
+  if (it.style === "pill") { heart(ctx, bx - fs * 0.5, y, fs * 0.28, ink); heart(ctx, bx + bw + fs * 0.5, y, fs * 0.28, ink); }
+  ctx.fillStyle = ink; lines.forEach((l, i) => ctx.fillText(l, x, y - h / 2 + lh * (i + 0.5)));
 }
 // 글자·이모지: x·y 는 원본 사진 좌표(가운데), size 는 사진 긴 변의 % → 비율을 바꿔도 크기·자리가 안 변함
 function items(ctx, e, s, ox, oy, long) {
@@ -120,6 +160,7 @@ function items(ctx, e, s, ox, oy, long) {
     ctx.save(); ctx.font = it.k === "emoji" ? `${fs}px ${EMOJI_FONT}` : `800 ${fs}px ${TEXT_FONT}`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const w = Math.max(...lines.map((l) => ctx.measureText(l).width)), h = lh * lines.length, dark = it.color === "#111111" || it.color === "#493087";
+    if (it.k === "text" && it.style) { styled(ctx, it, lines, x, y, fs, lh, w, h); ctx.restore(); it._box = { x: it.x - w / 2 / s, y: it.y - h / 2 / s, w: w / s, h: h / s }; continue; }
     if (it.k === "text" && it.band) { ctx.fillStyle = dark ? "rgba(255,255,255,.85)" : "rgba(0,0,0,.5)"; ctx.beginPath(); ctx.roundRect(x - w / 2 - fs * 0.4, y - h / 2 - fs * 0.15, w + fs * 0.8, h + fs * 0.3, fs * 0.3); ctx.fill(); }
     else if (it.k === "text" && !dark) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = fs * 0.18; }
     ctx.fillStyle = it.color; lines.forEach((l, i) => ctx.fillText(l, x, y - h / 2 + lh * (i + 0.5)));
@@ -152,9 +193,9 @@ async function setRatio(list, ratio) { for (const p of list) { p.edits.ratio = r
 
 // ── 자동 꾸미기 (게시물 탭, 신고 #3): AI(blog-write deco)가 사진마다 고른 한 벌 → 그대로 굽고, 매니저가 [편집]에서 고침(deco=manual 은 다시 안 건드림) ──
 // 한 벌 = { filter, frame, bright, contrast, text, text_pos, text_color, band, emoji, emoji_pos }. 언어 세트는 AI 가 안 될 때 대신 쓰는 기본값
-const LANGS = { en: { name: "영어", frame: "purple", filter: "vivid", emoji: "💬", text: "English Talk" }, ja: { name: "일본어", frame: "white", filter: "warm", emoji: "🌸", text: "日本語" },
-  zh: { name: "중국어", frame: "yellow", filter: "vivid", emoji: "🏮", text: "中文" }, es: { name: "스페인어", frame: "polaroid", filter: "warm", emoji: "☀️", text: "Español" } };
-const preset = (lang) => LANGS[lang] ? { bright: 0, contrast: 0, text_pos: "bottom", text_color: "#ffffff", band: true, emoji_pos: "top-right", ...LANGS[lang] } : null;
+const LANGS = { en: { name: "영어", frame: "purple", fancy_frame: "fancysky", filter: "vivid", emoji: "💬", text: "English Talk" }, ja: { name: "일본어", frame: "white", fancy_frame: "fancy", filter: "warm", emoji: "🌸", text: "日本語" },
+  zh: { name: "중국어", frame: "yellow", fancy_frame: "fancylemon", filter: "vivid", emoji: "🏮", text: "中文" }, es: { name: "스페인어", frame: "polaroid", fancy_frame: "fancy", filter: "warm", emoji: "☀️", text: "Español" } };
+const preset = (lang) => LANGS[lang] ? { bright: 0, contrast: 0, text_pos: "bottom", text_color: "#ffffff", band: true, emoji_pos: "top-right", ...LANGS[lang], title: LANGS[lang].text } : null;
 const clamp40 = (v) => Math.max(-40, Math.min(40, Math.round(+v || 0)));
 function decoEdits(p, d) {
   const e = p.edits;
@@ -162,6 +203,18 @@ function decoEdits(p, d) {
   if (!d) { e.frame = "none"; e.filter = "none"; e.bright = 0; e.contrast = 0; return; }
   e.frame = FRAMES[d.frame] ? d.frame : "none"; e.filter = FILTERS[d.filter] ? d.filter : "none"; e.bright = clamp40(d.bright); e.contrast = clamp40(d.contrast);
   const c = cropRect(p), long = Math.max(p.img.naturalWidth, p.img.naturalHeight), m = Math.min(c.w, c.h), pol = e.frame === "polaroid";
+  if (String(d.title ?? "").trim()) { // 🎀 화려하게: 무지개 제목 · 말풍선 2개 · 아래 알약 한 줄 (글자는 각각 끌어서 옮기고 고칠 수 있음)
+    e.frame = FRAMES[d.fancy_frame]?.[2] ? d.fancy_frame : "fancy";
+    const { top, bot } = bands(m), em = (t) => [...t].reduce((a, ch) => a + (ch.charCodeAt(0) < 256 ? 0.6 : 1), 0), fit = (t, max, room) => Math.min(max, room * c.w / m / em(t)) * 100 * m / long; // 글자 수에 맞춰 칸 안에
+    const put = (t, x, y, size, o) => e.items.push({ k: "text", t, x, y, size, color: "#ffffff", band: false, auto: true, ...o }), cut = (v, n) => [...String(v ?? "").trim()].slice(0, n).join("");
+    const title = cut(d.title, 28), under = cut(d.bottom, 32), b1 = cut(d.bubble1, 18), b2 = cut(d.bubble2, 18);
+    put(title, c.x + c.w / 2, c.y + top / 2, fit(title, 0.085, 0.78), { style: "rainbow" });
+    if (under) put(under, c.x + c.w / 2, c.y + c.h - bot / 2, fit(under, 0.046, 0.66), { style: "pill" });
+    const bx = (pos) => c.x + c.w * (String(pos).endsWith("left") ? 0.28 : 0.72);
+    if (b1) put(b1, bx(d.bubble1_pos ?? "top-right"), c.y + top + m * 0.1, fit(b1, 0.036, 0.4), { style: "bubble", tail: "down", color: "#148F6B" });
+    if (b2) put(b2, bx(d.bubble2_pos ?? "bottom-left"), c.y + c.h - bot - m * 0.09, fit(b2, 0.036, 0.4), { style: "bubble", tail: "up", color: "#D6337F" });
+    return;
+  }
   if (d.emoji) {
     const [v, h] = String(d.emoji_pos || "top-right").split("-");
     e.items.push({ k: "emoji", t: d.emoji, x: h === "left" ? c.x + m * 0.13 : c.x + c.w - m * 0.13, y: v === "bottom" ? c.y + c.h - m * (pol ? 0.26 : 0.13) : c.y + m * 0.13, size: 9 * m / long, color: "#ffffff", band: false, auto: true });
@@ -268,6 +321,7 @@ function editorDom() {
       <div class="tb" id="phEdEmoji"><span class="mut">이모지</span>${EMOJI.map((x) => `<button type="button" class="emo" data-emo="${x}">${x}</button>`).join("")}</div>
       <div class="tb sel" id="phEdSel" hidden><span class="mut">고른 것</span><span class="mut">크기</span><input type="range" id="phEdSize" min="2" max="30" step="0.5">
         <span class="txo blseg" id="phEdColor">${Object.entries(COLORS).map(([k, v]) => `<button type="button" data-color="${k}" title="${v}"><i style="background:${k}"></i>${v}</button>`).join("")}</span>
+        <span class="txo blseg" id="phEdStyle">${[["", "기본"], ["rainbow", "🌈 무지개"], ["bubble", "💬 말풍선"], ["pill", "💊 알약"]].map(([k, v]) => `<button type="button" data-tstyle="${k}">${v}</button>`).join("")}</span>
         <button type="button" class="txo btn ghost small" id="phEdBand">글자 뒤 띠</button><button type="button" class="btn ghost small" id="phEdDel">🗑 빼기</button></div>
     </div>
     <div class="hf" id="phEdHf" hidden><b>🪄 힉스필드 AI 다듬기</b> <span class="mut">사람 없는 사진만(교실·교재·간판 등) · 지점마다 하루 10장 · 사진 전체를 다시 그려서 원본과 비교 후 골라요</span>
@@ -310,6 +364,7 @@ function edDraw() {
     $e("#phEdSize").value = it.size; dlg.querySelectorAll(".txo").forEach((x) => (x.hidden = it.k !== "text"));
     dlg.querySelectorAll("[data-color]").forEach((b) => b.classList.toggle("on", b.dataset.color === it.color));
     $e("#phEdBand").classList.toggle("on", it.band);
+    dlg.querySelectorAll("[data-tstyle]").forEach((b) => b.classList.toggle("on", b.dataset.tstyle === (it.style ?? "")));
   }
 }
 // 고르면 글자 칸에 그 글자를 띄움 → 칸을 고치면 바로 바뀜
@@ -360,6 +415,7 @@ function wireEditor() {
   $e("#phEdText").oninput = (ev) => { if (ED.sel?.k === "text") { ED.sel.t = ev.target.value; edDraw(); } };
   $e("#phEdSize").oninput = (ev) => { if (ED.sel) { ED.sel.size = +ev.target.value; edDraw(); } };
   $e("#phEdColor").onclick = (ev) => { const c = ev.target.closest("[data-color]")?.dataset.color; if (c && ED.sel) { ED.sel.color = c; edDraw(); } };
+  $e("#phEdStyle").onclick = (ev) => { const b = ev.target.closest("[data-tstyle]"); if (b && ED.sel) { ED.sel.style = b.dataset.tstyle || undefined; edDraw(); } };
   $e("#phEdBand").onclick = () => { if (ED.sel) { ED.sel.band = !ED.sel.band; edDraw(); } };
   $e("#phEdDel").onclick = () => { ED.e.items.splice(ED.e.items.indexOf(ED.sel), 1); ED.sel = null; edDraw(); };
   $e("#phEdFace").onclick = async (ev) => {

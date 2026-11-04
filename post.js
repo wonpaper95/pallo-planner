@@ -5,7 +5,8 @@
 (() => {
 const C = window.SNSCORE;
 const allKeys = () => new Set(C.CHANNELS.map((c) => c.key));
-const PS = (window.PS = { tab: "make", photos: [], post: null, jobs: [], ch: "instagram", sel: allKeys(), topic: "", tone: "friendly" });
+const PS = (window.PS = { tab: "make", photos: [], post: null, jobs: [], ch: "instagram", sel: allKeys(), topic: "", tone: "friendly", plain: false });
+try { PS.plain = localStorage.getItem("ps-deco") === "plain"; } catch {} // 🎀 화려하게(기본) / 깔끔하게 — 기기마다 기억
 const TONES = [["friendly", "친근 (~해요)"], ["polite", "정중 (~합니다)"]];
 const V = () => document.getElementById("postView");
 const $p = (s) => V().querySelector(s);
@@ -109,7 +110,7 @@ function renderThumbs() {
   $p("#psFaceRow").innerHTML = n ? `<button type="button" class="btn ghost small" id="psFaceAll">🙂 얼굴 자동 블러${unchecked ? ` (${unchecked}장)` : ""}</button> <small class="mut">${n}장 · 사진은 이 기기 안에서 처리한 뒤 올려요</small>` : "";
   const ln = langNow();
   $p("#psLang").innerHTML = n ? `<span class="mut">🤖 AI 꾸미기 · 글자 언어</span><span class="blseg">${[...Object.entries(PHOTO.LANGS).map(([k, v]) => [k, v.name]), ["none", "꾸미기 없음"]].map(([k, t]) => `<button type="button" data-lang="${k}" class="${k === ln ? "on" : ""}" ${PS.decoBusy ? "disabled" : ""}>${t}</button>`).join("")}</span>
-    ${ln !== "none" ? `<button type="button" class="btn ghost small" data-redeco="1" ${PS.decoBusy ? "disabled" : ""}>🔄 다시 꾸미기</button>` : ""}<small class="mut">${PS.decoBusy ? " 🤖 AI가 사진 꾸미는 중…" : PS.photos.some((p) => p.deco === "manual") ? " · [편집]으로 고친 사진은 그대로" : " · 부족한 건 사진 [편집]에서 고쳐요"}</small>` : "";
+    ${ln !== "none" ? `<span class="blseg">${[[0, "🎀 화려하게"], [1, "깔끔하게"]].map(([k, t]) => `<button type="button" data-dstyle="${k}" class="${+PS.plain === k ? "on" : ""}" ${PS.decoBusy ? "disabled" : ""}>${t}</button>`).join("")}</span><button type="button" class="btn ghost small" data-redeco="1" ${PS.decoBusy ? "disabled" : ""}>🔄 다시 꾸미기</button>` : ""}<small class="mut">${PS.decoBusy ? " 🤖 AI가 사진 꾸미는 중…" : PS.photos.some((p) => p.deco === "manual") ? " · [편집]으로 고친 사진은 그대로" : " · 부족한 건 사진 [편집]에서 고쳐요"}</small>` : "";
   $p("#psRatio").innerHTML = n ? `<span class="mut">한 번에 자르기</span><span class="blseg">${[["4:5", "4:5 세로 (인스타 추천)"], ["1:1", "1:1"], ["orig", "원본"]].map(([r, t]) => `<button type="button" data-ratio="${r}">${t}</button>`).join("")}</span>` : "";
 }
 async function addFiles(files) {
@@ -125,6 +126,7 @@ async function addFiles(files) {
 }
 // 🤖 AI 자동 꾸미기 (신고 #3): 사진을 보고 필터·테두리·밝기·글자(고른 언어)·이모지를 사진마다 골라 바로 구움 → 매니저는 [편집]에서 부족한 것만.
 // [편집]으로 고친 사진은 안 건드림. AI 가 안 되면 언어별 기본 세트로. 하루 생성 제한에는 안 셈
+const look = (d) => (PS.plain && d ? { ...d, title: "" } : d); // 깔끔하게 = 제목 없이 예전 꾸미기
 async function autoDeco(list) {
   list = list.filter((p) => p.deco !== "manual"); if (!list.length) return;
   const lang = PS.lang ?? langNow(), team = PS.team;
@@ -135,8 +137,8 @@ async function autoDeco(list) {
   if (team !== PS.team || lang !== (PS.lang ?? langNow())) return renderThumbs(); // 그 사이 지점·언어 바꿈 → 새로 부른 쪽이 꾸밈
   list = list.filter((p) => PS.photos.includes(p));
   const specs = r?.result?.photos;
-  if (Array.isArray(specs) && specs.length >= list.length) { await PHOTO.applyDeco(list, specs.slice(0, list.length)); toast("🤖 AI가 사진을 꾸몄어요 · 부족한 건 [편집]에서 고쳐 주세요"); }
-  else { await PHOTO.applyLang(list, lang); if (r) toast("AI 꾸미기 결과가 이상해서 기본 꾸미기로 했어요 · [🔄 다시 꾸미기]"); }
+  if (Array.isArray(specs) && specs.length >= list.length) { await PHOTO.applyDeco(list, specs.slice(0, list.length).map(look)); toast("🤖 AI가 사진을 꾸몄어요 · 부족한 건 [편집]에서 고쳐 주세요"); }
+  else { await PHOTO.applyDeco(list, list.map(() => look(PHOTO.preset(lang)))); if (r) toast("AI 꾸미기 결과가 이상해서 기본 꾸미기로 했어요 · [🔄 다시 꾸미기]"); }
   renderThumbs(); photosChanged();
 }
 function photosChanged() { if (PS.post) { renderOut(); saveSoon(); } }
@@ -421,6 +423,7 @@ function wire() {
       return;
     }
     if (d.lang) { PS.lang = d.lang; return autoDeco(PS.photos); }
+    if (d.dstyle !== undefined) { PS.plain = d.dstyle === "1"; try { localStorage.setItem("ps-deco", PS.plain ? "plain" : "fancy"); } catch {} return autoDeco(PS.photos); }
     if (d.redeco) return autoDeco(PS.photos);
     const th = t.closest("#psThumbs .blthumb"); if (th && !t.closest("button")) { const i = [...th.parentNode.children].indexOf(th); return PHOTO.view(PS.photos, i, { onEdit: (p) => PHOTO.edit(p, { title: `사진 ${pad(PS.photos.indexOf(p) + 1)}`, onSave: () => { p.deco = "manual"; renderThumbs(); photosChanged(); }, hf: (b) => call("hf", b) }) }); } // 🔍 크게 보기
     if (d.mv) { const i = +d.i, j = i + +d.mv; if (j < 0 || j >= PS.photos.length) return; [PS.photos[i], PS.photos[j]] = [PS.photos[j], PS.photos[i]]; renderThumbs(); return photosChanged(); }

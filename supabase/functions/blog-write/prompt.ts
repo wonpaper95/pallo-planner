@@ -292,7 +292,13 @@ export const DECO_SYSTEM = `너는 성인 외국어 회화 학원 "팔로(Pallo)
 - 글자: 지정 언어로 2~4단어, 16자 이내. 사진 내용에 맞는 한마디(예: 영어 "Let's talk!", 일본어 "一緒に話そう!", 중국어 "一起说中文!", 스페인어 "¡Hablemos!"). 사진마다 다르게. 글자가 어울리지 않는 사진(풍경·문서 위주 등)은 "" 로 비워라. 전체의 절반 이상은 글자를 넣어라.
 - 글자 자리: 사람 얼굴·중요한 물건을 가리지 않는 빈 곳(top/bottom/center). polaroid 면 bottom(아래 흰 띠). 배경이 밝으면 band=true 로 띠를 깔거나 어두운 색, 어두우면 흰 글자.
 - 이모지: 0~1개, 모서리 중 빈 곳. 남발 금지.
-- 매니저 메모가 있으면 참고한다.`;
+- 매니저 메모가 있으면 참고한다.
+화려한 꾸미기용 글자도 함께 만든다 (화면이 파스텔 프레임 위에 얹는다, 위 text·frame 은 '깔끔하게' 고를 때 쓴다). 전부 지정 언어로, 사진마다 다르게, 눈에 딱 들어오고 활기차게:
+- title: 맨 위 제목 6~14자(영어·스페인어는 24자까지). 사진 속 상황을 귀엽게 (예: 일본어 "おやつタイム&べんきょう♡", 영어 "Snack & Study Time♡"). 비우지 마라.
+- bottom: 맨 아래 한 줄 6~14자(영어·스페인어는 26자까지) (예: "ポテトでパワーチャージ!").
+- bubble1·bubble2: 사진 속 사람·물건이 말하는 듯한 말풍선 각 8자 이내(영어·스페인어는 14자까지) (예: "がんばろう!", "ポテトたべよ〜♡"). 어울리지 않으면 "".
+- bubble1_pos(위쪽)·bubble2_pos(아래쪽): 얼굴을 가리지 않는 쪽.
+- fancy_frame: 프레임 색 fancy(핑크)·fancysky(하늘)·fancylemon(레몬). 한 게시물 안에서는 모든 사진이 같은 색.`;
 export const DECO_SCHEMA = {
   type: "object", additionalProperties: false, required: ["photos"],
   properties: {
@@ -300,7 +306,7 @@ export const DECO_SCHEMA = {
       type: "array",
       items: {
         type: "object", additionalProperties: false,
-        required: ["filter", "frame", "bright", "contrast", "text", "text_pos", "text_color", "band", "emoji", "emoji_pos"],
+        required: ["filter", "frame", "bright", "contrast", "text", "text_pos", "text_color", "band", "emoji", "emoji_pos", "title", "bottom", "bubble1", "bubble2", "bubble1_pos", "bubble2_pos", "fancy_frame"],
         properties: {
           filter: { type: "string", enum: ["none", "warm", "cool", "vivid", "soft", "mono", "vintage"] },
           frame: { type: "string", enum: ["none", "white", "polaroid", "purple", "yellow"] },
@@ -311,6 +317,9 @@ export const DECO_SCHEMA = {
           band: { type: "boolean" },
           emoji: { type: "string", enum: DECO_EMOJI },
           emoji_pos: { type: "string", enum: ["top-left", "top-right", "bottom-left", "bottom-right"] },
+          title: { type: "string" }, bottom: { type: "string" }, bubble1: { type: "string" }, bubble2: { type: "string" },
+          bubble1_pos: { type: "string", enum: ["top-left", "top-right"] }, bubble2_pos: { type: "string", enum: ["bottom-left", "bottom-right"] },
+          fancy_frame: { type: "string", enum: ["fancy", "fancysky", "fancylemon"] },
         },
       },
     },
