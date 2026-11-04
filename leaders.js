@@ -146,7 +146,7 @@ function needTable() {
 
 // 📜 자격증: 참여 48회 → 2급, 96회 → 1급 (같은 이름 줄은 한 사람). 발급하면 날짜·누가 남김 (누르면 취소) · 아직이면 다음 급까지 남은 횟수
 const isSub = (r) => r.kind === "sub" || r.kind === "wait", isLeader = (r) => r.kind !== "staff" && !isSub(r);
-const isPerson = (r) => r.kind !== "staff" && r.name !== VACANT && !/^구해야/.test(r.name); // '구해야됨 (유정)' 같은 빈자리 줄은 사람이 아님
+const isPerson = (r) => r.kind !== "staff" && r.status !== "구해야 함" && r.name !== VACANT && !/^구해야/.test(r.name); // 빈자리 줄('구해야됨 (유정)', 조교 이름을 적어 둔 칸)은 리더가 아님
 const same = (r) => LD.rows.filter((x) => x.name === r.name);
 const people = (rs) => [...new Map([...rs].sort((a, b) => isSub(b) - isSub(a)).map((r) => [r.name, r])).values()]; // 이름당 한 줄 (뒤 값이 이김 → 메인 리더 줄 우선)
 const cntOf = (r) => LD.cnt?.get(r.name) ?? { base: r.att_base || 0, o: 0, sub: new Set(), n: r.att_base || 0 };
@@ -229,23 +229,26 @@ const subsOn = (g, d) => LD.rows.filter((r) => r.kind === "sub" && LDC.activeIn(
 const subLine = (ss, d, hint = "") => (ss.length ? `<div class="tdrow sbline"><b>서브</b><div class="tdc">${hint ? `<span class="mut">${hint}</span>` : ""}${ss.map((s) => { const c = LD.cfm?.get(`${s.id}:${d}`);
   return `<span class="sbc ${c ? "on" : ""}"><button data-cfm="${s.id}" data-day="${d}" title="${c ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "전화해서 와줄 수 있다고 하면 누르기"}">${c ? "✅" : "⬜"} ${esc(s.name)}</button>${tags(s)}${tel(s)}</span>`; }).join("")}</div></div>` : "");
 // 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 📞 · 🔁 대타 필요 → 🆘 구하는 중 → 🔁 대타 OOO (이름 넣으면 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
+// ⭕ 오늘 실제 출석 (리더 리스트 출석 칸과 같은 값 · 참 → 불참 → 비움) — 대타를 넣은 날은 이미 불참이라 안 보임
+const attTog = (r, d) => { const s = LD.att.get(r.id)?.get(d) ?? ""; return `<button class="batt ${s === "O" ? "atton" : s === "X" ? "attoff" : ""}" data-batt="${r.id}" data-day="${d}" title="실제 출석 — 누르면 참 → 불참 → 비움 (잘못 누르면 아래 되돌리기)">${s === "O" ? "⭕ 참" : s === "X" ? "❌ 불참" : "참·불참"}</button>`; };
 const NEED = "대타 필요"; // ponytail: leader_confirm.note 로 표시 (칸 추가 없이) — 통계에 필요해지면 need_sub 칸으로 옮기기
 function chip(r, d) {
-  if (r.status !== "확정") return `<span class="cfm vac">🔴 ${tags(r)} 빈자리</span>`;
+  if (r.status !== "확정") return `<span class="cfm vac ${r.name === VACANT ? "" : "named"}"><button data-vac="${r.id}" title="누르면 이 자리에 들어갈 사람 이름 적기 (조교 등) — 자리는 계속 구하는 중">${r.name === VACANT ? "빈자리" : `<b>${esc(r.name)}</b>`}</button>${tags(r)}</span>`;
   const c = LD.cfm?.get(`${r.id}:${d}`), sub = LD.subs.get(r.id)?.get(d) ?? "";
   const need = c?.note === NEED, on = c && !need;
   return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${tel(r)}`
-    + `<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>${on && d === today() ? lateSel(r.id, c.note) : ""}</span>`;
+    + `<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>${d === today() && !sub ? attTog(r, d) : ""}${on && d === today() ? lateSel(r.id, c.note) : ""}</span>`;
 }
 function dayCard(d, label) {
   const g = grpOn(d), head = (x = "") => `<h3>${label} <span class="dd">${md(d)}(${dw(d)})${g ? ` · ${g}` : ""}</span>${x}</h3>`;
   if (!g) return `<section class="ldday">${head()}<p class="mut">수업 없음</p></section>`;
   const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && LDC.activeIn(r, d, d)), ok = rs.filter((r) => r.status === "확정");
+  const attN = (st) => ok.filter((r) => LD.att.get(r.id)?.get(d) === st).length;
   const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
   const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;
   const pool = subsOn(g, d), subOk = pool.filter((s) => LD.cfm?.has(`${s.id}:${d}`)).length, used = new Set(), times = bySlot(rs).map(([t, list]) => { const ss = pool.filter((s) => { const w = LDC.subWhen(s); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
     return `<div class="tdrow"><b>${esc(t || "시간 미정")}</b><div class="tdc">${list.map((r) => chip(r, d)).join("")}</div></div>${subLine(ss, d)}`; }).join("");
-  return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}${subOk ? ` · 서브 ✅ <b class="on">${subOk}</b>` : ""}</span>`)}`
+  return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}${subOk ? ` · 서브 ✅ <b class="on">${subOk}</b>` : ""}${d === today() ? ` · 참 <b class="on">${attN("O")}</b> · 불참 <b class="re">${attN("X")}</b>` : ""}</span>`)}`
     + `${times || `<p class="mut">리더 없음</p>`}${subLine(pool.filter((s) => !used.has(s.id)), d, "시간 무관")}</section>`;
 }
 const editTd = `<td class="edc"><button class="slotedit" data-ldedit title="고치기">✏️</button></td>`;
@@ -267,7 +270,7 @@ function dayPage(g) {
 }
 function renderBoard() {
   if (!LDC.GRPS.includes(LD.day)) LD.day = grpOn(today()) ?? grpOn(tmr()) ?? "월수";
-  V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 밑에 그 요일·시간대 서브리더 — 와줄 수 있다고 하면 ⬜ 눌러 ✅</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
+  V().innerHTML = bar() + `<p class="mut ldhint">📞 전날 전화: 온다고 하면 ⬜ 눌러 ✅ · 못 온다고 하면 [🔁 대타 필요] · 구하면 다시 눌러 이름 넣기 · 밑에 그 요일·시간대 서브리더 — 와줄 수 있다고 하면 ⬜ 눌러 ✅ · 오늘 수업 후 [참·불참] 누르면 출석에 바로 들어가요 · 빈자리를 누르면 들어갈 사람(조교 등) 이름을 적어요</p><div class="ldtd2">${dayCard(today(), "📋 오늘")}${dayCard(tmr(), tmr() === W.add(today(), 1) ? "📅 내일" : "📅 다음 수업")}</div>${findHtml()}${needTable()}${mixHtml()}`
     + `<div class="ldseg lddays">${LDC.GRPS.map((g) => `<button data-dpg="${g}" class="${LD.day === g ? "on" : ""}">${g === "토일" ? "주말 (토일)" : g}</button>`).join("")}</div>${dayPage(LD.day)}`;
 }
 // 📋 리스트 보기: 시간대별(기존) / 📜 횟수별(96회↑·48회↑·미만) / 전체(가나다) — 지금 활동 중인 리더·서브·대기, 이름당 한 줄
@@ -605,6 +608,14 @@ document.addEventListener("click", async (e) => {
   if (b.dataset.view) { LD.view = b.dataset.view; try { localStorage.setItem("ld-view", LD.view); } catch {} return LD.render(); }
   if (b.dataset.page) { LD.page = b.dataset.page; try { localStorage.setItem("ld-page", LD.page); } catch {} return LD.render(); }
   if (b.dataset.dpg) { LD.day = b.dataset.dpg; return LD.render(); } // 요일 페이지 (월수·화목·토일)
+  if (b.dataset.vac) { const r = LD.rows.find((x) => x.id === +b.dataset.vac); // 🔴 빈자리 칸에 들어갈 사람 이름 (조교 등) · 비우면 다시 빈자리
+    const v = prompt("이 자리에 들어갈 사람 이름은요? (조교 등)\n비우고 확인하면 다시 빈자리로 보여요", r.name === VACANT ? "" : r.name); if (v === null) return;
+    const name = v.trim().slice(0, 40) || VACANT; if (name === r.name) return;
+    const { error } = await sb.from("leaders").update({ name }).eq("id", r.id); if (fail(error)) return; toast("저장했어요"); return LD.load(); }
+  if (b.dataset.batt) { const id = +b.dataset.batt, d = b.dataset.day, r = LD.rows.find((x) => x.id === id), cur = LD.att.get(id)?.get(d) ?? "", cs = LD.subs.get(id)?.get(d) ?? "", nx = cur === "" ? "O" : cur === "O" ? "X" : ""; // ⭕ 보드 참·불참
+    const { error } = await setAtt(id, d, nx, ""); if (fail(error)) return;
+    nx ? LD.att.get(id)?.set(d, nx) : LD.att.get(id)?.delete(d); LD.subs.get(id)?.delete(d); LD.render(); // 다시 불러오는 동안 또 눌러도 맞게 바로 반영
+    undoBar(`${md(d)} ${r.name}: ${attLabel(cur, cs)} → ${attLabel(nx, "")}`, () => setAtt(id, d, cur, cs)); return LD.load(); }
   if (b.dataset.sub) { // 🔁 오늘·내일 대타: 그날 출석 X + 대타 이름 (대타 해준 리더는 출석 인정) · 비우면 기록 지움
     const id = +b.dataset.sub, d = b.dataset.day, r = LD.rows.find((x) => x.id === id), cur = LD.subs.get(id)?.get(d) ?? "", st = LD.att.get(id)?.get(d) ?? "", k = `${id}:${d}`, need = LD.cfm.get(k)?.note === NEED;
     if (!cur && !need) { const { data, error } = await sb.from("leader_confirm").upsert({ leader_id: id, day: d, by_name: myName ?? "", at: new Date().toISOString(), note: NEED }).select().single(); if (fail(error)) return; LD.cfm.set(k, data); return LD.render(); }
