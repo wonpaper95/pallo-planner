@@ -262,6 +262,11 @@ body.is-assist #ldView .ldday .tdc { grid-template-columns: repeat(auto-fill, mi
 #ldView .ldday .cfm [data-sub], #ldView .ldday .cfm .subslot { min-width: 120px; box-sizing: border-box; }
 #ldView .ldday .cfr .sl1 { width: 64px; } #ldView .ldday .cfr .sl2 { width: 30px; }
 #ldView .ldday .cfm .cflate { flex: none; width: 30px; max-width: 30px; }
+@media (max-width: 760px) { /* 폰: 시간은 칩 위 한 줄 → 칩 폭 확보, 360px 폰에서도 📞 까지 첫 줄 */
+  #ldView .ldday .tdrow { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  #ldView .ldday .tdrow > b { padding-top: 2px; }
+  #ldView .ldday span.cfm > button[data-cfm], #ldView .ldday .vcn { flex-basis: 150px; }
+}
 #ldView .ldday .sbline .tdc > .mut { grid-column: 1 / -1; }
 #ldView .ldday .sbc { display: flex; align-items: center; gap: 4px; margin: 1px 0; min-width: 0; }
 #ldView .ldday .sbc > button[data-cfm] { flex: 1; min-width: 0; white-space: normal; word-break: keep-all; }
