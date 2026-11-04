@@ -45,7 +45,7 @@ MT.load = async function () {
   drawList();
 };
 function drawList() {
-  const q = MT.q.trim().toLowerCase(), live = MT.list.filter((m) => !m.deleted_at), gone = MT.list.filter((m) => m.deleted_at);
+  const q = MT.q.trim().toLowerCase(), live = MT.list.filter((m) => !m.deleted_at), gone = admin() ? MT.list.filter((m) => m.deleted_at) : []; // 대표가 매니저 화면으로 볼 때는 숨김
   const hit = live.filter((m) => !q || [m.title, m.attendees, m.notes, m.created_name, ...(m.slides ?? []).flatMap((s) => [s.title, s.body])].join(" ").toLowerCase().includes(q));
   let last = "", html = "";
   for (const m of hit) {
