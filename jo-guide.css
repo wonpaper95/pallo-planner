@@ -127,3 +127,15 @@ p.jgsub small { color: var(--sub); font-size: 13px; font-weight: 400; }
 .jgtabs button[data-jgt="hire"]:not(.on) { color: var(--text); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
 .jghire { border-left: 4px solid var(--accent); }
 .jghirecore { background: color-mix(in srgb, var(--accent) 7%, var(--panel)); }
+/* ✏️ 지점별 내용 고치기 (0091) */
+.jgeon [data-jek] { cursor: text; border-radius: 4px; outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 1px; }
+.jgeon [data-jek]:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.jgeta { display: block; width: 100%; box-sizing: border-box; font: inherit; font-weight: 400; color: var(--text); background: var(--bg); border: 1.5px solid var(--accent); border-radius: 8px; padding: 6px 8px; resize: vertical; }
+.jgebanner { margin: 8px 0 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); }
+.jgebar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.jgebar small { color: var(--sub); }
+.jgeadd { display: block; width: 100%; margin: 6px 0; padding: 6px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--sub); font: inherit; font-size: 13px; cursor: pointer; }
+.jgeadd:hover { color: var(--text); border-color: var(--accent); }
+.jgehid > summary { opacity: .55; text-decoration: line-through; }
+.jgepick { font-size: 13px; color: var(--sub); }
+.jgepick select { padding: 4px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }

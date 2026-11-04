@@ -2,6 +2,7 @@
 // 🔒 내용(JG)은 DB(0080): 플래너는 로그인으로 jo_guide_full(), 사전숙제 링크는 매니저가 만든 7일 키(?k=)로 jo_guide_pre() — 사전 준비만. 원본은 ../guide-src (공개 저장소 밖)
 // 체크·퀴즈 점수는 이 기기에 저장(localStorage). 플래너 안에서 조교가 '나'(조교체크리스트 이름)를 고르면 jc_guide(0073)에도 저장 →
 // 조교는 📍 지금 몇 일차를 크게 보고, 같은 지점 매니저·대표는 조교별 진행표를 봄 (올리비아 신고 10-29). 사전숙제 링크(guide.html)는 기기에만.
+// ✏️ 지점별 수정(0091, 11-04): 매니저·대표가 [내용 고치기]로 글자를 눌러 고치면 jo_guide_edit 에 저장, 원본(BASE) 위에 merge. 같은 지점 화면에 실시간 반영.
 (() => {
   const KEY = "jg-state";
   const TABS = [["pre", "사전 준비"], ["d1", "1일차"], ["d2", "2일차"], ["d3", "3일차"], ["d4", "4일차"], ["ref", "📚 찾아보기"]];
@@ -15,37 +16,52 @@
   try { lang = new URLSearchParams(location.search).get("lang") || localStorage.getItem("jg-lang") || "en"; } catch {}
   const txt = (r) => (lang === "ja" && r.ja) || r.body;
   const REF = () => Object.fromEntries(JG.REF.map((r) => [r.id, r]));
-  let JG = window.JG || null, INV = null, lockMsg = ""; // INV = 사전숙제 링크 키의 { team, exp }
+  let JG = null, BASE = null, EDITS = {}, INV = null, lockMsg = ""; // INV = 사전숙제 링크 키의 { team, exp } · BASE = 원본, EDITS = 이 지점 수정본, JG = 둘을 합친 화면용
+  // 지점 수정본 입히기: 칸(PRE·QUIZ·DAYS.n·REF.id)을 통째로 덮음. 링크·사진·파일·정답·체크 id 는 항상 원본 값 (수정본 값을 주소에 쓰지 않음)
+  function merge(B, E = {}) {
+    const pick = (b, e, ...ks) => { const o = { ...b }; for (const k of ks) if (e?.[k] != null) o[k] = e[k]; return o; };
+    const ids = new Set(B.REF.map((r) => r.id)), P = E.PRE;
+    return { ...B,
+      PRE: P ? { ...pick(B.PRE, P, "goal"), read: B.PRE.read.map((r, i) => pick(r, P.read?.[i], "t", "note")), hw: B.PRE.hw.map((h, i) => pick(h, P.hw?.[i], "t", "how")) } : B.PRE,
+      QUIZ: E.QUIZ ? B.QUIZ.map((q, i) => pick(q, E.QUIZ[i], "q", "a", "why")) : B.QUIZ,
+      DAYS: B.DAYS.map((d) => { const e = E[`DAYS.${d.day}`]; return e ? { ...e, day: d.day, files: d.files } : d; }),
+      REF: [...B.REF.map((r) => { const e = E[`REF.${r.id}`]; return e ? { ...e, id: r.id, img: r.img, cap: r.cap, br: undefined } : r; }), // 고친 항목은 'OO 기준' 꼬리표를 뗌
+        ...Object.keys(E).filter((k) => k.startsWith("REF.") && !ids.has(k.slice(4))).map((k) => ({ ...E[k], id: k.slice(4), img: undefined, cap: undefined }))], // 지점이 새로 넣은 항목
+    };
+  }
+  const remerge = () => { if (BASE) JG = merge(BASE, EDITS); };
   const KEY_Q = (() => { try { return new URLSearchParams(location.search).get("k") || ""; } catch { return ""; } })();
   async function loadDoc() {
-    if (JG) return;
+    if (BASE) return;
     if (!cli()) { lockMsg = "인터넷 연결을 확인해 주세요."; return render(); }
     const r = opts.standalone ? await cli().rpc("jo_guide_pre", { p_key: KEY_Q }) : await cli().rpc("jo_guide_full");
     if (r.error || !r.data) {
       lockMsg = opts.standalone ? "🔒 열 수 없는 링크예요 — 기간(7일)이 지났거나 주소가 잘렸어요. 매니저님께 새 링크를 받아 주세요." : "가이드를 불러오지 못했어요" + (r.error ? ": " + r.error.message : " — 플래너 계정에 지점이 연결돼 있어야 해요.");
       return render();
     }
-    if (opts.standalone) { JG = r.data.doc; INV = { team: r.data.team, exp: r.data.exp }; } else JG = r.data;
-    render();
+    if (opts.standalone) { BASE = r.data.doc; EDITS = r.data.edits || {}; INV = { team: r.data.team, exp: r.data.exp }; } else BASE = r.data;
+    remerge(); render();
   }
 
-  function body(lines) {
+  function body(lines, k, p) { // k·p: 고치기 모드에서 이 줄이 어느 칸 어느 자리인지 (없으면 못 고침)
     let h = "", ul = false;
-    for (const x of lines) {
+    const a = (s) => (k ? ed(k, `${p}.${s}`) : "");
+    for (const [n, x] of lines.entries()) {
       const li = typeof x === "string" && x.startsWith("• ");
       if (li && !ul) { h += "<ul>"; ul = true; } else if (!li && ul) { h += "</ul>"; ul = false; }
-      if (x.table) h += `<div class="jgtw"><table>${x.table.map((r, i) => `<tr${x.hi?.includes(i) ? ' class="hi"' : ""}>${r.map((c) => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join("")}</tr>`).join("")}</table></div>`;
-      else if (li) h += `<li>${imp(x.slice(2))}</li>`;
-      else h += `<p${x.startsWith("❗") ? ' class="jgwarn"' : ""}>${imp(x)}</p>`;
+      if (x.table) h += `<div class="jgtw"><table>${x.table.map((r, i) => `<tr${x.hi?.includes(i) ? ' class="hi"' : ""}>${r.map((c, j) => i ? `<td${a(`${n}.table.${i}.${j}`)}>${esc(c)}</td>` : `<th${a(`${n}.table.${i}.${j}`)}>${esc(c)}</th>`).join("")}</tr>`).join("")}</table></div>`;
+      else if (li) h += `<li${a(n)}>${imp(x.slice(2))}</li>`;
+      else h += `<p${x.startsWith("❗") ? ' class="jgwarn"' : ""}${a(n)}>${imp(x)}</p>`;
     }
-    return h + (ul ? "</ul>" : "");
+    return h + (ul ? "</ul>" : "") + (k && LV.edit ? act("addline", k, p, "+ 줄 추가", "jgeadd") : "");
   }
   const imp = (s) => esc(s).replace(/\(중요!!\)/g, '<b class="jgimp">(중요!!)</b>'); // 전화·회신 강조
   const shots = (r) => (r.img || []).map((f) => `<a class="jgshot" href="img/jg/${f}.jpg" target="_blank" rel="noopener"><img src="img/jg/${f}.jpg" alt="${esc(r.t)} ${r.cap ? "예시" : "실제"} 화면" loading="lazy"></a>`).join("") + (r.img ? `<p class="jgcap">${esc(r.cap || "실제 전산 화면 · 이름·번호·메모는 예시로 바꿨어요 · 누르면 크게")}</p>` : ""); // cap = 예시 화면(가짜 데이터) 설명
   const br = (r) => r.br ? ` <span class="jgbr" title="이 지점 기준이에요 — 우리 지점에 맞게 읽어요">${esc(r.br)} 기준</span>` : "";
   const hl = (s, k) => k ? esc(s).replace(new RegExp(esc(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (m) => `<mark>${m}</mark>`) : esc(s); // 찾아보기: 제목에서 찾은 말 칠하기
-  const refBox = (ids, open, k) => (ids || []).map((id) => { const r = REF()[id]; return r ? `<details class="jgref"${open ? " open" : ""}><summary>📖 ${hl(r.t, k)}${br(r)}</summary>${body(txt(r))}${shots(r)}</details>` : ""; }).join("");
-  const ck = (id, label, sub) => `<label class="jgck${st.c[id] ? " on" : ""}"><input type="checkbox" data-jgc="${id}"${st.c[id] ? " checked" : ""}><span><b>${esc(label)}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
+  const refBox = (ids, open, k) => (ids || []).map((id) => { const r = REF()[id], K = `REF.${id}`; return r && (!r.hidden || LV.edit) ? `<details data-jgo="f${esc(id)}" class="jgref${r.hidden ? " jgehid" : ""}"${open ? " open" : ""}><summary>📖 ${hl(r.t, k)}${br(r)}${r.hidden ? " <small>우리 지점엔 안 보임</small>" : ""}</summary>${body(txt(r), K, lang === "ja" && r.ja ? "ja" : "body")}${shots(r)}
+    ${bar(K, `${tinp(K, "t", "✏️ 제목 고치기")}${r.hidden ? "" : act("hide", K, "", "🗑 이 항목 빼기")}`)}</details>` : ""; }).join("");
+  const ck = (id, label, sub, la = "") => `<label class="jgck${st.c[id] ? " on" : ""}"><input type="checkbox" data-jgc="${id}"${st.c[id] ? " checked" : ""}><span><b${la}>${esc(label)}</b>${sub ? `<small>${sub}</small>` : ""}</span></label>`;
   const doneOf = (d, c = st.c) => d.pass.filter((_, i) => c[`d${d.day}-${i}`]).length;
   // 단계별 끝났나 (사전 준비 = 숙제 전부, n일차 = 통과 체크 전부) → 지금 단계 = 처음 안 끝난 단계
   const okOf = (k, c) => { const d = JG.DAYS.find((x) => `d${x.day}` === k); return k === "pre" ? JG.PRE.hw.every((h) => c[h.id]) : !!d && doneOf(d, c) === d.pass.length; };
@@ -57,7 +73,91 @@
   // ── 플래너 연동 (조교: 나 고르기 + 저장 / 매니저·대표: 조교별 진행표) ──
   const live = () => !opts.standalone && typeof sb !== "undefined" && typeof me !== "undefined" && !!me;
   const isJo = () => typeof myRole !== "undefined" && myRole === "assistant";
-  const LV = { team: null, names: [], rows: [], meId: null, ready: false };
+  const LV = { team: null, names: [], rows: [], meId: null, ready: false, edit: false, busy: false, pick: null, chan: null, ver: 0, saving: 0 };
+
+  // ── ✏️ 지점별 내용 고치기 ──
+  const say = (m) => (window.toast || alert)(m);
+  const gTeam = () => LV.team || LV.pick || null; // 고치는 지점: 매니저 = 우리 지점, 대표 = 👀 매니저 화면의 지점 또는 위에서 고른 지점
+  const canEdit = () => live() && !isJo() && !!gTeam() && (myRole === "admin" || myRole === "manager");
+  const ed = (k, p) => (LV.edit ? ` data-jek="${esc(k)}" data-jep="${esc(p)}"` : ""); // 누르면 바로 고쳐지는 글자
+  const act = (a, k, p, label, cls = "jgbtn") => `<button class="${cls}" data-jea="${a}" data-k="${esc(k)}" data-p="${esc(p)}">${label}</button>`;
+  const tinp = (k, p, label) => (LV.edit ? `<span class="jgbtn"${ed(k, p)}>${label}</span>` : ""); // 접는 칸 제목: 제목을 누르면 펼쳐져야 해서 버튼으로 따로
+  const bar = (k, extra = "") => (LV.edit ? `<div class="jgebar">${extra}${EDITS[k] ? `<small>✏️ 우리 지점 수정본</small>${act("reset", k, "", "↩ 원래대로")}` : ""}</div>` : "");
+  const blockOf = (k) => (k === "PRE" ? JG.PRE : k === "QUIZ" ? JG.QUIZ : k.startsWith("DAYS.") ? JG.DAYS.find((d) => d.day === +k.slice(5)) : JG.REF.find((r) => r.id === k.slice(4)));
+  const at = (o, p) => p.split(".").reduce((a, s) => a?.[s], o);
+  function keepRender() { // 다시 그려도 펼친 칸·풀던 퀴즈·스크롤 유지
+    const open = new Set([...el.querySelectorAll("details[data-jgo][open]")].map((d) => d.dataset.jgo));
+    const picked = [...el.querySelectorAll("input[type=radio]:checked")].map((x) => [x.name, x.value]), y = scrollY;
+    render();
+    el.querySelectorAll("details[data-jgo]").forEach((d) => { if (open.has(d.dataset.jgo)) d.open = true; });
+    picked.forEach(([n, v]) => { const r = el.querySelector(`input[name="${n}"][value="${v}"]`); if (r) r.checked = true; });
+    scrollTo(0, y);
+  }
+  async function loadEdits() {
+    const t = gTeam(), v = LV.ver, r = t ? await sb.from("jo_guide_edit").select("k, data").eq("team_id", t) : { data: [] };
+    if (r.error || v !== LV.ver) return; // 읽는 사이 내가 또 고쳤으면 옛 내용으로 덮지 않음
+    EDITS = Object.fromEntries(r.data.map((x) => [x.k, x.data])); remerge();
+  }
+  let sT;
+  const redraw = () => { // 실시간 반영: 입력 중이면 미룸
+    const a = document.activeElement, typing = el.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "radio" && a.type !== "checkbox";
+    if (LV.busy || typing) { clearTimeout(sT); sT = setTimeout(redraw, 3000); return; }
+    keepRender();
+  };
+  const refresh = () => { clearTimeout(sT); sT = setTimeout(async () => { if (LV.saving) return; await loadEdits(); redraw(); }, 300); };
+  function liveSub() { // 같은 지점 다른 사람이 고치면 바로 (조교 화면 포함)
+    if (LV.chan) sb.removeChannel(LV.chan); LV.chan = null;
+    const t = gTeam(); if (!t) return;
+    LV.chan = sb.channel("jg-edit").on("postgres_changes", { event: "*", schema: "public", table: "jo_guide_edit", filter: `team_id=eq.${t}` },
+      refresh).subscribe();
+  }
+  async function write(q) { // 화면 먼저 바꾸고 저장 → 저장 중 온 실시간 알림은 끝난 뒤 한 번에 읽음
+    LV.ver++; LV.saving++; remerge(); keepRender();
+    const { error } = await q();
+    LV.saving--;
+    if (error) say("저장 실패: " + error.message);
+    if (!LV.saving) refresh();
+  }
+  const saveBlock = (k, data) => { EDITS[k] = data; return write(() => sb.from("jo_guide_edit").upsert({ team_id: gTeam(), k, data, updated_at: new Date().toISOString() })); };
+  const resetBlock = (k) => { delete EDITS[k]; return write(() => sb.from("jo_guide_edit").delete().eq("team_id", gTeam()).eq("k", k)); };
+  // 글자 자리에 입력칸: Enter·밖 누르기 = 저장, Esc = 취소. 목록 줄은 비우면 삭제, 여러 줄 붙여넣으면 줄을 나눔
+  function editAt(node, k, p, add) {
+    const B = structuredClone(blockOf(k)), segs = p.split(".");
+    let holder, key = segs.pop(), raw = "";
+    const par = segs.length ? at(B, segs.join(".")) : B;
+    if (add) holder = par[key] ??= []; else { holder = par; raw = String(holder[key] ?? ""); }
+    const pre = raw.startsWith("• ") ? "• " : "", old = raw.slice(pre.length);
+    const cell = /(^|\.)(table\.\d+|a)$/.test(segs.join(".")), line = !add && Array.isArray(holder) && !cell; // 표 칸·퀴즈 보기는 자리가 고정이라 비워도 안 지움
+    const ta = Object.assign(document.createElement("textarea"), { className: "jgeta", value: old, rows: Math.max(2, Math.ceil(old.length / 34)) });
+    if (add) node.replaceWith(ta); else { node.style.display = node.tagName === "SPAN" ? "block" : ""; node.replaceChildren(ta); }
+    ta.focus(); ta.select(); LV.busy = true; let done = false;
+    const end = (save) => {
+      if (done) return; done = true; LV.busy = false;
+      const v = ta.value.trim(), parts = v.split(/\s*\n\s*/).filter(Boolean);
+      if (!save || v === old) return keepRender();
+      if (add) { if (!parts.length) return keepRender(); holder.push(...parts); }
+      else if (line) holder.splice(+key, 1, ...parts.map((x) => pre + x));
+      else { if (!v && !cell) return keepRender(); holder[key] = pre + parts.join(" "); }
+      saveBlock(k, B);
+    };
+    ta.onclick = (ev) => { ev.preventDefault(); ev.stopPropagation(); }; // 라벨·접는 칸이 같이 반응하지 않게
+    ta.onblur = () => end(true);
+    ta.onkeydown = (ev) => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); ta.blur(); } else if (ev.key === "Escape") { ev.stopPropagation(); end(false); } };
+  }
+  function editAct(a, k, p, node) {
+    const B = k && blockOf(k) ? structuredClone(blockOf(k)) : null, openIt = (o) => { const d = el.querySelector(`details[data-jgo="${o}"]`); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } };
+    if (a === "addline") return editAt(node, k, p, true);
+    if (a === "reset") { if (confirm("우리 지점에서 고친 내용을 지우고 원래대로 돌릴까요?\n(이 칸 전체가 돌아가요)")) resetBlock(k); return; }
+    if (a === "must") { const s = at(B, p); s.must = !s.must; return saveBlock(k, B); }
+    if (a === "step") { B.steps.push({ t: "새 단계", when: "10분", must: true, how: [] }); saveBlock(k, B); return openIt(`s${B.day}-${B.steps.length - 1}`); }
+    if (a === "delstep") { if (!confirm("이 단계를 뺄까요?")) return; B.steps.splice(+p, 1); return saveBlock(k, B); }
+    if (a === "hide") {
+      if (!confirm("우리 지점 가이드에서 이 항목을 뺄까요?")) return;
+      if (BASE.REF.some((r) => `REF.${r.id}` === k)) { B.hidden = true; return saveBlock(k, B); }
+      return resetBlock(k); // 지점이 새로 넣은 항목은 그냥 지움
+    }
+    if (a === "newref") { const id = "n" + Date.now().toString(36); q = ""; saveBlock(`REF.${id}`, { ch: p, t: "새 항목", body: ["내용을 눌러 고쳐요"] }); return openIt(`f${id}`); }
+  }
   const meKey = () => `jg-me-${LV.team}`;
   async function liveLoad() {
     if (!live()) return;
@@ -69,6 +169,8 @@
     const [n, g, t, h] = await Promise.all([qn, qg, boss ? sb.from("teams").select("id, name, sort").order("sort") : { data: [] }, qh]);
     if (n.error || g.error) return;
     LV.names = n.data; LV.rows = g.data; LV.teams = t.data ?? []; LV.boss = boss; LV.hw = h.data ?? []; LV.ready = true;
+    try { LV.pick = boss ? +localStorage.getItem("jg-pick") || null : null; } catch {}
+    await loadEdits(); liveSub();
     if (isJo()) {
       try { LV.meId = +localStorage.getItem(meKey()) || null; } catch {}
       if (!LV.names.some((x) => x.id === LV.meId)) LV.meId = null;
@@ -121,31 +223,33 @@
     }).join("");
     return `<div class="jghead"><div class="jgtitle"><h2>🧑‍🎓 조교 온보딩 · ${opts.standalone ? "사전 준비" : "1주일"}${lang === "ja" ? " · 일본어" : ""}</h2>
       <div class="jglang">${[["en", "🇺🇸 영어"], ["ja", "🇯🇵 일본어"]].map(([k, n]) => `<button data-jgl="${k}" class="${lang === k ? "on" : ""}">${n}</button>`).join("")}</div>
-      ${opts.standalone || isJo() ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 7일 동안 열리는 사전숙제 링크 — 누를 때마다 새로 만들어요">🔗 사전숙제 링크 복사</button>`}</div>
+      ${opts.standalone || isJo() ? "" : `<button class="jgbtn" data-jgcopy title="로그인 없이 7일 동안 열리는 사전숙제 링크 — 누를 때마다 새로 만들어요">🔗 사전숙제 링크 복사</button>`}
+      ${live() && LV.boss ? `<label class="jgepick">보는 지점 <select data-jepick><option value="">공통 원본</option>${LV.teams.map((t) => `<option value="${t.id}"${t.id === LV.pick ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : ""}
+      ${canEdit() ? `<button class="jgbtn${LV.edit ? " pri" : ""}" data-jeon>${LV.edit ? "✅ 고치기 끝" : `✏️ ${LV.boss ? esc(LV.teams.find((t) => t.id === LV.pick)?.name ?? "") : "우리 지점"} 내용 고치기`}</button>` : ""}</div>
       ${opts.standalone ? `<p class="jgsub">출근 첫날 전에 이것만 해 오면 돼요. 1~4일차는 출근해서 매니저와 같이 봐요.${INV?.exp ? ` <small>· 이 링크는 ${new Date(INV.exp).getMonth() + 1}/${new Date(INV.exp).getDate()}까지 열려요</small>` : ""}</p></div>` // 사전숙제 링크: 1~4일차·찾아보기 탭 숨김 (10-31)
         : `<p class="jgsub">사전 준비 → 1~4일차 → 5일차부터 혼자 근무. <span class="must">🔴 필수</span> = 2시간 30분 근무도 이것만은 · <span class="add">🟡 추가</span> = 4시간 근무면 더</p>
-      <nav class="jgtabs">${chips}</nav>${liveBox()}</div>`}`;
+      <nav class="jgtabs">${chips}</nav>${LV.edit ? `<p class="jgebanner">✏️ <b>글자를 누르면 바로 고쳐져요.</b> Enter = 저장, Esc = 취소, 줄을 비우고 저장 = 그 줄 삭제. 저장하면 이 지점 조교 화면에 바로 보이고, 다른 지점은 안 바뀌어요.</p>` : ""}${liveBox()}</div>`}`;
   }
 
   function pre() {
     const P = JG.PRE;
     const mins = P.read.reduce((a, r) => a + r.min, 0);
-    return `<div class="jgcard"><h3>📖 출근 전에 읽어 오기 <small>약 ${mins}분</small></h3><p class="jgmut">${esc(P.goal)}</p>
-      ${P.read.map((r, i) => `<details class="jgread"><summary><b>${"①②③④⑤⑥⑦⑧"[i]} ${esc(r.t)}</b><small>${r.min}분</small></summary>${r.note ? `<p class="jgmut">${esc(r.note)}</p>` : ""}${refBox(r.ref, r.ref.length === 1)}</details>`).join("")}</div>
+    return `<div class="jgcard"><h3>📖 출근 전에 읽어 오기 <small>약 ${mins}분</small></h3><p class="jgmut"${ed("PRE", "goal")}>${esc(P.goal)}</p>${bar("PRE")}
+      ${P.read.map((r, i) => `<details data-jgo="r${i}" class="jgread"><summary><b>${"①②③④⑤⑥⑦⑧"[i]} ${esc(r.t)}</b><small>${r.min}분</small></summary>${r.note ? `<p class="jgmut"${ed("PRE", `read.${i}.note`)}>${esc(r.note)}</p>` : ""}${LV.edit ? `<div class="jgebar">${tinp("PRE", `read.${i}.t`, "✏️ 제목 고치기")}</div>` : ""}${refBox(r.ref, r.ref.length === 1)}</details>`).join("")}</div>
       <div class="jgcard"><h3>✍️ 사전 숙제 <small>${P.hw.filter((h) => st.c[h.id]).length}/${P.hw.length}</small></h3>
-      ${P.hw.map((h) => ck(h.id, h.t, esc(h.how)) + (h.link ? `<div class="jgin"><a class="jgbtn" href="${esc(h.link[0])}" target="_blank" rel="noopener">${esc(h.link[1])}</a></div>` : "") + (h.ref ? `<div class="jgin">${refBox(h.ref)}</div>` : "")).join("")}</div>
+      ${P.hw.map((h, i) => ck(h.id, h.t, `<span${ed("PRE", `hw.${i}.how`)}>${esc(h.how)}</span>`, ed("PRE", `hw.${i}.t`)) + (h.link ? `<div class="jgin"><a class="jgbtn" href="${esc(h.link[0])}" target="_blank" rel="noopener">${esc(h.link[1])}</a></div>` : "") + (h.ref ? `<div class="jgin">${refBox(h.ref)}</div>` : "")).join("")}</div>
       ${quiz()}${opts.standalone ? subBox() : ""}`;
   }
 
   function quiz(on) { // 📝 4일차에만 (사전 준비 탭엔 안 보임)
     if (!on) return "";
     const r = st.q4;
-    return `<div class="jgcard" id="jgquiz"><h3>📝 4일차 퀴즈 <small>${r ? `제출 · ${score(r)}점` : `1~3일차 복습 ${JG.QUIZ.length}문제`}</small></h3>
+    return `<div class="jgcard" id="jgquiz"><h3>📝 4일차 퀴즈 <small>${r ? `제출 · ${score(r)}점` : `1~3일차 복습 ${JG.QUIZ.length}문제`}</small></h3>${bar("QUIZ")}
       <p class="jgmut">가이드·찾아보기를 보면서 풀어도 돼요. 틀려도 괜찮아요 — 다 풀면 [제출하기], 틀린 건 해설 보고 매니저와 같이 짚어요.</p>
       ${JG.QUIZ.map((x, i) => {
         const a = r?.[i], res = r ? (a === x.ok ? "ok" : "no") : "";
-        return `<div class="jgq ${res}"><b>${i + 1}. ${esc(x.q)}</b>${x.a.map((t, j) => `<label><input type="radio" name="jgq${i}" value="${j}"${a === j ? " checked" : ""}> ${esc(t)}</label>`).join("")}
-          ${r ? `<p class="jgwhy">${res === "ok" ? "✓ 정답" : "✗ 정답: " + esc(x.a[x.ok])} — ${esc(x.why)}</p>` : ""}</div>`;
+        return `<div class="jgq ${res}"><b>${i + 1}. <span${ed("QUIZ", `${i}.q`)}>${esc(x.q)}</span></b>${x.a.map((t, j) => `<label><input type="radio" name="jgq${i}" value="${j}"${a === j ? " checked" : ""}> <span${ed("QUIZ", `${i}.a.${j}`)}>${esc(t)}</span>${LV.edit && j === x.ok ? " <small>(정답)</small>" : ""}</label>`).join("")}
+          ${r || LV.edit ? `<p class="jgwhy">${r ? (res === "ok" ? "✓ 정답" : "✗ 정답: " + esc(x.a[x.ok])) + " — " : "해설: "}<span${ed("QUIZ", `${i}.why`)}>${esc(x.why)}</span></p>` : ""}</div>`;
       }).join("")}
       <div class="jgrow"><button class="jgbtn pri" data-jgscore>${r ? "다시 제출하기" : "제출하기"}</button>${r ? `<button class="jgbtn" data-jgretry>다시 풀기</button><b class="jgscore">${score(r)}점</b>` : ""}</div></div>`;
   }
@@ -200,27 +304,29 @@
   // 📋 투두리스트 바로가기 — 오늘 근무 시간대를 먼저 골라야 [조교체크리스트] 탭 그 시간대로 넘어감
   const jcGo = `<div class="jggo"><b>📋 투두리스트 바로가기</b><span class="jgmut">오늘 내 근무 시간대를 먼저 골라요</span><div>${[["am", "평일 오전"], ["pm", "평일 오후"], ["we", "주말"]].map(([k, l]) => `<button class="jgbtn" data-jggo="${k}">${l}</button>`).join("")}</div></div>`;
   function day(d) {
-    const step = (s) => `<details class="jgstep ${s.must ? "must" : "add"}"><summary><span class="tag">${s.must ? "🔴" : "🟡"}</span><span class="when">${esc(s.when)}</span><b>${esc(s.t)}</b></summary>
-      ${s.how ? body(s.how.map((x) => "• " + x)) : ""}${s.go === "jc" && !opts.standalone ? jcGo : ""}${refBox(s.ref)}</details>`;
+    const K = `DAYS.${d.day}`;
+    const step = (s) => { const i = d.steps.indexOf(s), P = `steps.${i}`; return `<details data-jgo="s${d.day}-${i}" class="jgstep ${s.must ? "must" : "add"}"><summary><span class="tag">${s.must ? "🔴" : "🟡"}</span><span class="when">${esc(s.when)}</span><b>${esc(s.t)}</b></summary>
+      ${s.how || LV.edit ? body((s.how || []).map((x) => "• " + x), K, `${P}.how`) : ""}${s.go === "jc" && !opts.standalone ? jcGo : ""}${refBox(s.ref)}
+      ${LV.edit ? `<div class="jgebar">${tinp(K, `${P}.t`, "✏️ 제목")}${tinp(K, `${P}.when`, "✏️ 시간")}${act("must", K, P, s.must ? "🔴 필수 → 🟡 추가로" : "🟡 추가 → 🔴 필수로")}${act("delstep", K, String(i), "🗑 단계 빼기")}</div>` : ""}</details>`; };
     const must = d.steps.filter((s) => s.must), add = d.steps.filter((s) => !s.must);
-    return `<div class="jgcard"><h3>${d.day}일차 · ${esc(d.title)}</h3><p class="jggoal">🎯 ${esc(d.goal)}</p>${d.tip ? `<p class="jgmut">💡 ${esc(d.tip)}</p>` : ""}${(d.files || []).map(([f, n]) => `<a class="jgbtn" href="${f}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`).join(" ")}</div>
-      <div class="jgcard"><h3>오늘 순서</h3>${must.map(step).join("")}${add.length ? `<h4>🟡 4시간 근무면 이어서</h4>${add.map(step).join("")}` : ""}</div>
+    return `<div class="jgcard"><h3>${d.day}일차 · <span${ed(K, "title")}>${esc(d.title)}</span></h3><p class="jggoal">🎯 <span${ed(K, "goal")}>${esc(d.goal)}</span></p>${d.tip ? `<p class="jgmut">💡 <span${ed(K, "tip")}>${esc(d.tip)}</span></p>` : ""}${(d.files || []).map(([f, n]) => `<a class="jgbtn" href="${f}" target="_blank" rel="noopener">📄 ${esc(n)}</a>`).join(" ")}${bar(K)}</div>
+      <div class="jgcard"><h3>오늘 순서</h3>${must.map(step).join("")}${add.length ? `<h4>🟡 4시간 근무면 이어서</h4>${add.map(step).join("")}` : ""}${LV.edit ? act("step", K, "", "+ 단계 추가", "jgeadd") : ""}</div>
       ${quiz(d.day === 4)}<div class="jgcard"><h3>✅ 통과 체크 <small>${doneOf(d)}/${d.pass.length} · 매니저와 같이 확인</small></h3>
-      ${d.pass.map((p, i) => ck(`d${d.day}-${i}`, p)).join("")}</div>
-      ${d.after ? `<div class="jgcard jgafter"><h3>🚀 5일차부터</h3><p>${esc(d.after)}</p></div>` : ""}`;
+      ${d.pass.map((p, i) => ck(`d${d.day}-${i}`, p, "", ed(K, `pass.${i}`))).join("")}${LV.edit ? act("addline", K, "pass", "+ 줄 추가", "jgeadd") : ""}</div>
+      ${d.after ? `<div class="jgcard jgafter"><h3>🚀 5일차부터</h3><p${ed(K, "after")}>${esc(d.after)}</p></div>` : ""}`;
   }
 
   // 📚 찾아보기 (10-31 "백과사전처럼 잘 보이게"): 큰 검색칸(위에 붙음) · 자주 찾는 말 · 목차 바로가기 · 찾은 개수 · 제목 칠하기
   const QUICK = ["환불", "연기", "결제", "신규 등록", "출석", "차감", "전화 회신", "마감"];
   function ref() {
     const k = q.trim().toLowerCase();
-    const hit = (r) => !k || JSON.stringify([r.t, r.ch, txt(r)]).toLowerCase().includes(k);
+    const hit = (r) => (!r.hidden || LV.edit) && (!k || JSON.stringify([r.t, r.ch, txt(r)]).toLowerCase().includes(k));
     const chs = [...new Set(JG.REF.map((r) => r.ch))].map((c, i) => ({ c, i, rs: JG.REF.filter((r) => r.ch === c && hit(r)) })).filter((x) => x.rs.length);
     const n = chs.reduce((a, x) => a + x.rs.length, 0);
     const toc = `<nav class="jgtoc">${chs.map((x) => `<button data-jgch="${x.i}">${esc(x.c)} <small>${x.rs.length}</small></button>`).join("")}</nav>`;
     // 찾은 게 많으면 접어서 제목만 (제목에 그 말이 든 항목 먼저), 3개 이하면 펼침
     const first = (r) => (r.t.toLowerCase().includes(k) ? 0 : 1);
-    const html = chs.map((x) => `<h4 id="jgch-${x.i}">${esc(x.c)}</h4>${refBox([...x.rs].sort((a, b) => first(a) - first(b)).map((r) => r.id), !!k && n <= 3, k)}`).join("");
+    const html = chs.map((x) => `<h4 id="jgch-${x.i}">${esc(x.c)}</h4>${refBox([...x.rs].sort((a, b) => first(a) - first(b)).map((r) => r.id), !!k && n <= 3, k)}${LV.edit ? act("newref", "", x.c, "+ 이 목차에 항목 추가", "jgeadd") : ""}`).join("");
     return `<div class="jgcard jgfind"><h3>📚 전체 가이드북 — 필요할 때 찾아보기</h3><p class="jgmut">1~4일차에 안 넣은 업무(신규 등록·결제·환불·구멤버·재무 등)도 다 여기 있어요. 처음 하는 건 매니저와 같이.</p>
       <div class="jgsbox"><span aria-hidden="true">🔍</span><input class="jgsearch" type="search" enterkeyhint="search" placeholder="무엇이 궁금해요? (예: 환불, 연기, QR)" aria-label="가이드북 검색" value="${esc(q)}"></div>
       <div class="jgquick"><span>자주 찾는 말</span>${QUICK.map((w) => `<button data-jgw="${esc(w)}" class="${k === w ? "on" : ""}">${esc(w)}</button>`).join("")}</div>
@@ -231,13 +337,18 @@
     if (!el) return;
     if (!JG) { el.innerHTML = `<div class="jg"><div class="jgcard jglock"><p>${esc(lockMsg || "불러오는 중…")}</p></div></div>`; return; }
     const d = JG.DAYS.find((x) => `d${x.day}` === tab);
-    el.innerHTML = `<div class="jg">${head()}${tab === "hire" && canHire() ? hire() : tab === "ref" ? ref() : d ? day(d) : pre()}
+    el.innerHTML = `<div class="jg${LV.edit ? " jgeon" : ""}">${head()}${tab === "hire" && canHire() ? hire() : tab === "ref" ? ref() : d ? day(d) : pre()}
       <p class="jgfoot">${live() && isJo() && LV.meId ? "체크는 이 기기와 플래너(매니저 화면)에 저장돼요." : "체크는 이 기기에만 저장돼요."} <button class="jglink" data-jgreset>체크 모두 지우기</button></p></div>`;
   }
   const go = (t) => { tab = t; try { localStorage.setItem("jg-tab", t); } catch {} render(); scrollTo(0, 0); };
 
   function bind() {
     el.addEventListener("click", async (e) => {
+      if (e.target.closest("[data-jeon]")) { LV.edit = !LV.edit; return keepRender(); }
+      if (LV.edit) {
+        const a = e.target.closest("[data-jea]"); if (a) { e.preventDefault(); return editAct(a.dataset.jea, a.dataset.k, a.dataset.p, a); }
+        const x = e.target.closest("[data-jek]"); if (x) { e.preventDefault(); return editAt(x, x.dataset.jek, x.dataset.jep); }
+      }
       const t = e.target.closest("[data-jgt]"); if (t) return go(t.dataset.jgt);
       const g = e.target.closest("[data-jggo]"); if (g) { if (window.JC) JC.page = g.dataset.jggo; try { localStorage.setItem("jc-page", g.dataset.jggo); } catch {} return document.querySelector('[data-v="jc"]')?.click(); }
       const w = e.target.closest("[data-jgw]"); if (w) { q = q.trim() === w.dataset.jgw ? "" : w.dataset.jgw; render(); return el.querySelector(".jgsearch")?.focus({ preventScroll: true }); }
@@ -265,7 +376,11 @@
       }
     });
     el.addEventListener("toggle", (e) => { if (e.target.classList?.contains("jgme")) LV.progOpen = e.target.open; }, true); // 👥 진행표 펼침 기억 (toggle 은 버블 안 됨)
-    el.addEventListener("change", (e) => {
+    el.addEventListener("change", async (e) => {
+      if (e.target.matches?.("[data-jepick]")) { // 대표: 어느 지점 수정본을 볼지
+        LV.pick = +e.target.value || null; LV.edit = false; try { localStorage.setItem("jg-pick", LV.pick ?? ""); } catch {}
+        await loadEdits(); liveSub(); return keepRender();
+      }
       const sk = e.target.dataset?.jgs;
       if (sk === "file") { SUB.file = e.target.files?.[0] || null; const s = el.querySelector("[data-jgfile]"); if (s) s.textContent = SUB.file ? `📎 ${SUB.file.name} (${Math.ceil(SUB.file.size / 1024)}KB)` : ""; return; }
       if (sk) { (st.sub ||= {})[sk] = e.target.value; return save(); }
@@ -287,6 +402,7 @@
   }
 
   window.JGUIDE = {
+    merge,
     mount(target, o = {}) { if (el !== target) { el = target; opts = o; bind(); } if (o.standalone) tab = "pre"; render(); loadDoc(); liveLoad(); },
   };
 })();
