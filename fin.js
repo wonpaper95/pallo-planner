@@ -119,7 +119,7 @@ function renderStatus() {
     : `🔗 <a href="https://docs.google.com/spreadsheets/d/${esc(c.sheet_id)}/edit" target="_blank" rel="noopener">구글 시트</a> ${c.last_sync ? new Date(c.last_sync).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) + " 맞춤" : ""}`;
 }
 function shell() {
-  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : "입력은 여기 먼저 → 우리 재무 시트 → 팔로 전체 재무제표(전화번호 제외)로 자동으로 넘어가요"}</small></h2>
+  return `<div class="fnbar"><h2>💼 재무 <small class="mut">${jo() ? "보기만 (대표님 승인)" : [2, 3, 4].includes(+FN.team) ? "입력은 여기 먼저 → 우리 재무 시트 → 팔로 전체 재무제표(전화번호 제외)로 자동으로 넘어가요" : "대표·매니저 · 여기가 기준"}</small></h2>
     <div class="fnrow">${admin() ? `<select id="fnTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === FN.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
       <button class="btn ghost" data-act="prev">‹</button><b class="fnym">${ymLabel(FN.month)}</b><button class="btn ghost" data-act="next">›</button>
       ${FN.month !== ymNow() ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
