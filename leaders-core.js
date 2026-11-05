@@ -151,9 +151,24 @@ const LDC = {
     const pm = s.match(/오후\s*(\d{1,2})/); if (pm) return ((+pm[1] % 12) + 12) * 60 + lang;
     return (s.includes("오전") ? 600 : s.includes("오후") ? 840 : s.includes("저녁") ? 1140 : 9999) + lang; // 대기·스터디는 맨 뒤
   },
-  // 📌 보드: 언어를 빼고 시간대로 묶음 ('일본어 오전'·'중국어 오전' → '오전') · 언어는 이름 옆에 작게
-  langOf: (s) => (String(s ?? "").match(/일본어|중국어/) ?? [""])[0],
-  timeKey: (s) => String(s ?? "").replace(/일본어|중국어/g, "").replace(/\s+/g, " ").trim(),
+  // 📌 보드 칸 = 시간 + 언어 (11AM EN · 11AM JP, 제안 마야 #46). 언어를 안 적은 칸은 영어
+  langOf: (s) => (String(s ?? "").match(/일본어|중국어|스페인어/) ?? [""])[0],
+  timeKey: (s) => String(s ?? "").replace(/영어|일본어|중국어|스페인어/g, "").replace(/\s+/g, " ").trim(),
+  LANG_CODE: { "": "EN", 일본어: "JP", 중국어: "CH", 스페인어: "SP" },
+  langCode: (s) => LDC.LANG_CODE[LDC.langOf(s)],
+  // 한 반의 리더 rows → 칸 목록 (시간순, 같은 시간은 EN·JP·CH·SP 순). '오전'·'오후'·'저녁'은 그 때의 시각 칸이 하나뿐이면 그 시각으로 합침 ('오전'+'일본어 11AM' → 11AM EN·11AM JP)
+  // times: 이 칸의 시간 이름들, lang: 언어. 시간이 아닌 칸('대기' 등)은 언어를 적었을 때만 표시
+  boardCells(rows) {
+    const band = (t) => { const m = LDC.slotMin(t); return m >= 9999 ? "" : m < 720 ? "am" : m < 1080 ? "pm" : "ev"; };
+    const keys = [...new Set(rows.map((r) => LDC.timeKey(r.slot)))], nums = keys.filter((t) => /\d\s*(AM|PM)/i.test(t));
+    const alias = (t) => { if (!["오전", "오후", "저녁"].includes(t)) return t; const n = nums.filter((x) => band(x) === band(t)); return n.length === 1 ? n[0] : t; };
+    const by = new Map(); rows.forEach((r) => { const t = alias(LDC.timeKey(r.slot)); by.set(t, [...(by.get(t) ?? []), r]); });
+    return [...by].sort((a, b) => LDC.slotMin(a[0]) - LDC.slotMin(b[0])).flatMap(([t, rs]) => {
+      const times = new Set([t, ...rs.map((r) => LDC.timeKey(r.slot))]);
+      return Object.keys(LDC.LANG_CODE).map((l) => ({ label: [t, band(t) || l ? LDC.LANG_CODE[l] : ""].filter(Boolean).join(" "), times, lang: l, rows: rs.filter((r) => LDC.langOf(r.slot) === l) })).filter((c) => c.rows.length);
+    });
+  },
+  cellHasSub: (c, s, g) => c.times.has(LDC.subWhen(s, g).time) && LDC.langOf(s.slot) === c.lang,
   // 🔁 서브리더 요일·시간대: 칸(grp·slot)이 비었거나 '백업리더'처럼 시간이 아니면 가능 시간 글('화목 패턴1', '월수 오전')에서 읽음
   // g: 지금 보는 반 — 글에 요일을 여러 개 적었으면('월수 화목') 그 반도 가능
   subWhen(s, g) { const a = String(s.avail ?? ""), t = LDC.timeKey(s.slot), all = [...(a.match(/월수|화목|토일/g) ?? []), ...(a.includes("주말") ? ["토일"] : [])];
@@ -171,12 +186,12 @@ const LDC = {
     return m ? +m[0] + ((s.match(/\+/g) ?? []).length - (s.match(/-/g) ?? []).length) * 0.01 : 99; },
   // 전산 수업 이름('월수 오전', '월수 오후6', '일본어 월수 18시', '영어 화목 11:00') → 반·시간대. 그 반에 비슷한 시간(±90분)·같은 언어 칸이 있으면 그걸 씀
   courseSlot(course, rows) {
-    const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0], lang = (c.match(/일본어|중국어/) ?? [""])[0];
+    const c = String(course ?? ""), grp = (c.match(/월수|화목|토일/) ?? [c.includes("주말") ? "토일" : ""])[0], lang = (c.match(/일본어|중국어|스페인어/) ?? [""])[0];
     const pm = c.match(/오후\s*(\d{1,2})/), hm = c.match(/(\d{1,2})\s*(?:시|:\d{2})/);
     const label = pm ? `${+pm[1]}PM` : hm ? (+hm[1] < 12 ? `${+hm[1]}AM` : `${+hm[1] === 12 ? 12 : +hm[1] - 12}PM`) : (c.match(/오전|오후|저녁/) ?? [""])[0];
     const want = LDC.slotMin(label); if (!grp || want >= 9999) return { grp, slot: label };
     let cand = [...new Set(rows.filter((r) => r.grp === grp).map((r) => r.slot))];
-    if (cand.some((x) => /일본어|중국어/.test(x))) cand = cand.filter((x) => lang ? x.includes(lang) : !/일본어|중국어/.test(x)); // 언어별 칸이면 같은 언어만
+    if (cand.some((x) => /일본어|중국어|스페인어/.test(x))) cand = cand.filter((x) => lang ? x.includes(lang) : !/일본어|중국어|스페인어/.test(x)); // 언어별 칸이면 같은 언어만
     const near = cand.map((x) => [x, Math.abs(LDC.slotMin(x) - LDC.slotMin(label + (x.includes("중국어") ? " 중국어" : "")))]).filter(([, d]) => d <= 90).sort((a, b) => a[1] - b[1])[0];
     const word = want < 720 ? "오전" : want < 1080 ? "오후" : "저녁"; // 언어별 칸은 오전·오후·저녁 이름
     return { grp, slot: near ? near[0] : (lang && cand.length ? `${lang} ${word}` : label) };

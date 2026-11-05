@@ -218,9 +218,9 @@ function bar(extra = "") {
       <span class="ldact">${myRole !== "assistant" ? `<button class="btn ai" id="ldAI" title="이 지점 리더 데이터를 AI 가 읽고 ${ym(statMonth())} 운영 전략을 써 줘요 (달마다 저장)">🤖 AI 전략</button>` : ""}<button class="btn" id="ldAdd">+ 리더 추가</button><button class="btn ghost" id="ldPaste">📋 시트에서 붙여넣기</button>${myRole !== "assistant" ? `<button class="btn ghost" id="ldRename" title="이 지점 레벨 이름을 한 번에 바꿔요 (예: 패턴 → 레벨)">🏷 레벨 이름 바꾸기</button>` : ""}</span></div>`;
 }
 // 📌 보드: 오늘·내일 리더 → 🔍 찾기 → 🔴 구해야 함 → 🔀 팀 믹싱 → 요일(월수·화목·토일) 한 페이지씩: 시간대 칸 안에 레벨순 리더 + 서브리더, 밑에 서브리더·대기 리더
-// 시간대는 언어를 빼고 묶음 ('일본어 오전'+'중국어 오전' = 오전) · 언어는 이름 옆에 작게
+// 칸 = 시간 + 언어 (11AM EN · 11AM JP, LDC.boardCells)
 const lvTxt = (lv) => (/^\d+(\.\d+)?$/.test(lv ?? "") ? `${lv}레벨` : lv ?? "");
-const tags = (r) => `${r.level ? `<span class="lv">${esc(lvTxt(r.level))}</span>` : ""}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}`;
+const tags = (r) => `${r.level ? `<span class="lv">${esc(lvTxt(r.level))}</span>` : ""}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langCode(r.slot)}</span>` : ""}`;
 const tel = (r) => (r.phone ? `<button type="button" class="tel${myRole === "assistant" ? " num" : ""}" data-tel="${esc(r.phone)}" data-name="${esc(r.name)}" title="눌러서 연락처 보기" aria-label="${esc(r.name)} 연락처 보기">📞${myRole === "assistant" ? ` ${esc(r.phone)}` : ""}</button>` : ""); // 조교 보드엔 번호까지
 // 📞 → 바로 걸지 않고 연락처 창: PC 에서 tel: 은 전화 앱 묻는 창만 뜸(은서 11-04). 밖을 누르거나 Esc 면 닫힘
 function showTel(b) {
@@ -237,10 +237,7 @@ function showTel(b) {
   p.style.left = Math.max(m, Math.min(box.left, innerWidth - w - m)) + "px";
   p.style.top = (box.bottom + h + m < innerHeight ? box.bottom + 6 : Math.max(m, box.top - h - 6)) + "px";
 }
-const bySlot = (rs) => { const m = new Map();
-  [...rs].sort((a, b) => LDC.slotMin(LDC.timeKey(a.slot)) - LDC.slotMin(LDC.timeKey(b.slot)) || LDC.lvNum(a.level) - LDC.lvNum(b.level) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || a.sort - b.sort)
-    .forEach((r) => { const k = LDC.timeKey(r.slot); m.set(k, [...(m.get(k) ?? []), r]); });
-  return [...m]; };
+const bySlot = (rs) => LDC.boardCells([...rs].sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level) || LDC.slotMin(a.slot) - LDC.slotMin(b.slot) || a.sort - b.sort)).map((c) => [c.label, c.rows, c]);
 const grpOn = (d) => LDC.GRPS.find((x) => LDC.DAYS[x].includes(W.parse(d).getDay()));
 // 🔁 그 요일에 올 수 있는 서브리더 (요일 안 적은 사람 포함) · 레벨순
 const workOn = (r, d) => LDC.activeIn(r, d, d) && !LDC.goneBy(r, d); // 그만둔 날부터는 오늘·내일 칸에서 빠짐
@@ -274,7 +271,7 @@ function dayCard(d, label) {
   const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
   const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;
   const msgN = msgKinds(d).map((k) => ` · ${MSG[k][1]} <b class="${ok.length && ok.every((r) => msgOn(r.id, d, k)) ? "on" : ""}">${ok.filter((r) => msgOn(r.id, d, k)).length}/${ok.length}</b>`).join("");
-  const pool = subsOn(g, d), subOk = pool.filter((s) => LD.cfm?.has(`${s.id}:${d}`)).length, used = new Set(), times = bySlot(rs).map(([t, list]) => { const ss = pool.filter((s) => { const w = LDC.subWhen(s, g); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
+  const pool = subsOn(g, d), subOk = pool.filter((s) => LD.cfm?.has(`${s.id}:${d}`)).length, used = new Set(), times = bySlot(rs).map(([t, list, cell]) => { const ss = pool.filter((s) => LDC.subWhen(s, g).grp === g && LDC.cellHasSub(cell, s, g)); ss.forEach((s) => used.add(s.id));
     return `<div class="tdrow"><b>${esc(t || "시간 미정")}</b><div class="tdc">${msgAll(list, d)}${list.map((r) => chip(r, d)).join("")}</div></div>${subLine(ss, d)}`; }).join("");
   return `<section class="ldday">${head(` <span class="mut">온다 확인 <b class="${done === ok.length ? "on" : "re"}">${done}/${ok.length}</b>${need ? ` · 🆘 대타 필요 <b class="needn">${need}</b>` : ""}${subs ? ` · 🔁 대타 <b>${subs}</b>` : ""}${subOk ? ` · 서브 ✅ <b class="on">${subOk}</b>` : ""}${msgN}${d === today() ? ` · 참 <b class="on">${attN("O")}</b> · 불참 <b class="re">${attN("X")}</b>` : ""}</span>`)}`
     + `${times || `<p class="mut">리더 없음</p>`}${subLine(pool.filter((s) => !used.has(s.id)), d, "시간 무관")}</section>`;
@@ -287,11 +284,11 @@ const poolBlk = (title, hint, rs, kind) => `<section class="ldblk ldpool"><h3>${
 function dayPage(g) {
   const td = today(), live = (r) => workOn(r, td);
   const subs = subsOn(g, td), used = new Set();
-  const cards = bySlot(LD.rows.filter((r) => r.grp === g && isLeader(r) && live(r))).map(([t, rs]) => {
-    const ss = subs.filter((s) => { const w = LDC.subWhen(s, g); return w.grp === g && w.time === t; }); ss.forEach((s) => used.add(s.id));
+  const cards = bySlot(LD.rows.filter((r) => r.grp === g && isLeader(r) && live(r))).map(([t, rs, cell]) => {
+    const ss = subs.filter((s) => LDC.subWhen(s, g).grp === g && LDC.cellHasSub(cell, s, g)); ss.forEach((s) => used.add(s.id));
     const need = rs.filter((r) => r.status === "구해야 함").length;
     return `<section class="ldblk ldcard"><h3>${g} ${esc(t || "시간 미정")} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 ${need}</span>` : ""}</h3><table>`
-      + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${nameEd(r.name === VACANT ? "빈자리" : esc(r.name))}</span>` : `<b>${nameEd(esc(r.name))}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langOf(r.slot)}</span>` : ""}${tel(r)}${noteLine(r)}</td>${editTd}</tr>`).join("")
+      + rs.map((r) => `<tr data-id="${r.id}" class="${r.status === "구해야 함" ? "need" : ""}"><td class="lvc">${esc(lvTxt(r.level)) || "–"}</td><td class="nm">${r.status === "구해야 함" ? `<span class="ldneed">🔴 ${nameEd(r.name === VACANT ? "빈자리" : esc(r.name))}</span>` : `<b>${nameEd(esc(r.name))}</b>`}${LDC.langOf(r.slot) ? `<span class="lg">${LDC.langCode(r.slot)}</span>` : ""}${tel(r)}${noteLine(r)}</td>${editTd}</tr>`).join("")
       + (ss.length ? `<tr class="subrow"><td class="lvc">서브</td><td class="nm" colspan="2">${ss.map((s) => `<span class="sbc" data-id="${s.id}">${nameEd(esc(s.name))}${tags(s)}${tel(s)}${noteLine(s)}</span>`).join("")}</td></tr>` : "") + `</table></section>`; }).join("");
   const waits = LD.rows.filter((r) => r.kind === "wait" && live(r) && (!r.grp || r.grp === g));
   return `<div class="ldcards">${cards || `<div class="card mut" style="padding:14px">${g} 리더가 아직 없어요</div>`}</div>`
@@ -347,9 +344,8 @@ function renderList() {
   const blocks = [], gone = (r) => LDC.goneBy(r, td, to); // 👋 그만둔 사람은 표 맨 아래 접힌 칸으로 (기록은 그대로)
   const slotBlocks = (list) => { const out = [];
   for (const g of [...LDC.GRPS, ""]) { // "" = 반 없는 리더 (백업리더 등)
-    const slots = [...new Set(list.filter((r) => r.grp === g).map((r) => r.slot))].sort((a, b) => LDC.slotMin(a) - LDC.slotMin(b));
-    for (const s of slots) {
-      const rs = list.filter((r) => r.grp === g && r.slot === s).sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level) || a.sort - b.sort), need = rs.filter((r) => r.status === "구해야 함").length;
+    for (const c of LDC.boardCells(list.filter((r) => r.grp === g))) {
+      const rs = [...c.rows].sort((a, b) => LDC.lvNum(a.level) - LDC.lvNum(b.level) || a.sort - b.sort), need = rs.filter((r) => r.status === "구해야 함").length;
       const ses = LD.mode === "q3" ? [] : LDC.sessions(g, from, to);
       const head = `<tr><th>레벨</th><th>자리</th><th>리더</th><th>첫 시작일 <small class="agh">✏️ 눌러서 고치기</small>${rapOn() ? ` <small class="agh">· 🎂 생년월일</small>` : ""}</th>${rapTh()}<th>상태</th><th>그만둠</th>${LD.mode === "q3" ? months.map((m) => `<th>${ym(m)}</th>`).join("")
         : `<th>출석${g ? ` <small class="agh">윗줄 ${DOW[LDC.DAYS[g][0]]} · 아랫줄 ${DOW[LDC.DAYS[g][1]]}</small>` : ""}</th><th>${ym(sm)}</th>`}${LD.mode === "month" ? `<th>특이사항 <small class="agh">✏️ 눌러서 적기</small></th><th class="sm" title="리더교육 했음/아직 — 누르면 바뀜">교육</th><th class="sm" title="참여 횟수 · 자격증 — 48회 2급 · 96회 1급">🔢 참여 · 📜</th>` : ""}</tr>`;
@@ -359,8 +355,8 @@ function renderList() {
         + (LD.mode === "q3" ? months.map((m) => monthCell(r, m)).join("") : `<td class="att2">${attGrid(r, ses, g)}</td><td>${flags(r, sm)}</td>`)
         + (LD.mode === "month" ? `${noteTd(r)}<td>${eduBox(r)}</td>${certCell(r)}` : "") + `</tr>`).join("");
       // 🔁 이 시간대 서브리더도 바로 보이게 (신고 은서 #38: 서브로 바꾸면 표에서 사라진 것처럼 보였음)
-      const ss = g ? LD.rows.filter((x) => x.kind === "sub" && !LDC.goneBy(x, td) && LDC.subWhen(x, g).grp === g && LDC.subWhen(x, g).time === LDC.timeKey(s) && LDC.langOf(x.slot) === LDC.langOf(s)) : [];
-      out.push(`<section class="ldblk"><h3>${g} ${esc(s || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div>${ss.length ? `<div class="ldsubs"><b>🔁 서브</b>${ss.map((x) => `<span class="sbc" data-id="${x.id}"><b>${esc(x.name)}</b>${tags(x)}${tel(x)}${noteLine(x)}</span>`).join("")}</div>` : ""}</section>`);
+      const ss = g ? LD.rows.filter((x) => x.kind === "sub" && !LDC.goneBy(x, td) && LDC.subWhen(x, g).grp === g && LDC.cellHasSub(c, x, g)) : [];
+      out.push(`<section class="ldblk"><h3>${g} ${esc(c.label || (g ? "시간 미정" : "반 없음"))} <span class="mut">${rs.length}팀</span>${need ? ` <span class="ldneed">🔴 리더 구해야 함 ${need}</span>` : ""}</h3><div class="ldtw"><table>${head}${body}</table></div>${ss.length ? `<div class="ldsubs"><b>🔁 서브</b>${ss.map((x) => `<span class="sbc" data-id="${x.id}"><b>${esc(x.name)}</b>${tags(x)}${tel(x)}${noteLine(x)}</span>`).join("")}</div>` : ""}</section>`);
     }
   }
   return out; };
@@ -402,10 +398,10 @@ const SUBF = new Set(["level", "name", "phone", "note"]), KINDS = [["leader", "�
 function editDlg(r, kind) {
   if (!r && kind) r = { kind, grp: "" }; // + 서브리더·대기 리더 추가: 구분·요일 무관 미리 골라 둠
   const add = !r?.id, kl = KINDS.find(([k]) => k === (r?.kind ?? "leader"))[1].replace(/ \(.*/, "");
-  const langs = LD.rows.some((x) => LDC.langOf(x.slot)); // 일본어·중국어 반이 있는 지점만 언어 칸
+  const langs = LD.rows.some((x) => LDC.langOf(x.slot)); // 다른 언어 반이 있는 지점만 언어 칸
   const d = dlg(`<form method="dialog" class="ldform"><h2>${add ? `${kl} 추가` : `${kl} 고치기${isSub(r) ? " · ⬆️ 팀에 넣으려면 구분을 리더로" : ""}`}</h2>
     <label>구분<select name="kind">${KINDS.map(([k, l]) => `<option value="${k}" ${(r?.kind ?? "leader") === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-    ${langs ? `<label class="so">언어<select name="lang">${["", "일본어", "중국어"].map((x) => `<option value="${x}" ${LDC.langOf(r?.slot) === x ? "selected" : ""}>${x || "영어 · 없음"}</option>`).join("")}</select></label>` : ""}
+    ${langs ? `<label class="so">언어<select name="lang">${["", "일본어", "중국어", "스페인어"].map((x) => `<option value="${x}" ${LDC.langOf(r?.slot) === x ? "selected" : ""}>${x || "영어 · 없음"}</option>`).join("")}</select></label>` : ""}
     <label>반 · 요일<select name="grp">${LDC.GRPS.map((g) => `<option ${r?.grp === g ? "selected" : ""}>${g}</option>`).join("")}<option value="" ${r && !r.grp ? "selected" : ""}>없음 (요일 무관 · 블로그스텝 등)</option></select></label>
     <label>시간대 · 업무<span class="slotpick"><select name="slotSel"></select><input name="slotOwn" placeholder="직접 입력 (예: 9PM · 블로그스텝)" maxlength="20" class="hidden"></span></label>
     ${F.map(([k, l]) => k === "start_day" ? `<label class="lo">${l}<input type="date" name="start_day" value="${LDC.parseDay(r?.start_day) ?? ""}"></label>`
