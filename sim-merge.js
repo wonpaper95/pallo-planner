@@ -2,23 +2,31 @@
 // merge3(기준, 내 글, 서버 글): 기준→내 글에서 내가 지운 줄은 서버 글에서도 빼고, 내가 새로 쓴 줄은 앞줄 뒤에 끼워 넣음.
 // 줄마다 쓴 사람(who)도 같이 옮김. 각 인자는 { lines: [...], who: [...] }. 같은 줄을 둘이 동시에 고치면 둘 다 남음(안 지움).
 (() => {
-const count = (arr) => arr.reduce((m, l) => m.set(l, (m.get(l) ?? 0) + 1), new Map());
+// 🐞 같은 글의 줄(빈 줄 등)이 여러 개면 글자로 찾지 않고 줄 번호로 맞춤 — 고친 줄이 첫 빈 줄 뒤로 튀던 문제(마야 신고 #45)
+const lcs = (a, b) => { // a[i] ↔ b[j] 같은 줄 짝: a 줄 번호 → b 줄 번호
+  const d = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) d[i][j] = a[i] === b[j] ? d[i + 1][j + 1] + 1 : Math.max(d[i + 1][j], d[i][j + 1]);
+  const m = new Map();
+  for (let i = 0, j = 0; i < a.length && j < b.length;) { if (a[i] === b[j]) m.set(i++, j++); else if (d[i + 1][j] >= d[i][j + 1]) i++; else j++; }
+  return m;
+};
 function merge3(base, mine, theirs) {
-  const b = count(base.lines), keep = new Map(b), added = [];
-  mine.lines.forEach((l, j) => { if (keep.get(l) > 0) keep.set(l, keep.get(l) - 1); else added.push(j); }); // 기준에도 있던 줄 = 그대로 둔 줄
-  const del = new Map([...keep].filter(([, n]) => n > 0)); // 기준엔 있는데 내 글엔 없는 줄 = 내가 지운 줄
-  const out = [];
-  theirs.lines.forEach((l, i) => { if (del.get(l) > 0) del.set(l, del.get(l) - 1); else out.push([l, theirs.who[i] ?? ""]); });
-  const has = count(theirs.lines), base2 = count(base.lines);
-  let cursor = 0, lastAnchor = null;
-  for (const j of added) {
-    const l = mine.lines[j];
-    if ((has.get(l) ?? 0) > (base2.get(l) ?? 0) && l.trim()) { has.set(l, has.get(l) - 1); continue; } // 남도 똑같은 줄을 이미 씀
-    let a = j - 1; while (a >= 0 && added.includes(a)) a--;
-    if (a < 0) cursor = lastAnchor === -1 ? cursor : 0, lastAnchor = -1;
-    else if (lastAnchor !== a) { const at = out.findIndex(([x]) => x === mine.lines[a]); cursor = at < 0 ? out.length : at + 1; lastAnchor = a; }
-    out.splice(cursor, 0, [l, mine.who[j] ?? ""]); cursor++;
-  }
+  const toMine = lcs(base.lines, mine.lines), toTheirs = lcs(base.lines, theirs.lines);
+  const gone = new Set(), after = new Map(), fromMine = new Set(toMine.values()); // gone = 내가 지운 줄(서버 줄 번호), after = 서버 줄 번호(-1 = 맨 위) 뒤에 넣을 내 새 줄
+  base.lines.forEach((_, i) => { if (!toMine.has(i) && toTheirs.has(i)) gone.add(toTheirs.get(i)); });
+  const mineToBase = new Map([...toMine].map(([i, j]) => [j, i])), seen = theirs.lines.reduce((m, l) => m.set(l, (m.get(l) ?? 0) + 1), new Map());
+  base.lines.forEach((l) => seen.set(l, (seen.get(l) ?? 0) - 1)); // seen = 남이 새로 쓴 줄 수
+  let anchor = -1;
+  mine.lines.forEach((l, j) => {
+    if (fromMine.has(j)) { // 앞줄이 서버에서 지워졌으면 그 앞 살아 있는 줄 뒤로
+      let i = mineToBase.get(j); while (i >= 0 && !toTheirs.has(i)) i--;
+      anchor = i < 0 ? -1 : toTheirs.get(i); return;
+    }
+    if (l.trim() && (seen.get(l) ?? 0) > 0) { seen.set(l, seen.get(l) - 1); return; } // 남도 똑같은 줄을 이미 씀
+    if (!after.has(anchor)) after.set(anchor, []); after.get(anchor).push([l, mine.who[j] ?? ""]);
+  });
+  const out = [...(after.get(-1) ?? [])];
+  theirs.lines.forEach((l, i) => { if (!gone.has(i)) out.push([l, theirs.who[i] ?? ""]); out.push(...(after.get(i) ?? [])); });
   return { lines: out.map(([l]) => l), who: out.map(([, w]) => w) };
 }
 // ✍️ 줄 안에서도 쓴 사람 나눔: 줄마다 "이름" 또는 [["이름", 글자 수], …]. 남의 문장은 그 사람 그대로, 내가 끼워 쓴 글자만 내 이름
