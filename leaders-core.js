@@ -164,7 +164,7 @@ const LDC = {
     const alias = (t) => { if (!["오전", "오후", "저녁"].includes(t)) return t; const n = nums.filter((x) => band(x) === band(t)); return n.length === 1 ? n[0] : t; };
     const by = new Map(); rows.forEach((r) => { const t = alias(LDC.timeKey(r.slot)); by.set(t, [...(by.get(t) ?? []), r]); });
     return [...by].sort((a, b) => LDC.slotMin(a[0]) - LDC.slotMin(b[0])).flatMap(([t, rs]) => {
-      const times = new Set([t, ...rs.map((r) => LDC.timeKey(r.slot))]);
+      const times = new Set([t, ...rs.map((r) => LDC.timeKey(r.slot)), ...["오전", "오후", "저녁"].filter((w) => alias(w) === t)]); // 가능 시간에 '월수 오전'이라 적은 서브도 11AM 칸으로
       return Object.keys(LDC.LANG_CODE).map((l) => ({ label: [t, band(t) || l ? LDC.LANG_CODE[l] : ""].filter(Boolean).join(" "), times, lang: l, rows: rs.filter((r) => LDC.langOf(r.slot) === l) })).filter((c) => c.rows.length);
     });
   },
