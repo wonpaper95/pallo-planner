@@ -73,7 +73,8 @@ TB.apply = (root, st) => { // 서버 글 통째(10초 다시 받기·예전 화�
   paint(root); TB.grow(root);
 };
 // 글이 길면 칸이 아래로 늘어나서 다 보임 (브레인 덤프·시간표 칸)
-const fit = (el) => { el.style.height = "auto"; el.style.height = (el.classList.contains("tbDump") ? Math.max(160, el.scrollHeight + 2) : el.scrollHeight) + "px"; };
+// 재는 동안 칸이 잠깐 줄어도 페이지 높이는 그대로 둠 — 안 그러면 화면이 튐(마야 #47)
+const fit = (el) => { const box = el.parentElement; box.style.minHeight = box.offsetHeight + "px"; el.style.height = "auto"; el.style.height = (el.classList.contains("tbDump") ? Math.max(160, el.scrollHeight + 2) : el.scrollHeight) + "px"; box.style.minHeight = ""; };
 TB.grow = (root) => root?.querySelectorAll(".tbDump, .tbc").forEach(fit);
 // 남이 적은 것 → 그 지점 타임박스 전부(메인 칸·현황 카드)
 // 바뀐 칸 → 저장·전송 모양 { body, p: {i}, t: {"HH:00"}, w: {칸} }. 예전 :30 칸은 그 시간 칸에 합쳐졌으니 지움
