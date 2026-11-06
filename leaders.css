@@ -301,3 +301,4 @@ body.is-assist #ldView .ldday .tdc { grid-template-columns: repeat(auto-fill, mi
 #ldView .ldsubs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: rgba(59, 130, 246, .06); font-size: 13px; } #ldView .ldsubs > b { color: #2563eb; }
 #ldView .ldjump { all: unset; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 #ldView .ldholdblk { margin-top: 18px; }
+@media (max-width: 380px) { #ldView .ldday .cfr { flex: 0 1 100%; flex-wrap: wrap; justify-content: flex-end; margin-left: 0; } } /* 📱 좁은 폰: 체크 버튼 줄이 화면 밖으로 안 나가게 */
