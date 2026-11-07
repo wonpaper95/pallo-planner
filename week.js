@@ -36,6 +36,12 @@ const W = {
     const v = (k) => ({ done: k.done_by, start_time: k.deadline, id: k.id });
     return String(a.day).localeCompare(String(b.day)) || W.daySort(v(a), v(b));
   },
+  // 🧠 몰입 시간 안의 할 일인지. st = 'HH:MM(:SS)', f = { s:'10:00', e:'12:00' } (e 가 s 보다 작으면 밤을 넘김, 예 22:00~02:00)
+  inFocus(st, f) {
+    if (!st || !f?.s || !f?.e || f.s === f.e) return false;
+    const t = String(st).slice(0, 5);
+    return f.s < f.e ? t >= f.s && t < f.e : t >= f.s || t < f.e;
+  },
   // 데드라인 상태: over(지남) / soon(24시간 안) / ok
   due(deadline, now = new Date()) {
     const ms = new Date(deadline) - now, h = Math.abs(ms) / 3600000;
