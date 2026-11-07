@@ -36,8 +36,9 @@ const W = {
     const v = (k) => ({ done: k.done_by, start_time: k.deadline, id: k.id });
     return String(a.day).localeCompare(String(b.day)) || W.daySort(v(a), v(b));
   },
-  // 🧠 몰입 시간 안의 할 일인지. st = 'HH:MM(:SS)', f = { s:'10:00', e:'12:00' } (e 가 s 보다 작으면 밤을 넘김, 예 22:00~02:00)
+  // 🎯 몰입 시간 안의 할 일인지. st = 'HH:MM(:SS)', f = { s:'10:00', e:'12:00' } 또는 그 배열(시간대 여러 개). e 가 s 보다 작으면 밤을 넘김(예 22:00~02:00)
   inFocus(st, f) {
+    if (Array.isArray(f)) return f.some((x) => W.inFocus(st, x));
     if (!st || !f?.s || !f?.e || f.s === f.e) return false;
     const t = String(st).slice(0, 5);
     return f.s < f.e ? t >= f.s && t < f.e : t >= f.s || t < f.e;
