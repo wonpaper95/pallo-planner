@@ -376,7 +376,7 @@ function renderList() {
   const goneInner = slotBlocks(leaders.filter(gone)).join("") + (LD.mode === "month" ? subTable(sm, true) : "") + staffBlock(staff.filter(gone));
   blocks.push(goneWrap(goneInner));
   V().innerHTML = `${bar(`${viewSeg()}<span class="ldseg">${[["month", "월간"], ["q3", "3달"]].map(([k, l]) => `<button data-mode="${k}" class="${LD.mode === k ? "on" : ""}">${l}</button>`).join("")}</span>
-      <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter === k ? "on" : ""}">${l}</button>`).join("")}</span>
+      <span class="ldseg ldflt">${LDC.FILTERS.map(([k, l]) => `<button data-flt="${k}" class="${LD.filter.split("+").includes(k) ? "on" : ""}" title="${k === "all" ? "필터 끄기" : "두 개 같이 고를 수 있어요 — 예: 평일 오후 + 월·수"}">${l}</button>`).join("")}</span>
       <span class="ldnav"><button data-nav="-1">‹</button><b>${title}</b><button data-nav="1">›</button><button data-nav="0">오늘</button></span>`)}
     ${findHtml()}
     ${certTable()}
@@ -669,7 +669,7 @@ async function renameDlg() {
 document.addEventListener("click", async (e) => {
   const v = V(); if (!v || !v.contains(e.target)) return;
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.flt) { LD.filter = b.dataset.flt; try { localStorage.setItem("ld-filter", LD.filter); } catch {} return LD.render(); }
+  if (b.dataset.flt) { LD.filter = LDC.toggleFilter(LD.filter, b.dataset.flt); try { localStorage.setItem("ld-filter", LD.filter); } catch {} return LD.render(); }
   if (b.dataset.mode) { LD.mode = b.dataset.mode; try { localStorage.setItem("ld-mode", LD.mode); } catch {} return LD.load(); }
   if (b.dataset.nav !== undefined) {
     const n = +b.dataset.nav;

@@ -358,6 +358,19 @@ document.addEventListener("focusout", (e) => { if (e.target.dataset?.pend && e.t
 document.addEventListener("compositionstart", (e) => { if (e.target.matches?.("#fnView input")) composing = true; });
 document.addEventListener("compositionend", (e) => { if (!e.target.matches?.("#fnView input")) return; composing = false; if (pendingRender) { pendingRender = false; setTimeout(render); } });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
-document.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.target.matches("#fnView input[data-id]")) e.target.blur(); }); // 한글 조합 중 Enter 는 글자 확정용 — 그때 나가면 마지막 글자가 사라지거나 두 번 들어감
+// ⌨️ 구글시트처럼 칸 옮기기 (제안 세연 #49): ↑↓·Enter(Shift+Enter 위) = 같은 칸 위아래 줄, ←→ = 커서가 글 끝에 닿았을 때 옆 칸. 같은 표 안에서만
+// 한글 조합 중 키는 글자 확정용 — 그때 옮기면 마지막 글자가 사라지거나 두 번 들어감
+document.addEventListener("keydown", (e) => {
+  const t = e.target; if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || !t.matches?.("#fnView input[data-k], #fnView select[data-k]")) return;
+  const inp = t.tagName === "INPUT", k = e.key, len = inp ? t.value.length : 0;
+  const dy = k === "ArrowDown" || (k === "Enter" && inp && !e.shiftKey) ? 1 : k === "ArrowUp" || (k === "Enter" && inp && e.shiftKey) ? -1 : 0;
+  const dx = k === "ArrowRight" && (!inp || (t.selectionStart === len && t.selectionEnd === len) || (t.selectionStart === 0 && t.selectionEnd === len)) ? 1 : k === "ArrowLeft" && (!inp || t.selectionEnd === 0 || (t.selectionStart === 0 && t.selectionEnd === len)) ? -1 : 0;
+  if (!dy && !dx) return;
+  const cells = (box) => [...box.querySelectorAll("input[data-k], select[data-k]")];
+  const list = dy ? cells(t.closest("table")).filter((x) => x.dataset.k === t.dataset.k) : cells(t.closest("tr"));
+  const to = list[list.indexOf(t) + (dy || dx)];
+  if (!to) { if (k === "Enter") t.blur(); return; }
+  e.preventDefault(); to.focus(); to.select?.(); to.scrollIntoView({ block: "nearest", inline: "nearest" });
+});
 document.addEventListener("focusout", (e) => { if (dirty && e.target.matches("#fnView input")) setTimeout(() => { if (dirty && !V().contains(document.activeElement)) { dirty = false; FN.load(); } }, 300); });
 })();
