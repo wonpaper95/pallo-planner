@@ -1,5 +1,5 @@
-// 🔗 연동 오류 탭: 연동 안 된 회원을 처리될 때까지 관리 (대구일중점 매니저·대표만, jpcnTeam 은 index.html loadProfile 이 정함)
-// 서버 규칙은 DB 0095 — 다른 지점 안 보임·조교 못 봄. 입력칸 값이 날아가지 않게 #leList 만 다시 그림
+// 🔗 연동 오류 탭: 연동 안 된 회원을 처리될 때까지 관리 (대구일중점 매니저·조교·대표, jpcnTeam 은 index.html loadProfile 이 정함)
+// 서버 규칙은 DB 0095·0096 — 다른 지점 안 보임, 조교는 자기 지점(11-08). 입력칸 값이 날아가지 않게 #leList 만 다시 그림
 (() => {
 const LE = (window.LE = { list: [], q: "", cls: "", edit: null, draft: null, doneOpen: null, ready: false, adding: false });
 const V = () => document.getElementById("leView");

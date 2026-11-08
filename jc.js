@@ -19,6 +19,10 @@ const ts = (s) => new Date(s).toLocaleString("ko-KR", { month: "numeric", day: "
 const opts = (list, sel) => list.map((v) => `<option value="${esc(v)}" ${v === sel ? "selected" : ""}>${esc(v)}</option>`).join("");
 const chip = (n) => `<span class="jcchip" style="background:${esc(n.color)}">${esc(n.name)}</span>`;
 const pinFirst = (a) => a.slice().sort((x, y) => (y.pinned ? 1 : 0) - (x.pinned ? 1 : 0));
+// 🎨 할일 강조 색 (11-08, 제안 채림): 매니저·대표가 중요한 줄에 빨강·초록·파랑·노랑. 조교는 보기만 (DB 0097 트리거가 막음)
+const MARKS = [["", "없음"], ["red", "빨강"], ["green", "초록"], ["blue", "파랑"], ["yellow", "노랑"]];
+const mk = (t) => t.mark ? `mk-${t.mark}` : "";
+const markBtn = (t) => jo() ? "" : `<button type="button" class="jcicon jcmk ${t.mark ? "on" : ""}" data-act="mark" title="강조 색 (중요한 줄 표시)">🎨</button>`;
 
 JC.load = async function () {
   if (admin()) { if (!JC.team) { try { JC.team = +localStorage.getItem("jc-team") || null; } catch {} } if (!teams.some((t) => t.id === JC.team)) JC.team = teams[0]?.id ?? null; }
@@ -147,8 +151,8 @@ function renderGrid(toToday) {
     return `<td class="jccell ${d.tag?.cls ?? ""} ${d.k === tk ? "today" : ""}"><button class="jccb" data-act="cell" data-task="${t.id}" data-day="${d.k}">${ns.slice(0, 2).map(chip).join("")}${ns.length > 2 ? `<span class="jcmore">+${ns.length - 2}</span>` : ""}${ns.length ? "" : `<span class="jcplus">+</span>`}</button></td>`;
   };
   box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.tag?.cls ?? ""} ${d.k === tk ? "today" : ""}">${d.label}${d.tag ? `<em class="jctag">${d.tag.tag}</em>${d.tag.name ? `<small>${esc(d.tag.name)}</small>` : ""}` : ""}</th>`).join("")}</tr></thead>
-    <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jctasktxt" data-act="taskedit" title="눌러서 내용 고치기"><b>${esc(t.body.slice(1).trim())}</b></button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
-      : `<tr data-task="${t.id}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button><button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
+    <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec ${mk(t)}"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jctasktxt" data-act="taskedit" title="눌러서 내용 고치기"><b>${esc(t.body.slice(1).trim())}</b></button>${markBtn(t)}<button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
+      : `<tr data-task="${t.id}" class="${mk(t)}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button>${markBtn(t)}<button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
   const sc = box.querySelector(".jcscrollx");
   if (toToday || keep === null) setTimeout(() => scrollToday(V().querySelector(".jcscrollx"), false)); else sc.scrollLeft = keep; // 그 사이 다시 그렸으면 새 표 기준
 }
@@ -207,7 +211,7 @@ async function uploadPhotos(f) {
 // ── 담당자 고르기·색 고르기 작은 창 (body 에 하나씩, 다시 그려도 안 닫힘) ──
 const pop = (id) => document.getElementById(id) ?? document.body.appendChild(Object.assign(document.createElement("div"), { id, className: "jcpop", hidden: true }));
 const place = (el, btn, w, h) => { const r = btn.getBoundingClientRect(); el.style.left = Math.max(16, Math.min(r.left, innerWidth - w - 16)) + "px"; el.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(16, r.top - h - 6) : r.bottom + 6) + "px"; };
-let cellCtx = null, colorId = null;
+let cellCtx = null, colorId = null, markId = null;
 function openCell(btn) {
   cellCtx = { task: +btn.dataset.task, day: btn.dataset.day };
   const sel = JC.cells.get(`${cellCtx.task}|${cellCtx.day}`) ?? [], el = pop("jcCellPop");
@@ -220,7 +224,12 @@ function openColor(btn, id) {
   el.innerHTML = `<div class="jcsw">${COLORS.map((c) => `<button data-color="${c}" class="${c === cur ? "on" : ""}" style="background:${c}"></button>`).join("")}</div>`;
   el.hidden = false; el.style.width = ""; place(el, btn, 142, 150);
 }
-const closePops = () => { for (const id of ["jcCellPop", "jcColorPop"]) { const el = document.getElementById(id); if (el) el.hidden = true; } cellCtx = colorId = null; };
+function openMark(btn, id) {
+  markId = id; const cur = JC.tasks.find((t) => t.id === id)?.mark ?? "", el = pop("jcColorPop");
+  el.innerHTML = `<div class="jcpt">강조 색</div><div class="jcmks">${MARKS.map(([v, l]) => `<button type="button" data-mark="${v}" class="mk-${v || "none"} ${v === cur ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  el.hidden = false; el.style.width = ""; place(el, btn, 150, 60);
+}
+const closePops = () => { for (const id of ["jcCellPop", "jcColorPop"]) { const el = document.getElementById(id); if (el) el.hidden = true; } cellCtx = colorId = markId = null; };
 document.addEventListener("change", async (e) => {
   if (!e.target.closest("#jcCellPop") || !cellCtx) return;
   const { task, day } = cellCtx, ids = [...document.querySelectorAll("#jcCellPop input:checked")].map((c) => +c.value);
@@ -229,9 +238,11 @@ document.addEventListener("change", async (e) => {
 });
 document.addEventListener("click", async (e) => {
   if (e.target.closest(".jcclose")) return closePops();
+  const mkb = e.target.closest("#jcColorPop [data-mark]");
+  if (mkb) { const id = markId; closePops(); if (id) { const t = JC.tasks.find((x) => x.id === id); t.mark = mkb.dataset.mark; renderGrid(); fail((await sb.from("jc_tasks").update({ mark: t.mark }).eq("id", id)).error); } return; }
   const sw = e.target.closest("#jcColorPop [data-color]");
   if (sw) { const id = colorId; closePops(); if (id) { JC.names.find((n) => n.id === id).color = sw.dataset.color; render(); fail((await sb.from("jc_names").update({ color: sw.dataset.color }).eq("id", id)).error); } return; }
-  if (!e.target.closest(".jcpop") && !e.target.closest("[data-act=cell]") && !e.target.closest("[data-act=color]")) closePops();
+  if (!e.target.closest(".jcpop") && !e.target.closest("[data-act=cell]") && !e.target.closest("[data-act=color]") && !e.target.closest("[data-act=mark]")) closePops();
 });
 
 // ── 지우기: 한 번 누르면 '확인?' 3초, 한 번 더 = 지움 ──
@@ -287,6 +298,7 @@ function bind() {
     if (act === "today") return scrollToday(v.querySelector(".jcscrollx"), true);
     if (act === "cell") return openCell(b);
     if (act === "color") return openColor(b, id);
+    if (act === "mark") return openMark(b, +b.closest("tr[data-task]").dataset.task);
     if (act === "memodone") { const m = JC.memos.find((x) => x.id === id); m.done = b.checked; renderMemos(); return fail((await sb.from("jc_memos").update({ done: b.checked }).eq("id", id)).error); }
     if (act === "memopin" || act === "linkpin" || act === "photopin") {
       const lid = act === "linkpin" ? +b.closest("[data-link]").dataset.link : id, table = { linkpin: "jc_links", memopin: "jc_memos", photopin: "jc_photos" }[act], x = { linkpin: JC.links, memopin: JC.memos, photopin: JC.photos }[act].find((y) => y.id === lid);

@@ -89,3 +89,11 @@ body:not(.jcv) #jcView { display: none; }
 #jcView .jcph figcaption { display: flex; align-items: flex-start; gap: 4px; padding: 8px 8px 8px 10px; }
 #jcView .jcph .jcmt { display: block; }
 @media (max-width: 680px) { #jcView .jcphotos { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
+/* 🎨 할일 강조 색 (11-08): 줄 왼쪽 띠 + 옅은 배경 + 굵은 글씨. 조교도 보임, 바꾸기는 매니저(🎨 버튼) */
+#jcView .jcgrid tr.mk-red { --mk: var(--red); } #jcView .jcgrid tr.mk-green { --mk: var(--green); } #jcView .jcgrid tr.mk-blue { --mk: var(--blue); } #jcView .jcgrid tr.mk-yellow { --mk: #d9a400; }
+#jcView .jcgrid tr[class*="mk-"] td.jctask, #jcView .jcgrid tr.jcsec[class*="mk-"] td { background: color-mix(in srgb, var(--mk) 16%, var(--bg)); box-shadow: inset 4px 0 0 var(--mk); font-weight: 700; color: color-mix(in srgb, var(--mk) 70%, var(--text)); }
+#jcView .jcmk { font-size: 13px; opacity: .45; } #jcView .jcmk.on, #jcView .jcmk:hover { opacity: 1; }
+.jcpop .jcmks { display: flex; flex-wrap: wrap; gap: 6px; }
+.jcpop .jcmks button { border: 2px solid transparent; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
+.jcpop .jcmks button.on { border-color: var(--text); }
+.jcpop .jcmks .mk-none { background: var(--fill); color: var(--sub); } .jcpop .jcmks .mk-red { background: var(--red); } .jcpop .jcmks .mk-green { background: var(--green); } .jcpop .jcmks .mk-blue { background: var(--blue); } .jcpop .jcmks .mk-yellow { background: #d9a400; }
