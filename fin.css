@@ -110,3 +110,10 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fndifflist mark { background: #ffd8a8; color: #3b1d00; border-radius: 4px; padding: 0 4px; }
 #fnView .fnresb { display: inline-flex; gap: 4px; margin-left: auto; }
 #fnView .fnresb .btn { padding: 2px 8px; font-size: 12px; }
+
+/* ⌨️ 사용법 상자 · 📋 복사한 줄 점선 */
+#fnView .fnhelp { margin: 0 0 12px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card, transparent); font-size: 13px; line-height: 1.55; }
+#fnView .fnhelp summary { cursor: pointer; font-weight: 700; }
+#fnView .fnhelp ul { margin: 6px 0 2px; padding-left: 18px; } #fnView .fnhelp li { margin: 3px 0; } #fnView .fnhelp li b { margin-right: 4px; }
+#fnView .fnhelp kbd { display: inline-block; padding: 0 5px; margin: 0 1px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: 600 11.5px/1.5 inherit; background: var(--hover); white-space: nowrap; }
+#fnView .fntbl tr.fncopied > td { border-top: 2px dashed var(--accent); border-bottom: 2px dashed var(--accent); }

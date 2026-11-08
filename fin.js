@@ -91,13 +91,14 @@ function render() {
   V().querySelector("#fnQ")?.classList.toggle("hidden", gate);
   if (gate) { box.innerHTML = joGate(); return renderStatus(); }
   // 다시 그려도 적던 자리 그대로: 표 스크롤(가로·세로) + 지금 적고 있는 칸(포커스·글자·커서) — 안 하면 몇 자 치다 표가 맨 위로 튐 (신고 세연)
-  const a = document.activeElement, cur = box.contains(a) && a.matches?.("[data-id][data-k]") ? { id: a.dataset.id, k: a.dataset.k, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
+  const a = document.activeElement, cur = box.contains(a) && a.matches?.("input[data-id][data-k], select[data-id][data-k]") ? { id: a.dataset.id, k: a.dataset.k, v: a.value, s: a.selectionStart, e: a.selectionEnd } : null;
+  // ↑ 입력칸만 — [플래너 값 유지] 버튼도 data-id·data-k 가 있어 칸으로 착각 → 그 칸에 빈 값을 넣고 떠날 때 저장하던 것 (신고 마야)
   if (cur && composing) { pendingRender = true; return; } // 한글 조합 중엔 조합 끝나고 그림
   const keep = [...V().querySelectorAll(".fnscroll")].map((x) => [x.scrollLeft, x.scrollTop]);
   box.innerHTML = summaryHtml() + (canEdit() ? diffHtml() : "") + (admin() ? accessHtml() : "") + saleHtml() + bookHtml() + costHtml() + depositHtml() + dailyHtml();
   V().querySelectorAll(".fnscroll").forEach((x, i) => { if (keep[i]) [x.scrollLeft, x.scrollTop] = keep[i]; });
   // pend = 다시 그리기 전에 적던 글자 → 칸 떠날 때 저장 (프로그램으로 넣은 값엔 change 가 안 와서)
-  const el = cur && box.querySelector(`[data-id="${cur.id}"][data-k="${cur.k}"]`);
+  const el = cur && box.querySelector(`input[data-id="${cur.id}"][data-k="${cur.k}"], select[data-id="${cur.id}"][data-k="${cur.k}"]`);
   if (el) { if (el.value !== cur.v) { el.value = cur.v; el.dataset.pend = 1; } el.focus({ preventScroll: true }); try { if (cur.s != null) el.setSelectionRange(cur.s, cur.e); } catch {} }
   renderStatus(); pinHeads();
 }
@@ -125,7 +126,21 @@ function shell() {
       ${FN.month !== ymNow() ? `<button class="btn ghost" data-act="now">이번 달</button>` : ""}</div></div>
   <div class="fnrow fntools"><span id="fnSync" class="mut"></span>${jo() ? "" : `<button class="btn ghost" data-act="sync" title="지금 시트와 맞춰요 (평소엔 5분마다 자동). 플래너에서 고친 건 시트로, 시트의 새 줄·빈 칸은 플래너로, 플래너 값과 다른 칸은 🔀 표시">🔄 지금 맞추기</button>`}${admin() ? `<button class="btn ghost" data-act="cfg">⚙️ 시트 설정</button>` : ""}
     <input id="fnQ" type="search" placeholder="🔍 이름·전화번호·사용처 찾기" value="${esc(FN.q)}"></div>
-  <div id="fnBody"></div>`;
+  ${canEdit() ? helpHtml() : ""}<div id="fnBody"></div>`;
+}
+// ⌨️ 사용법 상자 (사용자 지시 11-08: 화면에 사용법 다). 처음엔 펼침, 접으면 기억
+function helpHtml() {
+  let open = true; try { open = localStorage.getItem("fn-help") !== "0"; } catch {}
+  const k = (x) => `<kbd>${x}</kbd>`;
+  return `<details class="fnhelp" ${open ? "open" : ""}><summary>⌨️ 사용법 · 단축키 <small class="mut">(엑셀·구글 시트처럼)</small></summary><ul>
+    <li><b>줄 복사</b> 줄의 아무 칸을 누르고 ${k(MK + "C")} → 그 줄 전체가 복사돼요 (점선 표시, ${k("Esc")}로 지움). 칸 글자만 복사하려면 마우스로 글자를 끌어서 고른 뒤 ${k(MK + "C")}</li>
+    <li><b>줄 붙이기</b> 붙일 줄의 아무 칸에서 ${k(MK + "V")} → 칸마다 그대로 채워져요. 구글 시트에서 복사한 줄도 돼요 (줄 전체면 첫 칸부터, 몇 칸만이면 누른 칸부터). 이미 적힌 칸을 덮을 땐 먼저 물어봐요</li>
+    <li><b>줄 넣기</b> 줄 오른쪽 끝 ${k("＋")} = 바로 아래에 빈 줄 (칸에서 ${k(MK + "Enter")}) · ${k("⧉")} = 이 줄을 복사해서 바로 아래에 (${k(MK + "Shift+Enter")}) · ${k("🗑")} = 줄 지우기 (시트에서도 지워져요)</li>
+    <li><b>칸 옮기기</b> ${k("↑")}${k("↓")} 위아래 줄 · ${k("Enter")} 아래 줄 (${k("Shift+Enter")} 위) · ${k("←")}${k("→")} 글 끝에서 옆 칸</li>
+    <li><b>저장</b> 칸을 고치면 바로 저장되고 몇 초 뒤 우리 재무 시트로 넘어가요. 시트에 적은 건 5분마다 들어와요</li>
+    <li><b>🔀 시트와 다른 칸</b> 위에 뜨는 목록에서 칸마다 [시트 값으로] 또는 [플래너 값 유지]를 눌러 정리해요</li>
+    <li><b>📎 첨부</b> 영수증·증빙을 올려요${admin() ? "" : " (열어 보는 건 대표님만)"} · <b>⚠️ 덜 쓴 줄</b> 주황 테두리 칸 = 꼭 적어야 할 칸</li>
+  </ul></details>`;
 }
 function joGate() {
   const s = FN.access?.status;
@@ -164,12 +179,12 @@ function accessHtml() {
 // 줄 표시: ⚠️ 덜 쓴 줄(주황 띠) + 💚 스탭페이 줄(연두 — 울산 시트에서 손으로 칠하던 색)
 const trOf = (r) => {
   const p = problems(r), m = p.map((x) => x[0]), step = r.kind === "sale" && String(r.vals.결제수단 ?? "").trim() === "스탭페이";
-  const cls = [m.length && "fnmiss", step && "fnstep", r.sheet_flag && `fn${r.sheet_flag}`].filter(Boolean).join(" ");
+  const cls = [m.length && "fnmiss", step && "fnstep", r.sheet_flag && `fn${r.sheet_flag}`, FN.clip?.id === r.id && "fncopied"].filter(Boolean).join(" ");
   return [m, `<tr data-row="${r.id}" class="${cls}"${m.length ? ` title="⚠️ 확인할 칸: ${esc(p.map(([k, w]) => `${k}(${w})`).join(", "))}"` : ""}>`];
 };
 const missBtn = (n) => `<button class="btn ghost fnmissbtn ${FN.miss ? "on" : ""}" data-act="miss" title="꼭 있어야 할 칸(날짜·멤버쉽·매출·이름·거래형태·결제수단·상담자, 카드면 카드사·할부, 가입이면 전화번호·가입경로 / 비용은 사용처·금액)이 빈 줄 + 금액이 숫자가 아니거나 환불인데 + 금액인 줄">${FN.miss ? "✕ 모두 보기" : `⚠️ 덜 쓴·확인할 줄 <b>${n}</b>`}</button>`;
 const clip = (r) => jo() ? "" : `<td class="fnclip"><button data-act="files" data-id="${r.id}" title="${admin() ? "📎 첨부 보기·올리기" : "📎 올리기 (열람은 대표님만)"}">📎${r.files ? `<i>${r.files}</i>` : ""}</button></td>`;
-const del = (r) => canEdit() ? `<td class="fndel"><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
+const del = (r) => canEdit() ? `<td class="fndel"><button data-act="below" data-id="${r.id}" title="바로 아래에 빈 줄 넣기 (칸에서 ⌘/Ctrl+Enter)">＋</button><button data-act="dup" data-id="${r.id}" title="이 줄 통째로 복사해서 바로 아래에 (칸에서 ⌘/Ctrl+Shift+Enter)">⧉</button><button data-act="del" data-id="${r.id}" title="줄 지우기">🗑</button></td>` : "";
 const shortDay = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v.slice(0, 4) === FN.month.slice(0, 4) ? v.slice(5).replace("-", "/") : v;
 const showOf = (k, v) => NUMK.has(k) ? fmtNum(v) : k === "날짜" ? shortDay(String(v)) : String(v);
 function cellIn(r, k, need) {
@@ -237,16 +252,46 @@ async function saveCell(inp) {
     const was = toNum(r.vals.금액), auto = toNum(r.vals.근무시간) !== null ? Math.round(rate * toNum(r.vals.근무시간)) : null;
     if (was === null || was === 0 || was === auto) patch.금액 = Math.round(rate * v);
   }
-  edits++; r.vals = { ...r.vals, ...patch };
   inp.value = showOf(k, v); inp.title = String(v);
-  // 저장은 차례로, 바뀐 칸만 (fin_patch, 0077) — 줄 전체를 보내면 그사이 시트에서 고친 다른 칸이 되돌아감. 돌아온 vals(서버 최신)로 맞춤
+  if ((await patchRow(r, patch)) && (k === "근무시간" || NUMK.has(k))) render();
+}
+// 저장은 차례로, 바뀐 칸만 (fin_patch, 0077) — 줄 전체를 보내면 그사이 시트에서 고친 다른 칸이 되돌아감. 돌아온 vals(서버 최신)로 맞춤
+// r.vals 는 기다리기 전에 바로 바꿈 (화면 먼저)
+async function patchRow(r, patch) {
+  edits++; r.vals = { ...r.vals, ...patch };
   Object.assign((r._p ??= {}), patch); // 아직 저장 중인 칸 (돌아온 서버 값이 이걸 되돌리지 않게)
   const { data, error } = await (save = save.then(() => sb.rpc("fin_patch", { p_id: r.id, p_patch: patch })));
   for (const [x, y] of Object.entries(patch)) if (r._p[x] === y) delete r._p[x];
-  if (fail(error)) return;
+  if (fail(error)) return false;
   if (data && typeof data === "object") r.vals = { ...data, ...r._p };
-  if (k === "근무시간" || NUMK.has(k)) render();
-  queueSync();
+  queueSync(); return true;
+}
+// 📋 ⌘C = 줄 통째 복사 (칸 글자 일부를 마우스로 골랐을 때만 그 글자) · ⌘V = 복사한 줄·탭으로 나뉜 줄(구글 시트)이면 지금 줄 칸마다 채움 (제안 마야, B안 11-08)
+const headsOf = (r) => (r.kind === "sale" ? SALE_H : COST_H);
+const MK = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+function copyRow(r) {
+  const tsv = FNC.rowTsv(r.vals, headsOf(r));
+  FN.clip = { id: r.id, kind: r.kind, vals: { ...r.vals }, tsv };
+  navigator.clipboard?.writeText(tsv).catch(() => {}); // 시트·메모장에도 붙게. 실패해도 플래너 안에선 FN.clip 으로 붙음
+  V().querySelectorAll("tr.fncopied").forEach((x) => x.classList.remove("fncopied"));
+  V().querySelector(`tr[data-row="${r.id}"]`)?.classList.add("fncopied");
+  toast(`📋 줄을 복사했어요 — 붙일 줄의 칸에서 ${MK}V`);
+}
+async function pasteRow(t, text) {
+  const r = FN.rows.find((x) => x.id === t.dataset.id); if (!r) return;
+  const heads = headsOf(r), own = !!FN.clip && (text == null || text === FN.clip.tsv);
+  if (own && FN.clip.kind !== r.kind) return toast(FN.clip.kind === "sale" ? "매출 줄은 매출 표에만 붙일 수 있어요" : "비용 줄은 비용 쪽 표에만 붙일 수 있어요");
+  const all = own ? Object.fromEntries(heads.map((h) => [h, FN.clip.vals[h] ?? ""])) : FNC.pasteVals(text, heads, t.dataset.k, FN.month);
+  const keys = Object.keys(all).filter((h) => String(all[h]) !== String(r.vals[h] ?? ""));
+  if (!keys.length) return toast("이미 같은 내용이에요");
+  const over = keys.filter((h) => h !== "날짜" && h !== "구분" && String(r.vals[h] ?? "").trim() !== ""); // 날짜·구분은 ＋/+줄이 미리 채운 칸
+  if (over.length && !confirm(`이 줄에 이미 적힌 칸 ${over.length}개(${over.join(", ")})를 덮어써요. 붙일까요?`)) return;
+  const k = t.dataset.k; t.blur(); // 적던 글자가 있으면 먼저 저장, 다시 그릴 때 옛 글자가 되살아나지 않게
+  const done = patchRow(r, Object.fromEntries(keys.map((h) => [h, all[h]])));
+  render(); V().querySelector(`input[data-id="${r.id}"][data-k="${k}"], select[data-id="${r.id}"][data-k="${k}"]`)?.focus();
+  const lines = own ? 1 : String(text).split(/\r?\n/).filter((l) => l.trim()).length;
+  toast(lines > 1 ? `📋 첫 줄만 붙였어요 (${lines}줄 중) — 나머지는 ＋로 줄을 넣고 한 줄씩` : "📋 붙였어요");
+  await done;
 }
 async function addRow(kind, sec) {
   const d = FN.month === ymNow() ? today() : "";
@@ -258,6 +303,24 @@ async function addRow(kind, sec) {
   edits++; FN.rows.push(data); FN.q = ""; const q = V().querySelector("#fnQ"); if (q) q.value = ""; render(); // 검색칸 글자도 지움 (검색만 풀리고 글자는 남던 것)
   V().querySelector(`input[data-id="${data.id}"][data-k="${kind === "sale" ? "멤버쉽" : "사용처"}"]`)?.focus();
   queueSync();
+}
+// ＋ 바로 아래에 빈 줄 / ⧉ 이 줄 복사 (제안 올리비아·마야): 새 줄 순서 = 이 줄 +1, 밑에 걸리는 줄만 한 칸씩 밀어 줌. 시트에는 맨 아래에 붙음
+// 빈 줄은 날짜(비용은 구분도) 이어받음 — 비용 구분이 비면 '기타'로 빠짐
+let inserting = false;
+async function insertBelow(id, copy) {
+  const r = FN.rows.find((x) => x.id === id); if (!r || inserting) return;
+  inserting = true;
+  try {
+    const { sort, bump } = FNC.below(FN.rows.filter((x) => x.kind === r.kind), id);
+    for (const [bid, n] of bump) { const { error } = await sb.from("fin_rows").update({ sort: n }).eq("id", bid); if (fail(error)) return; const x = FN.rows.find((y) => y.id === bid); if (x) x.sort = n; }
+    const vals = copy ? { ...r.vals } : r.kind === "sale" ? { 날짜: r.vals.날짜 ?? "" } : { 구분: r.vals.구분 ?? "", 날짜: r.vals.날짜 ?? "" };
+    const { data, error } = await sb.from("fin_rows").insert({ team_id: FN.team, month: FN.month, kind: r.kind, vals, sort }).select(COLS).single();
+    if (fail(error)) return;
+    edits++; FN.rows.push(data); render();
+    V().querySelector(`input[data-id="${data.id}"][data-k="${r.kind === "sale" ? (copy ? "날짜" : "멤버쉽") : "사용처"}"], select[data-id="${data.id}"][data-k="멤버쉽"]`)?.focus();
+    toast(copy ? "⧉ 바로 아래에 복사했어요" : "＋ 바로 아래에 줄을 넣었어요");
+    queueSync();
+  } finally { inserting = false; }
 }
 // 🔀 정리 (0082 fin_resolve): k 있으면 그 칸을 시트 값으로·플래너 값 유지, 없으면 줄 표시만 지움
 async function resolve(id, k, use) {
@@ -339,6 +402,7 @@ document.addEventListener("click", async (e) => {
   if (a === "cfg") return cfgDlg();
   if (a === "add") return addRow(b.dataset.kind, b.dataset.sec);
   if (a === "del") return delRow(b.dataset.id);
+  if (a === "below" || a === "dup") return insertBelow(b.dataset.id, a === "dup");
   if (a === "files") return filesDlg(b.dataset.id);
   if (a === "miss") { FN.miss = !FN.miss; return render(); }
   if (a === "diffonly") { FN.diffOnly = !FN.diffOnly; return render(); }
@@ -355,13 +419,29 @@ document.addEventListener("change", (e) => {
   if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") { e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; if (e.target.dataset.k === "결제수단") e.target.closest("tr")?.classList.toggle("fnstep", e.target.value === "스탭페이"); } }
 });
 document.addEventListener("focusout", (e) => { if (e.target.dataset?.pend && e.target.matches("#fnView input[data-id]")) { delete e.target.dataset.pend; saveCell(e.target); } });
+document.addEventListener("toggle", (e) => { if (e.target.matches?.("#fnView .fnhelp")) try { localStorage.setItem("fn-help", e.target.open ? "1" : "0"); } catch {} }, true);
+document.addEventListener("paste", (e) => {
+  const t = e.target; if (!t.matches?.("#fnView input[data-id][data-k]")) return;
+  const text = e.clipboardData?.getData("text/plain") ?? "";
+  if (!(FN.clip && text === FN.clip.tsv) && !text.includes("\t")) return; // 칸 글자 하나 → 평소처럼 그 칸에
+  e.preventDefault(); pasteRow(t, text);
+});
 document.addEventListener("compositionstart", (e) => { if (e.target.matches?.("#fnView input")) composing = true; });
 document.addEventListener("compositionend", (e) => { if (!e.target.matches?.("#fnView input")) return; composing = false; if (pendingRender) { pendingRender = false; setTimeout(render); } });
 document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = e.target.value; clearTimeout(FN.qt); FN.qt = setTimeout(render, 200); } });
 // ⌨️ 구글시트처럼 칸 옮기기 (제안 세연 #49): ↑↓·Enter(Shift+Enter 위) = 같은 칸 위아래 줄, ←→ = 커서가 글 끝에 닿았을 때 옆 칸. 같은 표 안에서만
 // 한글 조합 중 키는 글자 확정용 — 그때 옮기면 마지막 글자가 사라지거나 두 번 들어감
 document.addEventListener("keydown", (e) => {
-  const t = e.target; if (e.isComposing || e.altKey || e.ctrlKey || e.metaKey || !t.matches?.("#fnView input[data-k], #fnView select[data-k]")) return;
+  const t = e.target; if (e.isComposing || e.altKey || !t.matches?.("#fnView input[data-k], #fnView select[data-k]")) return;
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && canEdit()) { e.preventDefault(); t.blur(); return insertBelow(t.dataset.id, e.shiftKey); } // blur → 적던 칸 먼저 저장(복사에 들어가게)
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.code === "KeyC" || e.key.toLowerCase() === "c")) { // 한글 자판이어도 C 자리
+    const part = t.tagName === "INPUT" && t.selectionStart !== t.selectionEnd && !(t.selectionStart === 0 && t.selectionEnd === t.value.length);
+    if (part) return; // 마우스로 글자 일부를 골랐으면 그 글자만 (평소 복사)
+    e.preventDefault(); const r = FN.rows.find((x) => x.id === t.dataset.id); if (r) copyRow(r); return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.code === "KeyV" || e.key.toLowerCase() === "v") && t.tagName === "SELECT" && FN.clip) { e.preventDefault(); pasteRow(t, null); return; } // ▾ 칸엔 붙여넣기가 안 와서 복사해 둔 줄로
+  if (e.ctrlKey || e.metaKey) return;
+  if (e.key === "Escape" && FN.clip) { FN.clip = null; V().querySelectorAll("tr.fncopied").forEach((x) => x.classList.remove("fncopied")); return; }
   const inp = t.tagName === "INPUT", k = e.key, len = inp ? t.value.length : 0;
   const dy = k === "ArrowDown" || (k === "Enter" && inp && !e.shiftKey) ? 1 : k === "ArrowUp" || (k === "Enter" && inp && e.shiftKey) ? -1 : 0;
   const dx = k === "ArrowRight" && (!inp || (t.selectionStart === len && t.selectionEnd === len) || (t.selectionStart === 0 && t.selectionEnd === len)) ? 1 : k === "ArrowLeft" && (!inp || t.selectionEnd === 0 || (t.selectionStart === 0 && t.selectionEnd === len)) ? -1 : 0;

@@ -81,5 +81,21 @@ function daily(rows) {
   let acc = 0;
   return [...m.values()].sort((a, b) => (a.day || "9").localeCompare(b.day || "9")).map((x) => { const profit = x.sale - x.cost + x.book; return { ...x, profit, acc: (acc += profit) }; });
 }
-window.FNC = { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt };
+// ＋/⧉ 바로 아래에 새 줄: 새 순서 번호 + 밑에서 밀어야 할 줄 [[id, 새 번호]] (같은 번호 줄은 id 순 — fin.js sorted 와 같게)
+function below(rows, id) {
+  const list = [...rows].sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)), i = list.findIndex((x) => x.id === id), sort = list[i].sort + 1, bump = [];
+  for (let j = i + 1, need = sort + 1; j < list.length && list[j].sort < need; j++, need++) bump.push([list[j].id, need]);
+  return { sort, bump };
+}
+// 📋 ⌘C/⌘V 줄 복사·붙이기: 시트처럼 탭으로 나눈 한 줄. 붙일 땐 줄 전체(칸 수 ≥ 머리줄)면 첫 칸부터, 몇 칸만이면 고른 칸부터
+const NUMH = new Set(["매출", "금액", "근무시간"]);
+const rowTsv = (vals, heads) => heads.map((h) => String(vals[h] ?? "").replace(/[\t\r\n]+/g, " ")).join("\t");
+function pasteVals(text, heads, startKey, month) {
+  const line = String(text ?? "").replace(/\r/g, "").split("\n").find((l) => l.trim() !== "") ?? "";
+  const cells = line.split("\t").map((c) => (/^".*"$/s.test(c) ? c.slice(1, -1).replace(/""/g, '"') : c).trim());
+  const at = cells.length >= heads.length ? 0 : Math.max(0, heads.indexOf(startKey)), out = {};
+  cells.slice(0, heads.length - at).forEach((v, i) => { const h = heads[at + i]; out[h] = h === "날짜" ? normDate(v, month) : NUMH.has(h) && v !== "" ? toNum(v) ?? v : v; });
+  return out;
+}
+window.FNC = { rowTsv, pasteVals, below, OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt };
 })();
