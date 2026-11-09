@@ -155,7 +155,8 @@ function renderDash() {
 }
 // ---- 📋 멤버 리스트: 해민 시트 'PALLO! 외국인 멤버 관리' 칸 그대로 (구멤버·신멤버 안 나누고 한 리스트) · 칸을 고치면 바로 저장
 // 출석체크 = 영어 프리토킹 출석한 날짜들 · 출석률 = 고른 달 출석 ÷ 8회 (gx-core.js) · 국적·영어세션시간은 고르기(+직접 입력)
-const PLAN = { C: ["Plan C", "Plan C (Korean Class Only)"], D: ["Plan D", "Plan D (Class + Free Talking)"] };
+const PLAN = { A: ["Plan A", "Plan A · Regular (기존 회원 · 무료 · Korean Class 들으면 프리토킹 주 2시간 필수)"], B: ["Plan B", "Plan B · Free Pass (기존 회원 · ₩100,000 1회 · 최소 출석 없음 · Partner Voucher 포함)"],
+  C: ["Plan C", "Plan C · Korean Class Only (새 회원 · ₩150,000 · 프리토킹 없음)"], D: ["Plan D", "Plan D · Class + Free Talking (새 회원 · 등록비 ₩30,000 · 프리토킹 주 2회 이상)"] }; // 해민 포스터 (11-09)
 const SHORT = { session_time: "영어세션 시간", korean_level: "한국어 레벨", le: "언어 교환", le_partner: "언어교환 파트너", reg_fee: "등록비", voucher: "바우처" }; // 좁은 칸 제목 (전체 이름은 마우스 올리면)
 const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "n"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "s"], ["korean_level", "한국어레벨", "k"], ["plan", "플랜종류", "p"],
   ["le", "언어교환 유무", "c"], ["le_partner", "언어교환 파트너", "t"], ["reg_fee", "등록비 여부", "c"], ["voucher", "바우처 수령 여부", "c"]];
@@ -188,14 +189,14 @@ function rAtt(r) {
 function rRate(r) {
   if (r.plan === "C") return `<span class="mut" title="Plan C 는 프리토킹 없음">—</span>`;
   const x = GXC.rate(r.attend, ym());
-  return `<span class="gx8" title="${+ym().slice(5)}월 ${x.n}번 출석 / 한 달 ${x.of}회">${Array.from({ length: x.of }, (_, i) => `<i class="${i < x.n ? "on" : ""}"></i>`).join("")}</span><b>${x.n}/${x.of}회</b> <small class="mut">${x.pct}%</small>`;
+  return `<span class="gx8" title="${+ym().slice(5)}월 ${x.n}번 출석 / 한 달 ${x.of}회 · ${GXC.GOAL}회 오면 출석 보상">${Array.from({ length: x.of }, (_, i) => `<i class="${i < x.n ? "on" : ""}${i === GXC.GOAL - 1 ? " g" : ""}"></i>`).join("")}</span><b>${x.n}/${x.of}회</b> <small class="mut">${x.pct}%</small>${x.goal ? `<small class="gxgoal" title="한 달 ${GXC.GOAL}/${x.of}회 달성 → 첫 달: Partner Voucher · 매달: Free Event Pass (₩40,000 이하 이벤트 무료)">🎁 보상</small>` : ""}`;
 }
 function renderRoster() {
   const list = GX.roster.filter(inBr), allBr = !GX.br;
   const head = [...RF.map(([f, l]) => [SHORT[f] || l, "c-" + f, l]), ["출석체크", "gxattc"], [`출석률 (${+ym().slice(5)}월)`, "gxratec"], ...(jo() ? [] : [["", "c-del"]])];
   body().innerHTML = `<div class="card gxros">
       <div class="gxroshead"><span class="gxmon"><button class="btn ghost" data-mon="-1" title="지난 달">◀</button><b>${ym().slice(0, 4)}년 ${+ym().slice(5)}월</b><button class="btn ghost" data-mon="1" title="다음 달">▶</button>${ym() === today().slice(0, 7) ? "" : `<button class="btn ghost" data-mon="0">이번 달</button>`}</span>
-      <p class="mut gxroshelp">칸을 고치면 바로 저장돼요 · Plan C = Korean Class Only · Plan D = Class + Free Talking · <b>☐ 오늘 출석</b> = 영어 프리토킹 출석 체크 → 그날 날짜가 남아요 (날짜 누르면 지우기, 📅 = 지난 날 넣기) · <b>출석률</b> = 이 달 출석 ÷ 한 달 8회 · 출석 날짜·출석률은 위에서 고른 달 것</p></div>
+      <p class="mut gxroshelp">칸을 고치면 바로 저장돼요 · 기존 회원 Plan A = Regular(무료) · B = Free Pass · 새 회원 Plan C = Korean Class Only · D = Class + Free Talking · <b>☐ 오늘 출석</b> = 영어 프리토킹 출석 체크 → 그날 날짜가 남아요 (날짜 누르면 지우기, 📅 = 지난 날 넣기) · <b>출석률</b> = 이 달 출석 ÷ 한 달 8회 · 6회(75%) 넘으면 🎁 보상 (첫 달 Partner Voucher · 매달 Free Event Pass, Plan A·B·D) · 출석 날짜·출석률은 위에서 고른 달 것</p></div>
       <table class="gxt gxrt"><thead><tr>${head.map(([h, c, l]) => `<th class="${c}" title="${l || h}">${h}</th>`).join("")}</tr></thead><tbody>
       ${list.map((r) => `<tr data-r="${r.id}">
         ${RF.map((c) => `<td data-l="${c[1]}" class="c-${c[0]}">${rCell(r, c)}${allBr && c[0] === "name" ? `<select data-f="branch" class="gxrbr" title="지점">${opts(BR, r.branch)}</select>` : ""}</td>`).join("")}

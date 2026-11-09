@@ -149,3 +149,6 @@ body:not(.gxv) #gxView { display: none; }
   #gxView .gxdt { text-align: left; border: 1px solid var(--line); background: var(--panel); padding: 7px 8px; }
   #gxView .gxrt .gxatt { width: auto; padding: 4px 10px; } #gxView .gxrt td.gxattc > * { justify-self: start; }
 }
+/* 출석 보상: 6번째 칸 뒤 금 · 6/8 달성 표시 (해민 포스터 11-09) */
+#gxView .gx8 i.g { box-shadow: 2px 0 0 0 var(--card, #fff), 3px 0 0 0 #c9a400; }
+#gxView .gxgoal { display: block; color: #8a6d00; font-weight: 700; }
