@@ -1,9 +1,9 @@
-// 🌏 [언어교환] 탭 — 옛 외국인 회원 사이트(culcom-global admin.html)를 플래너로 옮김. 대표·매니저·조교 누구나 전 지점 보기·매칭 (DB 0075_gx)
+// 🌏 [외국인] 탭 (11-09 '언어교환'에서 이름 바꿈) — 📋 멤버 리스트(해민 시트, DB 0098 gx_roster) + 옛 외국인 회원 사이트(culcom-global admin.html)를 플래너로 옮김. 대표·매니저·조교 누구나 전 지점 보기·매칭 (DB 0075_gx)
 // 외국인(4개 프로그램 신청) · 한국인(1:1 언어교환) · 매칭 추천(스케줄→언어→지점→온/오프, 동점 멤버십) · 이벤트 · 공개 신청 링크·QR · CSV
 // 공개 신청폼 = site/gx/ (로그인 없음). 지우기는 조교 빼고(서버도 막음)
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail 을 씀 → window.GX
 (() => {
-const GX = (window.GX = { sub: "db", fp: "", fs: "", br: null, q: "", kq: "", members: [], koreans: [], events: [], sel: null, ksel: null });
+const GX = (window.GX = { sub: "ls", roster: [], fp: "", fs: "", br: null, q: "", kq: "", members: [], koreans: [], events: [], sel: null, ksel: null });
 const V = () => document.getElementById("gxView");
 const BR = { "daegu-en": "대구영어점", "daegu-jpcn": "대구일중점", ulsan: "울산점" }; // 공개폼 지점 id ↔ 플래너 지점 이름 (gx/config.js BRANCHES)
 const PROG = { korean_class: "한국어 수업", language_exchange: "1:1 언어교환", socializing: "소셜(스터디)", event: "이벤트" };
@@ -13,7 +13,7 @@ const K_ST = { new: "대기", matched: "매칭됨", inactive: "쉬는 중" };
 const KEY = { available_days: "요일", available_times: "시간", days: "요일", times: "시간", mode: "방식", frequency: "횟수", exchange_style: "교환 스타일", other_language_level: "언어 레벨", preferred_partner: "원하는 상대", level: "반", message: "메시지", note: "메모" }; // 신청폼 답 이름 → 한국어
 const answers = (a, sep) => Object.entries(a.data || {}).filter(([, v]) => v && v.length).map(([k, v]) => `${KEY[k] || k}: ${Array.isArray(v) ? v.join("/") : v}`).join(sep);
 const TIER = { "VVIP+": 0, VVIP: 1, Basic: 2, Lite: 3 };
-const SUBS = [["db", "📊 현황"], ["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"], ["help", "📖 사용법"]];
+const SUBS = [["ls", "📋 멤버 리스트"], ["db", "📊 현황"], ["fm", "🌍 외국인"], ["kr", "🇰🇷 한국인"], ["ev", "🎉 이벤트"], ["ln", "🔗 신청 링크·QR"], ["help", "📖 사용법"]];
 const jo = () => myRole === "assistant";
 const day = (s) => (s ? new Date(s).toLocaleDateString("sv-SE") : ""); // 한국 시간 YYYY-MM-DD
 const when = (s) => (s ? new Date(s).toLocaleString("sv-SE").slice(0, 16) : "");
@@ -23,7 +23,7 @@ const active = (k) => (k.gx_matches || []).filter((x) => !x.ended_at);
 const since = (d) => { const n = Math.floor((Date.now() - new Date(d)) / 864e5); return n < 7 ? `${n}일째` : `${Math.floor(n / 7)}주째`; };
 const arr = (v) => (Array.isArray(v) ? v : []); // 공개 폼 값은 배열이 아닐 수도 있음
 const dash = (v) => (v == null || v === "" ? `<span class="mut">—</span>` : esc(v));
-try { GX.sub = localStorage.getItem("gx-sub") || "db"; } catch {}
+try { GX.sub = localStorage.getItem("gx-sub2") || "ls"; } catch {} // 11-09 멤버 리스트가 첫 화면 (예전 gx-sub 기억은 버림)
 
 GX.load = async function () {
   if (GX.br === null) { // 처음 한 번: 우리 지점 기본 (대표는 지난번 고른 것, 없으면 전 지점)
@@ -32,12 +32,13 @@ GX.load = async function () {
     else { const tid = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data; const name = tid && (await sb.from("teams").select("name").eq("id", tid).maybeSingle()).data?.name; /* teams 배열은 대표만 채워짐 */ br = Object.keys(BR).find((k) => BR[k] === name) || ""; }
     GX.br = br;
   }
-  const [m, k, e] = await Promise.all([
+  const [r, m, k, e] = await Promise.all([
+    sb.from("gx_roster").select("*").order("created_at"),
     sb.from("gx_members").select("*, gx_applications(*, gx_events(title), gx_matches(*, gx_koreans(name, membership)))").order("created_at", { ascending: false }),
     sb.from("gx_koreans").select("*, gx_matches(*, gx_members(name))").order("created_at", { ascending: false }),
     sb.from("gx_events").select("*, gx_applications(id)").order("event_date", { ascending: false })]);
-  if ([m, k, e].some((r) => fail(r.error))) return;
-  GX.members = m.data; GX.koreans = k.data; GX.events = e.data;
+  if ([m, k, e, r].some((x) => fail(x.error))) return;
+  GX.roster = r.data; GX.members = m.data; GX.koreans = k.data; GX.events = e.data;
   if (GX.sel) GX.sel = GX.members.find((x) => x.id === GX.sel.id) || null;
   if (GX.ksel) GX.ksel = GX.koreans.find((x) => x.id === GX.ksel.id) || null;
   render();
@@ -83,15 +84,15 @@ async function endMatch(x) {
 
 // ---- 화면
 function render() {
-  const v = V(), n = { fm: GX.members.filter(inBr).length, kr: GX.koreans.filter(inBr).length };
-  v.innerHTML = `<div class="gxbar"><h2>🌏 언어교환</h2><select id="gxBr">${brOpts(GX.br)}</select>
+  const v = V(), n = { ls: GX.roster.filter(inBr).length, fm: GX.members.filter(inBr).length, kr: GX.koreans.filter(inBr).length };
+  v.innerHTML = `<div class="gxbar"><h2>🌏 외국인</h2><select id="gxBr">${brOpts(GX.br)}</select>
       <nav class="gxsub">${SUBS.map(([id, l]) => `<button data-s="${id}" class="${GX.sub === id ? "on" : ""}">${l}${n[id] != null ? ` <span class="mut">${n[id]}</span>` : ""}</button>`).join("")}</nav>
       <button class="btn ghost" id="gxCsv" title="외국인 + 신청 한 줄씩">⬇️ CSV</button></div>
     <div id="gxBody"></div>`;
   v.querySelector("#gxBr").onchange = (e) => { GX.br = e.target.value; try { if (myRole === "admin") localStorage.setItem("gx-br", GX.br); } catch {} render(); };
-  v.querySelectorAll(".gxsub button").forEach((b) => (b.onclick = () => { GX.sub = b.dataset.s; try { localStorage.setItem("gx-sub", GX.sub); } catch {} render(); }));
+  v.querySelectorAll(".gxsub button").forEach((b) => (b.onclick = () => { GX.sub = b.dataset.s; try { localStorage.setItem("gx-sub2", GX.sub); } catch {} render(); }));
   v.querySelector("#gxCsv").onclick = csv;
-  ({ help: renderHelp, db: renderDash, fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
+  ({ ls: renderRoster, help: renderHelp, db: renderDash, fm: renderMembers, kr: renderKoreans, ev: renderEvents, ln: renderLinks })[GX.sub]?.();
 }
 const inBr = (x) => !GX.br || x.branch === GX.br;
 const body = () => V().querySelector("#gxBody");
@@ -144,11 +145,82 @@ function renderDash() {
   const B = body();
   B.querySelectorAll(".gxnum").forEach((b) => (b.onclick = () => { const g = b.dataset.go; if (g === "list") B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); else if (g === "wait") B.querySelector("#gxWait").scrollIntoView({ behavior: "smooth" }); else { GX.sub = g; render(); } }));
   B.querySelectorAll("tr[data-p]").forEach((tr) => (tr.onclick = () => { GX.fp = GX.fp === tr.dataset.p ? "" : tr.dataset.p; renderDash(); B.querySelector(".gxwide").scrollIntoView({ behavior: "smooth" }); }));
-  B.querySelector("#gxHelpGo").onclick = () => { GX.sub = "help"; try { localStorage.setItem("gx-sub", "help"); } catch {} render(); };
+  B.querySelector("#gxHelpGo").onclick = () => { GX.sub = "help"; try { localStorage.setItem("gx-sub2", "help"); } catch {} render(); };
   B.querySelector("#gxFp").onchange = (e) => { GX.fp = e.target.value; renderDash(); };
   B.querySelector("#gxFs").onchange = (e) => { GX.fs = e.target.value; renderDash(); };
   B.querySelectorAll("[data-m]").forEach((el) => (el.onclick = (ev) => { ev.preventDefault(); openMember(el.dataset.m); }));
   B.querySelectorAll(".d-match").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); const { a, m } = all.find((x) => x.a.id === b.dataset.a); match(a, m, GX.koreans.find((k) => k.id === b.dataset.k)); }));
+}
+// ---- 📋 멤버 리스트: 해민 시트 'PALLO! 외국인 멤버 관리' 칸 그대로 (구멤버·신멤버 안 나누고 한 리스트) · 칸을 고치면 바로 저장
+// 출석체크 = 영어 프리토킹 출석한 날짜들 · 출석률 = 출석 ÷ (시작 후 주 수 × 2) (gx-core.js)
+const PLAN = { C: ["Plan C", "Plan C (Korean Class Only)"], D: ["Plan D", "Plan D (Class + Free Talking)"] };
+const SHORT = { session_time: "영어세션 시간", korean_level: "한국어 레벨", le: "언어 교환", le_partner: "언어교환 파트너", reg_fee: "등록비", voucher: "바우처" }; // 좁은 칸 제목 (전체 이름은 마우스 올리면)
+const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "t"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "t"], ["korean_level", "한국어레벨", "t"], ["plan", "플랜종류", "p"],
+  ["le", "언어교환 유무", "c"], ["le_partner", "언어교환 파트너", "t"], ["reg_fee", "등록비 여부", "c"], ["voucher", "바우처 수령 여부", "c"]];
+const today = () => new Date().toLocaleDateString("sv-SE");
+const md = (d) => `${+d.slice(5, 7)}/${+d.slice(8)}`;
+function rCell(r, [f, , t]) {
+  const v = r[f];
+  if (t === "c") return `<input type="checkbox" data-f="${f}" ${v ? "checked" : ""}>`;
+  if (t === "d") return `<label class="gxdt"><span>${v ? v.slice(2).replace(/-/g, ".") : `<span class="mut">날짜</span>`}</span><input type="date" data-f="${f}" value="${esc(v || "")}"></label>`; // 좁은 칸: 26.10.19 로 보이고 누르면 달력
+  if (t === "g") return `<select data-f="${f}">${["", "남", "여"].map((x) => `<option ${x === v ? "selected" : ""}>${x}</option>`).join("")}</select>`;
+  if (t === "p") return `<select data-f="${f}" title="${esc(PLAN[v]?.[1] || "")}"><option value=""></option>${Object.entries(PLAN).map(([k, [s, l]]) => `<option value="${k}" title="${l}" ${k === v ? "selected" : ""}>${s}</option>`).join("")}</select>`;
+  return `<input data-f="${f}" value="${esc(v)}" title="${esc(v)}" maxlength="${f === "phone" ? 30 : f === "name" || f === "le_partner" ? 60 : 40}">`;
+}
+function rAtt(r) {
+  const t = today(), on = r.attend.includes(t);
+  return `<div class="gxattb"><button class="gxatt ${on ? "on" : ""}" data-act="today" title="오늘 영어 프리토킹 출석 (다시 누르면 취소)">${on ? "✅" : "☐"} 오늘 출석</button>
+    <label class="gxattd btn ghost" title="지난 날 출석 넣기">📅<input type="date" data-act="day" max="${t}"></label></div>
+    <div class="gxdays">${[...r.attend].sort().map((d) => `<button class="gxday" data-d="${d}" title="${d} · 누르면 이 날 출석 지우기">${md(d)}</button>`).join("")}</div>`;
+}
+function rRate(r) {
+  if (r.plan === "C") return `<span class="mut" title="Plan C 는 프리토킹 없음">—</span>`;
+  const x = GXC.rate(r.start_date, r.attend, today());
+  if (!x) return `<span class="mut" title="시작일을 넣으면 계산돼요">—</span>`;
+  return `<b>${x.pct}%</b> <small class="mut">${x.n}/${x.of}회</small><i class="gxrbar"><i style="width:${x.pct}%"></i></i>`;
+}
+function renderRoster() {
+  const list = GX.roster.filter(inBr), allBr = !GX.br;
+  const head = [...RF.map(([f, l]) => [SHORT[f] || l, "c-" + f, l]), ["출석체크", "gxattc"], ["출석률", "gxratec"], ...(jo() ? [] : [["", "c-del"]])];
+  body().innerHTML = `<div class="card gxros">
+      <p class="mut gxroshelp">칸을 고치면 바로 저장돼요 · Plan C = Korean Class Only · Plan D = Class + Free Talking · <b>☐ 오늘 출석</b> = 영어 프리토킹 출석 체크 → 그날 날짜가 남아요 (날짜 누르면 지우기, 📅 = 지난 날 넣기) · <b>출석률</b> = 출석 ÷ (시작 후 주 수 × 2회)</p>
+      <table class="gxt gxrt"><thead><tr>${head.map(([h, c, l]) => `<th class="${c}" title="${l || h}">${h}</th>`).join("")}</tr></thead><tbody>
+      ${list.map((r) => `<tr data-r="${r.id}">
+        ${RF.map((c) => `<td data-l="${c[1]}" class="c-${c[0]}">${rCell(r, c)}${allBr && c[0] === "name" ? `<select data-f="branch" class="gxrbr" title="지점">${opts(BR, r.branch)}</select>` : ""}</td>`).join("")}
+        <td data-l="출석체크" class="gxattc">${rAtt(r)}</td><td data-l="출석률" class="gxratec">${rRate(r)}</td>
+        ${jo() ? "" : `<td class="c-del"><button class="gxrdel" title="이 줄 지우기">🗑</button></td>`}</tr>`).join("") || `<tr><td colspan="${head.length}" class="mut gxempty">아직 없어요 — 아래 [＋ 멤버 추가] 로 한 줄씩 넣어요</td></tr>`}
+      </tbody></table>
+      <button class="btn" id="gxrAdd">＋ 멤버 추가</button> <small class="mut">${list.length}명${allBr ? " · 전 지점 (새 줄은 대구영어점, 이름 밑 지점에서 바꾸기)" : ""}</small></div>`;
+  const B = body(), row = (el) => GX.roster.find((r) => r.id === el.closest("tr[data-r]")?.dataset.r);
+  const save = async (r, patch) => { const { error } = await sb.from("gx_roster").update(patch).eq("id", r.id); if (fail(error)) return false; Object.assign(r, patch); return true; };
+  const redraw = (r) => { const tr = B.querySelector(`tr[data-r="${r.id}"]`); tr.querySelector(".gxattc").innerHTML = rAtt(r); tr.querySelector(".gxratec").innerHTML = rRate(r); };
+  const setAttend = async (r, attend) => { if (await save(r, { attend: [...new Set(attend)].sort() })) redraw(r); };
+  B.querySelector("tbody").onchange = async (e) => {
+    const el = e.target, r = row(el); if (!r) return;
+    if (el.dataset.act === "day") { if (el.value) await setAttend(r, [...r.attend, el.value]); return; }
+    const f = el.dataset.f; if (!f) return;
+    const v = el.type === "checkbox" ? el.checked : f === "start_date" ? el.value || null : el.value.trim();
+    if (!(await save(r, { [f]: v }))) { el.type === "checkbox" ? (el.checked = r[f]) : (el.value = r[f] ?? ""); return; }
+    if (f === "plan") el.title = PLAN[v]?.[1] || "";
+    if (f === "start_date") el.previousElementSibling.innerHTML = v ? v.slice(2).replace(/-/g, ".") : `<span class="mut">날짜</span>`;
+    if (el.title !== undefined && el.type === "text") el.title = v;
+    if (f === "start_date" || f === "plan") redraw(r);
+    if (f === "branch" && GX.br && v !== GX.br) renderRoster();
+  };
+  B.querySelector("tbody").onclick = async (e) => {
+    if (e.target.type === "date") { try { e.target.showPicker(); } catch {} return; } // 숨긴 날짜칸: 누르면 바로 달력
+    const el = e.target.closest("button"), r = el && row(el); if (!r) return;
+    if (el.dataset.act === "today") { const t = today(); return setAttend(r, r.attend.includes(t) ? r.attend.filter((d) => d !== t) : [...r.attend, t]); }
+    if (el.dataset.d) { if (confirm(`${r.name || "이 멤버"} — ${el.dataset.d} 출석을 지울까요?`)) setAttend(r, r.attend.filter((d) => d !== el.dataset.d)); return; }
+    if (el.classList.contains("gxrdel") && confirm(`${r.name || "빈 줄"} 을(를) 리스트에서 지울까요? 되돌릴 수 없어요.`)) {
+      const { error } = await sb.from("gx_roster").delete().eq("id", r.id); if (fail(error)) return;
+      GX.roster = GX.roster.filter((x) => x !== r); renderRoster();
+    }
+  };
+  B.querySelector("#gxrAdd").onclick = async () => {
+    const { data, error } = await sb.from("gx_roster").insert({ branch: GX.br || "daegu-en" }).select().single(); if (fail(error)) return;
+    GX.roster.push(data); renderRoster(); B.querySelector(`tr[data-r="${data.id}"] [data-f="name"]`)?.focus();
+  };
 }
 const showPanel = () => { if (innerWidth < 1300) body().querySelector("#gxPanel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; // 한 줄 화면이면 밑의 상세로
 
