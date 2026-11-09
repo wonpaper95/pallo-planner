@@ -5,7 +5,7 @@
 (() => {
 const GX = (window.GX = { sub: "ls", roster: [], fp: "", fs: "", br: null, q: "", kq: "", members: [], koreans: [], events: [], sel: null, ksel: null });
 const V = () => document.getElementById("gxView");
-const BR = { "daegu-en": "대구영어점", "daegu-jpcn": "대구일중점", ulsan: "울산점" }; // 공개폼 지점 id ↔ 플래너 지점 이름 (gx/config.js BRANCHES)
+const BR = { "daegu-en": "대구영어점", "daegu-jpcn": "대구일중점", ulsan: "울산점", gumi: "구미점" }; // 공개폼 지점 id ↔ 플래너 지점 이름 (gx/config.js BRANCHES) · 구미점은 멤버 리스트만 (공개 신청폼엔 아직 없음, 11-09)
 const PROG = { korean_class: "한국어 수업", language_exchange: "1:1 언어교환", socializing: "소셜(스터디)", event: "이벤트" };
 const APP_ST = { applied: "신청", confirmed: "확정", matched: "매칭됨", attended: "참석", cancelled: "취소" };
 const M_ST = { new: "새 회원", active: "활동 중", inactive: "쉬는 중" };
@@ -410,7 +410,7 @@ function renderLinks() {
   const L = [["외국인 · 처음부터", "환영 → 기본정보 → 프로그램 고르기", B], ["외국인 · 한국어 수업", "기본정보 뒤 바로 한국어 수업", B + "?p=korean_class"],
     ["외국인 · 1:1 언어교환", "바로 언어교환 신청", B + "?p=language_exchange"], ["외국인 · 소셜(스터디)", "바로 스터디 예약", B + "?p=socializing"],
     ["외국인 · 이벤트", "바로 이벤트 목록", B + "?p=events"], ["한국인 · 1:1 언어교환 신청", "한국인 회원용 (한국어)", B + "korean.html"],
-    ...Object.entries(BR).flatMap(([id, ko]) => [[`${ko} · 외국인 신청`, "지점 미리 골라져 있음", B + "?b=" + id], [`${ko} · 한국인 신청`, "지점 미리 골라져 있음", B + "korean.html?b=" + id]])];
+    ...Object.entries(BR).filter(([id]) => id !== "gumi").flatMap(([id, ko]) => [[`${ko} · 외국인 신청`, "지점 미리 골라져 있음", B + "?b=" + id], [`${ko} · 한국인 신청`, "지점 미리 골라져 있음", B + "korean.html?b=" + id]])];
   body().innerHTML = `<div class="gxlinks">${L.map(([t, s, u], i) => `<div class="card gxlc"><div class="gxqr" id="gxqr${i}"></div><div><b>${esc(t)}</b><small class="mut">${esc(s)}</small><code>${esc(u)}</code>
     <button class="btn ghost" data-copy="${esc(u)}">링크 복사</button> <a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener">열기</a></div></div>`).join("")}</div>`;
   body().querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.copy); toast("복사했어요"); } catch { prompt("복사:", b.dataset.copy); } }));
