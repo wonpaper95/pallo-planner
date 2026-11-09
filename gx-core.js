@@ -7,12 +7,19 @@
     return { n, of: PER_MONTH, pct: Math.min(100, Math.round((n / PER_MONTH) * 100)) };
   }
   // 영어세션시간 고르기 목록: 리더 현황 표의 반·시간대 → "월수 11AM" 중복 없이, 월수→화목→토일, 시간 순
+  // 운영 리더 표엔 일본어·중국어반, 블로그스텝·백업리더 같은 줄, "오후 6시"/"6PM" 섞임이 있음 (11-09 라이브 확인) →
+  // 영어반만(일본어·중국어 빼고), 반(월수·화목·토일) 있는 것만, "오후 6시"→"6PM", 그 반에 시각이 있으면 "오전/오후" 같은 큰 묶음은 뺌
   const GRP = { 월수: 0, 화목: 1, 토일: 2 };
-  const mins = (s) => { const m = /(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i.exec(s); if (!m) return 9999; return ((+m[1] % 12) + (/pm/i.test(m[3]) ? 12 : 0)) * 60 + (+m[2] || 0); };
+  const norm = (s) => s.replace(/\s+/g, " ").trim().replace(/^(오전|오후|저녁)\s*(\d{1,2})시(?:\s*(\d{1,2})분)?$/, (_, ap, h, m) => `${h}${m ? ":" + m.padStart(2, "0") : ""}${ap === "오전" ? "AM" : "PM"}`).replace(/\s*(AM|PM)$/i, (x) => x.trim().toUpperCase());
+  const mins = (s) => { const m = /^(\d{1,2})(?::(\d{2}))?(AM|PM)$/.exec(s); return m ? ((+m[1] % 12) + (m[3] === "PM" ? 12 : 0)) * 60 + (+m[2] || 0) : { 오전: 600, 오후: 900, 저녁: 1140 }[s] ?? 9999; };
   function slots(rows) {
-    const seen = new Map();
-    for (const { grp, slot } of rows || []) { const label = [grp, slot].filter(Boolean).join(" ").trim(); if (label && !seen.has(label)) seen.set(label, [GRP[grp] ?? 9, mins(slot || "")]); }
-    return [...seen].sort((a, b) => a[1][0] - b[1][0] || a[1][1] - b[1][1] || a[0].localeCompare(b[0])).map(([l]) => l);
+    const by = {};
+    for (const { grp, slot } of rows || []) {
+      const t = norm(slot || "");
+      if (!(grp in GRP) || /일본어|중국어/.test(t) || !/^(\d{1,2}(:\d{2})?(AM|PM)|오전|오후|저녁)$/.test(t)) continue;
+      (by[grp] ??= new Set()).add(t);
+    }
+    return Object.keys(GRP).flatMap((g) => { const ts = [...(by[g] ?? [])], exact = ts.filter((t) => /\d/.test(t)); return (exact.length ? exact : ts).sort((a, b) => mins(a) - mins(b)).map((t) => `${g} ${t}`); });
   }
   const api = { rate, slots, PER_MONTH };
   if (typeof module === "object" && module.exports) module.exports = api; else root.GXC = api;
