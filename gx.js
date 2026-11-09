@@ -157,13 +157,14 @@ function renderDash() {
 // 출석체크 = 영어 프리토킹 출석한 날짜들 · 출석률 = 고른 달 출석 ÷ 8회 (gx-core.js) · 국적·영어세션시간은 고르기(+직접 입력)
 const PLAN = { C: ["Plan C", "Plan C (Korean Class Only)"], D: ["Plan D", "Plan D (Class + Free Talking)"] };
 const SHORT = { session_time: "영어세션 시간", korean_level: "한국어 레벨", le: "언어 교환", le_partner: "언어교환 파트너", reg_fee: "등록비", voucher: "바우처" }; // 좁은 칸 제목 (전체 이름은 마우스 올리면)
-const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "n"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "s"], ["korean_level", "한국어레벨", "t"], ["plan", "플랜종류", "p"],
+const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "n"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "s"], ["korean_level", "한국어레벨", "k"], ["plan", "플랜종류", "p"],
   ["le", "언어교환 유무", "c"], ["le_partner", "언어교환 파트너", "t"], ["reg_fee", "등록비 여부", "c"], ["voucher", "바우처 수령 여부", "c"]];
 const today = () => new Date().toLocaleDateString("sv-SE");
 const NAT = [["미국", "🇺🇸"], ["캐나다", "🇨🇦"], ["영국", "🇬🇧"], ["아일랜드", "🇮🇪"], ["호주", "🇦🇺"], ["뉴질랜드", "🇳🇿"], ["남아공", "🇿🇦"], ["필리핀", "🇵🇭"], ["인도", "🇮🇳"],
   ["일본", "🇯🇵"], ["중국", "🇨🇳"], ["대만", "🇹🇼"], ["홍콩", "🇭🇰"], ["베트남", "🇻🇳"], ["태국", "🇹🇭"], ["인도네시아", "🇮🇩"], ["말레이시아", "🇲🇾"], ["싱가포르", "🇸🇬"], ["몽골", "🇲🇳"],
   ["우즈베키스탄", "🇺🇿"], ["카자흐스탄", "🇰🇿"], ["러시아", "🇷🇺"], ["독일", "🇩🇪"], ["프랑스", "🇫🇷"], ["스페인", "🇪🇸"], ["이탈리아", "🇮🇹"], ["네덜란드", "🇳🇱"], ["스웨덴", "🇸🇪"],
   ["폴란드", "🇵🇱"], ["튀르키예", "🇹🇷"], ["멕시코", "🇲🇽"], ["브라질", "🇧🇷"], ["아르헨티나", "🇦🇷"], ["칠레", "🇨🇱"], ["콜롬비아", "🇨🇴"], ["페루", "🇵🇪"], ["나이지리아", "🇳🇬"], ["이집트", "🇪🇬"]];
+const KLV = ["pre-beginner", "beginner", "intermediate1", "intermediate2", "free-talking"]; // 한국어 레벨 5단계 (11-09 사용자 지정)
 const OWN = "__own__"; // 고르기의 '✏️ 직접 입력…' 값
 const pickSel = (f, v, list, title) => `<select data-f="${f}" class="gxpick" title="${esc(v || title)}"><option value=""></option>${list.some(([x]) => x === v) || !v ? "" : `<option selected>${esc(v)}</option>`}${list.map(([x, l]) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(l)}</option>`).join("")}<option value="${OWN}">✏️ 직접 입력…</option></select>`;
 const ym = () => GX.rm || today().slice(0, 7);
@@ -175,6 +176,7 @@ function rCell(r, [f, , t]) {
   if (t === "g") return `<select data-f="${f}">${["", "남", "여"].map((x) => `<option ${x === v ? "selected" : ""}>${x}</option>`).join("")}</select>`;
   if (t === "n") return pickSel(f, v, NAT.map(([x]) => [x, x]), "국적");
   if (t === "s") { const l = (GX.slots?.[r.branch] || []).map((x) => [x, x]); return pickSel(f, v, l, l.length ? "지점 시간표 (리더 현황 반·시간)" : "이 지점 시간표가 없어요 — 직접 입력"); }
+  if (t === "k") return `<select data-f="${f}" class="gxpick" title="${esc(v || "한국어 레벨")}"><option value=""></option>${KLV.includes(v) || !v ? "" : `<option selected>${esc(v)}</option>`}${KLV.map((x) => `<option value="${x}" ${x === v ? "selected" : ""}>${x}</option>`).join("")}</select>`;
   if (t === "p") return `<select data-f="${f}" title="${esc(PLAN[v]?.[1] || "")}"><option value=""></option>${Object.entries(PLAN).map(([k, [s, l]]) => `<option value="${k}" title="${l}" ${k === v ? "selected" : ""}>${s}</option>`).join("")}</select>`;
   return `<input data-f="${f}" value="${esc(v)}" title="${esc(v)}" maxlength="${f === "phone" ? 30 : f === "name" || f === "le_partner" ? 60 : 40}">`;
 }

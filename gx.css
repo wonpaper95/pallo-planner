@@ -109,7 +109,7 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxrt td { padding: 3px 2px; } #gxView .gxrt th { padding: 6px 2px; }
 #gxView .gxrt td input:not([type=checkbox]), #gxView .gxrt td select { padding: 5px 3px; }
 #gxView .gxrt .c-name { width: 108px; } #gxView .gxrt .c-gender { width: 36px; } #gxView .gxrt .c-nationality { width: 76px; } #gxView .gxrt .c-phone { width: 106px; } #gxView .gxrt .c-start_date { width: 60px; }
-#gxView .gxrt .c-korean_level { width: 50px; } #gxView .gxrt .c-le_partner { width: 60px; }
+#gxView .gxrt .c-korean_level { width: 92px; } #gxView .gxrt .c-le_partner { width: 60px; }
 #gxView .gxrt .c-plan { width: 56px; } #gxView .gxrt .c-le, #gxView .gxrt .c-reg_fee, #gxView .gxrt .c-voucher { width: 36px; }
 #gxView .gxrt .gxattc { width: 86px; } #gxView .gxrt .gxratec { width: 64px; } #gxView .gxrt .c-del { width: 26px; }
 #gxView .gxrt select[data-f=gender], #gxView .gxrt select[data-f=plan], #gxView .gxrt .gxrbr, #gxView .gxrt .gxpick { appearance: none; -webkit-appearance: none; cursor: pointer; }
