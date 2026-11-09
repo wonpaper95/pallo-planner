@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202611081735">
+<meta name="app-version" content="202611091518">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202611081735"></script>
+<script src="theme.js?v=202611091518"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -562,28 +562,28 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202611081735">
-<link rel="stylesheet" href="photo.css?v=202611081735">
-<link rel="stylesheet" href="post.css?v=202611081735">
-<link rel="stylesheet" href="marketing.css?v=202611081735">
-<link rel="stylesheet" href="contacts.css?v=202611081735">
-<link rel="stylesheet" href="leaders.css?v=202611081735">
-<link rel="stylesheet" href="links.css?v=202611081735">
-<link rel="stylesheet" href="mt.css?v=202611081735">
-<link rel="stylesheet" href="le.css?v=202611081735">
-<link rel="stylesheet" href="reports.css?v=202611081735">
-<link rel="stylesheet" href="edu.css?v=202611081735">
-<link rel="stylesheet" href="qna.css?v=202611081735">
-<link rel="stylesheet" href="jo-guide.css?v=202611081735">
-<link rel="stylesheet" href="jc.css?v=202611081735">
-<link rel="stylesheet" href="talkbot.css?v=202611081735">
-<link rel="stylesheet" href="work.css?v=202611081735">
-<link rel="stylesheet" href="fin.css?v=202611081735">
-<link rel="stylesheet" href="gx.css?v=202611081735">
-<link rel="stylesheet" href="att.css?v=202611081735">
-<link rel="stylesheet" href="glass.css?v=202611081735">
-<link rel="stylesheet" href="sidebar.css?v=202611081735">
-<link rel="stylesheet" href="skins.css?v=202611081735">
+<link rel="stylesheet" href="blog.css?v=202611091518">
+<link rel="stylesheet" href="photo.css?v=202611091518">
+<link rel="stylesheet" href="post.css?v=202611091518">
+<link rel="stylesheet" href="marketing.css?v=202611091518">
+<link rel="stylesheet" href="contacts.css?v=202611091518">
+<link rel="stylesheet" href="leaders.css?v=202611091518">
+<link rel="stylesheet" href="links.css?v=202611091518">
+<link rel="stylesheet" href="mt.css?v=202611091518">
+<link rel="stylesheet" href="le.css?v=202611091518">
+<link rel="stylesheet" href="reports.css?v=202611091518">
+<link rel="stylesheet" href="edu.css?v=202611091518">
+<link rel="stylesheet" href="qna.css?v=202611091518">
+<link rel="stylesheet" href="jo-guide.css?v=202611091518">
+<link rel="stylesheet" href="jc.css?v=202611091518">
+<link rel="stylesheet" href="talkbot.css?v=202611091518">
+<link rel="stylesheet" href="work.css?v=202611091518">
+<link rel="stylesheet" href="fin.css?v=202611091518">
+<link rel="stylesheet" href="gx.css?v=202611091518">
+<link rel="stylesheet" href="att.css?v=202611091518">
+<link rel="stylesheet" href="glass.css?v=202611091518">
+<link rel="stylesheet" href="sidebar.css?v=202611091518">
+<link rel="stylesheet" href="skins.css?v=202611091518">
 </head>
 <body>
 
@@ -768,9 +768,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202611081735"></script>
-<script src="week.js?v=202611081735"></script>
-<script src="pick.js?v=202611081735"></script>
+<script src="config.js?v=202611091518"></script>
+<script src="week.js?v=202611091518"></script>
+<script src="pick.js?v=202611091518"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -875,7 +875,7 @@ async function joLogin(token) { // 폰은 첫 연결이 느리거나 끊기기 �
 function joHome() {
   let t = null; try { t = localStorage.getItem("jo-token"); } catch {} if (!t) return;
   document.querySelector('link[rel="manifest"]')?.remove();
-  if (new URLSearchParams(location.search).get("jo") !== t) history.replaceState(null, "", `${location.pathname}?jo=${t}`);
+  if (new URLSearchParams(location.search).get("jo") !== t) history.replaceState(null, "", `${location.pathname}?jo=${t}${location.hash}`);
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent), home = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
   let seen = false; try { seen = !!localStorage.getItem("jo-home-tip"); } catch {}
   if (!ios || home || seen || document.getElementById("joTip")) return;
@@ -914,7 +914,7 @@ async function boot() {
       joScreen("busy");
       try { await joLogin(jo); } catch (e) { joFail = e; if (e.gone) try { localStorage.removeItem("jo-token"); } catch {} }
     }
-    if (!localStorage.getItem("jo-token")) history.replaceState(null, "", location.pathname); // 조교가 아니면(취소) 링크 값은 주소창에서 지움 — 조교면 joHome 이 주소를 남겨 둠(홈 화면 추가용)
+    if (!localStorage.getItem("jo-token")) history.replaceState(null, "", location.pathname + location.hash); // 조교가 아니면(취소) 링크 값은 주소창에서 지움 — 조교면 joHome 이 주소를 남겨 둠(홈 화면 추가용)
   } else if (!(await sb.auth.getSession()).data.session) { // 조교 기기: 로그인이 풀렸으면 기억한 링크로 다시
     let t = null; try { t = localStorage.getItem("jo-token"); } catch {}
     if (t) { joScreen("busy"); try { await joLogin(t); } catch (e) { joFail = e; if (e.gone) try { localStorage.removeItem("jo-token"); } catch {} } }
@@ -959,7 +959,7 @@ async function boot() {
   if (view === "board") myRole === "admin" ? loadBoard() : setView("week");
   const kk = new URLSearchParams(location.search).get("kakao"); // 💬 카카오 연결하고 돌아옴
   if (kk) {
-    history.replaceState(null, "", location.pathname);
+    history.replaceState(null, "", location.pathname + location.hash);
     toast({ ok: "💬 카카오톡 연결 완료! '나와의 채팅'에 확인 메시지를 보냈어요", nomsg: "💬 연결은 됐는데 확인 메시지를 못 보냈어요. 카카오 앱 설정을 확인해 주세요",
       sender_ok: "📮 업무폰 계정 연결 완료! 이제 그 대화방으로 알림이 와요", nofriend: "📮 업무폰 카톡과 대표님 카톡이 친구인지, 대표님이 '카톡으로도 받기'를 먼저 연결했는지 확인해 주세요",
       noscope_sender: "📮 '친구목록'과 '카카오톡 메시지 전송' 둘 다 동의해야 해요. 다시 연결해 주세요",
@@ -1745,6 +1745,7 @@ addEventListener("appinstalled", () => { installEvt = null; $("#installBtn").cla
 $("#installBtn").onclick = async () => { if (!installEvt) return toast("크롬 주소창 오른쪽 '설치' 아이콘으로 설치할 수 있어요"); installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("#installBtn").classList.add("hidden"); };
 let view = "week";
 try { view = localStorage.getItem("planner-view") || "week"; } catch {}
+if (/^#\w+$/.test(location.hash)) view = location.hash.slice(1); // 🔖 탭별 북마크: 주소 #sales 면 매출 탭으로 열림
 if (!document.querySelector(`.seg [data-v="${view}"]`)) view = "week"; // 없앤 탭이 저장돼 있으면 빈 화면이 된다
 const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx", "at", "le"]; // 🧑‍🎓 조교가 볼 수 있는 탭 (le 는 일중 조교만, is-jpcn)
 function setView(v) {
@@ -1775,10 +1776,13 @@ function setView(v) {
   document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
   if (v !== "edu") document.body.classList.remove("edurep");
   try { localStorage.setItem("planner-view", v); } catch {}
+  if (location.hash !== "#" + v && !location.hash.includes("=")) history.replaceState(null, "", location.pathname + location.search + "#" + v); // 🔖 주소에 탭 이름 → 탭마다 북마크 따로
+  const tb = document.querySelector(`.seg [data-v="${v}"]`); document.title = "팔로 플래너" + (tb ? " · " + tb.firstChild.textContent.trim() : ""); // 북마크 이름도 탭마다 다르게
   window.scrollTo(0, 0);
 }
 document.querySelector(".seg").onclick = (e) => !dragged && e.target.dataset.v && setView(e.target.dataset.v);
 setView(view);
+addEventListener("hashchange", () => { const v = location.hash.slice(1); if (/^\w+$/.test(v) && v !== view && document.querySelector(`.seg [data-v="${v}"]`)) setView(v); }); // 열린 상태에서 다른 탭 북마크 눌러도 이동
 $("#weekList").onclick = (e) => {
   if (e.target.id === "py" || e.target.id === "ny") { year += e.target.id === "py" ? -1 : 1; monday = W.weeksOf(year)[0]; return loadAll(); }
   const b = e.target.closest(".wk"); if (!b) return;
@@ -2376,42 +2380,42 @@ checkVer(); document.addEventListener("visibilitychange", () => document.visibil
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.replace(location.pathname)); // ?jo= 빼고 — 조교 기기는 boot 가 기억한 jo-token 으로 다시 들어감
 document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 다 돈 뒤 — 바로 부르면 데이터가 스크립트보다 빨리 온 첫 로드에 없는 전역(REF 등)을 씀 (뒤 스크립트들은 로드 시점에 me·myRole 안 씀)
 </script>
-<script src="sales.js?v=202611081735"></script>
-<script src="month-goal.js?v=202611081735"></script>
-<script src="sales-all.js?v=202611081735"></script>
-<script src="photo.js?v=202611081735"></script>
-<script src="blog.js?v=202611081735"></script>
-<script src="mk-core.js?v=202611081735"></script>
-<script src="mkc-core.js?v=202611081735"></script>
-<script src="mka-core.js?v=202611081735"></script>
-<script src="mkd-core.js?v=202611081735"></script>
-<script src="marketing.js?v=202611081735"></script>
-<script src="sns-core.js?v=202611081735"></script>
-<script src="post.js?v=202611081735"></script>
-<script src="someday.js?v=202611081735"></script>
-<script src="contacts.js?v=202611081735"></script>
-<script src="refs.js?v=202611081735"></script>
-<script src="sim-merge.js?v=202611081735"></script>
-<script src="simtb.js?v=202611081735"></script>
-<script src="leaders-core.js?v=202611081735"></script>
-<script src="leaders.js?v=202611081735"></script>
-<script src="links.js?v=202611081735"></script>
-<script src="mt.js?v=202611081735"></script>
-<script src="le.js?v=202611081735"></script>
-<script src="edu-data.js?v=202611081735"></script>
-<script src="edu.js?v=202611081735"></script>
-<script src="reports.js?v=202611081735"></script>
-<script src="jo-guide-hire.js?v=202611081735"></script>
-<script src="jo-guide.js?v=202611081735"></script>
-<script src="jc.js?v=202611081735"></script>
-<script src="talkbot.js?v=202611081735"></script>
-<script src="work-core.js?v=202611081735"></script>
-<script src="work.js?v=202611081735"></script>
-<script src="fin-core.js?v=202611081735"></script>
-<script src="fin.js?v=202611081735"></script>
-<script src="gx.js?v=202611081735"></script>
-<script src="att.js?v=202611081735"></script>
-<script src="qna.js?v=202611081735"></script>
-<script src="sidebar.js?v=202611081735"></script>
+<script src="sales.js?v=202611091518"></script>
+<script src="month-goal.js?v=202611091518"></script>
+<script src="sales-all.js?v=202611091518"></script>
+<script src="photo.js?v=202611091518"></script>
+<script src="blog.js?v=202611091518"></script>
+<script src="mk-core.js?v=202611091518"></script>
+<script src="mkc-core.js?v=202611091518"></script>
+<script src="mka-core.js?v=202611091518"></script>
+<script src="mkd-core.js?v=202611091518"></script>
+<script src="marketing.js?v=202611091518"></script>
+<script src="sns-core.js?v=202611091518"></script>
+<script src="post.js?v=202611091518"></script>
+<script src="someday.js?v=202611091518"></script>
+<script src="contacts.js?v=202611091518"></script>
+<script src="refs.js?v=202611091518"></script>
+<script src="sim-merge.js?v=202611091518"></script>
+<script src="simtb.js?v=202611091518"></script>
+<script src="leaders-core.js?v=202611091518"></script>
+<script src="leaders.js?v=202611091518"></script>
+<script src="links.js?v=202611091518"></script>
+<script src="mt.js?v=202611091518"></script>
+<script src="le.js?v=202611091518"></script>
+<script src="edu-data.js?v=202611091518"></script>
+<script src="edu.js?v=202611091518"></script>
+<script src="reports.js?v=202611091518"></script>
+<script src="jo-guide-hire.js?v=202611091518"></script>
+<script src="jo-guide.js?v=202611091518"></script>
+<script src="jc.js?v=202611091518"></script>
+<script src="talkbot.js?v=202611091518"></script>
+<script src="work-core.js?v=202611091518"></script>
+<script src="work.js?v=202611091518"></script>
+<script src="fin-core.js?v=202611091518"></script>
+<script src="fin.js?v=202611091518"></script>
+<script src="gx.js?v=202611091518"></script>
+<script src="att.js?v=202611091518"></script>
+<script src="qna.js?v=202611091518"></script>
+<script src="sidebar.js?v=202611091518"></script>
 </body>
 </html>
