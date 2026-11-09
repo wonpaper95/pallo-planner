@@ -98,32 +98,46 @@ body:not(.gxv) #gxView { display: none; }
 #gxView .gxattb { display: flex; gap: 4px; align-items: center; }
 #gxView .gxatt { flex: 1; padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 #gxView .gxatt.on { background: color-mix(in srgb, var(--accent) 16%, transparent); border-color: var(--accent); }
-#gxView .gxattd { position: relative; padding: 3px 6px; font-size: 13px; cursor: pointer; overflow: hidden; }
+#gxView .gxattd { position: relative; padding: 0 3px; font-size: 12px; line-height: 18px; cursor: pointer; overflow: hidden; border-radius: 999px; } #gxView .gxattd:hover { background: var(--bg); }
 #gxView .gxattd input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; padding: 0; }
 #gxView .gxdays { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-#gxView .gxdays:empty { display: none; }
 #gxView .gxday { padding: 1px 6px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
 #gxView .gxday:hover { text-decoration: line-through; }
-#gxView .gxratec b { font-size: 14px; } #gxView .gxratec small { display: block; }
-#gxView .gxrbar { display: block; height: 4px; margin-top: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
-#gxView .gxrbar i { display: block; height: 100%; background: var(--accent); }
+#gxView .gxratec small { display: block; }
 #gxView .gxrdel { border: 0; background: none; cursor: pointer; opacity: .55; font-size: 14px; padding: 4px; } #gxView .gxrdel:hover { opacity: 1; }
-/* 칸 너비 (사이드바 있는 1280 에서 가로 스크롤 없이) — 국적·세션·레벨·파트너가 남는 폭을 나눠 가짐 */
-#gxView .gxrt td { padding: 4px 2px; } #gxView .gxrt th { padding: 6px 2px; }
-#gxView .gxrt .c-name { width: 112px; } #gxView .gxrt .c-gender { width: 40px; } #gxView .gxrt .c-phone { width: 106px; } #gxView .gxrt .c-start_date { width: 64px; }
-#gxView .gxrt .c-plan { width: 58px; } #gxView .gxrt .c-le, #gxView .gxrt .c-reg_fee, #gxView .gxrt .c-voucher { width: 42px; }
-#gxView .gxrt .gxattc { width: 116px; } #gxView .gxrt .gxratec { width: 54px; } #gxView .gxrt .c-del { width: 26px; }
-#gxView .gxrt select[data-f=gender], #gxView .gxrt select[data-f=plan], #gxView .gxrt .gxrbr { appearance: none; -webkit-appearance: none; text-align: center; cursor: pointer; }
+/* 칸 너비 (사이드바 있는 1280 에서 가로 스크롤 없이) — 국적·세션시간이 남는 폭을 나눠 가짐 */
+#gxView .gxrt td { padding: 3px 2px; } #gxView .gxrt th { padding: 6px 2px; }
+#gxView .gxrt td input:not([type=checkbox]), #gxView .gxrt td select { padding: 5px 3px; }
+#gxView .gxrt .c-name { width: 108px; } #gxView .gxrt .c-gender { width: 36px; } #gxView .gxrt .c-nationality { width: 76px; } #gxView .gxrt .c-phone { width: 106px; } #gxView .gxrt .c-start_date { width: 60px; }
+#gxView .gxrt .c-korean_level { width: 50px; } #gxView .gxrt .c-le_partner { width: 60px; }
+#gxView .gxrt .c-plan { width: 56px; } #gxView .gxrt .c-le, #gxView .gxrt .c-reg_fee, #gxView .gxrt .c-voucher { width: 36px; }
+#gxView .gxrt .gxattc { width: 86px; } #gxView .gxrt .gxratec { width: 64px; } #gxView .gxrt .c-del { width: 26px; }
+#gxView .gxrt select[data-f=gender], #gxView .gxrt select[data-f=plan], #gxView .gxrt .gxrbr, #gxView .gxrt .gxpick { appearance: none; -webkit-appearance: none; cursor: pointer; }
+#gxView .gxrt select[data-f=gender], #gxView .gxrt select[data-f=plan], #gxView .gxrt .gxrbr { text-align: center; }
 #gxView .gxrt .gxrbr { margin-top: 2px; font-size: 11px !important; padding: 2px 4px !important; color: var(--sub); }
 #gxView .gxrt .c-name input { font-weight: 700; }
 #gxView .gxdt { position: relative; display: block; padding: 5px 2px; text-align: center; cursor: pointer; border-radius: 8px; white-space: nowrap; }
 #gxView .gxdt:hover { background: var(--bg); }
 #gxView .gxdt input { position: absolute; inset: 0; opacity: 0; width: 100% !important; padding: 0 !important; cursor: pointer; }
-#gxView .gxattb .gxatt { padding: 4px 4px; }
+#gxView .gxrt .gxatt { width: 100%; padding: 4px 2px; }
+/* 칸 테두리 (시트처럼 서로 구분) */
+#gxView .gxrt { border: 1px solid var(--line); border-radius: 0; }
+#gxView .gxrt th, #gxView .gxrt td { border: 1px solid var(--line); }
+#gxView .gxrt thead th { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--text); }
+#gxView .gxrt tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--accent) 3%, transparent); }
+#gxView .gxrt tbody tr:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+/* 달 고르기 · 출석률 8칸 */
+#gxView .gxroshead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
+#gxView .gxroshead .gxroshelp { flex: 1 1 400px; margin: 0; }
+#gxView .gxmon { display: inline-flex; align-items: center; gap: 6px; } #gxView .gxmon b { font-size: 15px; min-width: 92px; text-align: center; } #gxView .gxmon .btn { padding: 4px 10px; }
+#gxView .gx8 { display: flex; gap: 2px; justify-content: center; margin-bottom: 3px; }
+#gxView .gx8 i { width: 5px; height: 10px; border-radius: 2px; background: var(--line); } #gxView .gx8 i.on { background: var(--accent); }
+#gxView .gxratec b { font-size: 13px; }
 /* 폰·좁은 화면: 한 사람 = 카드 한 장, 칸 이름이 왼쪽에 */
 @media (max-width: 900px) {
   #gxView .gxrt, #gxView .gxrt tbody, #gxView .gxrt tr, #gxView .gxrt td { display: block; width: auto !important; }
   #gxView .gxrt thead { display: none; }
+  #gxView .gxrt { border: 0; } #gxView .gxrt tbody tr td { background: none !important; } #gxView .gx8 { justify-content: flex-start; }
   #gxView .gxrt tr[data-r] { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; background: var(--bg); }
   #gxView .gxrt td { display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 4px 8px; border: 0; padding: 3px 0; text-align: left !important; }
   #gxView .gxrt td::before { content: attr(data-l); color: var(--sub); font-size: 12px; grid-row: 1; }
@@ -133,5 +147,5 @@ body:not(.gxv) #gxView { display: none; }
   #gxView .gxrt td.gxempty { display: block; }
   #gxView .gxrt td input:not([type=checkbox]), #gxView .gxrt td select { border-color: var(--line); background: var(--panel); font-size: 14px; padding: 7px 8px; }
   #gxView .gxdt { text-align: left; border: 1px solid var(--line); background: var(--panel); padding: 7px 8px; }
-  #gxView .gxattb { justify-content: flex-start; } #gxView .gxatt { flex: none; }
+  #gxView .gxrt .gxatt { width: auto; padding: 4px 10px; } #gxView .gxrt td.gxattc > * { justify-self: start; }
 }

@@ -32,12 +32,14 @@ GX.load = async function () {
     else { const tid = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data; const name = tid && (await sb.from("teams").select("name").eq("id", tid).maybeSingle()).data?.name; /* teams 배열은 대표만 채워짐 */ br = Object.keys(BR).find((k) => BR[k] === name) || ""; }
     GX.br = br;
   }
-  const [r, m, k, e] = await Promise.all([
+  const [r, m, k, e, ld] = await Promise.all([
     sb.from("gx_roster").select("*").order("created_at"),
     sb.from("gx_members").select("*, gx_applications(*, gx_events(title), gx_matches(*, gx_koreans(name, membership)))").order("created_at", { ascending: false }),
     sb.from("gx_koreans").select("*, gx_matches(*, gx_members(name))").order("created_at", { ascending: false }),
-    sb.from("gx_events").select("*, gx_applications(id)").order("event_date", { ascending: false })]);
+    sb.from("gx_events").select("*, gx_applications(id)").order("event_date", { ascending: false }),
+    sb.from("leaders").select("grp, slot, teams(name)").limit(3000)]); // 영어세션시간 고르기 = 지점 리더 현황의 반·시간대 (매니저·조교는 자기 지점만 보임)
   if ([m, k, e, r].some((x) => fail(x.error))) return;
+  GX.slots = Object.fromEntries(Object.entries(BR).map(([key, name]) => [key, GXC.slots((ld.data || []).filter((x) => x.teams?.name === name))]));
   GX.roster = r.data; GX.members = m.data; GX.koreans = k.data; GX.events = e.data;
   if (GX.sel) GX.sel = GX.members.find((x) => x.id === GX.sel.id) || null;
   if (GX.ksel) GX.ksel = GX.koreans.find((x) => x.id === GX.ksel.id) || null;
@@ -152,38 +154,46 @@ function renderDash() {
   B.querySelectorAll(".d-match").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); const { a, m } = all.find((x) => x.a.id === b.dataset.a); match(a, m, GX.koreans.find((k) => k.id === b.dataset.k)); }));
 }
 // ---- 📋 멤버 리스트: 해민 시트 'PALLO! 외국인 멤버 관리' 칸 그대로 (구멤버·신멤버 안 나누고 한 리스트) · 칸을 고치면 바로 저장
-// 출석체크 = 영어 프리토킹 출석한 날짜들 · 출석률 = 출석 ÷ (시작 후 주 수 × 2) (gx-core.js)
+// 출석체크 = 영어 프리토킹 출석한 날짜들 · 출석률 = 고른 달 출석 ÷ 8회 (gx-core.js) · 국적·영어세션시간은 고르기(+직접 입력)
 const PLAN = { C: ["Plan C", "Plan C (Korean Class Only)"], D: ["Plan D", "Plan D (Class + Free Talking)"] };
 const SHORT = { session_time: "영어세션 시간", korean_level: "한국어 레벨", le: "언어 교환", le_partner: "언어교환 파트너", reg_fee: "등록비", voucher: "바우처" }; // 좁은 칸 제목 (전체 이름은 마우스 올리면)
-const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "t"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "t"], ["korean_level", "한국어레벨", "t"], ["plan", "플랜종류", "p"],
+const RF = [["name", "이름", "t"], ["gender", "성별", "g"], ["nationality", "국적", "n"], ["phone", "전화번호", "t"], ["start_date", "시작일", "d"], ["session_time", "영어세션시간", "s"], ["korean_level", "한국어레벨", "t"], ["plan", "플랜종류", "p"],
   ["le", "언어교환 유무", "c"], ["le_partner", "언어교환 파트너", "t"], ["reg_fee", "등록비 여부", "c"], ["voucher", "바우처 수령 여부", "c"]];
 const today = () => new Date().toLocaleDateString("sv-SE");
+const NAT = [["미국", "🇺🇸"], ["캐나다", "🇨🇦"], ["영국", "🇬🇧"], ["아일랜드", "🇮🇪"], ["호주", "🇦🇺"], ["뉴질랜드", "🇳🇿"], ["남아공", "🇿🇦"], ["필리핀", "🇵🇭"], ["인도", "🇮🇳"],
+  ["일본", "🇯🇵"], ["중국", "🇨🇳"], ["대만", "🇹🇼"], ["홍콩", "🇭🇰"], ["베트남", "🇻🇳"], ["태국", "🇹🇭"], ["인도네시아", "🇮🇩"], ["말레이시아", "🇲🇾"], ["싱가포르", "🇸🇬"], ["몽골", "🇲🇳"],
+  ["우즈베키스탄", "🇺🇿"], ["카자흐스탄", "🇰🇿"], ["러시아", "🇷🇺"], ["독일", "🇩🇪"], ["프랑스", "🇫🇷"], ["스페인", "🇪🇸"], ["이탈리아", "🇮🇹"], ["네덜란드", "🇳🇱"], ["스웨덴", "🇸🇪"],
+  ["폴란드", "🇵🇱"], ["튀르키예", "🇹🇷"], ["멕시코", "🇲🇽"], ["브라질", "🇧🇷"], ["아르헨티나", "🇦🇷"], ["칠레", "🇨🇱"], ["콜롬비아", "🇨🇴"], ["페루", "🇵🇪"], ["나이지리아", "🇳🇬"], ["이집트", "🇪🇬"]];
+const OWN = "__own__"; // 고르기의 '✏️ 직접 입력…' 값
+const pickSel = (f, v, list, title) => `<select data-f="${f}" class="gxpick" title="${esc(v || title)}"><option value=""></option>${list.some(([x]) => x === v) || !v ? "" : `<option selected>${esc(v)}</option>`}${list.map(([x, l]) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(l)}</option>`).join("")}<option value="${OWN}">✏️ 직접 입력…</option></select>`;
+const ym = () => GX.rm || today().slice(0, 7);
 const md = (d) => `${+d.slice(5, 7)}/${+d.slice(8)}`;
 function rCell(r, [f, , t]) {
   const v = r[f];
   if (t === "c") return `<input type="checkbox" data-f="${f}" ${v ? "checked" : ""}>`;
   if (t === "d") return `<label class="gxdt"><span>${v ? v.slice(2).replace(/-/g, ".") : `<span class="mut">날짜</span>`}</span><input type="date" data-f="${f}" value="${esc(v || "")}"></label>`; // 좁은 칸: 26.10.19 로 보이고 누르면 달력
   if (t === "g") return `<select data-f="${f}">${["", "남", "여"].map((x) => `<option ${x === v ? "selected" : ""}>${x}</option>`).join("")}</select>`;
+  if (t === "n") return pickSel(f, v, NAT.map(([x]) => [x, x]), "국적");
+  if (t === "s") { const l = (GX.slots?.[r.branch] || []).map((x) => [x, x]); return pickSel(f, v, l, l.length ? "지점 시간표 (리더 현황 반·시간)" : "이 지점 시간표가 없어요 — 직접 입력"); }
   if (t === "p") return `<select data-f="${f}" title="${esc(PLAN[v]?.[1] || "")}"><option value=""></option>${Object.entries(PLAN).map(([k, [s, l]]) => `<option value="${k}" title="${l}" ${k === v ? "selected" : ""}>${s}</option>`).join("")}</select>`;
   return `<input data-f="${f}" value="${esc(v)}" title="${esc(v)}" maxlength="${f === "phone" ? 30 : f === "name" || f === "le_partner" ? 60 : 40}">`;
 }
 function rAtt(r) {
   const t = today(), on = r.attend.includes(t);
-  return `<div class="gxattb"><button class="gxatt ${on ? "on" : ""}" data-act="today" title="오늘 영어 프리토킹 출석 (다시 누르면 취소)">${on ? "✅" : "☐"} 오늘 출석</button>
-    <label class="gxattd btn ghost" title="지난 날 출석 넣기">📅<input type="date" data-act="day" max="${t}"></label></div>
-    <div class="gxdays">${[...r.attend].sort().map((d) => `<button class="gxday" data-d="${d}" title="${d} · 누르면 이 날 출석 지우기">${md(d)}</button>`).join("")}</div>`;
+  return `<button class="gxatt ${on ? "on" : ""}" data-act="today" title="오늘 영어 프리토킹 출석 (다시 누르면 취소)">${on ? "✅" : "☐"} 오늘 출석</button>
+    <div class="gxdays">${r.attend.filter((d) => d.startsWith(ym())).sort().map((d) => `<button class="gxday" data-d="${d}" title="${d} · 누르면 이 날 출석 지우기">${md(d)}</button>`).join("")}<label class="gxattd" title="지난 날 출석 넣기">📅<input type="date" data-act="day" max="${t}"></label></div>`;
 }
 function rRate(r) {
   if (r.plan === "C") return `<span class="mut" title="Plan C 는 프리토킹 없음">—</span>`;
-  const x = GXC.rate(r.start_date, r.attend, today());
-  if (!x) return `<span class="mut" title="시작일을 넣으면 계산돼요">—</span>`;
-  return `<b>${x.pct}%</b> <small class="mut">${x.n}/${x.of}회</small><i class="gxrbar"><i style="width:${x.pct}%"></i></i>`;
+  const x = GXC.rate(r.attend, ym());
+  return `<span class="gx8" title="${+ym().slice(5)}월 ${x.n}번 출석 / 한 달 ${x.of}회">${Array.from({ length: x.of }, (_, i) => `<i class="${i < x.n ? "on" : ""}"></i>`).join("")}</span><b>${x.n}/${x.of}회</b> <small class="mut">${x.pct}%</small>`;
 }
 function renderRoster() {
   const list = GX.roster.filter(inBr), allBr = !GX.br;
-  const head = [...RF.map(([f, l]) => [SHORT[f] || l, "c-" + f, l]), ["출석체크", "gxattc"], ["출석률", "gxratec"], ...(jo() ? [] : [["", "c-del"]])];
+  const head = [...RF.map(([f, l]) => [SHORT[f] || l, "c-" + f, l]), ["출석체크", "gxattc"], [`출석률 (${+ym().slice(5)}월)`, "gxratec"], ...(jo() ? [] : [["", "c-del"]])];
   body().innerHTML = `<div class="card gxros">
-      <p class="mut gxroshelp">칸을 고치면 바로 저장돼요 · Plan C = Korean Class Only · Plan D = Class + Free Talking · <b>☐ 오늘 출석</b> = 영어 프리토킹 출석 체크 → 그날 날짜가 남아요 (날짜 누르면 지우기, 📅 = 지난 날 넣기) · <b>출석률</b> = 출석 ÷ (시작 후 주 수 × 2회)</p>
+      <div class="gxroshead"><span class="gxmon"><button class="btn ghost" data-mon="-1" title="지난 달">◀</button><b>${ym().slice(0, 4)}년 ${+ym().slice(5)}월</b><button class="btn ghost" data-mon="1" title="다음 달">▶</button>${ym() === today().slice(0, 7) ? "" : `<button class="btn ghost" data-mon="0">이번 달</button>`}</span>
+      <p class="mut gxroshelp">칸을 고치면 바로 저장돼요 · Plan C = Korean Class Only · Plan D = Class + Free Talking · <b>☐ 오늘 출석</b> = 영어 프리토킹 출석 체크 → 그날 날짜가 남아요 (날짜 누르면 지우기, 📅 = 지난 날 넣기) · <b>출석률</b> = 이 달 출석 ÷ 한 달 8회 · 출석 날짜·출석률은 위에서 고른 달 것</p></div>
       <table class="gxt gxrt"><thead><tr>${head.map(([h, c, l]) => `<th class="${c}" title="${l || h}">${h}</th>`).join("")}</tr></thead><tbody>
       ${list.map((r) => `<tr data-r="${r.id}">
         ${RF.map((c) => `<td data-l="${c[1]}" class="c-${c[0]}">${rCell(r, c)}${allBr && c[0] === "name" ? `<select data-f="branch" class="gxrbr" title="지점">${opts(BR, r.branch)}</select>` : ""}</td>`).join("")}
@@ -191,6 +201,7 @@ function renderRoster() {
         ${jo() ? "" : `<td class="c-del"><button class="gxrdel" title="이 줄 지우기">🗑</button></td>`}</tr>`).join("") || `<tr><td colspan="${head.length}" class="mut gxempty">아직 없어요 — 아래 [＋ 멤버 추가] 로 한 줄씩 넣어요</td></tr>`}
       </tbody></table>
       <button class="btn" id="gxrAdd">＋ 멤버 추가</button> <small class="mut">${list.length}명${allBr ? " · 전 지점 (새 줄은 대구영어점, 이름 밑 지점에서 바꾸기)" : ""}</small></div>`;
+  body().querySelectorAll("[data-mon]").forEach((b) => (b.onclick = () => { const d = +b.dataset.mon, [y, m] = ym().split("-").map(Number), t = new Date(y, m - 1 + d, 1); GX.rm = d ? `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}` : ""; renderRoster(); }));
   const B = body(), row = (el) => GX.roster.find((r) => r.id === el.closest("tr[data-r]")?.dataset.r);
   const save = async (r, patch) => { const { error } = await sb.from("gx_roster").update(patch).eq("id", r.id); if (fail(error)) return false; Object.assign(r, patch); return true; };
   const redraw = (r) => { const tr = B.querySelector(`tr[data-r="${r.id}"]`); tr.querySelector(".gxattc").innerHTML = rAtt(r); tr.querySelector(".gxratec").innerHTML = rRate(r); };
@@ -199,11 +210,18 @@ function renderRoster() {
     const el = e.target, r = row(el); if (!r) return;
     if (el.dataset.act === "day") { if (el.value) await setAttend(r, [...r.attend, el.value]); return; }
     const f = el.dataset.f; if (!f) return;
+    if (el.value === OWN) { // ✏️ 직접 입력
+      const typed = (prompt(f === "nationality" ? "국적을 적어 주세요" : "영어세션시간을 적어 주세요 (예: 월수 7:30PM)", r[f] || "") ?? "").trim().slice(0, 40);
+      if (!typed) { el.value = r[f] || ""; return; }
+      if (!(await save(r, { [f]: typed }))) { el.value = r[f] || ""; return; }
+      const td = el.closest("td"); td.innerHTML = rCell(r, RF.find((c) => c[0] === f)); return;
+    }
     const v = el.type === "checkbox" ? el.checked : f === "start_date" ? el.value || null : el.value.trim();
     if (!(await save(r, { [f]: v }))) { el.type === "checkbox" ? (el.checked = r[f]) : (el.value = r[f] ?? ""); return; }
     if (f === "plan") el.title = PLAN[v]?.[1] || "";
     if (f === "start_date") el.previousElementSibling.innerHTML = v ? v.slice(2).replace(/-/g, ".") : `<span class="mut">날짜</span>`;
-    if (el.title !== undefined && el.type === "text") el.title = v;
+    if (el.type === "text" || el.classList.contains("gxpick")) el.title = v;
+    if (f === "branch") { const td = B.querySelector(`tr[data-r="${r.id}"] td.c-session_time`); if (td) td.innerHTML = rCell(r, RF.find((c) => c[0] === "session_time")); } // 지점 바뀌면 시간표도
     if (f === "start_date" || f === "plan") redraw(r);
     if (f === "branch" && GX.br && v !== GX.br) renderRoster();
   };
