@@ -117,3 +117,8 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fnhelp ul { margin: 6px 0 2px; padding-left: 18px; } #fnView .fnhelp li { margin: 3px 0; } #fnView .fnhelp li b { margin-right: 4px; }
 #fnView .fnhelp kbd { display: inline-block; padding: 0 5px; margin: 0 1px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: 600 11.5px/1.5 inherit; background: var(--hover); white-space: nowrap; }
 #fnView .fntbl tr.fncopied > td { border-top: 2px dashed var(--accent); border-bottom: 2px dashed var(--accent); }
+/* 환불인데 + 금액: 주황 칸 + [−로] 버튼 (11-10) */
+#fnView .fntbl .fnflipw { display: flex; align-items: center; gap: 2px; }
+#fnView .fntbl td.fnflip { outline: 1.5px dashed #e67e22; outline-offset: -3px; }
+#fnView .fntbl td.fnflip input { min-width: 0; }
+#fnView .fntbl td.fnflip button { flex: none; border: 1px solid #e67e22; background: #fff4e6; color: #a0460b; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 1px 4px; cursor: pointer; }

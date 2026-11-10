@@ -198,7 +198,9 @@ function cellIn(r, k, need) {
     return `<td class="${nd}" title="${esc(dt)}" style="min-width:${W_[k] ?? 80}px"><select data-id="${r.id}" data-k="${k}" class="fnchip ${c}"><option value=""></option>${list.map((o) => `<option ${o === show ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></td>`;
   }
   if (!canEdit()) return `<td class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}${nd}" title="${esc(dt)}">${esc(show)}</td>`;
-  return `<td class="${nd}" style="min-width:${W_[k] ?? 80}px"><input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(dt || String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} ></td>`;
+  // 거래형태에 '환불'(환불·시작전환불·디파짓(가입/환불)·환불정산)인데 매출이 + 면 칸을 주황으로 + [−로] 버튼 (신고 11-10)
+  const flip = k === "매출" && /환불/.test(String(r.vals.거래형태 ?? "")) && (toNum(v) ?? 0) > 0;
+  return `<td class="${nd}${flip ? " fnflip" : ""}" style="min-width:${W_[k] ?? 80}px">${flip ? "<span class=fnflipw>" : ""}<input size="1" data-id="${r.id}" data-k="${k}" value="${esc(show)}" title="${esc(dt || String(v))}" class="${NUMK.has(k) ? "num" : ""} ${neg ? "neg" : ""}" ${NUMK.has(k) ? 'inputmode="decimal"' : ""} >${flip ? `<button data-act="neg" data-id="${r.id}" title="환불이면 − 금액이에요 · 누르면 −${esc(show)} 로 바꿔요 (가입 디파짓이면 그대로 두세요)">−로</button></span>` : ""}</td>`;
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
@@ -253,7 +255,7 @@ async function saveCell(inp) {
     if (was === null || was === 0 || was === auto) patch.금액 = Math.round(rate * v);
   }
   inp.value = showOf(k, v); inp.title = String(v);
-  if ((await patchRow(r, patch)) && (k === "근무시간" || NUMK.has(k))) render();
+  if ((await patchRow(r, patch)) && (k === "근무시간" || k === "거래형태" || NUMK.has(k))) render(); // 거래형태 바뀌면 [−로] 버튼 다시
 }
 // 저장은 차례로, 바뀐 칸만 (fin_patch, 0077) — 줄 전체를 보내면 그사이 시트에서 고친 다른 칸이 되돌아감. 돌아온 vals(서버 최신)로 맞춤
 // r.vals 는 기다리기 전에 바로 바꿈 (화면 먼저)
@@ -402,6 +404,7 @@ document.addEventListener("click", async (e) => {
   if (a === "cfg") return cfgDlg();
   if (a === "add") return addRow(b.dataset.kind, b.dataset.sec);
   if (a === "del") return delRow(b.dataset.id);
+  if (a === "neg") { const r = FN.rows.find((x) => x.id === b.dataset.id), n = r && toNum(r.vals.매출); if (n > 0 && (await patchRow(r, { 매출: -n }))) { render(); } return; } // patchRow 가 시트 동기화도 걸어 둠
   if (a === "below" || a === "dup") return insertBelow(b.dataset.id, a === "dup");
   if (a === "files") return filesDlg(b.dataset.id);
   if (a === "miss") { FN.miss = !FN.miss; return render(); }
