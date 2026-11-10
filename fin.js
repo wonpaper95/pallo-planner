@@ -133,7 +133,8 @@ function helpHtml() {
   let open = true; try { open = localStorage.getItem("fn-help") !== "0"; } catch {}
   const k = (x) => `<kbd>${x}</kbd>`;
   return `<details class="fnhelp" ${open ? "open" : ""}><summary>⌨️ 사용법 · 단축키 <small class="mut">(엑셀·구글 시트처럼)</small></summary><ul>
-    <li><b>줄 복사</b> 줄의 아무 칸을 누르고 ${k(MK + "C")} → 그 줄 전체가 복사돼요 (점선 표시, ${k("Esc")}로 지움). 칸 글자만 복사하려면 마우스로 글자를 끌어서 고른 뒤 ${k(MK + "C")}</li>
+    <li><b>칸 복사·붙이기</b> 칸을 누르고 ${k(MK + "C")} → 그 칸만 복사돼요. 붙일 칸에서 ${k(MK + "V")} (▾ 고르는 칸도 돼요)</li>
+    <li><b>줄 복사</b> 줄의 아무 칸을 누르고 ${k(MK + "Shift+C")} → 그 줄 전체가 복사돼요 (점선 표시, ${k("Esc")}로 지움)</li>
     <li><b>줄 붙이기</b> 붙일 줄의 아무 칸에서 ${k(MK + "V")} → 칸마다 그대로 채워져요. 구글 시트에서 복사한 줄도 돼요 (줄 전체면 첫 칸부터, 몇 칸만이면 누른 칸부터). 이미 적힌 칸을 덮을 땐 먼저 물어봐요</li>
     <li><b>줄 넣기</b> 줄 오른쪽 끝 ${k("＋")} = 바로 아래에 빈 줄 (칸에서 ${k(MK + "Enter")}) · ${k("⧉")} = 이 줄을 복사해서 바로 아래에 (${k(MK + "Shift+Enter")}) · ${k("🗑")} = 줄 지우기 (시트에서도 지워져요)</li>
     <li><b>칸 옮기기</b> ${k("↑")}${k("↓")} 위아래 줄 · ${k("Enter")} 아래 줄 (${k("Shift+Enter")} 위) · ${k("←")}${k("→")} 글 끝에서 옆 칸</li>
@@ -277,7 +278,22 @@ function copyRow(r) {
   navigator.clipboard?.writeText(tsv).catch(() => {}); // 시트·메모장에도 붙게. 실패해도 플래너 안에선 FN.clip 으로 붙음
   V().querySelectorAll("tr.fncopied").forEach((x) => x.classList.remove("fncopied"));
   V().querySelector(`tr[data-row="${r.id}"]`)?.classList.add("fncopied");
+  FN.cell = null;
   toast(`📋 줄을 복사했어요 — 붙일 줄의 칸에서 ${MK}V`);
+}
+// 📋 칸 하나 복사 (제안 세연 #58): ⌘C = 그 칸만, 줄 통째는 ⌘Shift+C. FN.cell = ▾ 칸에 붙일 때 씀 (▾ 칸엔 붙여넣기 이벤트가 안 옴)
+// ponytail: FN.cell 은 플래너 안에서 복사한 값만 기억 — 밖에서 복사한 글자를 ▾ 칸에 붙이려면 clipboard.readText(권한 팝업) 필요
+function copyCell(t) {
+  FN.cell = { v: t.value }; FN.clip = null;
+  navigator.clipboard?.writeText(t.value).catch(() => {});
+  V().querySelectorAll("tr.fncopied").forEach((x) => x.classList.remove("fncopied"));
+  toast(`📋 칸을 복사했어요 — 붙일 칸에서 ${MK}V`);
+}
+function pasteCell(t) {
+  const v = FN.cell.v;
+  if (t.tagName === "SELECT" && ![...t.options].some((o) => o.value === v)) return toast(`이 칸에서는 고를 수 없는 값이에요: ${v || "(빈칸)"}`);
+  t.value = v; t.dispatchEvent(new Event("change", { bubbles: true })); // change → saveCell
+  toast("📋 붙였어요");
 }
 async function pasteRow(t, text) {
   const r = FN.rows.find((x) => x.id === t.dataset.id); if (!r) return;
@@ -426,6 +442,7 @@ document.addEventListener("toggle", (e) => { if (e.target.matches?.("#fnView .fn
 document.addEventListener("paste", (e) => {
   const t = e.target; if (!t.matches?.("#fnView input[data-id][data-k]")) return;
   const text = e.clipboardData?.getData("text/plain") ?? "";
+  if (FN.cell && text === FN.cell.v) { e.preventDefault(); return pasteCell(t); } // 플래너에서 복사한 칸 → 칸 전체를 그 값으로
   if (!(FN.clip && text === FN.clip.tsv) && !text.includes("\t")) return; // 칸 글자 하나 → 평소처럼 그 칸에
   e.preventDefault(); pasteRow(t, text);
 });
@@ -437,12 +454,14 @@ document.addEventListener("input", (e) => { if (e.target.id === "fnQ") { FN.q = 
 document.addEventListener("keydown", (e) => {
   const t = e.target; if (e.isComposing || e.altKey || !t.matches?.("#fnView input[data-k], #fnView select[data-k]")) return;
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && canEdit()) { e.preventDefault(); t.blur(); return insertBelow(t.dataset.id, e.shiftKey); } // blur → 적던 칸 먼저 저장(복사에 들어가게)
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.code === "KeyC" || e.key.toLowerCase() === "c")) { // 한글 자판이어도 C 자리
+  if ((e.ctrlKey || e.metaKey) && (e.code === "KeyC" || e.key.toLowerCase() === "c")) { // 한글 자판이어도 C 자리
     const part = t.tagName === "INPUT" && t.selectionStart !== t.selectionEnd && !(t.selectionStart === 0 && t.selectionEnd === t.value.length);
-    if (part) return; // 마우스로 글자 일부를 골랐으면 그 글자만 (평소 복사)
-    e.preventDefault(); const r = FN.rows.find((x) => x.id === t.dataset.id); if (r) copyRow(r); return;
+    if (part && !e.shiftKey) return; // 마우스로 글자 일부를 골랐으면 그 글자만 (평소 복사)
+    e.preventDefault(); const r = FN.rows.find((x) => x.id === t.dataset.id);
+    if (!e.shiftKey) copyCell(t); else if (r) copyRow(r); // ⌘C = 칸, ⌘Shift+C = 줄 통째 (#58)
+    return;
   }
-  if ((e.ctrlKey || e.metaKey) && (e.code === "KeyV" || e.key.toLowerCase() === "v") && t.tagName === "SELECT" && FN.clip) { e.preventDefault(); pasteRow(t, null); return; } // ▾ 칸엔 붙여넣기가 안 와서 복사해 둔 줄로
+  if ((e.ctrlKey || e.metaKey) && (e.code === "KeyV" || e.key.toLowerCase() === "v") && t.tagName === "SELECT" && canEdit() && (FN.cell || FN.clip)) { e.preventDefault(); FN.cell ? pasteCell(t) : pasteRow(t, null); return; } // ▾ 칸엔 붙여넣기가 안 와서 복사해 둔 칸·줄로
   if (e.ctrlKey || e.metaKey) return;
   if (e.key === "Escape" && FN.clip) { FN.clip = null; V().querySelectorAll("tr.fncopied").forEach((x) => x.classList.remove("fncopied")); return; }
   const inp = t.tagName === "INPUT", k = e.key, len = inp ? t.value.length : 0;
