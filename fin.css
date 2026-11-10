@@ -116,7 +116,9 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fnhelp summary { cursor: pointer; font-weight: 700; }
 #fnView .fnhelp ul { margin: 6px 0 2px; padding-left: 18px; } #fnView .fnhelp li { margin: 3px 0; } #fnView .fnhelp li b { margin-right: 4px; }
 #fnView .fnhelp kbd { display: inline-block; padding: 0 5px; margin: 0 1px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; font: 600 11.5px/1.5 inherit; background: var(--hover); white-space: nowrap; }
-#fnView .fntbl tr.fncopied > td { border-top: 2px dashed var(--accent); border-bottom: 2px dashed var(--accent); }
+/* 📋 범위(파랑) · 복사한 범위(점선) — 엑셀처럼 (11-10) */
+#fnView .fntbl td.fnsel { box-shadow: inset 0 0 0 999px rgba(37, 99, 235, .15); }
+#fnView .fntbl td.fncopied { outline: 1.5px dashed #2563eb; outline-offset: -2px; }
 /* 환불인데 + 금액: 주황 칸 + [−로] 버튼 (11-10) */
 #fnView .fntbl .fnflipw { display: flex; align-items: center; gap: 2px; }
 #fnView .fntbl td.fnflip { outline: 1.5px dashed #e67e22; outline-offset: -3px; }

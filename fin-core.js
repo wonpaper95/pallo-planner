@@ -87,15 +87,28 @@ function below(rows, id) {
   for (let j = i + 1, need = sort + 1; j < list.length && list[j].sort < need; j++, need++) bump.push([list[j].id, need]);
   return { sort, bump };
 }
-// 📋 ⌘C/⌘V 줄 복사·붙이기: 시트처럼 탭으로 나눈 한 줄. 붙일 땐 줄 전체(칸 수 ≥ 머리줄)면 첫 칸부터, 몇 칸만이면 고른 칸부터
 const NUMH = new Set(["매출", "금액", "근무시간"]);
-const rowTsv = (vals, heads) => heads.map((h) => String(vals[h] ?? "").replace(/[\t\r\n]+/g, " ")).join("\t");
-function pasteVals(text, heads, startKey, month) {
-  const line = String(text ?? "").replace(/\r/g, "").split("\n").find((l) => l.trim() !== "") ?? "";
-  const cells = line.split("\t").map((c) => (/^".*"$/s.test(c) ? c.slice(1, -1).replace(/""/g, '"') : c).trim());
-  const at = cells.length >= heads.length ? 0 : Math.max(0, heads.indexOf(startKey)), out = {};
-  cells.slice(0, heads.length - at).forEach((v, i) => { const h = heads[at + i]; out[h] = h === "날짜" ? normDate(v, month) : NUMH.has(h) && v !== "" ? toNum(v) ?? v : v; });
+// 📋 범위 복사·붙이기 (엑셀·구글 시트처럼): 탭 = 옆 칸, 줄바꿈 = 아래 줄, 탭·줄바꿈·따옴표가 든 칸은 "따옴표" (시트와 같은 규칙)
+const toTsv = (grid) => grid.map((row) => row.map((v) => { v = String(v ?? ""); return /[\t\n\r"]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v; }).join("\t")).join("\n");
+function parseTsv(text) {
+  const s = String(text ?? "").replace(/\r\n?/g, "\n"), out = [];
+  let row = [], i = 0;
+  for (;;) {
+    let v = null;
+    if (s[i] === '"') { // "따옴표 칸" — 닫는 따옴표 뒤가 탭·줄바꿈·끝일 때만
+      let j = i + 1, w = "";
+      while (j < s.length && !(s[j] === '"' && s[j + 1] !== '"')) { w += s[j]; j += s[j] === '"' ? 2 : 1; }
+      if (j < s.length && (j + 1 >= s.length || s[j + 1] === "\t" || s[j + 1] === "\n")) { v = w; i = j + 1; }
+    }
+    if (v === null) { let e = i; while (e < s.length && s[e] !== "\t" && s[e] !== "\n") e++; v = s.slice(i, e); i = e; }
+    row.push(v.trim());
+    if (i >= s.length) { out.push(row); break; }
+    if (s[i] === "\n") { out.push(row); row = []; }
+    i++;
+  }
+  while (out.length && out[out.length - 1].every((c) => c === "")) out.pop(); // 시트 복사는 끝에 줄바꿈이 붙음
   return out;
 }
-window.FNC = { rowTsv, pasteVals, below, OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt };
+const normCell = (h, v, month) => (h === "날짜" ? normDate(v, month) : NUMH.has(h) && v !== "" ? toNum(v) ?? v : v);
+window.FNC = { toTsv, parseTsv, normCell, below, OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt };
 })();
