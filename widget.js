@@ -59,7 +59,7 @@ function render() {
       + `${ck ? `<b class="who">${esc(ck.done_name ?? "")} ✓ ${hm(ck.done_at)}</b>` : ""}<span class="t">${from ? `<b style="color:var(--orange)">↪ ${from.slice(5).replace("-", "/")} 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small style="color:var(--sub)">📷 인증샷</small>` : it.need_link && !ck ? ` <small style="color:var(--sub)">🔗 링크</small>` : ""}</span>`
       + `${ck?.link ? `<a href="${esc(ck.link)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">${isPhotoLink(ck.link) ? "📷" : "🔗"}</a>` : ""}</label>`;
     $("#rtList").innerHTML = state.carried.map((x) => row(x.it, null, x.from)).join("") + routine.map((it) => row(it, checks.get(it.id))).join("")
-      + (routine.length && n === routine.length ? `<div class="done-all">🎉 고정업무 끝! 보고하고 퇴근하세요</div>` : "");
+      + (routine.length && n === routine.length ? `<div class="done-all">🎉 매니저체크리스트 끝! 보고하고 퇴근하세요</div>` : "");
   }
   // ✅ 오늘 할 일 (+ 👥 팀): 플래너와 같은 순서 — 끝낸 일 위, 시작시간 없음 → 시간순 (팀 일은 시작시간 없음 취급)
   const rows = [...tasks.map((t) => ({ k: "t", t })), ...team.map((t) => ({ k: "team", t }))]
@@ -77,7 +77,7 @@ function render() {
   // 요약
   const over = dues.filter((t) => W.due(t.deadline).cls === "over").length, must = tasks.filter((t) => t.must_do && !t.done).length;
   const rtLeft = role === "admin" ? 0 : state.routine.filter((it) => !checks.has(it.id)).length;
-  $("#sum").innerHTML = [rtLeft ? `<span>📌 ${rtLeft}개 남음</span>` : role === "admin" ? "" : `<span class="ok">📌 고정업무 끝</span>`,
+  $("#sum").innerHTML = [rtLeft ? `<span>📌 ${rtLeft}개 남음</span>` : role === "admin" ? "" : `<span class="ok">📌 체크리스트 끝</span>`,
     `<span>✅ ${rows.length - doneN}개 남음</span>`, must ? `<span class="hot">🔥 꼭 ${must}</span>` : "", over ? `<span class="hot">⏰ 지남 ${over}</span>` : ""].join("");
   $("#foot").textContent = `실시간 연결됨 · ${hm(new Date().toISOString())} 갱신`;
   if (globalThis.chrome?.runtime?.id) chrome.runtime.sendMessage("badge").catch(() => {}); // 확장 배지
@@ -192,7 +192,7 @@ async function boot() {
   const { data: p } = await sb.from("profiles").select("role").eq("user_id", me.id).maybeSingle();
   role = p?.role ?? "manager";
   for (const [k, v] of Object.entries(me.user_metadata?.prefs ?? {})) document.body.classList.toggle("off-" + k, v === false); // 플래너 ⚙️ 보기 설정 그대로
-  if (role === "admin") $("#sRoutine h2").firstChild.textContent = "📌 매니저 고정업무 ";
+  if (role === "admin") $("#sRoutine h2").firstChild.textContent = "📌 매니저체크리스트 ";
   await load();
   sb.channel("w-tasks").on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${me.id}` }, soft).subscribe();
   sb.channel("w-team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, soft).subscribe();
