@@ -47,7 +47,7 @@ function render() {
   const { tasks, team, routine, checks, status, dues } = state;
   // 📌 고정업무
   if (role === "admin") {
-    $("#rtN").textContent = `${routine.length}개 · 지점별`;
+    $("#rtN").textContent = "지점별";
     $("#rtBar").parentElement.classList.add("hidden");
     $("#rtList").innerHTML = status.length ? `<table>${status.map((x) => `<tr><td>${esc(x.team)} <span style="color:var(--sub)">${esc(x.members ?? "매니저 없음")}</span></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉" : ""}</td></tr>`).join("")}</table>` : `<div class="empty">지점이 없어요</div>`;
   } else {

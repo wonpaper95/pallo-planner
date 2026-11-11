@@ -125,6 +125,11 @@ body.is-assist .seg button:not([data-v="gx"]):not([data-v="le"]):not([data-v="ld
 }
 dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .rthead small { color: var(--sub); margin-left: 6px; }
+.rtall { align-items: center; gap: 5px; font-size: 13px; color: var(--sub); margin-left: 8px; } body.is-admin .rtall { display: inline-flex; }
+#rtLog { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; } #rtLog summary { cursor: pointer; font-weight: 600; } #rtLog summary small { color: var(--sub); font-weight: 400; margin-left: 6px; }
+#rtLogList { max-height: 260px; overflow-y: auto; margin-top: 6px; font-size: 13.5px; }
+.rtlog { padding: 6px 2px; border-bottom: 1px solid var(--line); line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; } .rtlog small { color: var(--sub); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.rtlog i { display: block; font-style: normal; color: var(--sub); padding-left: 12px; }
 .rt .carry { color: var(--orange); font-size: 12.5px; } .rt .needlink { color: var(--sub); } .rt .rtlink { flex: none; font-size: 12.5px; color: var(--accent); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
 .rtthumb { height: 30px; width: 30px; object-fit: cover; border-radius: 5px; vertical-align: middle; }
 .bphotos { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; font-size: 13px; color: var(--sub); } .bphotos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
@@ -676,7 +681,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="jgView"></section>
   <section id="mcView">
       <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 매니저체크리스트</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
-          <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
+          <button id="rtEdit" class="btn ghost" type="button">편집</button></summary>
         <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
   </section>
   <section id="jcView"></section>
@@ -770,9 +775,10 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 </dialog>
 
 <dialog id="rtDialog" class="wide">
-  <div class="rthead"><b>📌 고정업무 편집</b> <small>순서대로 매니저 화면에 나와요 · 대표만 편집</small></div>
+  <div class="rthead"><b>📌 매니저체크리스트 편집 · <span id="rtEdTeam"></span></b> <small>이 지점만 바뀌어요 · 누가 고쳤는지 기록돼요</small></div>
   <div id="rtRows"></div>
-  <div class="quick"><button data-add="weekday">+ 평일(월~목) 업무</button><button data-add="weekend">+ 주말(토·일) 업무</button></div>
+  <div class="quick"><button data-add="weekday">+ 평일(월~목) 업무</button><button data-add="weekend">+ 주말(토·일) 업무</button><label class="adminonly rtall"><input type="checkbox" id="rtAll"> 전 지점에 같이 추가</label></div>
+  <details id="rtLog"><summary>📜 편집 기록 <small>누가 · 언제 · 무엇을</small></summary><div id="rtLogList"></div></details>
   <div class="sheet-foot"><span></span><button class="btn" id="rtClose">닫기</button></div>
 </dialog>
 <div id="pop" class="pop hidden"></div>
@@ -1217,10 +1223,15 @@ function consultAlert(n, target) {
 }
 // 대표: 고정업무 편집기
 const WEEKS = [["", "매주"], ["1,3", "1·3주차"], ["2,4", "2·4주차"], ["1", "1주차"], ["2", "2주차"], ["3", "3주차"], ["4", "4주차"]];
+let edTeam = null; // ✏️ 편집 중인 지점 (대표 = 탭에서 고른 지점, 매니저 = 우리 지점)
+const rtEdRows = () => routine.filter((it) => it.team_id === edTeam && (!it.to_day || it.to_day >= today()));
 function renderRtEditor() {
-  $("#rtRows").innerHTML = routine.filter((it) => !it.to_day || it.to_day >= today()).map((it, i) => `<div class="rtrow" data-id="${it.id}">
-    <div class="mv"><button data-mv="-1" ${i ? "" : "disabled"}>▲</button><button data-mv="1" ${i < routine.length - 1 ? "" : "disabled"}>▼</button></div>
-    <input type="text" class="t" value="${esc(it.title)}" data-f="title">${it.team_id || it.from_day || it.to_day ? `<small class="needlink" style="white-space:nowrap">📍 ${it.team_id ? esc(teams.find((x) => x.id === it.team_id)?.name ?? "") : "전 지점"}${it.from_day || it.to_day ? ` · ${it.from_day ? md(it.from_day) : ""}~${it.to_day ? md(it.to_day) : ""}` : ""}</small>` : ""}
+  const rows = rtEdRows();
+  $("#rtEdTeam").textContent = teams.find((x) => x.id === edTeam)?.name ?? "우리 지점";
+  if ($("#rtLog").open) loadRtLog();
+  $("#rtRows").innerHTML = !rows.length ? `<div style="color:var(--sub);font-size:14px;padding:8px 0">아직 항목이 없어요 · 아래 [+] 버튼으로 넣어 주세요</div>` : rows.map((it, i) => `<div class="rtrow" data-id="${it.id}">
+    <div class="mv"><button data-mv="-1" ${i ? "" : "disabled"}>▲</button><button data-mv="1" ${i < rows.length - 1 ? "" : "disabled"}>▼</button></div>
+    <input type="text" class="t" value="${esc(it.title)}" data-f="title">${it.from_day || it.to_day ? `<small class="needlink" style="white-space:nowrap">📅 ${it.from_day ? md(it.from_day) : ""}~${it.to_day ? md(it.to_day) : ""}만</small>` : ""}
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -1228,7 +1239,23 @@ function renderRtEditor() {
     <button data-rm title="삭제">✕</button></div>`).join("");
 }
 async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
-$("#rtEdit").onclick = async (e) => { e.preventDefault(); await loadRoutine(); renderRtEditor(); $("#rtDialog").showModal(); };
+$("#rtEdit").onclick = async (e) => { e.preventDefault(); await loadRoutine();
+  edTeam = myRole === "admin" ? mcTeam : previewTeam ?? (await sb.rpc("my_team")).data;
+  if (!edTeam) return toast("지점이 정해져 있지 않아요");
+  $("#rtAll").checked = false; renderRtEditor(); $("#rtDialog").showModal(); };
+// 📜 편집 기록 (DB 트리거가 남김, 0101): 누가·언제·무엇을 전→후
+const RT_F = { title: "제목", days: "요일", weeks: "주차", color: "색", carry: "↪ 넘김", need_link: "🔗 링크", need_photo: "📷 인증샷", need_count: "📅 숫자", from_day: "시작일", to_day: "끝나는 날" };
+const rtVal = (k, v) => k === "weeks" ? (v ? v.join("·") + "주차" : "매주") : k === "color" ? ({ red: "빨강", green: "초록", yellow: "노랑" }[v] ?? "기본")
+  : k === "days" ? [1, 2, 3, 4, 5, 6, 0].filter((d) => (v ?? []).includes(d)).map((d) => DOW[d]).join("") : typeof v === "boolean" ? (v ? "켬" : "끔") : v == null || v === "" ? "없음" : String(v);
+async function loadRtLog() {
+  const { data, error } = await sb.from("routine_item_log").select("*").eq("team_id", edTeam).order("at", { ascending: false }).limit(100);
+  if (fail(error)) return;
+  $("#rtLogList").innerHTML = data.length ? data.map((l) => { const t = new Date(l.at);
+    return `<div class="rtlog"><small>${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:${pad(t.getMinutes())}</small><b>${esc(l.by_name ?? "?")}</b> ${l.action === "add" ? "➕ 추가" : l.action === "del" ? "🗑 삭제" : "✏️ 수정"} · ${esc(l.title)}`
+      + Object.entries(l.changes ?? {}).map(([k, [o, n]]) => `<i>${RT_F[k] ?? esc(k)}: ${esc(rtVal(k, o))} → ${esc(rtVal(k, n))}</i>`).join("") + `</div>`; }).join("")
+    : `<div style="color:var(--sub);padding:6px 0">아직 편집 기록이 없어요</div>`;
+}
+$("#rtLog").addEventListener("toggle", () => { if ($("#rtLog").open) loadRtLog(); });
 $("#rtClose").onclick = () => $("#rtDialog").close();
 $("#rtRows").addEventListener("change", (e) => {
   const row = e.target.closest(".rtrow"), f = e.target.dataset.f; if (!row || !f) return;
@@ -1237,7 +1264,7 @@ $("#rtRows").addEventListener("change", (e) => {
 });
 $("#rtRows").addEventListener("click", async (e) => {
   const row = e.target.closest(".rtrow"); if (!row) return;
-  const id = +row.dataset.id, it = routine.find((x) => x.id === id), i = routine.indexOf(it);
+  const id = +row.dataset.id, it = routine.find((x) => x.id === id), rows = rtEdRows(), i = rows.indexOf(it);
   if (e.target.dataset.dow !== undefined) {
     const d = +e.target.dataset.dow, days = it.days.includes(d) ? it.days.filter((x) => x !== d) : [...it.days, d];
     if (!days.length) return toast("요일을 하나 이상 골라 주세요");
@@ -1245,18 +1272,19 @@ $("#rtRows").addEventListener("click", async (e) => {
   }
   if (e.target.dataset.tg) return rtSave(id, { [e.target.dataset.tg]: !it[e.target.dataset.tg] }); // ↪ 넘김 · 🔗 링크 필수 · 📷 인증샷 필수
   if (e.target.dataset.mv) { // 위·아래 이웃과 sort 교환
-    const o = routine[i + +e.target.dataset.mv]; if (!o) return;
+    const o = rows[i + +e.target.dataset.mv]; if (!o) return;
     await sb.from("routine_items").update({ sort: o.sort }).eq("id", it.id);
     return rtSave(o.id, { sort: it.sort });
   }
-  if (e.target.dataset.rm !== undefined && confirm(`"${it.title}" 고정업무를 지울까요?`)) {
+  if (e.target.dataset.rm !== undefined && confirm(`"${it.title}"\n이 지점 체크리스트에서 지울까요? (편집 기록에 남아요)`)) {
     const { error } = await sb.from("routine_items").delete().eq("id", id);
     if (!fail(error)) { await loadRoutine(); renderRtEditor(); }
   }
 });
 $("#rtDialog").querySelector(".quick").onclick = async (e) => {
   const k = e.target.dataset.add; if (!k) return;
-  const { error } = await sb.from("routine_items").insert({ title: "새 고정업무", days: k === "weekend" ? [6, 0] : [1, 2, 3, 4], sort: (routine.at(-1)?.sort ?? 0) + 1 });
+  const all = myRole === "admin" && $("#rtAll").checked, sort = Math.max(0, ...routine.map((x) => x.sort)) + 1; // 전 지점: 지점마다 한 줄씩
+  const { error } = await sb.from("routine_items").insert((all ? teams.map((t) => t.id) : [edTeam]).map((team_id) => ({ title: "새 항목", days: k === "weekend" ? [6, 0] : [1, 2, 3, 4], sort, team_id })));
   if (fail(error)) return;
   await loadRoutine(); renderRtEditor();
   $("#rtRows").lastElementChild?.querySelector(".t").select();
