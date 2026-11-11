@@ -135,6 +135,7 @@ dialog.wide { width: min(860px, calc(100vw - 24px)); }
 .bphotos { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0 2px; font-size: 13px; color: var(--sub); } .bphotos img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 .rtrow { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto auto auto 26px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .rtrow input[type=text] { width: 100%; padding: 6px 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
+.rtrow .rtwhen { grid-column: 2 / -1; } /* 기간 표시는 맨 아래 한 줄로 (칸 수를 넘겨 가로로 밀리던 것, 11-11) */
 .rtrow select { padding: 5px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); }
 .dows { display: flex; gap: 2px; } .dows button { width: 24px; height: 26px; border-radius: 5px; font-size: 12px; background: var(--hover); border: 1px solid var(--line); color: var(--sub); }
 .dows button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -1231,12 +1232,12 @@ function renderRtEditor() {
   if ($("#rtLog").open) loadRtLog();
   $("#rtRows").innerHTML = !rows.length ? `<div style="color:var(--sub);font-size:14px;padding:8px 0">아직 항목이 없어요 · 아래 [+] 버튼으로 넣어 주세요</div>` : rows.map((it, i) => `<div class="rtrow" data-id="${it.id}">
     <div class="mv"><button data-mv="-1" ${i ? "" : "disabled"}>▲</button><button data-mv="1" ${i < rows.length - 1 ? "" : "disabled"}>▼</button></div>
-    <input type="text" class="t" value="${esc(it.title)}" data-f="title">${it.from_day || it.to_day ? `<small class="needlink" style="white-space:nowrap">📅 ${it.from_day ? md(it.from_day) : ""}~${it.to_day ? md(it.to_day) : ""}만</small>` : ""}
+    <input type="text" class="t" value="${esc(it.title)}" data-f="title">
     <div class="dows">${[1, 2, 3, 4, 5, 6, 0].map((d) => `<button data-dow="${d}" class="${it.days.includes(d) ? "on" : ""}">${DOW[d]}</button>`).join("")}</div>
     <select data-f="weeks">${WEEKS.map(([v, l]) => `<option value="${v}" ${(it.weeks ?? []).join(",") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <select data-f="color">${[["", "기본"], ["red", "빨강"], ["green", "초록"], ["yellow", "노랑"]].map(([v, l]) => `<option value="${v}" ${it.color === v ? "selected" : ""}>${l}</option>`).join("")}</select>
     <div class="dows"><button data-tg="carry" class="${it.carry ? "on" : ""}" title="못 끝내면 다음날로 넘김" style="width:auto;padding:0 6px">↪ 넘김</button><button data-tg="need_link" class="${it.need_link ? "on" : ""}" title="링크를 올려야 완료" style="width:auto;padding:0 6px">🔗 링크</button><button data-tg="need_photo" class="${it.need_photo ? "on" : ""}" title="사진(인증샷)을 올려야 완료" style="width:auto;padding:0 6px">📷 인증샷</button><button data-tg="need_count" class="${it.need_count ? "on" : ""}" title="숫자를 넣어야 완료 (예: 내일 상담 예약 수)" style="width:auto;padding:0 6px">🔢 숫자</button></div>
-    <button data-rm title="삭제">✕</button></div>`).join("");
+    <button data-rm title="삭제">✕</button>${it.from_day || it.to_day ? `<small class="needlink rtwhen">📅 ${it.from_day ? md(it.from_day) : ""} ~ ${it.to_day ? md(it.to_day) : ""} 기간만 나오는 줄</small>` : ""}</div>`).join("");
 }
 async function rtSave(id, patch) { const { error } = await sb.from("routine_items").update(patch).eq("id", id); if (fail(error)) return; await loadRoutine(); renderRtEditor(); }
 $("#rtEdit").onclick = async (e) => { e.preventDefault(); await loadRoutine();
