@@ -207,7 +207,7 @@ body.is-admin #assignbox { display: block; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
 body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm:not(.cd), body.off-dl .row .chip,
-body.off-routine #routinebox, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
+body.off-routine #rtMini, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -280,8 +280,16 @@ body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden;
 header #fbBtn { background: #f04438; border-color: #f04438; color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(240, 68, 56, .35); } /* 🐞 신고·제안 눈에 띄게 */
 header #fbBtn:hover { background: #d92d20; }
 /* 월간 보기 (애플 캘린더 모양) */
-body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.jcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout, body.mtv .layout, body.lev .layout { display: none; }
+body.mv .layout, body.tv .layout, body.bv .layout, body.sv .layout, body.blv .layout, body.mkv .layout, body.psv .layout, body.lkv .layout, body.ctv .layout, body.qav .layout, body.ldv .layout, body.smv .layout, body.eduv .layout, body.rpv .layout, body.jgv .layout, body.jcv .layout, body.mcv .layout, body.tkv .layout, body.wrv .layout, body.fnv .layout, body.gxv .layout, body.atv .layout, body.mtv .layout, body.lev .layout { display: none; }
 body:not(.bv) #boardView { display: none; }
+/* 📌 매니저체크리스트 탭 (주간 탭 고정업무 상자를 옮김, 11-11) + 주간 탭 한 줄 */
+body:not(.mcv) #mcView { display: none; } #mcView { max-width: 1080px; margin: 0 auto; padding: 16px 20px 100px; }
+.rtmini { display: flex; align-items: center; gap: 8px; padding: 9px 14px; margin-bottom: 12px; border: 1px solid color-mix(in srgb, var(--green) 55%, var(--line)); border-radius: 10px; background: var(--panel); color: var(--text); text-decoration: none; font-weight: 600; }
+.rtmini b { color: var(--sub); font-weight: 400; font-size: 14px; margin-right: auto; } .rtmini span { color: var(--accent); font-size: 13.5px; white-space: nowrap; }
+.mcteams { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.mcteams button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--text); font: inherit; font-size: 13.5px; cursor: pointer; }
+.mcteams button.on { background: var(--accent); border-color: var(--accent); color: #fff; } .mcteams small { opacity: .8; margin-left: 4px; }
+#mcView .rt.ro { cursor: default; } @media (max-width: 860px) { #mcView { padding: 10px 10px 80px; } }
 /* 💰 매출 목표 */
 body:not(.sv) #salesView { display: none; }
 #salesView { max-width: 1100px; margin: 0 auto; padding: 16px 20px 100px; }
@@ -465,7 +473,7 @@ body:not(.tv) #teamView { display: none; }
 }
 /* 주간 화면 SUN 밑 달력: 같은 월 달력을 조금 작게 */
 #somedayView { display: none; max-width: 1200px; margin: 0 auto; padding: 0 24px 100px; } /* 🌱 주간·월간 맨 아래만 */
-body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.jcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv):not(.mtv):not(.lev) #somedayView { display: block; }
+body:not(.tv):not(.bv):not(.sv):not(.blv):not(.mkv):not(.psv):not(.lkv):not(.ctv):not(.qav):not(.ldv):not(.smv):not(.eduv):not(.rpv):not(.jgv):not(.jcv):not(.mcv):not(.tkv):not(.wrv):not(.fnv):not(.gxv):not(.atv):not(.mtv):not(.lev) #somedayView { display: block; }
 body:not(.mv) #somedayView { margin-top: -90px; padding-left: 284px; } /* 주간: main 아래 여백(120px) 안으로 당겨 붙이고, 왼쪽 주차 목록(260px) 피해서 main 칸 밑에 */
 @media (max-width: 860px) { body:not(.mv) #somedayView { padding-left: 20px; } }
 /* 🌱 언젠가 할 일 자리: PC(넓은 화면) = 주간·월간 오른쪽 칸(스크롤해도 따라옴), 폰 = 맨 위 */
@@ -623,7 +631,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
     <button id="prefBtn" class="btn ghost" title="보기 설정" aria-label="보기 설정">⚙️</button>
     <button id="outBtn" class="btn ghost">로그아웃</button>
   </header>
-  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="mt">회의록</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="le" class="jpcnonly">연동 오류</button><button data-v="gx">외국인</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
+  <nav class="seg"><div><button data-v="week">주간(할일들 까먹지마요)</button><button data-v="month">월간</button><button data-v="team">팀</button><button data-v="mt">회의록</button><button data-v="sales">매출</button><button data-v="fn">재무</button><button data-v="blog">블로그</button><button data-v="mk">마케팅</button><button data-v="post">게시물</button><button data-v="qna">Q&amp;A<span id="qaBadge" class="qabadge hidden"></span></button><button data-v="links">바로가기</button><button data-v="ct">연락처</button><button data-v="at">출석 스캔</button><button data-v="le" class="jpcnonly">연동 오류</button><button data-v="gx">외국인</button><button data-v="ld">리더 현황</button><button data-v="edu">인턴교육</button><button data-v="jg">조교교육 및 가이드북</button><button data-v="mc">매니저체크리스트</button><button data-v="jc">조교체크리스트</button><button data-v="wr">조교 근무기록</button><button data-v="rp">리포트<span id="rpBadge" class="qabadge hidden" title="오늘 쓸 리포트"></span></button><button data-v="sim">시뮬레이터</button><button data-v="board" class="adminonly">현황</button><button data-v="tk" class="adminonly">톡톡·인스타 봇</button></div></nav>
   <div id="updBar" class="hidden"></div><!-- 📣 업데이트 소식 (새 것만, 확인하면 사라짐) -->
   <div class="wm"><!-- 주간·월간 + 🌱 언젠가 할 일 (PC 오른쪽 칸 · 폰 맨 위) -->
   <div class="layout">
@@ -638,9 +646,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
       <p class="wkhint">💡 바로 일을 하지 못할 것 같으면, <u>바로 여기에 적어 두는 곳</u>이에요.</p>
       <div id="focusBar" class="focusbar"></div><!-- 🎯 내 몰입 시간 (계정 prefs.focus) -->
       <div class="rate"><div class="bar"><i id="rateBar"></i></div><span id="rateTxt"></span></div>
-      <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
-          <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
-        <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
+      <a id="rtMini" class="rtmini" href="#mc">📌 매니저체크리스트 <b id="rtMiniN"></b><span>열기 ›</span></a>
       <details id="simbox" class="hidden" open><summary>🧠 다음날 시뮬레이션 <small class="tbsub">타임박스</small> <select id="simTeamSel" class="hidden" onclick="event.stopPropagation()"></select> <button id="simPrev" class="rtnav" type="button" title="하루 전">‹</button><button id="simDay" class="rtnav" type="button" title="눌러서 오늘로"></button><button id="simNext" class="rtnav" type="button" title="하루 뒤 (2주까지 미리)">›</button> <button id="simRec" class="rtnav" type="button" title="지난 시뮬레이션 날짜별로 보기">📜 기록</button> <small id="simWho"></small></summary>
         <div id="simTB"></div></details>
       <details id="assignbox" open><summary>📨 업무 배정 <small>(대표 전용)</small></summary>
@@ -668,6 +674,11 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <section id="leView"></section>
   <section id="eduView"></section>
   <section id="jgView"></section>
+  <section id="mcView">
+      <details id="routinebox" open><summary>📌 <span id="rtTitle">오늘 고정업무</span> <span id="rtCount"></span><button class="rtnav wk" id="rtWkBtn" type="button">📅 주간 기록</button>
+          <button id="rtEdit" class="btn ghost adminonly" type="button">편집</button></summary>
+        <div class="bar rtbar"><i id="rtBar"></i></div><div id="rtList"></div><div id="rtStatus"></div><div id="rtWeek" class="hidden"></div></details>
+  </section>
   <section id="jcView"></section>
   <section id="wrView"></section>
   <section id="gxView"></section>
@@ -809,7 +820,7 @@ async function loadProfile() {
   if (previewUser) { const { data: pu } = await sb.from("profiles").select("name, team_id").eq("user_id", previewUser).maybeSingle(); if (pu) { previewTeam = pu.team_id; previewName = pu.name; } else previewUser = null; }
   myRole = previewTeam || previewUser ? "manager" : data.role; myPhone = data.phone ?? ""; myName = data.name; $("#me").textContent = `${data.name} · ${me.email}`;
   document.body.classList.toggle("is-admin", myRole === "admin");
-  if (myRole === "admin") $("#weekCal").before($("#days")); else $("#routinebox").before($("#days")); // 매니저: 하루 일정 → 고정업무 → 시뮬레이션 순
+  if (myRole === "admin") $("#weekCal").before($("#days")); else $("#simbox").before($("#days")); // 매니저: 체크리스트 한 줄 → 하루 일정 → 시뮬레이션 순
   document.body.classList.toggle("is-assist", myRole === "assistant"); // 🧑‍🎓 조교: 탭 4개만 (서버에서도 막힘, 조교 가이드는 DB 없음)
   tabCols(); // 역할마다 보이는 탭 수가 달라서 두 줄 칸 수 다시
   if (myRole === "assistant") joHome(); // 🧑‍🎓 아이폰 홈 화면 앱도 조교 링크로 열리게
@@ -1083,43 +1094,43 @@ window.simOnOtherDay = (tid, day, root) => {
   else if (root.closest("#boardView") && boardSimDay[tid] !== off) { boardSimDay[tid] = off; loadBoard(); }
 }; // summary 안 버튼: 접히지 않게
 $("#simTeamSel").onchange = (e) => { simP = +e.target.value; try { localStorage.setItem("sim-team", simP); } catch {} $("#simTB").innerHTML = ""; loadSim(); };
+let mcTeam = null; try { mcTeam = +localStorage.getItem("mc-team") || null; } catch {} // 대표: 매니저체크리스트 탭에서 고른 지점
+const rtCnt = (t) => { $("#rtCount").textContent = t; $("#rtMiniN").textContent = t; }; // 탭 상자 + 주간 탭 한 줄
 async function loadRoutine() {
   loadSim();
-  const day = today(), isToday = true, future = false;
-  if (rtWk.open) renderRtWeek();
-  const [r, c, k] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"),
-    myRole === "admin" ? sb.rpc("routine_status", { p_day: day }) : sb.rpc("team_routine_checks_on", { p_day: day, p_team: previewTeam }),
-    myRole === "admin" || !isToday ? { data: [] } : sb.rpc("routine_carry", { p_day: day, p_team: previewTeam })]); // ↪ 전에 못 끝낸 '넘김' 일 (오늘만)
-  if (fail(r.error || c.error || k.error)) return;
+  const day = today(), isToday = true, admin = myRole === "admin", future = admin; // 대표는 보기만 (체크는 매니저)
+  const [r, st] = await Promise.all([sb.from("routine_items").select("*").order("sort").order("id"), admin ? sb.rpc("routine_status", { p_day: day }) : { data: [] }]);
+  if (fail(r.error || st.error)) return;
+  if (admin) mcTeam = (st.data.find((x) => x.team_id === mcTeam) ?? st.data[0])?.team_id ?? null;
+  const team = admin ? mcTeam : previewTeam;
+  const [c, k] = admin && !team ? [{ data: [] }, { data: [] }] : await Promise.all([sb.rpc("team_routine_checks_on", { p_day: day, p_team: team }),
+    isToday ? sb.rpc("routine_carry", { p_day: day, p_team: team }) : { data: [] }]); // ↪ 전에 못 끝낸 '넘김' 일 (오늘만)
+  if (fail(c.error || k.error)) return;
   routine = r.data;
-  if (myRole !== "admin" && routine.some((it) => it.need_count)) consultTarget = (await sb.rpc("consult_target", { p_team: previewTeam })).data ?? 8;
-  const mine = routine.filter((it) => applies(it, day, previewTeam)), dw = W.parse(day).getDay();
-  $("#rtTitle").textContent = isToday ? `오늘(${DOW[dw]}) 고정업무` : `${md(day)}(${DOW[dw]}) 고정업무`;
-  if (myRole === "admin") { // 대표: 매니저별 오늘 진행 현황
-    $("#rtCount").textContent = `${mine.length}개 · 지점별 현황`;
-    $("#rtBar").parentElement.classList.add("hidden"); $("#rtList").innerHTML = "";
-    $("#rtStatus").innerHTML = c.data.length ? `<table>${c.data.map((x) => { const pct = x.total ? Math.round((x.done / x.total) * 100) : 0;
-      return `<tr><td><b>${esc(x.team)}</b> <span style="color:var(--sub)">${esc(x.members ?? "매니저 없음")}</span></td><td><div class="bar"><i style="width:${pct}%"></i></div></td><td class="n">${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉 퇴근 가능" : ""}</td></tr>`; }).join("")}</table>`
-      : `<div style="color:var(--sub);font-size:14px">지점이 없어요</div>`;
-    return;
-  }
+  if (rtWk.open) renderRtWeek(); // 목록·고른 지점이 정해진 뒤에
+  if (routine.some((it) => it.need_count)) consultTarget = (await sb.rpc("consult_target", { p_team: team })).data ?? 8;
+  const mine = routine.filter((it) => applies(it, day, team)), dw = W.parse(day).getDay();
+  $("#rtTitle").textContent = `오늘(${DOW[dw]}) 매니저체크리스트`;
+  $("#rtBar").parentElement.classList.remove("hidden");
+  // 대표: 4지점 오늘 진행 → 눌러서 그 지점 항목별 누가·몇 시
+  const chips = admin ? `<div class="mcteams">${st.data.map((x) => `<button type="button" data-mcteam="${x.team_id}" class="${x.team_id === team ? "on" : ""}" title="${esc(x.members ?? "매니저 없음")}">${esc(x.team)}<small>${x.done}/${x.total}${x.total && x.done === x.total ? " 🎉" : ""}</small></button>`).join("")}</div>` : "";
   routineChecks = new Map(c.data.map((x) => [x.item_id, x])); // 지점 공용: 누가 언제 했는지
   const done = mine.filter((it) => routineChecks.has(it.id)).length;
   const carried = k.data.map((x) => ({ it: routine.find((i) => i.id === x.item_id), from: x.from_day })).filter((x) => x.it);
   if (!mine.length && !carried.length) { // 이날은 고정업무 없음 (‹ › 로 다른 날 보기)
-    $("#rtCount").textContent = ""; $("#rtBar").style.width = "0%";
-    $("#rtList").innerHTML = `<div style="color:var(--sub);font-size:14px;padding:4px 0">오늘은 고정업무가 없어요 · 📅 주간 기록에서 지난 기록을 볼 수 있어요</div>`;
+    rtCnt(""); $("#rtBar").style.width = "0%";
+    $("#rtList").innerHTML = chips + `<div style="color:var(--sub);font-size:14px;padding:4px 0">오늘은 고정업무가 없어요 · 📅 주간 기록에서 지난 기록을 볼 수 있어요</div>`;
     $("#rtStatus").innerHTML = ""; return;
   }
-  $("#rtCount").textContent = `${done}/${mine.length}`;
+  rtCnt(admin ? "지점별 현황" : `${done}/${mine.length}${mine.length && done === mine.length ? " 🎉" : ""}`);
   $("#rtBar").style.width = (mine.length ? Math.round((done / mine.length) * 100) : 0) + "%";
   const row = (it, ck, from) => { const at = ck && new Date(ck.done_at);
-    return `<label class="rt ${it.color} ${ck ? "done" : ""}"><input type="checkbox" data-rt="${it.id}" data-day="${from ?? day}" ${ck ? "checked" : ""} ${future ? "disabled" : ""}>`
-      + `${ck ? `<b class="who" title="누르면 체크 해제">${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}`
+    return `<label class="rt ${it.color} ${ck ? "done" : ""} ${admin ? "ro" : ""}"><input type="checkbox" data-rt="${it.id}" data-day="${from ?? day}" ${ck ? "checked" : ""} ${future ? "disabled" : ""}>`
+      + `${ck ? `<b class="who" ${admin ? "" : `title="누르면 체크 해제"`}>${esc(ck.done_name ?? "")} ✓ ${pad(at.getHours())}:${pad(at.getMinutes())}</b>` : ""}`
       + `<span>${from ? `<b class="carry">↪ ${md(from)}(${DOW[W.parse(from).getDay()]}) 못 끝낸 일</b> ` : ""}${esc(it.title)}${it.need_photo && !ck ? ` <small class="needlink">📷 인증샷 올리면 완료</small>` : it.need_link && !ck ? ` <small class="needlink">🔗 링크 올리면 완료</small>` : it.need_count && !ck ? ` <small class="needlink">📅 숫자 넣으면 완료 · 목표 ${consultTarget}명</small>` : ""}${ck?.num != null ? ` <b class="cnum ${ck.num < consultTarget ? "low" : ""}">${ck.num}명${ck.num < consultTarget ? ` · 목표 ${consultTarget}명 미달 → 대표님께 회신율·광고 연락` : " 👍"}</b>` : ""}</span>`
       + `${lkA(ck?.link, "rtlink", true)}</label>`; };
-  $("#rtList").innerHTML = carried.map((x) => row(x.it, null, x.from)).join("") + mine.map((it) => row(it, routineChecks.get(it.id))).join("")
-    + (mine.length && done === mine.length ? `<div class="rtdone">${isToday ? "🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요" : "🎉 이날 고정업무를 모두 끝냈어요"}</div>` : "");
+  $("#rtList").innerHTML = chips + carried.map((x) => row(x.it, null, x.from)).join("") + mine.map((it) => row(it, routineChecks.get(it.id))).join("")
+    + (!admin && mine.length && done === mine.length ? `<div class="rtdone">${isToday ? "🎉 오늘 고정업무를 모두 끝냈어요! 대표님께 보고하고 퇴근하세요" : "🎉 이날 고정업무를 모두 끝냈어요"}</div>` : "");
   $("#rtStatus").innerHTML = "";
 }
 // 📅 주간 기록: 고정업무 × 월~일 한 표 (매니저 = 우리 지점 누가·몇 시, 대표 = 지점별 n/N). ‹ › 는 주 단위
@@ -1166,10 +1177,12 @@ async function renderRtWeek() {
       const r = x.data.find((y) => y.team_id === tm.team_id); if (!r?.total) return `<td class="c x"></td>`;
       if (days[i] < RT_START) return `<td class="c f">–</td>`;
       const cls = days[i] > td ? "f" : r.done === r.total ? "y" : days[i] < td ? "n" : "";
-      return `<td class="c ${cls}">${r.done}/${r.total}${r.done === r.total ? " 🎉" : ""}</td>`; }).join("")}</tr>`).join("")}</table></div>`;
+      return `<td class="c ${cls}">${r.done}/${r.total}${r.done === r.total ? " 🎉" : ""}</td>`; }).join("")}</tr>`).join("")}</table></div>`
+      + (mcTeam ? `<div class="wh" style="margin-top:12px">${esc(teamsL.find((x) => x.team_id === mcTeam)?.team ?? "")} 항목별 기록</div>` + await routineWeekTable(mon, mcTeam) : "");
   } else $("#rtWeek").innerHTML = head + await routineWeekTable(mon, previewTeam); // 매니저: 우리 지점
   $("#rtWeek").classList.remove("hidden");
 }
+$("#rtList").addEventListener("click", (e) => { const t = +e.target.closest("[data-mcteam]")?.dataset.mcteam; if (!t) return; mcTeam = t; try { localStorage.setItem("mc-team", t); } catch {} loadRoutine(); });
 $("#rtList").addEventListener("change", async (e) => {
   const id = +e.target.dataset.rt; if (!id) return;
   const it = routine.find((x) => x.id === id), on = e.target.checked; let link = null, num = null;
@@ -1750,7 +1763,7 @@ if (!document.querySelector(`.seg [data-v="${view}"]`)) view = "week"; // 없앤
 const JO_VIEWS = ["ld", "blog", "post", "jg", "jc", "wr", "fn", "gx", "at", "le"]; // 🧑‍🎓 조교가 볼 수 있는 탭 (le 는 일중 조교만, is-jpcn)
 function setView(v) {
   if (document.body.classList.contains("is-assist") && !JO_VIEWS.includes(v)) v = "ld";
-  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at"); document.body.classList.toggle("mtv", v === "mt"); document.body.classList.toggle("lev", v === "le");
+  view = v; document.body.classList.toggle("mv", v === "month"); document.body.classList.toggle("tv", v === "team"); document.body.classList.toggle("bv", v === "board"); document.body.classList.toggle("sv", v === "sales"); document.body.classList.toggle("blv", v === "blog"); document.body.classList.toggle("mkv", v === "mk"); document.body.classList.toggle("psv", v === "post"); document.body.classList.toggle("lkv", v === "links"); document.body.classList.toggle("qav", v === "qna"); document.body.classList.toggle("ctv", v === "ct"); document.body.classList.toggle("ldv", v === "ld"); document.body.classList.toggle("eduv", v === "edu"); document.body.classList.toggle("smv", v === "sim"); document.body.classList.toggle("rpv", v === "rp"); document.body.classList.toggle("jgv", v === "jg"); document.body.classList.toggle("jcv", v === "jc"); document.body.classList.toggle("mcv", v === "mc"); document.body.classList.toggle("tkv", v === "tk"); document.body.classList.toggle("wrv", v === "wr"); document.body.classList.toggle("fnv", v === "fn"); document.body.classList.toggle("gxv", v === "gx"); document.body.classList.toggle("atv", v === "at"); document.body.classList.toggle("mtv", v === "mt"); document.body.classList.toggle("lev", v === "le");
   if (v === "team" && me) loadTeam();
   if (v === "board" && me) loadBoard();
   if (v === "sales" && me && window.SL) SL.load();
@@ -1768,6 +1781,7 @@ function setView(v) {
   if (v === "sim" && me && window.TB) TB.loadMine();
   if (v === "jg") window.JGUIDE?.mount($("#jgView")); // 🧑‍🎓 조교 가이드 (DB 없음)
   if (v === "jc" && me && window.JC) JC.load(); // ✅ 조교체크리스트
+  if (v === "mc" && me) loadRoutine(); // 📌 매니저체크리스트 (날짜 넘어간 뒤 열어도 오늘 것)
   if (v === "tk" && me && window.TK) TK.load(); // 💬 톡톡봇 (대표)
   if (v === "wr" && me && window.WR) WR.load(); // 🕒 근무기록
   if (v === "fn" && me && window.FN) FN.load(); // 💼 재무 (조교는 승인 받아야)
@@ -1847,7 +1861,7 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["routine", "📌 오늘 고정업무"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
+const FEATURES = [["routine", "📌 매니저체크리스트 한 줄(주간)"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
 function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); if (prefs().skin) plannerSkin.set(prefs().skin); applyTabOrder(); tabCols(); } // 🎨 계정에 저장된 디자인 → 이 기기에도
