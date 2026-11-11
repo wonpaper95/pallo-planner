@@ -1391,6 +1391,7 @@ $("#boardView").addEventListener("click", async (e) => {
   if (m) { boardWeek = m === "week"; try { localStorage.setItem("board-week", boardWeek ? "1" : ""); } catch {} return loadBoard(); }
   if (n !== undefined) { boardMon = +n === 0 ? null : W.add(boardMon ?? W.monday(today()), 7 * +n); return loadBoard(); }
 });
+let rtT; const rtSoon = () => { clearTimeout(rtT); rtT = setTimeout(loadRoutine, 400); }; // 체크 알림이 한꺼번에 와도 한 번만 다시 읽음 (11-11: 기록 수백 건이 한 번에 바뀌자 열린 화면마다 요청 폭주 → 운영 서버 멈춤)
 const boardSoon = () => { if (view !== "board") return; clearTimeout(boardT); boardT = setTimeout(loadBoard, 400); };
 setInterval(() => view === "board" && document.visibilityState === "visible" && loadBoard(), 60000); // 실시간이 끊겨도 1분마다
 async function loadBoard() {
@@ -1712,7 +1713,7 @@ function listen() {
   if (myRole !== "assistant") sb.channel("upd").on("postgres_changes", { event: "*", schema: "public", table: "app_updates" }, () => loadUpdates()).subscribe(); // 📣 새 소식 바로
   if (isBoss) sb.channel("fb").on("postgres_changes", { event: "*", schema: "public", table: "feedback" }, () => loadFeedback()).subscribe(); // 🐞 새 신고
   sb.channel("qna").on("postgres_changes", { event: "*", schema: "public", table: "qna_items" }, () => window.QA?.remote()).subscribe(); // 💬 질문·확정 바로 반영
-  sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { loadRoutine(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
+  sb.channel("rt").on("postgres_changes", { event: "*", schema: "public", table: "team_routine_checks" }, () => { rtSoon(); boardSoon(); }).subscribe(); // 팀원이 체크하면 바로
   sb.channel("team").on("postgres_changes", { event: "*", schema: "public", table: "team_tasks" }, () => { view === "team" ? teamSoon() : softReload(); boardSoon(); }).subscribe();
   sb.channel("sales").on("postgres_changes", { event: "*", schema: "public", table: "sales_plans" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
     .on("postgres_changes", { event: "*", schema: "public", table: "sales_days" }, (x) => SL.remote(x.new?.team_id ? x.new : x.old))
