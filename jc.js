@@ -139,7 +139,7 @@ function renderNames() {
   const box = V().querySelector("#jcNames");
   if (box.querySelector(".jcname-in")) return; // 이름 고치는 중
   box.innerHTML = JC.names.length ? JC.names.map((n) => `<span class="jcname" data-id="${n.id}"><button class="jcchip" data-act="rename" style="background:${esc(n.color)}" title="눌러서 이름 고치기">${esc(n.name)}</button>
-      <button class="jcdot" data-act="color" style="background:${esc(n.color)}" title="색상 변경"></button><button class="jcicon" data-del="name" title="삭제">✕</button></span>`).join("")
+      <button class="jcmv" data-act="mvl" title="앞으로">‹</button><button class="jcmv" data-act="mvr" title="뒤로">›</button><button class="jcdot" data-act="color" style="background:${esc(n.color)}" title="색상 변경"></button><button class="jcicon" data-del="name" title="삭제">✕</button></span>`).join("")
     : `<div class="mut jcempty">등록된 조교 이름이 없어요. 아래에서 추가해주세요.</div>`;
 }
 function renderGrid(toToday) {
@@ -260,7 +260,7 @@ const nextSort = (list) => list.reduce((m, x) => Math.max(m, x.sort ?? 0), 0) + 
 async function reorder(table, list, from, to) {
   const ids = list.map((x) => x.id), a = ids.indexOf(from), b = ids.indexOf(to); if (a < 0 || b < 0 || a === b) return;
   const next = list.slice(); next.splice(b, 0, ...next.splice(a, 1));
-  next.forEach((x, i) => (x.sort = i + 1)); for (const a of [JC.tasks, JC.links]) a.sort((x, y) => x.sort - y.sort); render();
+  next.forEach((x, i) => (x.sort = i + 1)); for (const a of [JC.tasks, JC.links, JC.names]) a.sort((x, y) => x.sort - y.sort); render();
   const errs = await Promise.all(next.map((x, i) => sb.from(table).update({ sort: i + 1 }).eq("id", x.id)));
   errs.some((r) => fail(r.error)); JC.load();
 }
@@ -298,6 +298,7 @@ function bind() {
     if (act === "today") return scrollToday(v.querySelector(".jcscrollx"), true);
     if (act === "cell") return openCell(b);
     if (act === "color") return openColor(b, id);
+    if (act === "mvl" || act === "mvr") { const i = JC.names.findIndex((x) => x.id === id), j = i + (act === "mvl" ? -1 : 1); if (j < 0 || j >= JC.names.length) return; return reorder("jc_names", JC.names, id, JC.names[j].id); }
     if (act === "mark") return openMark(b, +b.closest("tr[data-task]").dataset.task);
     if (act === "memodone") { const m = JC.memos.find((x) => x.id === id); m.done = b.checked; renderMemos(); return fail((await sb.from("jc_memos").update({ done: b.checked }).eq("id", id)).error); }
     if (act === "memopin" || act === "linkpin" || act === "photopin") {

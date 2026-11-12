@@ -97,3 +97,5 @@ body:not(.jcv) #jcView { display: none; }
 .jcpop .jcmks button { border: 2px solid transparent; border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: #fff; }
 .jcpop .jcmks button.on { border-color: var(--text); }
 .jcpop .jcmks .mk-none { background: var(--fill); color: var(--sub); } .jcpop .jcmks .mk-red { background: var(--red); } .jcpop .jcmks .mk-green { background: var(--green); } .jcpop .jcmks .mk-blue { background: var(--blue); } .jcpop .jcmks .mk-yellow { background: #d9a400; }
+
+#jcView button.jcmv { border: 0; background: transparent; color: var(--sub); font-size: 15px; line-height: 1; padding: 0 3px; cursor: pointer; }
