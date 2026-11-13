@@ -15,7 +15,7 @@ IDEA.load = async function () {
     ${ro ? "" : `<form id="idForm"><input name="title" maxlength="200" placeholder="예) 애플 메시지 답장 제안해주는 프로그램 만들기" autocomplete="off" required><button class="btn">담기</button></form>`}
     ${rows.length ? rows.map((r) => `<details class="idcard ${r.done ? "done" : ""}" data-id="${r.id}" ${open.has(String(r.id)) ? "open" : ""}>
       <summary><span class="idarrow">▶</span>
-        <input class="idtitle" value="${esc(r.title)}" maxlength="200" ${ro ? "readonly" : ""} aria-label="아이디어 제목">
+        <textarea class="idtitle" rows="1" maxlength="200" ${ro ? "readonly" : ""} aria-label="아이디어 제목">${esc(r.title)}</textarea>
         ${r.memo?.trim() ? `<span class="idhas" title="메모 있음">📝</span>` : ""}
         ${ro ? "" : `<button type="button" class="rf ${r.refs?.length ? "on" : ""}" data-ref title="참고 링크·파일">📎${r.refs?.length ? ` ${r.refs.length}` : ""}</button><label class="idcal" title="날짜를 정해 플래너로 옮기기">📅<input type="date" min="${today()}"></label><button type="button" class="iddel" title="지우기">🗑</button>`}
       </summary>
@@ -27,9 +27,11 @@ IDEA.load = async function () {
   V().querySelectorAll(".idcard").forEach((card) => {
     const id = card.dataset.id, r0 = rows.find((x) => String(x.id) === id), stop = (e) => e.stopPropagation();
     card.addEventListener("toggle", () => { const s = openSet(); card.open ? s.add(id) : s.delete(id); saveOpen(s); });
-    const ti = card.querySelector(".idtitle"), ta = card.querySelector("textarea"), st = card.querySelector(".idsave");
+    const ti = card.querySelector(".idtitle"), ta = card.querySelector(".idmemo textarea"), st = card.querySelector(".idsave");
     // summary 안 입력칸·버튼을 눌러도 카드가 접히지 않게
     card.querySelectorAll("summary input, summary button, summary label").forEach((el) => el.addEventListener("click", stop));
+    const fit = () => { ti.style.height = "auto"; ti.style.height = ti.scrollHeight + (ti.offsetHeight - ti.clientHeight) + "px"; }; // 제목이 길면 줄바꿈해서 전부 보이게
+    fit(); ti.addEventListener("input", fit); card.addEventListener("toggle", fit); addEventListener("resize", fit);
     ti.addEventListener("keydown", (e) => { if (e.key === " ") e.stopPropagation(); if (e.key === "Enter" && !e.isComposing) ti.blur(); }); // 스페이스가 카드 접기로 안 먹게
     ti.onchange = async () => { const title = ti.value.trim() || r0.title; ti.value = title; r0.title = title; const { error } = await sb.from("someday").update({ title }).eq("id", id); if (!fail(error)) window.SD?.load(); };
     let t; const flush = async () => { clearTimeout(t); if (ta.value === (r0.memo ?? "")) return; const memo = ta.value; st.textContent = "저장 중…";
