@@ -49,6 +49,15 @@ body:not(.bnv) #brainView { display: none; }
 .bnlrbar.mini { width: 100%; margin: 10px 0 0; padding: 9px 11px; grid-template-columns: auto minmax(30px, 1fr) auto; gap: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 13px; cursor: pointer; }
 .bnlrbar.mini b:first-child { color: color-mix(in srgb, #7c9cff 65%, var(--text)); } .bnlrbar.mini b:last-child { color: color-mix(in srgb, #ff8fb1 65%, var(--text)); }
 .bnlrbar.mini u { border-right-color: var(--bg); }
+.bnlrguide { margin: 8px 0 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); font-size: 13px; line-height: 1.5; color: var(--text); }
+.bnlrguide summary { padding: 9px 11px; font-weight: 700; cursor: pointer; }
+.bnlrguide > div { padding: 9px 11px; border-top: 1px solid var(--line); }
+.bnlrguide b { display: block; margin-bottom: 3px; }
+.bnlrguide p { display: grid; grid-template-columns: auto 1fr; margin: 2px 0 0; word-break: keep-all; }
+.bnlrguide i { display: inline-block; margin-right: 6px; font-style: normal; font-weight: 700; white-space: nowrap; }
+.bnlrguide .l i { color: color-mix(in srgb, #7c9cff 65%, var(--text)); } .bnlrguide .r i { color: color-mix(in srgb, #ff8fb1 65%, var(--text)); }
+.bnlrguide .act { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bnlrguide ul { margin: 0; padding: 0; list-style: none; word-break: keep-all; }
 
 /* 오른쪽 칸 */
 .bnheadline { margin: -4px 0 14px; padding: 11px 13px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--bg)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); font-size: 14.5px; line-height: 1.6; }

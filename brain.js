@@ -201,6 +201,16 @@ function lrShare() { // 좌:우 비율 — 온도를 무게로 (둘 다 = 반반
   for (const n of topics()) { const s = sideOf(n), w = Math.max(1, n.heat); c[s]++; if (s === "L") L += w; else if (s === "R") R += w; else if (s === "B") { L += w / 2; R += w / 2; } }
   return { c, pct: L + R ? Math.round((L / (L + R)) * 100) : null };
 }
+const LR_GUIDE = [ // 📖 좌뇌·우뇌 기준 (대표가 정리해 준 내용, 11-15): [상황, 좌뇌, 우뇌]
+  ["💼 사업·경영", "매출 분석 · 비용 계산 · 데이터 분석 · 전략 수립", "사업 아이디어 · 시장 흐름 파악 · 새로운 기회 발견"],
+  ["💬 대화·인간관계", "상대방의 말과 문장 이해", "표정 · 말투 · 감정 · 분위기 파악"],
+  ["📚 학습·공부", "개념 이해 · 논리적 정리 · 암기", "이미지 연상 · 전체 구조 파악 · 시각화"],
+  ["🚩 리더십", "조직 관리 · 업무 분배 · 목표 설정 · 성과 분석", "구성원의 감정 이해 · 동기부여 · 창의적인 문제 해결"],
+];
+const LR_ACT = [["독서·글쓰기", "수학·논리 문제", "외국어 학습", "데이터 분석", "전략적 사고", "토론·논증"], ["그림 그리기", "음악 감상·연주", "공간 퍼즐", "시각화 훈련", "창의적 아이디어 발상", "새로운 경험과 관찰"]];
+const lrGuide = () => `<details class="bnlrguide"${S.guide ? " open" : ""}><summary>📖 좌뇌·우뇌 기준</summary>
+  ${LR_GUIDE.map(([t, l, r]) => `<div><b>${t}</b><p class="l"><i>◐ 좌뇌</i>${l}</p><p class="r"><i>◑ 우뇌</i>${r}</p></div>`).join("")}
+  <div><b>🏋️ 각 뇌를 쓰는 활동</b><div class="act">${LR_ACT.map((a, j) => `<ul class="${j ? "r" : "l"}"><li><i>${j ? "◑ 우뇌" : "◐ 좌뇌"}</i></li>${a.map((x) => `<li>${x}</li>`).join("")}</ul>`).join("")}</div></div></details>`;
 const lrBar = (sh) => `<b>◐ 좌뇌 ${sh.pct}%</b><i><u style="width:${sh.pct}%"></u></i><b>우뇌 ${100 - sh.pct}% ◑</b>`;
 const lrLblCss = (r) => `width:max-content;max-width:${Math.round(Math.max(r * 2 + 10, 68))}px;font-size:${Math.max(10.5, Math.min(13, r * 0.42)).toFixed(1)}px`;
 function lrHit(p, q) { // 점끼리, 이름표끼리, 이름표와 남의 점이 닿는지 (이름표는 실제로 잰 네모로 따짐)
@@ -435,6 +445,7 @@ function drawPanel() {
       ${sm.headline ? `<p class="bnheadline">${esc(sm.headline)}</p>` : ""}
       <div class="dtstats"><div><b>${areas.length}</b><span>큰 주제</span></div><div><b>${total}</b><span>생각</span></div><div><b>${S.links.length}</b><span>이어진 선</span></div></div>
       ${sh.pct != null ? `<button type="button" class="bnlrbar mini" data-lr title="좌뇌·우뇌 보기로 — 요즘 생각이 논리 쪽(좌)·감각 쪽(우) 어디에 더 쏠려 있는지">${lrBar(sh)}</button>` : ""}
+      ${S.mode === "lr" ? lrGuide() : ""}
       ${hot.length ? `<h4>🔥 요즘 가장 많이 생각하는 것</h4>${bars(hot, (x) => x.heat, "#ffb347")}` : ""}
       ${wor.length ? `<h4>😟 고민이 걸려 있는 것</h4>${bars(wor, (x) => x.worry, "#ff6b6b")}` : ""}
       ${up.length ? `<h4>📈 요즘 새로 떠오른 것</h4>${list(up)}` : ""}
@@ -446,6 +457,7 @@ function drawPanel() {
       <form class="dtadd" data-addto="${S.root.id}"><input name="title" maxlength="80" placeholder="새 큰 주제 이름" autocomplete="off" required><button class="dtbtn pri">+ 큰 주제</button></form>
       <div class="dtmut">${S.run ? `주간 할 일 ${c.week ?? 0}개 · Claude 대화 ${c.claude ?? 0}마디${c.idea ? ` · 아이디어 ${c.idea}개` : ""}를 읽고 그렸어요${sm.period?.from ? ` (${esc(ymd(sm.period.from))}~${esc(ymd(sm.period.to))})` : ""}. ` : "첫 분석이 끝나면 여기에 주제와 온도가 채워져요. "}매주 월요일 새벽에 새로 분석해요. 직접 넣거나 고친 생각은 다시 분석해도 그대로 둬요.</div>`;
     p.onclick = (e) => { const id = e.target.closest("[data-go]")?.dataset.go; if (id) return select(id, true); if (e.target.closest("[data-lr]") && S.mode !== "lr") { S.mode = "lr"; lsSet(MODE_KEY, "lr"); draw(); } };
+    p.querySelector(".bnlrguide")?.addEventListener("toggle", (e) => { S.guide = e.target.open; }); // 칸을 다시 그려도 펼친 채로
     bindAdd(p); return;
   }
   const ps = path(n), cs = kids(n), rel = [...(S.rel.get(n.id) ?? [])].map((id) => S.by.get(id)).filter(Boolean).sort((a, b) => b.heat - a.heat || a._i - b._i), isRoot = n._d === 0;
