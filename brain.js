@@ -210,7 +210,7 @@ function lrLayout(W, H, BOT) { // 점 자리: 큰 점부터, 자기 큰 주제 �
   const sum = (l) => l.reduce((t, n) => t + f(n) ** 2, 0);
   let k = Math.min(Math.min(W, H) / 13, Math.sqrt((0.36 * Math.PI * a * b) / 2 / (Math.PI * Math.max(sum(by.L), sum(by.R), 1e-9)))); // 양쪽 같은 배율 — 그래야 어느 쪽이 더 찼는지 눈으로 비교됨
   for (let tries = 0; tries < 16; tries++, k *= 0.9) {
-    const thr = Math.max(13, k * 1.05), step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
+    const thr = Math.max(13, Math.min(k * 1.05, 21)),  step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
     const size = (n, rank) => { const r = k * f(n), lbl = r >= thr || rank < (H < 420 ? 3 : 5); return { r, lbl, pad: (lbl ? Math.max(r, 30) : r) + 1.5 }; }; // 이름을 다는 점은 둘레를 넉넉히
     const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n, i) => t + (2 * size(n, i).pad) ** 2, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
     const placed = []; // 가운데 띠부터 놓고 양쪽이 그 둘레를 피해 앉는다 (이름표가 경계 너머 점과 겹치지 않게 한데 모아 잼)
