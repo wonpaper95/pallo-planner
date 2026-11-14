@@ -95,4 +95,23 @@ export async function newMembers(sinceIso) {
   return (d?.proNetwork?.membersSearch?.edges ?? []).map((e) => ({ member_id: String(e.node.id), name: String(e.node.name ?? ""), city: e.node.city ?? null, joined_at: e.metadata?.joinTime ?? null }));
 }
 
+// 이벤트 댓글 (답글 안 주최자 답 여부 확인용 회원 번호까지). 20개씩 별칭으로 묶는다 → [{id, comments:[...]}]
+const COMMENT_FIELDS = `id text created link inReplyTo member { id name } replies(first: 10) { edges { node { member { id } } } }`;
+export async function commentsByEvent(ids) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += 20) {
+    const chunk = ids.slice(i, i + 20);
+    const q = `query { ${chunk.map((id, k) => `e${k}: event(id: ${JSON.stringify(String(id))}) { id comments(first: 20) { edges { node { ${COMMENT_FIELDS} } } } }`).join("\n")} }`;
+    const d = await gql(q);
+    out.push(...chunk.map((_, k) => d?.[`e${k}`]).filter(Boolean).map((e) => ({ id: String(e.id), comments: (e.comments?.edges ?? []).map((x) => x.node) })));
+  }
+  return out;
+}
+
+// 주최자 계정 알림 + 계정 회원 번호
+export async function notifications() {
+  const d = await gql(`query { self { id notifications(filter: { organizerOnly: false }) { edges { node { id kind text link read updatedAt } } } } }`);
+  return { selfId: d?.self?.id ? String(d.self.id) : null, nodes: (d?.self?.notifications?.edges ?? []).map((e) => e.node) };
+}
+
 export async function self() { return (await gql(`query { self { id name } }`))?.self ?? null; }

@@ -105,11 +105,43 @@ function weeklyStats(rows, weeks, todayYmd) {
   return [...out.values()].sort((a, b) => b.week.localeCompare(a.week) || b.rsvps - a.rsvps);
 }
 
+// ── 📬 답할 것: 이벤트 댓글 + 주최자 계정 알림 (개인 메시지는 API 에 없어 밋업 앱에서만 본다) ──
+// 답이 필요한 알림 종류만. 신청·가입·리마인드는 다른 칸에 이미 나온다.
+const INBOX_KINDS = { COMMENT: "댓글", REPLY: "답글", MUG_COMM_COMMENT: "게시판 댓글", PENDING_MEMBER: "가입 승인 대기" };
+const eventIdOfLink = (link) => { const m = String(link ?? "").match(/\/events\/(\d+)/); return m ? m[1] : null; };
+const clip = (t, n = 500) => { const s = String(t ?? "").trim(); return s.length > n ? s.slice(0, n) + "…" : s; };
+
+// 이벤트 댓글 → meetup_inbox 행. 맨 위 댓글만(답글 아님), 주최자(selfId) 본인 댓글은 뺀다. 주최자가 답글을 달았으면 answered.
+function commentRows(ev, nodes, selfId) {
+  const me = String(selfId ?? "");
+  return (nodes ?? []).filter((c) => c && !c.inReplyTo && c.member && String(c.member.id) !== me).map((c) => ({
+    id: "c:" + c.id, source: "comment", kind: "COMMENT", event_id: ev.id, team_id: ev.team_id, branch: ev.branch, event_title: ev.title,
+    member_name: String(c.member.name ?? ""), text: clip(c.text), link: c.link ?? ev.event_url ?? null, created_at: c.created ?? null,
+    answered: (c.replies?.edges ?? []).some((e) => String(e?.node?.member?.id ?? "") === me),
+  }));
+}
+
+// 계정 알림 → meetup_inbox 행. 답할 종류만. 밋업에서 읽었으면 answered. scannedEventIds(댓글을 직접 읽은 이벤트)의 댓글 알림은 겹치므로 뺀다.
+function noticeRows(nodes, scannedEventIds = []) {
+  const scanned = new Set(scannedEventIds.map(String));
+  return (nodes ?? []).filter((x) => x && INBOX_KINDS[x.kind]).filter((x) => !(["COMMENT", "REPLY"].includes(x.kind) && scanned.has(eventIdOfLink(x.link))))
+    .map((x) => ({ id: "n:" + x.id, source: "notice", kind: x.kind, event_id: eventIdOfLink(x.link), team_id: null, branch: null, event_title: null,
+      member_name: null, text: clip(x.text), link: x.link ?? null, created_at: x.updatedAt ?? null, answered: !!x.read }));
+}
+
+// 화면에 띄울 것: 아직 안 답했고 처리 안 한 것, 최근 days 일, 새것 먼저
+function inboxOpen(rows, nowIso, days = 14) {
+  const min = Date.parse(nowIso) - days * 86400e3;
+  return (rows ?? []).filter((r) => !r.answered && !r.done_at && (!r.created_at || Date.parse(r.created_at) >= min))
+    .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+}
+
 // JWT 클레임 (서명은 Node crypto 가 한다). 유효 120초.
 function jwtParts({ clientKey, memberId, signingKeyId }, nowSec) {
   return { header: { kid: signingKeyId, typ: "JWT", alg: "RS256" }, claims: { sub: String(memberId), iss: clientKey, aud: "api.meetup.com", exp: nowSec + 120 } };
 }
 
 return { NETWORK, GROUP, TEAM_OF_BRANCH, JEONSAN_CODE, ACTIVE, STATUS_LABEL, BRANCH_KO, branchKo, branchOf, teamKeyOfBranch, jeonsanCodeOf, kst, addDays, weekStart,
-  eventRow, rsvpRows, diffRsvps, jeonsanTodo, jeonsanTitle, jeonsanMemo, rosterOf, weeklyStats, jwtParts };
+  eventRow, rsvpRows, diffRsvps, jeonsanTodo, jeonsanTitle, jeonsanMemo, rosterOf, weeklyStats, jwtParts,
+  INBOX_KINDS, eventIdOfLink, commentRows, noticeRows, inboxOpen };
 });

@@ -46,10 +46,13 @@ async function renderMeetup(admin) {
   let rq = sb.from("meetup_rsvps").select("id,event_id,team_id,branch,event_title,starts_at,member_name,member_city,status,is_first_event,first_seen_at,cancelled_at,jeonsan_status,jeonsan_note")
     .gte("starts_at", from + "T00:00:00+09:00").order("starts_at").limit(2000);
   if (!admin && previewTeam) rq = rq.eq("team_id", previewTeam);
-  const [rr, run, mem] = await Promise.all([rq, sb.from("meetup_runs").select("ran_at,status,counts,error").order("id", { ascending: false }).limit(1).maybeSingle(),
-    admin ? sb.from("meetup_members").select("name,city,joined_at,first_seen_at").order("first_seen_at", { ascending: false }).limit(15) : Promise.resolve({ data: [] })]);
+  let iq = sb.from("meetup_inbox").select("id,source,kind,event_id,team_id,branch,event_title,member_name,text,link,created_at,answered,done_at")
+    .eq("answered", false).is("done_at", null).gte("created_at", new Date(Date.now() - 14 * 86400e3).toISOString()).order("created_at", { ascending: false }).limit(100);
+  if (!admin && previewTeam) iq = iq.eq("team_id", previewTeam);
+  const [rr, run, mem, ib] = await Promise.all([rq, sb.from("meetup_runs").select("ran_at,status,counts,error").order("id", { ascending: false }).limit(1).maybeSingle(),
+    admin ? sb.from("meetup_members").select("name,city,joined_at,first_seen_at").order("first_seen_at", { ascending: false }).limit(15) : Promise.resolve({ data: [] }), iq]);
   if (!body.isConnected || MK.tab !== "meetup") return;
-  if (fail(rr.error) || fail(run.error) || fail(mem.error)) return;
+  if (fail(rr.error) || fail(run.error) || fail(mem.error) || fail(ib.error)) return;
   const rows = rr.data ?? [], r0 = run.data;
   const RUN = { ok: "정상", partial: "일부 실패", failed: "실패", auth_failed: "밋업 인증 실패 — Claude에게 알려 주세요" };
   const when = (iso) => { const k = C.kst(iso); return k ? `${k.date.slice(5).replace("-", "/")}(${"일월화수목금토"[k.dow]}) ${k.time}` : "–"; };
@@ -69,8 +72,19 @@ async function renderMeetup(admin) {
   const recent = rows.filter((r) => Date.parse(r.first_seen_at) >= Date.now() - 7 * 86400e3).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at));
   const upcoming = rows.filter((r) => C.ACTIVE.includes(r.status) && C.kst(r.starts_at).date > C.addDays(today, 1));
   const weekly = C.weeklyStats(rows, 4, today);
+  const inbox = C.inboxOpen(ib.data ?? [], new Date().toISOString());
+  const safeLink = (u) => (/^https:\/\/(www\.)?meetup\.com\//.test(u ?? "") ? u : null);
+  const inboxCard = `<div class="card mu-inbox"><b>📬 답할 것 ${inbox.length}건</b>${inbox.length ? inbox.map((x) => {
+      const href = safeLink(x.link) ?? (x.event_id ? `https://www.meetup.com/${C.GROUP}/events/${encodeURIComponent(x.event_id)}/` : `https://www.meetup.com/${C.GROUP}/`);
+      return `<div class="mu-row"><div class="mu-when">${esc(x.created_at ? when(x.created_at) : "–")}</div><div class="mu-ib">
+        <div><span class="tag">${esc(C.INBOX_KINDS[x.kind] ?? x.kind)}</span>${x.branch ? ` <b>${esc(C.branchKo(x.branch))}</b>` : ""}${x.member_name ? ` · ${esc(x.member_name)}` : ""}</div>
+        <div class="mu-txt">${esc(x.text ?? "")}</div>
+        <div class="mu-act"><a href="${esc(href)}" target="_blank" rel="noopener">밋업에서 답하기 ↗</a> <button class="sm" data-mudone="${esc(x.id)}">처리함</button></div></div></div>`;
+    }).join("") : `<div class="mut">지금 답할 게 없어요.</div>`}
+    <div class="mut">이벤트 댓글과 밋업 알림(댓글·답글·가입 승인)이 매시간 모여요. 밋업에서 답글을 달거나 알림을 읽으면 다음 확인 때 저절로 빠져요. <b>개인 메시지는 여기 안 나와요 — 업무폰 밋업 앱에서 확인해 주세요.</b></div></div>`;
   body.innerHTML = `<div class="mkbar"><span class="mut">${r0 ? `마지막 확인 ${esc(when(r0.ran_at))} · ${esc(RUN[r0.status] ?? r0.status)}${r0.status === "ok" ? ` · 새 신청 ${n(r0.counts?.fresh)} · 취소 ${n(r0.counts?.cancelled)}` : ""}` : "아직 확인 전이에요 (밋업 API 승인 후 맥미니가 매시간 읽어요)"}</span>
       <a class="mut" href="https://www.meetup.com/${C.GROUP}/" target="_blank" rel="noopener">밋업 그룹 열기 ↗</a></div>
+    ${inboxCard}
     <div class="mu-two">${rosterCard(today, "오늘")}${rosterCard(C.addDays(today, 1), "내일")}</div>
     <div class="card"><b>새 신청 (최근 7일) ${recent.length}건</b>${recent.length ? `<div class="tw"><table><tr><th>참석자</th><th>지점</th><th>모임</th><th>상태</th><th>전산</th></tr>${recent.map((r) => `<tr>
         <td>${esc(r.member_name)}${r.is_first_event ? ` <span class="tag">첫 참석</span>` : ""}${r.member_city ? `<div class="mut">${esc(r.member_city)}</div>` : ""}</td>
@@ -80,6 +94,12 @@ async function renderMeetup(admin) {
     <div class="card"><b>주간 요약 (모임 날짜 기준, 최근 4주)</b>${weekly.length ? `<div class="tw"><table><tr><th>주(월요일)</th><th>지점</th><th>신청</th><th>왔음</th><th>안 옴</th><th>취소</th></tr>${weekly.map((w) => `<tr><td>${esc(w.week.slice(5).replace("-", "/"))}</td><td>${esc(C.branchKo(w.branch))}</td><td>${w.rsvps}</td><td>${w.attended}</td><td>${w.noShow}</td><td>${w.cancelled}</td></tr>`).join("")}</table></div>
       <div class="mut">왔음·안 옴은 밋업에서 출석 체크를 한 모임만 잡혀요.</div>` : `<div class="mut">아직 없어요</div>`}</div>
     ${admin ? `<div class="card"><b>새 회원</b>${(mem.data ?? []).length ? mem.data.map((m) => `<div class="mu-row"><div class="mu-when">${esc(when(m.joined_at ?? m.first_seen_at))}</div><div>${esc(m.name)}${m.city ? ` <span class="mut">${esc(m.city)}</span>` : ""}</div></div>`).join("") : `<div class="mut">아직 없어요</div>`}</div>` : ""}`;
+  body.querySelectorAll("[data-mudone]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const { error } = await sb.from("meetup_inbox").update({ done_at: new Date().toISOString(), done_by: me.id }).eq("id", b.dataset.mudone);
+    if (fail(error)) { b.disabled = false; return; }
+    toast("처리함으로 옮겼어요"); renderMeetup(admin);
+  }));
 }
 
 // ── 리포트·페르소나 보기 ──

@@ -106,3 +106,38 @@ test("jwtParts: 공식 문서 클레임, 120초", () => {
   assert.deepEqual(M.jwtParts({ clientKey: "ck", memberId: 123, signingKeyId: "kid1" }, 1000), {
     header: { kid: "kid1", typ: "JWT", alg: "RS256" }, claims: { sub: "123", iss: "ck", aud: "api.meetup.com", exp: 1120 } });
 });
+
+test("commentRows: 맨 위 댓글만, 주최자 댓글 빼고, 주최자가 답했으면 answered", () => {
+  const ev = { id: "900", team_id: 3, branch: "Ulsan", title: "[Ulsan] Language Exchange", event_url: "https://www.meetup.com/g/events/900/" };
+  const rows = M.commentRows(ev, [
+    { id: "1", text: "  Which exit?  ", created: "2026-11-14T01:00:00Z", link: null, inReplyTo: null, member: { id: "55", name: "Amy" }, replies: { edges: [] } },
+    { id: "2", text: "Thanks", created: "2026-11-13T01:00:00Z", inReplyTo: null, member: { id: "55", name: "Amy" }, replies: { edges: [{ node: { member: { id: "7" } } }] } },
+    { id: "3", text: "exit 2", inReplyTo: "1", member: { id: "7", name: "PALLO" } },
+    { id: "4", text: "Welcome all", inReplyTo: null, member: { id: "7", name: "PALLO" } },
+  ], 7);
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows[0], { id: "c:1", source: "comment", kind: "COMMENT", event_id: "900", team_id: 3, branch: "Ulsan", event_title: "[Ulsan] Language Exchange",
+    member_name: "Amy", text: "Which exit?", link: "https://www.meetup.com/g/events/900/", created_at: "2026-11-14T01:00:00Z", answered: false });
+  assert.equal(rows[1].answered, true);
+});
+
+test("noticeRows: 답할 종류만, 읽었으면 answered, 직접 읽은 이벤트 댓글 알림은 뺌", () => {
+  const rows = M.noticeRows([
+    { id: "a", kind: "COMMENT", text: "Amy commented", link: "https://www.meetup.com/g/events/900/comments/1", read: false, updatedAt: "2026-11-14T01:00:00Z" },
+    { id: "b", kind: "COMMENT", text: "Bob commented", link: "https://www.meetup.com/g/events/901/", read: false, updatedAt: "2026-11-14T02:00:00Z" },
+    { id: "c", kind: "RSVP", text: "Bob is going", link: null, read: false },
+    { id: "d", kind: "PENDING_MEMBER", text: "Cat wants to join", link: "https://www.meetup.com/g/members/", read: true, updatedAt: "2026-11-13T00:00:00Z" },
+  ], ["900"]);
+  assert.deepEqual(rows.map((r) => [r.id, r.event_id, r.answered]), [["n:b", "901", false], ["n:d", null, true]]);
+});
+
+test("inboxOpen: 안 답하고 처리 안 한 최근 14일, 새것 먼저", () => {
+  const rows = [
+    { id: "1", answered: false, done_at: null, created_at: "2026-11-13T00:00:00Z" },
+    { id: "2", answered: true, done_at: null, created_at: "2026-11-14T00:00:00Z" },
+    { id: "3", answered: false, done_at: "2026-11-14T00:00:00Z", created_at: "2026-11-14T00:00:00Z" },
+    { id: "4", answered: false, done_at: null, created_at: "2026-10-01T00:00:00Z" },
+    { id: "5", answered: false, done_at: null, created_at: "2026-11-14T02:00:00Z" },
+  ];
+  assert.deepEqual(M.inboxOpen(rows, NOW).map((r) => r.id), ["5", "1"]);
+});

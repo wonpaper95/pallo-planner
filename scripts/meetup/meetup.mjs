@@ -2,12 +2,12 @@
 // 밋업 운영 (docs/meetup/README.md). 스킬 pallo-meetup-sync 가 매시간 부른다.
 //   check        토큰을 받아 계정 이름만 확인 → {"ok":true,"member":"…"}
 //   poll         앞으로 21일 예정 이벤트 중 신청이 있는 것 + DB 에 참석 예정자가 남은 이벤트(지난 2일 포함)를 다시 읽어 meetup_events·meetup_rsvps 에 쌓고,
-//                최근 3일 새 회원을 meetup_members 에 쌓는다. 새 신청·취소·전산 등록할 것(jeonsan_todo)을 JSON 한 줄로 낸다. --print 면 저장하지 않는다.
+//                최근 3일 새 회원을 meetup_members 에, 답할 것(이벤트 댓글·주최자 알림)을 meetup_inbox 에 쌓는다. 새 신청·취소·전산 등록할 것(jeonsan_todo)을 JSON 한 줄로 낸다. --print 면 저장하지 않는다.
 //   jeonsan-mark 스킬이 전산 캘린더 등록 결과를 적는다.
 //   roster       그날(기본 오늘, 한국 날짜) 참석 예정자 지점·시간별.
 // stdout 은 JSON 한 줄, 진행 로그는 stderr. 종료코드: 인자 오류 2, 실패·인증 실패 1, 정상 0. 115초에 강제 종료.
 import { select, upsert, patch, insert, arg, run, MK } from "../mk/db.mjs";
-import { M, AuthError, self, upcomingWithRsvps, eventsById, newMembers } from "./api.mjs";
+import { M, AuthError, self, upcomingWithRsvps, eventsById, newMembers, commentsByEvent, notifications } from "./api.mjs";
 
 const [cmd] = process.argv.slice(2), print = process.argv.includes("--print");
 const out = (o, code = o.ok ? 0 : 1) => { console.log(JSON.stringify(o)); process.exitCode = code; };
@@ -47,9 +47,20 @@ async function poll() {
   const withJ = rows.map((r) => ({ ...r, jeonsan_status: prev[r.id]?.jeonsan_status ?? null }));
   const todo = M.jeonsanTodo(withJ, tms, now()).map((r) => ({ id: r.id, jeonsan_code: r.jeonsan_code, date: r.date, time: r.time, member_name: r.member_name, title: M.jeonsanTitle(r), memo: M.jeonsanMemo(r) }));
   const brief = (r) => ({ name: r.member_name, branch: r.branch, ...M.kst(r.starts_at), status: r.status, first: r.is_first_event });
-  const counts = { events: events.length, rsvps: rows.length, fresh: fresh.length, cancelled: cancelled.length, changed: changed.length, members: newOnes.length };
-  if (!print) await insert("meetup_runs", [{ status: "ok", counts }]);
-  out({ ok: true, saved: !print, counts, fresh: fresh.map(brief), cancelled: cancelled.map(brief), new_members: newOnes.map((m) => ({ name: m.name, city: m.city })), jeonsan_todo: todo });
+  // 답할 것: 여기서 실패해도 신청 동기화는 살린다(status partial)
+  let inbox = [], inboxErr = null;
+  try {
+    const { selfId, nodes } = await notifications();
+    const evIds = [...new Set(events.filter((e) => Date.parse(e.row.starts_at) >= Date.now() - 48 * 3600e3).map((e) => e.row.id))];
+    const byId = Object.fromEntries(events.map((e) => [e.row.id, e.row]));
+    const cm = evIds.length ? await commentsByEvent(evIds) : [];
+    inbox = [...cm.flatMap((c) => M.commentRows(byId[c.id], c.comments, selfId)), ...M.noticeRows(nodes, evIds)];
+    if (!print && inbox.length) await upsert("meetup_inbox", inbox, "id");
+  } catch (e) { if (e instanceof AuthError) throw e; inboxErr = String(e.message).slice(0, 200); log("답할 것 읽기 실패:", inboxErr); }
+  const open = M.inboxOpen(inbox, now());
+  const counts = { events: events.length, rsvps: rows.length, fresh: fresh.length, cancelled: cancelled.length, changed: changed.length, members: newOnes.length, inbox: open.length };
+  if (!print) await insert("meetup_runs", [{ status: inboxErr ? "partial" : "ok", counts, error: inboxErr ? `답할 것: ${inboxErr}` : null }]);
+  out({ ok: true, saved: !print, counts, inbox: open.map((r) => ({ kind: M.INBOX_KINDS[r.kind] ?? r.kind, branch: r.branch, name: r.member_name, text: String(r.text ?? "").slice(0, 80) })), inbox_error: inboxErr, fresh: fresh.map(brief), cancelled: cancelled.map(brief), new_members: newOnes.map((m) => ({ name: m.name, city: m.city })), jeonsan_todo: todo });
 }
 
 async function jeonsanMark() {
