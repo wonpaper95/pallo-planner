@@ -315,10 +315,10 @@
     { id: 6, user_id: U.m1, kind: "bug", body: "시뮬레이션에서 한글 입력 중에 글자가 한 번씩 사라져요", status: "done", photos: [], created_at: at(-21, "10:00") },
   ];
   DEMO.tables.someday = [
-    { id: 1, user_id: U.boss, title: "상담 스크립트 처음부터 다시 정리하기", done: false, created_at: at(-12), refs: [{ k: "link", name: "참고: 상담 스크립트 초안", url: "https://example.com/script-draft", at: at(-12) }] },
-    { id: 2, user_id: U.boss, title: "지점별 신규 매니저 교육 영상 만들기", done: false, created_at: at(-9), refs: [] },
-    { id: 3, user_id: U.boss, title: "회원 후기 모아서 한 장짜리 소개 자료 만들기", done: false, created_at: at(-7), refs: [{ k: "link", name: "후기 모음 시트", url: "https://example.com/reviews", at: at(-7) }, { k: "link", name: "디자인 참고", url: "https://example.com/design", at: at(-7) }] },
-    { id: 4, user_id: U.boss, title: "가을 이벤트 결과 정리해서 다음 기획에 반영", done: false, created_at: at(-5), refs: [] },
+    { id: 1, user_id: U.boss, title: "상담 스크립트 처음부터 다시 정리하기", color: "yellow", memo: "1. 첫 인사 → 2. 왜 배우려는지 묻기 → 3. 수업 방식 소개\n질문 순서를 바꾸면 등록이 늘었다는 매니저 의견 반영하기", done: false, created_at: at(-12), refs: [{ k: "link", name: "참고: 상담 스크립트 초안", url: "https://example.com/script-draft", at: at(-12) }] },
+    { id: 2, user_id: U.boss, title: "지점별 신규 매니저 교육 영상 만들기", color: "green", done: false, created_at: at(-9), refs: [] },
+    { id: 3, user_id: U.boss, title: "회원 후기 모아서 한 장짜리 소개 자료 만들기", color: "blue", memo: "후기는 지점마다 3개씩, 사진은 허락받은 것만", done: false, created_at: at(-7), refs: [{ k: "link", name: "후기 모음 시트", url: "https://example.com/reviews", at: at(-7) }, { k: "link", name: "디자인 참고", url: "https://example.com/design", at: at(-7) }] },
+    { id: 4, user_id: U.boss, title: "가을 이벤트 결과 정리해서 다음 기획에 반영", color: "yellow", done: false, created_at: at(-5), refs: [] },
     { id: 5, user_id: U.boss, title: "사무실 책상 배치 바꿔 보기", done: false, created_at: at(-3), refs: [] },
     { id: 6, user_id: U.boss, title: "작년 월간 보고서 양식 개선", done: true, created_at: at(-20), refs: [] },
   ];

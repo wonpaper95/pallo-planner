@@ -1,13 +1,14 @@
 /* 💡 아이디어 창구 탭 (idea.js) */
 body:not(.idv) #ideaView { display: none; }
-#ideaView { max-width: 860px; margin: 0 auto; padding: 16px 20px 100px; }
+#ideaView { max-width: 1240px; margin: 0 auto; padding: 16px 20px 100px; }
 #ideaView h2 { margin: 4px 0 2px; font-size: 22px; }
 #ideaView .mut { color: var(--sub); font-size: 13px; }
-#ideaView #idForm { display: flex; gap: 8px; margin: 14px 0 18px; }
+#ideaView #idForm { display: flex; gap: 8px; margin: 14px 0 12px; }
 #ideaView #idForm input { flex: 1; min-width: 0; padding: 10px 12px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font-size: 15px; }
-#ideaView .idcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; margin-bottom: 10px; }
+#ideaView .idcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px; container-type: inline-size;
+  box-shadow: inset 5px 0 0 var(--idc, transparent); border-color: color-mix(in srgb, var(--idc, var(--line)) 45%, var(--line)); background-image: linear-gradient(color-mix(in srgb, var(--idc, transparent) 9%, transparent), color-mix(in srgb, var(--idc, transparent) 9%, transparent)); } /* 색 이름표 = 왼쪽 굵은 띠 + 연한 바탕 */
 #ideaView .idcard.done .idtitle { color: var(--sub); text-decoration: line-through; }
-#ideaView .idcard > summary { display: flex; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; list-style: none; }
+#ideaView .idcard > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; cursor: pointer; list-style: none; }
 #ideaView .idcard > summary::-webkit-details-marker { display: none; }
 #ideaView .idarrow { color: var(--sub); font-size: 12px; transition: transform .15s; flex: none; }
 #ideaView .idcard[open] .idarrow { transform: rotate(90deg); }
@@ -23,3 +24,16 @@ body:not(.idv) #ideaView { display: none; }
 #ideaView .idsave { font-size: 12.5px; color: var(--sub); margin-top: 4px; min-height: 16px; }
 #ideaView .idempty { padding: 24px 0; text-align: center; }
 @media (max-width: 860px) { #ideaView { padding: 12px 14px 100px; } #ideaView .idmemo textarea { min-height: 220px; } }
+/* 2열: 넓으면 카드 2개씩 나란히, 좁으면(폰) 1열. 카드마다 높이가 달라도 위쪽 맞춤 */
+#ideaView .idgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 400px), 1fr)); gap: 12px; align-items: start; }
+#ideaView .idhide { display: none; }
+/* 색 이름표 — 색 값은 여기 한 곳 (키는 idea.js TAGS). 밝은·어두운 스킨 모두에서 글자는 --text 그대로 */
+#ideaView [data-color="yellow"] { --idc: #e0a800; } #ideaView [data-color="blue"] { --idc: #3b82f6; } #ideaView [data-color="green"] { --idc: #22a06b; } #ideaView [data-color="purple"] { --idc: #9b6bdf; }
+#ideaView [data-color=""] { --idc: initial; }
+#ideaView .idfilt { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+#ideaView .idpick { flex: 0 0 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 4px 22px; cursor: default; } #ideaView .idpick[hidden] { display: none; }
+#ideaView .idfilt button, #ideaView .idpick button, #ideaView .idtag { padding: 6px 12px; font-size: 14px; line-height: 1.3; white-space: nowrap; color: var(--text); border: 1px solid color-mix(in srgb, var(--idc, var(--line)) 55%, var(--line)); border-radius: 99px; background: color-mix(in srgb, var(--idc, transparent) 16%, var(--panel)); }
+#ideaView .idfilt button small { color: var(--sub); font-size: 12px; margin-left: 2px; }
+#ideaView .idfilt button.on, #ideaView .idpick button.on { font-weight: 700; box-shadow: 0 0 0 2px var(--idc, var(--accent)); background: color-mix(in srgb, var(--idc, var(--accent)) 30%, var(--panel)); }
+#ideaView .idtag { flex: none; padding: 3px 9px; font-size: 13px; } #ideaView .idcard[data-color=""] .idtag { color: var(--sub); border-style: dashed; }
+@container (max-width: 440px) { #ideaView .idcard > summary { gap: 6px; } #ideaView .idtag span { display: none; } #ideaView .idtag { padding: 3px 6px; } } /* 좁은 카드에서는 이름표를 그림만 */
