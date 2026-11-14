@@ -25,7 +25,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const S = { el: null, nodes: [], links: [], by: new Map(), kids: new Map(), rel: new Map(), why: new Map(), root: null,
   sel: null, hover: null, state: null, src: null, q: "",
   mode: lsGet(MODE_KEY, "3d"), colorBy: lsGet(CB_KEY, "area"), spin: lsGet(SPIN_KEY, "1") === "1", sort: lsGet(SORT_KEY, "heat"),
-  edit: false, fold: new Set(), run: null, prev: null, tview: lsGet("brain-tview", "tree") === "list" ? "list" : "tree" };
+  edit: false, fold: new Set(), run: null, prev: null, tview: ["list", "art"].includes(lsGet("brain-tview", "3d")) ? lsGet("brain-tview", "3d") : "3d", rev: 0 };
 if (!["3d", "tree", "rank", "lr"].includes(S.mode)) S.mode = "3d";
 if (!SORTS[S.sort]) S.sort = "heat";
 try { S.fold = new Set(JSON.parse(lsGet(FOLD_KEY, "[]"))); } catch {}
@@ -42,7 +42,7 @@ const topics = () => S.nodes.filter((n) => n._d >= 2); // 큰 주제 아래의 �
 
 function index() {
   for (const n of S.nodes) { n.note ??= ""; n.state ??= ""; n.heat = +n.heat || 0; n.worry = +n.worry || 0; n.src = Array.isArray(n.src) ? n.src : []; n.stats = n.stats && typeof n.stats === "object" ? n.stats : {}; }
-  S.by = new Map(S.nodes.map((n) => [n.id, n])); S.kids = new Map(); S.rel = new Map(); S.why = new Map();
+  S.rev = (S.rev || 0) + 1; S.by = new Map(S.nodes.map((n) => [n.id, n])); S.kids = new Map(); S.rel = new Map(); S.why = new Map();
   for (const n of S.nodes) { const k = n.parent_id && S.by.has(n.parent_id) ? n.parent_id : ""; if (!S.kids.has(k)) S.kids.set(k, []); S.kids.get(k).push(n); }
   for (const l of S.kids.values()) l.sort((a, b) => a.sort - b.sort || String(a.created_at).localeCompare(String(b.created_at)) || a.id.localeCompare(b.id));
   const tops = S.kids.get("") ?? []; S.root = tops[0] ?? null; let i = 0;
@@ -135,6 +135,8 @@ function shell() {
   $("[data-fit]").addEventListener("click", () => { select(null); fit(800); });
   $(".dtstage").addEventListener("click", (e) => { if (!e.target.closest("[data-colorby]")) return; S.colorBy = S.colorBy === "state" ? "area" : "state"; lsSet(CB_KEY, S.colorBy); drawHud(); if (S.mode === "3d") { syncGraph(); relight(); } else drawStage(); });
   $(".dttreebox").addEventListener("click", (e) => {
+    if (e.target.closest("[data-spin3]")) { S.spin = !S.spin; lsSet(SPIN_KEY, S.spin ? "1" : "0"); drawTree(); return; }
+    if (e.target.closest("[data-home3]")) { window.BRAIN3D?.reset(); select(null); return; }
     const tv = e.target.closest("[data-tview]"); if (tv) { S.tview = tv.dataset.tview; lsSet("brain-tview", S.tview); drawTree(); return; }
     const fold = e.target.closest("[data-fold]"); if (fold) { const id = fold.dataset.fold; S.fold.has(id) ? S.fold.delete(id) : S.fold.add(id); lsSet(FOLD_KEY, JSON.stringify([...S.fold].slice(-400))); drawTree(); return; }
     const all = e.target.closest("[data-foldall]"); if (all) { S.fold = all.dataset.foldall === "1" ? new Set(S.nodes.filter((n) => n._d >= 1 && kids(n).length).map((n) => n.id)) : new Set(); lsSet(FOLD_KEY, JSON.stringify([...S.fold])); drawTree(); return; }
@@ -166,11 +168,25 @@ function drawFilters() {
     + STATES.filter((s) => cnt((n) => n.state === s)).map((s) => `<button type="button" data-f="state:${s}" class="${S.state === s ? "on" : ""}" style="--oc:${ST[s][1]}" title="${ST[s][2]}">${ST[s][0]} ${s} <small>${cnt((n) => n.state === s)}</small></button>`).join("")
     + (srcs.length ? `<span class="dtfsep">어디서 나온 생각</span>` + srcs.map((w) => `<button type="button" data-f="src:${w}" class="cy ${S.src === w ? "on" : ""}">${SRC[w][0]} ${SRC[w][1]}</button>`).join("") : "");
 }
-function drawStage() { if (S.mode === "3d") return drawGraph(); pauseGraph(true); S.mode === "tree" ? drawTree() : S.mode === "rank" ? drawRank() : drawLR(); }
+function drawStage() { if (S.mode === "3d") { window.BRAIN3D?.pause(true); return drawGraph(); } pauseGraph(true); if (S.mode !== "tree") window.BRAIN3D?.pause(true); S.mode === "tree" ? drawTree() : S.mode === "rank" ? drawRank() : drawLR(); }
 const heatBar = (v, c) => `<i class="bnbar"><u style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></u></i>`;
 
 // ── 🌿 나뭇가지 ── 🌳 나무 그림(기본) / 📃 목록
-const drawTree = () => (S.tview === "list" ? drawTreeList() : drawTreeArt());
+const drawTree = () => { const box = $(".dttreebox"); box.classList.toggle("is3d", S.tview === "3d"); if (S.tview !== "3d") { window.BRAIN3D?.unmount(); box.classList.remove("is3d"); } return S.tview === "list" ? drawTreeList() : S.tview === "art" ? drawTreeArt() : drawTree3d(); };
+const TVIEWS = { "3d": "🌳 3D 나무", art: "🌿 2D 나무", list: "📃 목록" }, tvBtns = (cur) => Object.entries(TVIEWS).filter(([k]) => k !== cur).map(([k, l]) => `<button type="button" data-tview="${k}">${l}</button>`).join("");
+const B3X = () => ({ S, kids, path, below, litSet, colorOf, filtering, matches, select: (id) => select(id), loadLib });
+async function drawTree3d() {
+  const box = $(".dttreebox"), filt = filtering();
+  if (!box.querySelector(".bn3stage")) { window.BRAIN3D?.unmount(); box.innerHTML = `<div class="dttreebar"><span class="bn3info"></span><button type="button" data-colorby></button><button type="button" data-spin3></button><button type="button" data-home3>⤢ 처음 보기</button>${tvBtns("3d")}</div><div class="bn3stage"><div class="bn3msg">3D 나무를 준비하는 중…</div></div>`; }
+  const stage = box.querySelector(".bn3stage"), info = box.querySelector(".bn3info"); info.textContent = `${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`} · 잎이 클수록 요즘 자주 떠올린 생각 · 끌면 돌리고 휠로 확대 · 잎을 누르면 내용`;
+  box.querySelector("[data-spin3]").textContent = S.spin ? "⏸ 회전 멈추기" : "⟳ 천천히 돌리기"; drawHud();
+  if (window.BRAIN3D?.alive() && stage.querySelector("canvas")) { BRAIN3D.pause(false); if (S.rev === BRAIN3D_REV()) return BRAIN3D.update(); }
+  let ok = false; try { ok = await BRAIN3D.mount(stage, B3X()); } catch (e) { console.error(e); }
+  if (S.mode !== "tree" || S.tview !== "3d" || !stage.isConnected) return;
+  if (!ok) { say("이 기기에서는 3D 나무를 못 그려서 2D 나무로 보여 드려요"); S.tview = "art"; drawTree(); return; }
+  stage.querySelector(".bn3msg")?.remove();
+}
+const BRAIN3D_REV = () => (window.BRAIN3D?.rev?.() ?? -1);
 function drawTreeList() {
   const filt = filtering(), keep = new Set();
   if (filt) for (const n of S.nodes) if (matches(n)) path(n).forEach((p) => keep.add(p.id));
@@ -184,7 +200,7 @@ function drawTreeList() {
       ${cs.length && !folded ? `<ul>${cs.map(row).join("")}</ul>` : ""}</li>`;
   };
   const body = (S.kids.get("") ?? []).map(row).join("");
-  $(".dttreebox").innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`}</span>${filt ? "" : `<button type="button" data-foldall="0">모두 펴기</button><button type="button" data-foldall="1">모두 접기</button>`}<button type="button" data-tview="tree">🌳 나무로 보기</button></div>
+  $(".dttreebox").innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`}</span>${filt ? "" : `<button type="button" data-foldall="0">모두 펴기</button><button type="button" data-foldall="1">모두 접기</button>`}${tvBtns("list")}</div>
     ${body ? `<ul class="dttree">${body}</ul>` : `<div class="dtmsg">맞는 생각이 없어요.</div>`}`;
 }
 
@@ -239,7 +255,7 @@ function drawTreeArt() {
     if (b[0] < 4 || b[2] > W - 4 || b[1] < 4 || b[3] > H - 4 || boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1])) continue;
     boxes.push(b); shown++; labels.push(`<text class="bnlab${faint(n) ? " faint" : ""}" x="${(s > 0 ? x0 : s < 0 ? x0 + w : x0 + w / 2).toFixed(1)}" y="${y0.toFixed(1)}" text-anchor="${s > 0 ? "start" : s < 0 ? "end" : "middle"}">${esc(n.title)}</text>`);
   }
-  box.innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`} · 🍃 잎이 클수록 요즘 자주 떠올린 생각 · 눌러서 내용 보기</span><button type="button" data-colorby></button><button type="button" data-tview="list">📃 목록으로 보기</button></div>
+  box.innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`} · 🍃 잎이 클수록 요즘 자주 떠올린 생각 · 눌러서 내용 보기</span><button type="button" data-colorby></button>${tvBtns("art")}</div>
     <svg class="bntree" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="생각 나무">${branch}${trunk}${leaves.join("")}${pills.join("")}${labels.join("")}<text id="bnhov" class="bnhov" text-anchor="middle"></text></svg>`;
   drawHud(); box.scrollLeft = keep[0]; box.scrollTop = keep[1];
 }
@@ -468,14 +484,14 @@ function fly(id) { // 보던 방향 그대로 그 점 앞으로 다가감
   const cam = G.camera().position, t = G.controls().target, v = [cam.x - t.x, cam.y - t.y, cam.z - t.z], l = Math.hypot(...v) || 1;
   G.cameraPosition({ x: g.x + (v[0] / l) * span, y: g.y + (v[1] / l) * span, z: g.z + (v[2] / l) * span }, { x: g.x, y: g.y, z: g.z }, 900);
 }
-function teardown() { cancelAnimationFrame(raf); raf = 0; mo?.disconnect(); mo = null; try { G?._destructor?.(); } catch {} G = null; gn = new Map(); syncGraph.sig = null; fitted = false; touched = false; lblK = 1; }
+function teardown() { window.BRAIN3D?.unmount(); cancelAnimationFrame(raf); raf = 0; mo?.disconnect(); mo = null; try { G?._destructor?.(); } catch {} G = null; gn = new Map(); syncGraph.sig = null; fitted = false; touched = false; lblK = 1; }
 
 // ── 고르기 · 오른쪽 칸 ──
 function select(id, reveal) {
   S.sel = id && S.by.has(id) ? id : null; S.hover = null;
   if (S.sel && reveal) { let open = false; for (const p of path(S.by.get(S.sel)).slice(0, -1)) if (S.fold.delete(p.id)) open = true; if (open) lsSet(FOLD_KEY, JSON.stringify([...S.fold])); }
   spinSync(); drawPanel();
-  if (S.mode === "tree") { drawTree(); if (S.sel) (S.tview === "list" ? $(`.dtrow[data-id="${S.sel}"]`) : $(".bl.sel, .bn1.sel"))?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); }
+  if (S.mode === "tree") { drawTree(); if (S.sel && S.tview !== "3d") (S.tview === "list" ? $(`.dtrow[data-id="${S.sel}"]`) : $(".bl.sel, .bn1.sel"))?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); }
   else if (S.mode === "rank") { $(".bnrankbox").querySelectorAll("tr.sel").forEach((r) => r.classList.remove("sel")); const r = S.sel && $(`.bnrank tr[data-id="${S.sel}"]`); if (r) { r.classList.add("sel"); r.scrollIntoView({ block: "nearest", behavior: "smooth" }); } }
   else if (S.mode === "lr") lrSel();
   else { relight(); if (S.sel) fly(S.sel); }

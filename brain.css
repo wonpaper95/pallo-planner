@@ -111,3 +111,11 @@ body:not(.bnv) #brainView { display: none; }
 .bntree .bnroot rect { --c: var(--text); fill: color-mix(in srgb, var(--panel) 85%, var(--text)); stroke: var(--text); }
 .bntree .bnlab, .bntree .bnhov { fill: var(--text); font-size: 13px; font-weight: 600; paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .bntree .bnhov { font-size: 14.5px; font-weight: 800; }
+
+/* 🌳 3D 나무 (brain-tree3d.js): 따뜻한 유리 화분 장면 */
+.dttreebox.is3d { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.dttreebox.is3d .dttreebar { margin: 0; padding: 10px 16px; flex-wrap: wrap; row-gap: 6px; }
+.bn3stage { position: relative; flex: 1; min-height: 0; background: radial-gradient(ellipse 60% 55% at 50% 42%, #fff6df 0%, #f3e2bf 48%, #e4cc9d 100%); border-radius: 0 0 16px 16px; overflow: hidden; }
+.bn3stage::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 12% 18%, rgba(255,255,255,.55) 0 3%, transparent 3.5%), radial-gradient(circle at 86% 24%, rgba(255,243,214,.7) 0 4.5%, transparent 5%), radial-gradient(circle at 78% 82%, rgba(255,255,255,.4) 0 5.5%, transparent 6%), radial-gradient(circle at 20% 76%, rgba(255,236,196,.6) 0 4%, transparent 4.5%); }
+.bn3cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; } .bn3cv:active { cursor: grabbing; }
+.bn3msg { position: absolute; inset: 0; display: grid; place-items: center; color: #7a6244; font-size: 14px; pointer-events: none; }
