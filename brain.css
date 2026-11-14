@@ -1,0 +1,52 @@
+/* 🧠 뇌 탭 (brain.js) — 화면 틀(.dt*)은 duty.css 것을 같이 쓰고, 여기는 뇌 탭에만 있는 것 */
+body:not(.bnv) #brainView { display: none; }
+#brainView { max-width: 1500px; margin: 0 auto; padding: 14px 20px 40px; }
+.bnwhen span { padding: 5px 11px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--sub); font-size: 13px; white-space: nowrap; }
+.dtfilters button small { font-size: 11.5px; opacity: .75; }
+
+/* 🔥 순위 */
+.bnrankbox { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.dtwrap:not([data-mode="rank"]) .bnrankbox { display: none; }
+.bnrank th:nth-child(1) { width: 38px; } .bnrank th:nth-child(2) { width: auto; } .bnrank th:nth-child(3) { width: 84px; } .bnrank th:nth-child(4), .bnrank th:nth-child(5) { width: 15%; } .bnrank th:nth-child(6) { width: 84px; } .bnrank th:nth-child(7) { width: 62px; }
+.bnrank td { vertical-align: middle; }
+.bnrank td.r { color: var(--sub); text-align: right; font-variant-numeric: tabular-nums; }
+.bnrank td.m { white-space: nowrap; } .bnrank td.m .bnbar { display: inline-block; width: calc(100% - 34px); min-width: 40px; vertical-align: middle; } .bnrank td.m b { display: inline-block; width: 28px; text-align: right; font-weight: 600; font-size: 12.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.bnrank .up { color: #ff8a5c; font-size: 11px; } .bnrank .dn { color: #7c9cff; font-size: 11px; }
+.bnbar { display: block; height: 7px; border-radius: 99px; background: color-mix(in srgb, var(--sub) 18%, transparent); overflow: hidden; }
+.bnbar u { display: block; height: 100%; border-radius: 99px; }
+.bnst { text-decoration: none; display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; color: color-mix(in srgb, var(--oc) 55%, var(--text)); background: color-mix(in srgb, var(--oc) 18%, transparent); border: 1px solid color-mix(in srgb, var(--oc) 45%, transparent); }
+.dtchips u.bnst { border-radius: 999px; padding: 1px 8px; color: color-mix(in srgb, var(--oc) 55%, var(--text)); border-color: color-mix(in srgb, var(--oc) 45%, transparent); }
+.bnheat { font-style: normal; font-size: 11.5px; color: #e9a23b; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dtareas .bnheat, .dtlist .bnheat { flex: none; }
+.dtlist .bnst { flex: none; }
+
+/* 오른쪽 칸 */
+.bnheadline { margin: -4px 0 14px; padding: 11px 13px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--bg)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); font-size: 14.5px; line-height: 1.6; }
+.bnbars button { grid-template-columns: minmax(0, 1.25fr) minmax(40px, 1fr) 28px; }
+.bnnotes { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; } .bnnotes li { margin: 3px 0; }
+.bnmeters { display: grid; gap: 7px; margin: 14px 0 8px; }
+.bnmeters div { display: grid; grid-template-columns: 62px 1fr 30px; align-items: center; gap: 8px; font-size: 13px; }
+.bnmeters span { color: var(--sub); white-space: nowrap; } .bnmeters b { text-align: right; font-variant-numeric: tabular-nums; }
+.bnfacts { margin: 8px 0 4px; padding: 8px 11px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; line-height: 1.6; color: var(--sub); }
+.bnfacts b { color: var(--text); } .bnfacts span { font-size: 12px; }
+.bnspark { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; height: 62px; margin: 8px 0 2px; align-items: end; }
+.bnspark span { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.bnspark i { display: block; min-height: 2px; border-radius: 3px 3px 0 0; background: linear-gradient(#ffb347, #ff8a5c); opacity: .9; }
+.bnspark em { font-style: normal; text-align: center; font-size: 10px; color: var(--sub); padding-top: 2px; }
+.bnsrc { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.bnsrc li { display: grid; grid-template-columns: 20px 36px 1fr; gap: 4px; align-items: baseline; padding: 6px 8px; border-radius: 9px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; line-height: 1.5; }
+.bnsrc time { color: var(--sub); font-size: 11.5px; font-variant-numeric: tabular-nums; } .bnsrc p { margin: 0; overflow-wrap: anywhere; }
+.dtrel button[data-go] em { flex-basis: 100%; font-style: normal; color: var(--sub); font-size: 12px; line-height: 1.45; }
+.dtwrap.bn .dtlegend span:nth-child(3) { opacity: .85; }
+
+@media (max-width: 900px) {
+  #brainView { padding: 10px 12px 30px; }
+  .dtwrap.bn .dtlegend span:nth-child(3) { display: none; }
+  .bnrank th:nth-child(6), .bnrank td:nth-child(6), .bnrank th:nth-child(7), .bnrank td:nth-child(7) { display: none; }
+  .dttable.bnrank { min-width: 0; table-layout: fixed; }
+  .bnrank th:nth-child(1) { width: 26px; } .bnrank th:nth-child(3) { width: 64px; } .bnrank th:nth-child(4), .bnrank th:nth-child(5) { width: 42px; }
+  .bnrank td.m .bnbar { display: none; } .bnrank td.m b { width: auto; }
+  .bnrank td, .bnrank th { padding-left: 6px; padding-right: 6px; } .bnrank td.t { word-break: keep-all; overflow-wrap: anywhere; }
+  .bnrank th:nth-child(4), .bnrank th:nth-child(5) { font-size: 0; } .bnrank th:nth-child(4)::before { content: "🔥"; font-size: 12px; } .bnrank th:nth-child(5)::before { content: "😟"; font-size: 12px; }
+  .bnst { padding: 1px 6px; font-size: 11px; }
+}

@@ -56,3 +56,12 @@
 - 탭 단추는 기본 숨김 → DUTY.init() 이 대표이거나 공개됐을 때만 켬. 오른쪽 칸은 div (aside 쓰면 플래너의 주 목록 스타일이 먹어 폰에서 화면을 덮음).
 - 점검: tests/duty-seed.test.mjs, ~/.cache/pallo-planner-dev/test-duty.sh(권한 23가지), 체험판·로컬 DB 로 대표/매니저/공유 화면 확인.
 
+## 2026-11-14 🧠 뇌 탭 새로 · 🌳 업무분장은 2D 조직도로 (버전 202611142030)
+- 대표 요청: 옵시디언처럼 만든 3D 지도는 "내 생각 분석" 용도로 돌리고(뇌 탭), 업무분장은 회사에서 쓰는 2D 형태로 한눈에.
+- 🧠 뇌 탭: brain.js(window.BRAIN) + brain.css + brain-core.js(계산). 🌌 입체 지도 / 🌿 나뭇가지 / 🔥 순위. 점 크기 = 온도(요즘 얼마나 자주 떠올리는지), 붉은 빛 = 고민. 오른쪽 칸: 지금 내 머릿속(한 줄 요약·관심 TOP·고민 TOP·뜨는 것·식은 것·달라진 점) / 생각 하나(온도·고민·달별 추이·내용·근거·이어진 생각). 직접 더하기·잇기·고치기, 내용에 [[이름]] 쓰면 이어짐.
+- DB 20261114200000_brain.sql: brain_nodes·brain_links·brain_runs. 대표 본인만(user_id = auth.uid() 이고 대표). 분석이 만든 점을 고치면 edited(트리거) → 덮어쓰지 않음, 지우면 hidden → 안 되살림. **운영 적용은 대표가 직접** (그 전에는 탭이 아무에게도 안 보임, BRAIN.init).
+- 분석(맥미니): scripts/brain/collect.sh(플래너 대표 글 읽기 전용 + 맥미니·맥북 Claude 대화에서 내가 쓴 말) → 정의 ~/.local/share/pallo-brain/brain.json → scripts/brain/save.mjs. 자료·정의는 저장소에 안 올림. 스킬 pallo-brain-sync, 예약 pallo-brain-weekly(월 04:00). 설계 docs/brain/README.md.
+- 🌳 업무분장: 3D·나뭇가지를 빼고 🏢 조직도(첫 화면, 묶음 접기·한 화면에 맞추기) / 📊 분장표(● 주담당 ○ 함께) / 👥 사람별 / 📋 자세히(인쇄·CSV). 오른쪽 칸은 업무를 고르거나 [요약·점검]을 켰을 때만. DB·공유 링크·공개 스위치는 그대로.
+- 걸렸던 것: `.dtwrap button { font: inherit }` 가 새 줄들의 글자 크기를 이겨서 :where 로 낮춤 / 한 화면 맞춤은 스크롤 막대가 생겼다 없어져 폭이 흔들리므로 바깥 크기(offset)로 잼 / 사람별 칸 머리글을 header 로 쓰면 플래너 header 스타일이 먹음(div 로) / 유리 테마에서 폰 아래 칸이 비쳐서 --bg 를 깔았음.
+- 점검: tests/brain-core.test.mjs(7), ~/.cache/pallo-planner-dev/test-brain.sh(권한 16가지), 전체 테스트 459개, 로컬 DB·체험판에서 대표/매니저/공유 화면과 폰 크기 확인.
+

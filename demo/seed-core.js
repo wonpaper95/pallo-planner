@@ -96,6 +96,41 @@
   ];
   DEMO.tables.routine_items = routine;
   DEMO.tables.duty_meta = [{ id: true, published: true }]; // 🌳 업무분장: 체험판은 공개 상태 (내용은 duty-seed.js 가 처음 열 때 채움)
+  { // 🧠 뇌: 체험판 보기용 — 전부 지어낸 내용 (실제 분석은 맥미니 pallo-brain-sync 가 대표 글을 읽어 채운다)
+    const B = [ // [이름표, 위 가지, 이름, 상태, 온도, 고민, 내용, 최근 30일 횟수, 전체 횟수, 마지막(며칠 전)]
+      ["mkt", null, "📣 마케팅", "", 82, 34, "광고 소재를 매주 바꾸면서, 광고비 없이 들어오는 길을 따로 찾고 있어요.", 31, 240, 0],
+      ["mkt.meta", "mkt", "메타 광고 소재", "실행", 92, 35, "매주 월요일 새 소재 3개를 올리고 금요일에 숫자를 봐요. 요즘은 후기 영상이 가장 잘 나와요.", 14, 96, 1],
+      ["mkt.blog", "mkt", "블로그 글쓰기", "루틴", 58, 10, "지점마다 주 2회. 사진만 올리면 초안이 나오게 해 둔 뒤로 밀리지 않아요.", 8, 71, 2],
+      ["mkt.free", "mkt", "광고비 없는 유입", "고민", 70, 62, "광고를 끄면 문의가 끊기는 게 걱정이에요. 리뷰·지도·모임으로 들어오는 길을 넓히고 싶어요.", 7, 22, 3],
+      ["mkt.review", "mkt", "리뷰 이벤트", "관심", 41, 15, "첫 수업 뒤 리뷰를 부탁하는 문자를 시험 중이에요.", 3, 12, 9],
+      ["ppl", null, "👥 사람·조직", "", 76, 55, "매니저를 뽑고 키우는 일이 가장 큰 숙제예요.", 22, 310, 0],
+      ["ppl.hire", "ppl", "매니저 채용", "고민", 85, 74, "공고를 세 번 올렸지만 맞는 사람을 못 찾았어요. 기준을 다시 적고 있어요.", 11, 64, 1],
+      ["ppl.onb", "ppl", "온보딩 자료", "실행", 55, 25, "새 매니저가 2주 안에 혼자 상담하게 하는 교육 자료를 만들고 있어요.", 6, 30, 4],
+      ["ppl.one", "ppl", "1:1 미팅", "루틴", 48, 12, "격주로 매니저와 30분씩. 숫자보다 막힌 일을 먼저 물어요.", 4, 52, 6],
+      ["ppl.culture", "ppl", "스스로 움직이는 팀", "고민", 38, 58, "시키지 않아도 챙기는 팀을 만들고 싶은데 방법을 못 찾았어요.", 2, 19, 20],
+      ["ai", null, "🤖 자동화", "", 88, 22, "손으로 하던 일을 하나씩 자동으로 돌리고 있어요.", 35, 150, 0],
+      ["ai.planner", "ai", "플래너 기능 만들기", "실행", 88, 20, "필요한 기능을 그때그때 만들어 붙여요. 이번 달은 업무분장과 뇌 탭.", 16, 70, 0],
+      ["ai.agent", "ai", "24시간 도는 에이전트", "관심", 76, 30, "밤사이 광고 숫자를 모아 아침에 보고하게 했어요. 다음은 답장 초안.", 12, 40, 1],
+      ["ai.sms", "ai", "문자 답장 자동화", "식음", 12, 5, "봄에 시험해 봤지만 지금은 멈춰 있어요.", 0, 18, 140],
+      ["fin", null, "💰 돈", "", 60, 36, "매출 목표와 가격을 다시 보고 있어요.", 15, 205, 0],
+      ["fin.pay", "fin", "급여 정산", "루틴", 50, 15, "매달 5일. 인센티브 계산표를 한 장으로 줄였어요.", 5, 88, 8],
+      ["fin.goal", "fin", "월 매출 목표", "실행", 66, 45, "지점마다 목표를 주 단위로 쪼개 월요일 회의에서 봐요.", 7, 60, 2],
+      ["fin.price", "fin", "가격 다시 짜기", "관심", 44, 40, "장기권을 늘릴지, 한 달권을 올릴지 비교 중이에요.", 3, 21, 12],
+      ["me", null, "🌱 나", "", 40, 24, "일 말고 챙기고 싶은 것들.", 9, 90, 1],
+      ["me.wed", "me", "결혼 준비", "실행", 58, 20, "촬영 날짜를 잡았고 식장 두 곳을 보고 있어요.", 6, 25, 1],
+      ["me.read", "me", "책 읽기", "관심", 33, 5, "한 달에 두 권. 요즘은 조직 이야기를 주로 읽어요.", 3, 30, 5],
+      ["me.health", "me", "운동", "식음", 15, 30, "여름까지는 주 3회 갔는데 가을부터 못 가고 있어요.", 0, 35, 80],
+    ];
+    const id = (k) => `b0000000-0000-4000-8000-${String(["root", ...B.map((b) => b[0])].indexOf(k)).padStart(12, "0")}`, mon = (n) => day(-n).slice(0, 7);
+    const node = (k, p, title, state, heat, worry, note, n30, n, last, i) => ({ id: id(k), user_id: U.boss, parent_id: p === undefined ? null : id(p ?? "root"), key: k, title, state, heat, worry, note,
+      src: n ? [{ d: day(-last), w: "week", t: `${title.replace(/^\S+ /, "")} 관련해서 이번 주 할 일 정리하기` }, { d: day(-last - 6), w: "claude", t: `${title.replace(/^\S+ /, "")} — 이거 더 쉽게 할 방법 없을까?` }] : [],
+      stats: n ? { n, n30, n90: Math.min(n, n30 * 2 + 3), rise: Math.round((n30 - (n30 + 3) / 2) * 10) / 10, first: day(-300), last: day(-last), by: { week: Math.round(n * 0.7), claude: n - Math.round(n * 0.7) }, m: { [mon(0)]: n30, [mon(31)]: Math.round(n30 * 0.8) + 1, [mon(62)]: Math.round(n / 9), [mon(93)]: Math.round(n / 10), [mon(124)]: Math.round(n / 12) } } : {},
+      origin: "ai", edited: false, hidden: false, color: null, sort: i, created_at: iso(day(-30)) });
+    DEMO.tables.brain_nodes = [node("root", undefined, "나", "", 0, 0, "", 0, 0, 0, 0), ...B.map((b, i) => node(...b, i))];
+    DEMO.tables.brain_links = [["mkt.free", "ai.agent", "사람 손 없이 돌아가는 유입 경로를 만들려는 것"], ["ppl.hire", "fin.goal", "매니저가 비면 그 지점 목표가 흔들려요"], ["mkt.meta", "fin.goal", "광고 숫자가 매출 목표의 앞 단계"], ["ai.planner", "ppl.onb", "교육 자료를 플래너 안에 넣는 중"], ["mkt.blog", "ai.agent", "글 초안을 에이전트가 써요"], ["fin.price", "mkt.free", "가격을 올리려면 광고 말고도 들어오는 길이 있어야"], ["me.health", "ppl.hire", "채용이 길어지며 운동 시간이 줄었어요"], ["ppl.culture", "ai.planner", "챙길 일을 플래너가 먼저 알려 주게"]]
+      .map(([a, b, why]) => { const [x, y] = [id(a), id(b)].sort(); return { a: x, b: y, user_id: U.boss, why, origin: "ai", created_at: iso(day(-30)) }; });
+    DEMO.tables.brain_runs = [{ id: 1, user_id: U.boss, ran_at: iso(day(-1), "05:00"), summary: { headline: "요즘은 매니저 채용과 광고 소재에 생각이 가장 많이 가 있고, 그 사이사이 플래너를 고쳐 가며 손이 가는 일을 줄이고 있어요.", insights: ["채용 고민이 석 달째 이어지고 있어요.", "자동화 이야기가 지난달보다 두 배로 늘었어요.", "운동은 가을부터 거의 나오지 않아요."], changes: ["더 뜨거워진 생각: 24시간 도는 에이전트(52→76)"], counts: { week: 820, claude: 310, idea: 6 }, period: { from: day(-300), to: day(0) } } }];
+  }
   const on = (i, team, d) => i.days.includes(dow(d)) && (!i.weeks || i.weeks.includes(Math.floor((+d.slice(8, 10) - 1) / 7) + 1))
     && (!i.team_id || i.team_id === team) && (!i.from_day || d >= i.from_day) && (!i.to_day || d <= i.to_day);
   const sorted = () => [...rows("routine_items")].sort((a, b) => a.sort - b.sort || a.id - b.id);
