@@ -295,7 +295,7 @@ function fit(ms) { // 전체가 칸에 차게: 점들을 감싸는 공이 화면
   const c = ns.reduce((a, g) => [a[0] + g.x, a[1] + g.y, a[2] + g.z], [0, 0, 0]).map((v) => v / ns.length);
   const R = Math.max(80, ...ns.map((g) => Math.hypot(g.x - c[0], g.y - c[1], g.z - c[2]))) + 25;
   const cam = G.camera(), half = Math.min((cam.fov * Math.PI) / 360, Math.atan(Math.tan((cam.fov * Math.PI) / 360) * cam.aspect));
-  fitD = (R / Math.sin(half)) * 0.8; G.scene().fog.density = 0.5 / fitD;
+  fitD = (R / Math.sin(half)) * 0.93; G.scene().fog.density = 0.5 / fitD; // 업무분장 때(0.8)보다 넉넉히: 뜨거운 점이 커서 가장자리가 잘리지 않게
   const k = Math.min(1.7, Math.max(1, fitD / (G.height() || 700) / 1.1)); // 작은 화면(폰)은 같은 지도를 더 작게 보게 되니 글자를 그만큼 키움
   if (Math.abs(k - lblK) > 0.05) { lblK = k; for (const g of gn.values()) { const n = S.by.get(g.id); if (!n || !g.__text) continue; const d = Math.min(n._d, 3); g.__text.textHeight = LBL[d] * k; g.__text.position.y = -(rad(n) + LBL[d] * k * (d <= 1 ? 1.25 : 0.95)); } }
   const p = cam.position, v = [p.x - c[0], p.y - c[1], p.z - c[2]], l = Math.hypot(...v) || 1;
@@ -406,8 +406,9 @@ function drawPanel() {
   ti.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); ti.blur(); } });
   ti.addEventListener("change", () => { const title = ti.value.replace(/\s+/g, " ").trim(); if (!title) { ti.value = n.title; fitT(); return; } if (title !== n.title) save(n, { title }); });
   const ta = p.querySelector(".dtnote"), sv = p.querySelector(".dtsave"); let t;
+  const fitN = () => { ta.style.height = "auto"; ta.style.height = Math.min(420, Math.max(110, ta.scrollHeight + 2)) + "px"; }; fitN(); // 내용이 길면 칸을 키워 한눈에 읽히게
   const flush = async () => { clearTimeout(t); if (ta.value === n.note) return; sv.textContent = "저장 중…"; const ok = await save(n, { note: ta.value }, false, true); sv.textContent = ok ? "✓ 저장됨" : "⚠️ 저장 실패 — 다시 적어 주세요"; if (ok) wikiLinks(n); };
-  ta.addEventListener("input", () => { sv.textContent = "…"; clearTimeout(t); t = setTimeout(flush, 800); }); ta.addEventListener("blur", flush);
+  ta.addEventListener("input", () => { fitN(); sv.textContent = "…"; clearTimeout(t); t = setTimeout(flush, 800); }); ta.addEventListener("blur", flush);
   p.querySelector(".dtlink")?.addEventListener("change", (e) => { if (e.target.value) link(n.id, e.target.value); });
   p.querySelector(".dtmove")?.addEventListener("change", (e) => { if (e.target.value && e.target.value !== n.parent_id) move(n, e.target.value); });
   bindAdd(p);

@@ -1,6 +1,7 @@
 #!/bin/bash
 # 🧠 뇌 탭 분석 자료 모으기 (한 번에): 플래너 → 맥미니 Claude 대화 → 맥북에서 넘어온 대화 파일 → 한데 모으기
-# 사용: bash scripts/brain/collect.sh [--since YYYY-MM-DD]     (--since: 그 날짜부터의 새 조각을 chunks/new.txt 로)
+# 사용: bash scripts/brain/collect.sh [--since YYYY-MM-DD]     (--since: 그 날짜부터의 새 조각을 chunks/new.txt 로. 안 주면 지난 분석 날짜부터)
+# 어느 폴더에서 실행해도 된다 (저장소 위치를 스스로 찾는다)
 # 모은 것은 전부 맥미니 안(~/.local/share/pallo-brain)에만 둔다. 플래너 DB 는 읽기만 한다.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -17,4 +18,10 @@ for f in "$INBOX"/claude-*.json; do
   else echo "맥북 대화 파일이 아직 덜 넘어왔거나 깨졌어요 — 이번에는 건너뜀: $(basename "$f")" >&2; fi
 done
 [ -f "$DIR/claude-macbook.json" ] && echo "맥북 대화: $(python3 -c 'import json,sys,os,time; p=sys.argv[1]; d=json.load(open(p)); print(len(d["sessions"]), "개 대화 · 파일 날짜", time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(p))))' "$DIR/claude-macbook.json")" || echo "맥북 대화 파일 없음 (맥북에서 python3 ~/wonpaper308/pallo-brain/extract-claude.py 를 실행하면 생겨요)"
+# --since 를 안 주면 지난 분석 날짜(last-run.txt)부터, 그것도 없으면 14일 전부터
+if [[ " $* " != *" --since "* ]]; then
+  SINCE="$(cat "$DIR/last-run.txt" 2>/dev/null || true)"
+  [[ "$SINCE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || SINCE="$(date -v-14d +%F)"
+  set -- "$@" --since "$SINCE"
+fi
 node scripts/brain/corpus.mjs --chunks "$@"

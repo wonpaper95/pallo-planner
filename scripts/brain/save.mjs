@@ -2,7 +2,7 @@
 // 사용: node scripts/brain/save.mjs [--dry] [--def 경로]
 //   --dry : DB 에 닿지 않고 계산 결과만 보여 준다 (뜨거운 생각, 낱말에 안 걸린 최근 조각)
 // 지키는 것: 대표가 화면에서 고친 점(edited)은 이름·내용·상태·자리를 덮어쓰지 않고, 지운 점(hidden)은 되살리지 않고, 직접 넣은 점·선(origin=me)은 건드리지 않는다(온도만 매긴다).
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { createRequire } from "node:module";
 const C = createRequire(import.meta.url)("../../brain-core.js");
@@ -22,11 +22,11 @@ if (dry) {
   console.log("\n[한 번도 안 걸린 주제]\n" + (B.rows.filter((r) => !r.stats.n).map((r) => r.key).join(", ") || "없음"));
   if (process.argv.includes("--miss")) console.log("\n[최근 45일, 어느 주제에도 안 걸린 조각]\n" + B.coverage.recentUnmatched.map((x) => `${x.d} ${x.w} ${x.t}`).join("\n"));
   else console.log(`\n최근 45일 조각 중 안 걸린 것 ${B.coverage.recentUnmatched.length}개 (--miss 로 보기)`);
-  process.exit(0);
 }
 
-const { select, insert, patch, del, upsert, run } = await import("../mk/db.mjs");
-await run(async () => {
+// (--dry 일 때는 여기서 끝. process.exit 를 쓰면 파이프로 받을 때 출력이 잘린다)
+const { select, insert, patch, del, upsert, run } = dry ? {} : await import("../mk/db.mjs");
+if (!dry) await run(async () => {
   const u = JSON.parse(readFileSync(`${DIR}/planner.json`, "utf8")).user_id; if (!/^[0-9a-f-]{36}$/.test(u ?? "")) throw new Error("planner.json 에 대표 계정이 없어요 — collect-planner.mjs 를 먼저");
   let have;
   try { have = await select("brain_nodes", `select=id,parent_id,key,title,state,heat,worry,origin,edited,hidden&user_id=eq.${u}`, "created_at"); }
@@ -68,5 +68,6 @@ await run(async () => {
   if (want.size) await upsert("brain_links", [...want.values()], "a,b"); out.links = want.size;
   const ch = [...C.changes(before, B.rows), ...(def.changes ?? [])];
   await insert("brain_runs", [{ user_id: u, summary: { headline: def.headline ?? "", insights: def.insights ?? [], changes: ch, counts: B.counts, period: B.period } }]);
+  try { writeFileSync(`${DIR}/last-run.txt`, corpus.today + "\n", { mode: 0o600 }); } catch {} // 다음 collect.sh 가 '지난 분석 뒤 새 조각'을 여기서부터 뽑는다
   console.log(JSON.stringify({ ok: true, ...out, coverage: `${B.coverage.matched}/${B.coverage.items}`, changes: ch.length }));
 });
