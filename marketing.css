@@ -99,3 +99,8 @@ body:not(.mkv) #mkView { display: none; }
 #mkView .kwr.off { opacity: .6; }
 #mkView .kwr a { color: inherit; text-decoration: underline; }
 @media (max-width: 640px) { #mkView .kwr { flex-wrap: wrap; } #mkView .kwr .kw { flex-basis: 100%; } }
+/* 🌏 밋업 */
+#mkView .mu-row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+#mkView .mu-when { flex: none; min-width: 92px; font-variant-numeric: tabular-nums; color: var(--sub); font-size: 13px; }
+#mkView .mu-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+#mkView .tag { white-space: nowrap; }

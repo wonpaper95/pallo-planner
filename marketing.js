@@ -22,12 +22,13 @@ MK.load = async function () {
     if (!teams.some((t) => t.id === MK.team)) MK.team = teams[0]?.id ?? null;
   } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
-    ${admin && MK.tab !== "daily" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["monthly", "📊 월간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    ${admin && MK.tab !== "daily" && MK.tab !== "meetup" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
+    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["monthly", "📊 월간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["meetup", "🌏 밋업"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
   if (MK.tab === "compet") return renderCompet(admin);
+  if (MK.tab === "meetup") return renderMeetup(admin);
   if (MK.tab === "daily") return renderDaily(admin);
   if (MK.tab === "agent") return renderAgent(admin);
   if (MK.tab === "trend") return renderTrend();
@@ -36,6 +37,50 @@ MK.load = async function () {
   if (MK.tab === "monthly") return renderMonthly();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
 };
+
+// ── 🌏 밋업: 맥미니(스킬 pallo-meetup-sync)가 매시간 공식 API로 읽어 쌓은 신청을 보여준다. 계산은 meetup-core.js(MEETUPCORE) ──
+// 매니저는 RLS 로 자기 지점 행만 받는다. 대표 미리보기(previewTeam)는 그 지점만 거른다. 새 회원은 대표만(RLS).
+async function renderMeetup(admin) {
+  const C = window.MEETUPCORE, body = $m("#mkBody");
+  const today = C.kst(new Date().toISOString()).date, from = C.addDays(C.weekStart(today), -21);
+  let rq = sb.from("meetup_rsvps").select("id,event_id,team_id,branch,event_title,starts_at,member_name,member_city,status,is_first_event,first_seen_at,cancelled_at,jeonsan_status,jeonsan_note")
+    .gte("starts_at", from + "T00:00:00+09:00").order("starts_at").limit(2000);
+  if (!admin && previewTeam) rq = rq.eq("team_id", previewTeam);
+  const [rr, run, mem] = await Promise.all([rq, sb.from("meetup_runs").select("ran_at,status,counts,error").order("id", { ascending: false }).limit(1).maybeSingle(),
+    admin ? sb.from("meetup_members").select("name,city,joined_at,first_seen_at").order("first_seen_at", { ascending: false }).limit(15) : Promise.resolve({ data: [] })]);
+  if (!body.isConnected || MK.tab !== "meetup") return;
+  if (fail(rr.error) || fail(run.error) || fail(mem.error)) return;
+  const rows = rr.data ?? [], r0 = run.data;
+  const RUN = { ok: "정상", partial: "일부 실패", failed: "실패", auth_failed: "밋업 인증 실패 — Claude에게 알려 주세요" };
+  const when = (iso) => { const k = C.kst(iso); return k ? `${k.date.slice(5).replace("-", "/")}(${"일월화수목금토"[k.dow]}) ${k.time}` : "–"; };
+  const tag = (st) => `<span class="vd ${st === "YES" || st === "ATTENDED" ? "keep" : st === "WAITLIST" ? "watch" : st === "NO" || st === "NO_SHOW" ? "cut" : "hold"}">${esc(C.STATUS_LABEL[st] ?? st ?? "–")}</span>`;
+  const jeon = (r) => {
+    // teams 배열은 대표만 채워지므로 지점 판단은 제목의 [지점] 으로 한다
+    if (!C.jeonsanCodeOf(C.teamKeyOfBranch(r.branch))) return `<span class="mut">전산 등록 안 함</span>`;
+    return { registered: "✅ 전산 등록", duplicate: "✅ 이미 있음", skipped: "⏭ 건너뜀", failed: "⚠️ 등록 실패" }[r.jeonsan_status] ?? (C.ACTIVE.includes(r.status) ? "⏳ 등록 대기" : "–");
+  };
+  const person = (p) => `${esc(p.name)}${p.first ? ` <span class="tag">첫 참석</span>` : ""}${p.status === "WAITLIST" ? ` <span class="tag">대기</span>` : ""}`;
+  const rosterCard = (ymd, label) => {
+    const list = C.rosterOf(rows, ymd);
+    return `<div class="card"><b>${label} ${esc(ymd.slice(5).replace("-", "/"))} 참석 예정 ${list.reduce((s, g) => s + g.people.length, 0)}명</b>${list.length
+      ? list.map((g) => `<div class="mu-row"><div class="mu-when">${esc(g.time)}</div><div><b>${esc(C.branchKo(g.branch))}</b><div>${g.people.map(person).join(", ")}</div></div></div>`).join("")
+      : `<div class="mut">없어요</div>`}</div>`;
+  };
+  const recent = rows.filter((r) => Date.parse(r.first_seen_at) >= Date.now() - 7 * 86400e3).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at));
+  const upcoming = rows.filter((r) => C.ACTIVE.includes(r.status) && C.kst(r.starts_at).date > C.addDays(today, 1));
+  const weekly = C.weeklyStats(rows, 4, today);
+  body.innerHTML = `<div class="mkbar"><span class="mut">${r0 ? `마지막 확인 ${esc(when(r0.ran_at))} · ${esc(RUN[r0.status] ?? r0.status)}${r0.status === "ok" ? ` · 새 신청 ${n(r0.counts?.fresh)} · 취소 ${n(r0.counts?.cancelled)}` : ""}` : "아직 확인 전이에요 (밋업 API 승인 후 맥미니가 매시간 읽어요)"}</span>
+      <a class="mut" href="https://www.meetup.com/${C.GROUP}/" target="_blank" rel="noopener">밋업 그룹 열기 ↗</a></div>
+    <div class="mu-two">${rosterCard(today, "오늘")}${rosterCard(C.addDays(today, 1), "내일")}</div>
+    <div class="card"><b>새 신청 (최근 7일) ${recent.length}건</b>${recent.length ? `<div class="tw"><table><tr><th>참석자</th><th>지점</th><th>모임</th><th>상태</th><th>전산</th></tr>${recent.map((r) => `<tr>
+        <td>${esc(r.member_name)}${r.is_first_event ? ` <span class="tag">첫 참석</span>` : ""}${r.member_city ? `<div class="mut">${esc(r.member_city)}</div>` : ""}</td>
+        <td>${esc(C.branchKo(r.branch))}</td><td><a href="https://www.meetup.com/${C.GROUP}/events/${esc(r.event_id)}/" target="_blank" rel="noopener">${esc(when(r.starts_at))}</a></td>
+        <td>${tag(r.status)}</td><td>${jeon(r)}${r.jeonsan_status === "failed" && r.jeonsan_note ? `<div class="mut">${esc(r.jeonsan_note)}</div>` : ""}</td></tr>`).join("")}</table></div>` : `<div class="mut">최근 7일 동안 들어온 신청이 없어요.</div>`}</div>
+    <div class="card"><b>모레 이후 참석 예정 ${upcoming.length}명</b>${upcoming.length ? upcoming.map((r) => `<div class="mu-row"><div class="mu-when">${esc(when(r.starts_at))}</div><div>${esc(C.branchKo(r.branch))} · ${person({ name: r.member_name, status: r.status, first: r.is_first_event })}</div></div>`).join("") : `<div class="mut">없어요</div>`}</div>
+    <div class="card"><b>주간 요약 (모임 날짜 기준, 최근 4주)</b>${weekly.length ? `<div class="tw"><table><tr><th>주(월요일)</th><th>지점</th><th>신청</th><th>왔음</th><th>안 옴</th><th>취소</th></tr>${weekly.map((w) => `<tr><td>${esc(w.week.slice(5).replace("-", "/"))}</td><td>${esc(C.branchKo(w.branch))}</td><td>${w.rsvps}</td><td>${w.attended}</td><td>${w.noShow}</td><td>${w.cancelled}</td></tr>`).join("")}</table></div>
+      <div class="mut">왔음·안 옴은 밋업에서 출석 체크를 한 모임만 잡혀요.</div>` : `<div class="mut">아직 없어요</div>`}</div>
+    ${admin ? `<div class="card"><b>새 회원</b>${(mem.data ?? []).length ? mem.data.map((m) => `<div class="mu-row"><div class="mu-when">${esc(when(m.joined_at ?? m.first_seen_at))}</div><div>${esc(m.name)}${m.city ? ` <span class="mut">${esc(m.city)}</span>` : ""}</div></div>`).join("") : `<div class="mut">아직 없어요</div>`}</div>` : ""}`;
+}
 
 // ── 리포트·페르소나 보기 ──
 async function renderReport(kind) {
