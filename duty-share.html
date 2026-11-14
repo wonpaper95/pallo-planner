@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>팔로 업무분장</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0a14">
+<link rel="icon" href="icon-192.png">
+<!-- 🔗 로그인 없이 여는 업무분장 공유 링크 — 대표가 만든 키(?k=)로만 열리고 보기 전용 (DB duty_shared). 대표가 [공유 끄기]·[새 주소로 바꾸기] 하면 바로 안 열림 -->
+<style>
+:root { --bg: #0b0a14; --panel: #15132a; --line: #2a2748; --hover: #1e1b3a; --text: #ecebf7; --sub: #9a98b8; --accent: #8b6fd6; --red: #eb5757; color-scheme: dark; }
+@media (prefers-color-scheme: light) { :root { --bg: #f5f4fb; --panel: #ffffff; --line: #e4e1f0; --hover: #efedf8; --text: #262338; --sub: #6f6c88; --accent: #5a3fb0; color-scheme: light; } }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif; -webkit-text-size-adjust: 100%; }
+#duty { max-width: 1500px; margin: 0 auto; padding: 14px 20px 24px; }
+@media (max-width: 900px) { #duty { padding: 10px 12px 20px; } }
+</style>
+<link rel="stylesheet" href="duty.css?v=202611141314">
+</head>
+<body>
+<main id="duty"></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js?v=202611141314"></script>
+<script src="duty.js?v=202611141314"></script>
+<script>DUTY.mountShared(document.getElementById("duty"));</script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+/* 🌳 업무분장 탭 (duty.js) — 플래너 탭과 공유 페이지(duty-share.html)가 같이 씀. 입체 지도 칸은 테마와 상관없이 늘 밤하늘 색 */
+body:not(.dtv) #dutyView { display: none; }
+#dutyView { max-width: 1500px; margin: 0 auto; padding: 14px 20px 40px; }
+.dtwrap { --stage: #080716; color: var(--text); }
+.dtwrap button { font: inherit; cursor: pointer; }
+.dtttlbar { margin: 4px 0 2px; font-size: 22px; }
+.dtsub, .dtmut { color: var(--sub); font-size: 13px; line-height: 1.55; }
+.dtmsg { padding: 60px 0; text-align: center; color: var(--sub); }
+
+/* 위 막대 */
+.dtbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 12px 0 10px; }
+.dtseg { display: inline-flex; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; flex: none; }
+.dtseg button { padding: 6px 14px; border: 0; border-radius: 8px; background: none; color: var(--sub); font-weight: 600; font-size: 14px; }
+.dtseg button.on { background: var(--accent); color: #fff; }
+.dtq { width: 210px; max-width: 100%; padding: 8px 12px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 14px; }
+.dtq:focus { outline: none; border-color: var(--accent); }
+.dtgrow { flex: 1; }
+.dthead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 16px; }
+.dtwrap .dtpub { display: none; align-items: center; gap: 8px; font-size: 13px; color: var(--sub); }
+body.is-admin .dtwrap .dtpub { display: inline-flex; }
+.dtpub span { padding: 5px 11px; border-radius: 999px; background: var(--panel); border: 1px dashed var(--line); white-space: nowrap; }
+.dtpub span.on { border-style: solid; border-color: color-mix(in srgb, var(--green, #4dab9a) 60%, var(--line)); color: var(--text); }
+.dtfilters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.dtfilters button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub); font-size: 13px; white-space: nowrap; }
+.dtfilters button i { width: 8px; height: 8px; border-radius: 50%; background: var(--oc); }
+.dtfilters button.on { color: var(--text); border-color: var(--oc, var(--accent)); background: color-mix(in srgb, var(--oc, var(--accent)) 16%, var(--panel)); font-weight: 600; }
+.dtfilters button.cy { border-radius: 8px; }
+.dtfilters button.gap { border-color: #e9b949; background: color-mix(in srgb, #e9b949 18%, var(--panel)); }
+.dtfsep { margin: 0 2px 0 8px; color: var(--sub); font-size: 12px; }
+.dtbtn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--text); font-size: 13.5px; text-decoration: none; white-space: nowrap; }
+.dtbtn:hover { border-color: var(--accent); }
+.dtbtn.pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.dtbtn.danger { color: var(--red, #eb5757); }
+.dtbtn.danger:hover { border-color: var(--red, #eb5757); }
+.dtbtn:disabled { opacity: .4; cursor: default; }
+.dtwrap .dtsharebtn { display: none; } body.is-admin .dtwrap .dtsharebtn { display: inline-flex; } /* 대표만 */
+.dtwrap .dtsharebtn.on { border-color: var(--accent); color: var(--accent); }
+
+/* 공유 링크 상자 */
+.dtsharebox { margin: 0 0 12px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; font-size: 14px; }
+.dtsharebox b { display: block; margin-bottom: 2px; }
+.dtshareurl { display: flex; gap: 8px; margin: 10px 0 8px; flex-wrap: wrap; }
+.dtshareurl input { flex: 1; min-width: 180px; padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13px; }
+.dtshareact { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
+/* 본문: 왼쪽 지도/목록 + 오른쪽 칸 */
+.dtmain { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 14px; align-items: stretch; }
+.dtstage { position: relative; height: calc(100vh - var(--hh, 60px) - 190px); min-height: 460px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: var(--panel); }
+.dtwrap.shared .dtstage { height: calc(100vh - 170px); height: calc(100dvh - 170px); }
+.dtwrap[data-mode="3d"] .dtstage { background: var(--stage); border-color: #1d1b3a; }
+.dtgraph, .dttreebox, .dttablebox { position: absolute; inset: 0; }
+.dtwrap:not([data-mode="3d"]) :is(.dtgraph, .dthud, .dtlegend, .dtgmsg), .dtwrap:not([data-mode="tree"]) .dttreebox, .dtwrap:not([data-mode="table"]) .dttablebox { display: none; }
+.dtgraph { touch-action: none; cursor: grab; }
+.dtgraph:active { cursor: grabbing; }
+.dtgraph canvas { display: block; outline: none; }
+.dthud { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; }
+.dthud button { padding: 6px 11px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(16, 14, 40, .7); color: #cfd3ff; font-size: 12.5px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dthud button.on { color: #fff; border-color: #8f86ff; background: rgba(86, 72, 200, .55); }
+.dtlegend { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; color: #aab0e6; font-size: 12px; pointer-events: none; }
+.dtlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.dtlegend i { display: inline-block; width: 22px; height: 0; border-top: 2px solid #8fa2ff; }
+.dtlegend i.l2 { border-top: 2px dotted #ffdd8c; height: 7px; border-radius: 50% 50% 0 0 / 100% 100% 0 0; border-left: 0; border-right: 0; }
+.dtlegend .dthelp { margin-left: auto; opacity: .75; }
+.dtgmsg { position: absolute; inset: 0; display: grid; place-items: center; color: #aab0e6; font-size: 14px; pointer-events: none; }
+.dtgmsg[hidden] { display: none; }
+/* 점에 올렸을 때 말풍선 (라이브러리가 만든 칸) */
+.dtgraph .float-tooltip-kap, .dtgraph .scene-tooltip { padding: 0 !important; background: none !important; font: inherit !important; }
+.dttip { max-width: 250px; padding: 9px 12px; border-radius: 10px; background: rgba(18, 16, 44, .93); border: 1px solid rgba(255, 255, 255, .14); color: #fff; font-size: 13px; line-height: 1.45; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+.dttip b { display: block; font-size: 14px; }
+.dttip span { display: block; color: #ffdd8c; font-size: 12px; margin-top: 2px; }
+.dttip p { margin: 5px 0 0; color: #c9cdf5; font-size: 12.5px; white-space: normal; }
+
+/* 🌿 나뭇가지 */
+.dttreebox { overflow: auto; padding: 12px 18px 30px; }
+.dttreebar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--sub); font-size: 13px; }
+.dttreebar span { margin-right: auto; }
+.dttreebar button { padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--sub); font-size: 12.5px; }
+.dttree, .dttree ul { list-style: none; margin: 0; padding: 0; }
+.dttree ul { margin-left: 15px; padding-left: 15px; border-left: 1.5px solid color-mix(in srgb, var(--sub) 35%, transparent); }
+.dttree li { position: relative; }
+.dttree ul > li::before { content: ""; position: absolute; left: -15px; top: 18px; width: 12px; border-top: 1.5px solid color-mix(in srgb, var(--sub) 35%, transparent); }
+.dttree ul > li:last-child::after { content: ""; position: absolute; left: -17px; top: 19px; bottom: 0; width: 4px; background: var(--panel); } /* 마지막 가지 아래 세로줄 가리기 */
+.dtrow { display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 3px 8px 3px 2px; border-radius: 9px; cursor: pointer; }
+.dtrow:hover { background: var(--hover, rgba(127, 127, 127, .12)); }
+.dtrow.sel { background: color-mix(in srgb, var(--c) 20%, transparent); box-shadow: inset 0 0 0 1.5px var(--c); }
+.dtrow.faint .dtname { color: var(--sub); }
+.dtfold { flex: none; width: 22px; height: 26px; border: 0; background: none; color: var(--sub); font-size: 13px; padding: 0; }
+.dtdot { flex: none; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 70%, transparent); }
+.dtrow.d0 .dtname { font-size: 18px; font-weight: 800; } .dtrow.d0 .dtdot { width: 14px; height: 14px; background: var(--text); box-shadow: none; }
+.dtrow.d1 .dtname { font-size: 16px; font-weight: 700; } .dtrow.d1 .dtdot { width: 12px; height: 12px; }
+.dtrow.d2 .dtname { font-weight: 600; }
+.dtrow.d3 .dtdot { width: 7px; height: 7px; box-shadow: none; }
+.dtname { min-width: 0; font-size: 14.5px; line-height: 1.35; }
+.dtcnt { flex: none; padding: 0 7px; border-radius: 999px; background: var(--hover, rgba(127, 127, 127, .15)); color: var(--sub); font-size: 11.5px; }
+.dtchips { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: auto; padding-left: 8px; justify-content: flex-end; flex: none; max-width: 55%; }
+.dtchips b, .dtlist b { padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; color: color-mix(in srgb, var(--oc) 60%, var(--text)); background: color-mix(in srgb, var(--oc) 20%, transparent); border: 1px solid color-mix(in srgb, var(--oc) 45%, transparent); }
+.dtchips em { font-style: normal; font-size: 11.5px; color: var(--sub); white-space: nowrap; }
+.dtchips u { text-decoration: none; padding: 1px 7px; border-radius: 6px; font-size: 11.5px; color: var(--sub); border: 1px solid var(--line); white-space: nowrap; }
+.dtchips b.lead, .dtlist b.lead { box-shadow: 0 0 0 1px var(--oc); }
+.dtchips.big { margin: 0; padding: 0; max-width: none; justify-content: flex-start; } .dtchips.big b { font-size: 13px; padding: 3px 11px; }
+
+/* 📋 표 */
+.dttablebox { display: flex; flex-direction: column; }
+.dttbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--sub); font-size: 13px; }
+.dttbar > span { margin-right: auto; }
+.dtseg.sm button { padding: 4px 11px; font-size: 13px; }
+.dttwrap { flex: 1; min-height: 0; overflow: auto; }
+.dttable { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px; }
+.dttable th { position: sticky; top: 0; z-index: 2; padding: 8px 10px; text-align: left; font-size: 12px; font-weight: 600; color: var(--sub); background: var(--panel); box-shadow: 0 1px 0 var(--line); white-space: nowrap; }
+.dttable td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+.dttable th:nth-child(1) { width: 27%; } .dttable th:nth-child(2) { width: 17%; } .dttable th:nth-child(3) { width: 7%; } .dttable th:nth-child(4) { width: 13%; }
+.dttable tbody tr[data-id] { cursor: pointer; } .dttable tbody tr[data-id]:hover td { background: var(--hover, rgba(127, 127, 127, .1)); }
+.dttable tr.sel td { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.dttable tr.sec td { padding: 10px; background: color-mix(in srgb, var(--c) 14%, var(--panel)); border-bottom: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); font-size: 14.5px; }
+.dttable tr.sec td > * { vertical-align: middle; } .dttable tr.sec b { margin: 0 8px 0 6px; } .dttable tr.sec td > span:not(.dtchips) { color: var(--sub); font-size: 12.5px; } .dttable tr.sec .dtchips { float: right; max-width: none; }
+.dttable tr.grp td.t { font-weight: 700; } .dttable tr.faint td { color: var(--sub); }
+.dttable td.t .dtdot { width: 7px; height: 7px; margin-right: 7px; box-shadow: none; vertical-align: middle; }
+.dttable td.t small { display: block; color: var(--sub); font-size: 11.5px; font-weight: 400; }
+.dttable td.c { white-space: nowrap; } .dttable td.n { color: var(--sub); font-size: 13px; }
+.dttable .star { color: #e9b949; margin-right: 6px; } .dttable .star.off { color: var(--sub); opacity: .6; }
+.dttable .dtchips.big { flex-wrap: wrap; } .dttable .dtchips.big b { font-size: 12px; padding: 1px 8px; }
+
+/* 오른쪽 칸 */
+.dtpanel { height: calc(100vh - var(--hh, 60px) - 190px); min-height: 460px; overflow: auto; padding: 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-sizing: border-box; }
+.dtwrap.shared .dtpanel { height: calc(100vh - 170px); height: calc(100dvh - 170px); }
+.dtpanel h3 { margin: 0 0 12px; font-size: 18px; line-height: 1.35; }
+.dtpanel h4 { margin: 18px 0 7px; font-size: 12.5px; color: var(--sub); font-weight: 600; letter-spacing: .02em; }
+.dtpanel h4 small { margin-left: 4px; font-weight: 500; }
+.dtstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dtstats div { padding: 10px 6px; text-align: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+.dtstats b { display: block; font-size: 22px; } .dtstats span { color: var(--sub); font-size: 12px; }
+.dtbars button { display: grid; grid-template-columns: 76px 1fr 30px; align-items: center; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 13px; text-align: left; }
+.dtbars button:hover, .dtbars button.on { background: var(--hover, rgba(127, 127, 127, .12)); }
+.dtbars span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtbars i { height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--sub) 18%, transparent); overflow: hidden; }
+.dtbars u { display: block; height: 100%; border-radius: 99px; background: var(--oc); }
+.dtbars b { text-align: right; font-weight: 600; color: var(--sub); }
+.dtgaps button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 13.5px; text-align: left; }
+.dtgaps button:hover, .dtgaps button.on { background: color-mix(in srgb, #e9b949 16%, transparent); }
+.dtgaps span { flex: 1; } .dtgaps b { padding: 1px 9px; border-radius: 999px; font-size: 12.5px; background: color-mix(in srgb, #e9b949 26%, transparent); }
+.dtgaps button.ok b { background: none; color: var(--green, #4dab9a); font-weight: 600; }
+.dtareas button, .dtlist button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-radius: 9px; background: none; color: var(--text); font-size: 14px; text-align: left; }
+.dtareas button:hover, .dtlist button:hover { background: var(--hover, rgba(127, 127, 127, .12)); }
+.dtareas span, .dtlist span { flex: 1; min-width: 0; }
+.dtareas b { color: var(--sub); font-size: 12.5px; font-weight: 500; }
+.dtadd { display: flex; gap: 6px; margin: 10px 0; }
+.dtadd input { flex: 1; min-width: 0; padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 14px; }
+.dtadd input:focus, .dtowner:focus, .dtbackup:focus, .dtlinkurl:focus, .dtnote:focus, .dtpanel select:focus { outline: none; border-color: var(--accent); }
+.dtcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: -4px 0 8px; padding-right: 34px; position: relative; min-height: 28px; color: var(--sub); font-size: 12.5px; }
+.dtcrumb button[data-go] { padding: 2px 4px; border: 0; border-radius: 6px; background: none; color: var(--sub); font-size: 12.5px; }
+.dtcrumb button[data-go]:hover { color: var(--text); background: var(--hover, rgba(127, 127, 127, .12)); }
+.dtcrumb i { font-style: normal; opacity: .6; }
+.dtx { position: absolute; right: -4px; top: -2px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--sub); font-size: 15px; }
+.dtx:hover { background: var(--hover, rgba(127, 127, 127, .12)); color: var(--text); }
+.dtphead { display: flex; align-items: flex-start; gap: 9px; }
+.dtphead .dtdot { width: 13px; height: 13px; margin-top: 8px; }
+.dtphead h3 { margin: 0; font-size: 20px; }
+.dtptitle { flex: 1; min-width: 0; padding: 3px 7px; margin: -3px 0 0 -7px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 20px; font-weight: 700; line-height: 1.35; resize: none; overflow: hidden; display: block; }
+.dtptitle:hover { border-color: var(--line); } .dtptitle:focus { outline: none; border-color: var(--accent); background: var(--bg); }
+.dtpick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; }
+.dtpick button { padding: 4px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--sub); font-size: 13px; }
+.dtpick button.on { color: color-mix(in srgb, var(--oc) 60%, var(--text)); border-color: var(--oc); background: color-mix(in srgb, var(--oc) 20%, transparent); font-weight: 600; }
+.dtpick.cyc button { border-radius: 8px; } .dtpick.cyc button.on { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.dtrow2 { display: flex; gap: 6px; } .dtrow2 > :first-child { flex: 1; min-width: 0; } .dtrow2 .dtppl { width: 92px; flex: none; }
+.dtfacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; } .dtfacts div { padding: 6px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 13.5px; } .dtfacts span { color: var(--sub); font-size: 12px; margin-right: 6px; }
+.dtgobox { margin-top: 12px; } .dtgo { width: 100%; box-sizing: border-box; border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); color: var(--text); white-space: normal; text-align: center; }
+.dtlinkurl { margin-top: 6px; } .dtlinkurl[hidden] { display: none; }
+.dtowner, .dtbackup, .dtlinkurl, .dtpanel select { width: 100%; box-sizing: border-box; padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 13.5px; }
+.dtnote { width: 100%; box-sizing: border-box; min-height: 110px; padding: 10px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 10px; font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; }
+.dtnotev { margin: 0; font-size: 14.5px; line-height: 1.65; white-space: pre-wrap; }
+.dtsave { min-height: 15px; margin-top: 3px; font-size: 12px; color: var(--sub); }
+.dtrel { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+.dtrel > span { display: flex; align-items: stretch; border: 1px solid color-mix(in srgb, #e9b949 55%, var(--line)); border-radius: 10px; overflow: hidden; background: color-mix(in srgb, #e9b949 8%, transparent); }
+.dtrel button[data-go] { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 7px 10px; border: 0; background: none; color: var(--text); font-size: 13.5px; text-align: left; }
+.dtrel button[data-go] small { color: var(--sub); font-size: 11.5px; }
+.dtrel button:hover { background: color-mix(in srgb, #e9b949 16%, transparent); }
+.dtunl { flex: none; width: 34px; border: 0; border-left: 1px solid color-mix(in srgb, #e9b949 35%, var(--line)); background: none; color: var(--sub); }
+.dtmore { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dtmore summary { cursor: pointer; color: var(--sub); font-size: 13px; }
+.dtcolors { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.dtcolors button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+.dtcolors button.on { border-color: var(--text); box-shadow: 0 0 0 2px var(--panel) inset; }
+.dtcolors button.auto { width: auto; height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--sub); font-size: 12px; }
+.dtcolors button.auto.on { border-color: var(--accent); color: var(--text); box-shadow: none; }
+.dtord { display: flex; gap: 6px; }
+.dtmore .danger { margin-top: 18px; width: 100%; }
+
+/* 폰 */
+@media (max-width: 900px) {
+  #dutyView { padding: 10px 12px 30px; }
+  .dtmain { grid-template-columns: 1fr; }
+  .dtstage { height: 62vh; height: 62dvh; min-height: 380px; }
+  .dtwrap.shared .dtstage { height: 62vh; height: 62dvh; }
+  .dtpanel, .dtwrap.shared .dtpanel { height: auto; min-height: 0; }
+  /* 고르면: 위 절반 = 지도(또는 목록), 아래 절반 = 내용 */
+  .dtwrap.focus .dtstage, .dtwrap.shared.focus .dtstage { position: fixed; left: 0; right: 0; top: 0; height: 44vh; height: 44dvh; min-height: 0; z-index: 59; border-radius: 0; border: 0; }
+  .dtpanel.on, .dtwrap.shared .dtpanel.on { position: fixed; left: 0; right: 0; bottom: 0; top: 44vh; top: 44dvh; height: auto; z-index: 60; border-radius: 18px 18px 0 0; border-width: 1px 0 0; box-shadow: 0 -10px 40px rgba(0, 0, 0, .45); padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+  .dtq { flex: 1; width: auto; min-width: 120px; }
+  .dtfilters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; } .dtfilters > * { flex: none; }
+  .dtseg button { padding: 6px 10px; font-size: 13.5px; }
+  .dthud { left: 10px; right: 10px; top: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .dtlegend .dthelp { display: none; }
+  .dtchips { max-width: 46%; }
+}

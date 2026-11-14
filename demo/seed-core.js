@@ -95,6 +95,7 @@
     RI("소방 안전 점검표 사진 찍어 공유하기", [0, 1, 2, 3, 4, 5, 6], { team_id: T.bs, from_day: day(-2), to_day: day(-2), sort: 52 }),
   ];
   DEMO.tables.routine_items = routine;
+  DEMO.tables.duty_meta = [{ id: true, published: true }]; // 🌳 업무분장: 체험판은 공개 상태 (내용은 duty-seed.js 가 처음 열 때 채움)
   const on = (i, team, d) => i.days.includes(dow(d)) && (!i.weeks || i.weeks.includes(Math.floor((+d.slice(8, 10) - 1) / 7) + 1))
     && (!i.team_id || i.team_id === team) && (!i.from_day || d >= i.from_day) && (!i.to_day || d <= i.to_day);
   const sorted = () => [...rows("routine_items")].sort((a, b) => a.sort - b.sort || a.id - b.id);
