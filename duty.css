@@ -140,7 +140,7 @@ body.is-admin .dtwrap .dtpub { display: inline-flex; }
 .dtoroot { padding: 8px 30px; border-radius: 12px; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); color: var(--text); text-align: center; }
 .dtoroot b { display: block; font-size: 18px; } .dtoroot small { color: var(--sub); font-size: 11.5px; }
 .dtoroot.sel { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
-.dtocols { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; padding-top: 16px; }
+.dtocols { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 8px; padding-top: 16px; align-items: start; }
 .dtocols::before { content: ""; position: absolute; top: 0; left: calc((100% - 8px * (var(--n) - 1)) / var(--n) / 2); right: calc((100% - 8px * (var(--n) - 1)) / var(--n) / 2); border-top: 2px solid var(--ol); }
 .dtoc { position: relative; display: flex; flex-direction: column; min-width: 0; border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line)); border-radius: 12px; background: var(--bg); }
 .dtoc::before { content: ""; position: absolute; top: -17px; left: 50%; height: 16px; border-left: 2px solid var(--ol); }
@@ -150,6 +150,7 @@ body.is-admin .dtwrap .dtpub { display: inline-flex; }
 .dtoch .dtchips b { font-size: 10.5px; padding: 0 6px; }
 .dtoch small { display: block; margin-top: 4px; color: var(--sub); font-size: 11px; }
 .dtocb { flex: 1; padding: 5px 4px 6px; display: grid; gap: 1px; align-content: start; }
+body.is-admin .dtwrap:not(.shared) .dtocb { padding-bottom: 28px; } /* 대표: 칸 오른쪽 아래 ＋(업무 더하기) 자리 */
 .dtog { margin-top: 1px; }
 .dtogr { display: flex; align-items: stretch; border-radius: 7px; }
 .dtocar { flex: none; width: 17px; padding: 0; border: 0; background: none; color: var(--sub); font-size: 10.5px; }
@@ -170,7 +171,7 @@ body.is-admin .dtwrap .dtpub { display: inline-flex; }
 .dtorg .rel { background: color-mix(in srgb, #e9b949 16%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, #e9b949 80%, transparent); }
 .dtorg .hit { background: color-mix(in srgb, #e9b949 22%, transparent); }
 .dtorg .faint { opacity: .3; }
-.dtoadd { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; padding: 0; border: 1px dashed color-mix(in srgb, var(--c) 60%, var(--line)); border-radius: 6px; background: none; color: var(--sub); font-size: 12px; line-height: 1; opacity: .7; }
+.dtoadd { position: absolute; bottom: 5px; right: 5px; width: 20px; height: 20px; padding: 0; border: 1px dashed color-mix(in srgb, var(--c) 60%, var(--line)); border-radius: 6px; background: none; color: var(--sub); font-size: 12px; line-height: 1; opacity: .7; }
 .dtoadd:hover { border-color: var(--accent); color: var(--text); opacity: 1; }
 
 /* 📊 분장표 */
