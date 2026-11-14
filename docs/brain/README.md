@@ -14,14 +14,15 @@
 | `brain-core.js` | 계산(낱말 걸기·횟수·온도·근거·달라진 점). 화면에서는 안 쓰고 맥미니 스크립트와 테스트가 씀 |
 | `vendor/duty-lib.js` | 3D 라이브러리(3d-force-graph + three). 입체 지도를 처음 열 때만 받음 |
 | `scripts/brain/collect.sh` | 자료 모으기 한 번에 (아래 네 개를 차례로) |
-| `scripts/brain/collect-planner.mjs` | 플래너에서 대표 계정 글만 읽기 전용으로 (주간 할 일·아이디어 창구·월간 목표·리포트·회의록) |
+| `scripts/brain/collect-planner.mjs` | 플래너에서 대표 개인 칸만 읽기 전용으로 (주간 할 일·아이디어 창구·시뮬레이터 개인 메모·주간 회고·월간 목표·리포트·대표가 쓴 회의록). 매니저 쪽 칸은 대표가 썼어도 읽지 않는다 |
 | `scripts/brain/extract-claude.py` | 그 컴퓨터의 Claude Code 대화에서 "내가 쓴 말"만 뽑기 (맥북에서도 같은 파일을 실행) |
+| `scripts/brain/collect-chat.mjs` | Claude 채팅(claude.ai)에서 "내가 쓴 말"만 읽기 전용으로 (맥미니 전용 로그인 프로필 `~/.cache/pallo-brain/chat-profile`, 바뀐 대화만 다시 읽음). 처음 1회·로그인이 풀리면 `node scripts/brain/collect-chat.mjs login` |
 | `scripts/brain/corpus.mjs` | 한데 모아 조각 목록(corpus.json)과 읽기용 묶음(chunks/*.txt) 만들기. 비밀번호·열쇠는 가림 |
 | `scripts/brain/save.mjs` | 정의(brain.json) + 조각 → 온도·근거 계산 → DB 저장. `--dry` 는 계산만 |
 | `supabase/migrations/20261114200000_brain.sql` | 표 `brain_nodes`·`brain_links`·`brain_runs` 와 권한 |
 | `~/.claude/skills/pallo-brain-sync/SKILL.md` | 매주 월요일 새벽 분석 절차 (맥미니 예약 작업) |
 
-자료와 정의는 맥미니의 `~/.local/share/pallo-brain/` 에만 있다 (planner.json, claude-*.json, corpus.json, chunks/, digest/, brain.json). **저장소에 올리지 않는다** — 이 저장소는 공개된다.
+자료와 정의는 맥미니의 `~/.local/share/pallo-brain/` 에만 있다 (planner.json, claude-*.json(맥미니·맥북 Claude Code 대화, claude-chat.json = Claude 채팅), corpus.json, chunks/, digest/, brain.json). **저장소에 올리지 않는다** — 이 저장소는 공개된다.
 
 ## 점 하나에 담기는 것 (`brain_nodes`)
 - `title` 이름, `note` 내용, `state` 상태(관심·고민·실행·루틴·식음), `heat` 온도 0~100, `worry` 고민 0~100
@@ -76,4 +77,4 @@ bash ~/.cache/pallo-planner-dev/test-brain.sh  # 로컬 DB 권한 16가지 (도�
 1. 화면 배포(main 푸시). DB 표가 없으면 탭은 아무에게도 안 보인다(`BRAIN.init`).
 2. 운영 DB 에 `supabase/migrations/20261114200000_brain.sql` 적용 (대표가 직접).
 3. 맥미니에서 `node scripts/brain/save.mjs` → 대표 화면에 지도가 나타난다.
-4. 맥북 대화도 넣으려면 맥북에서 `python3 ~/wonpaper308/pallo-brain/extract-claude.py` (동기화 폴더로 넘어와 다음 분석 때 들어감).
+4. 맥북 대화도 넣으려면 맥북에서 `python3 ~/wonpaper308/pallo-brain/extract-claude.py` (동기화 폴더로 넘어와 다음 분석 때 들어감). 맥북에는 매일 21시·로그인 때 자동 실행을 걸어 두었다 (`~/Library/LaunchAgents/com.pallo.brain-extract.plist`, 로그 `~/Library/Logs/pallo-brain-extract.log`).

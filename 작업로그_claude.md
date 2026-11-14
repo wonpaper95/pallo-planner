@@ -67,3 +67,10 @@
 - 같은 날 밤 (버전 202611142125): 뇌 지도 전체 보기를 넉넉히(가장자리 안 잘리게), 내용 칸이 글 길이만큼 커지게. 조직도 칸 높이를 내용에 맞추고 ＋를 칸 오른쪽 아래로. save.mjs 는 --dry 출력이 파이프에서 잘리지 않게, 저장 성공 때 last-run.txt 기록. collect.sh 는 --since 를 안 주면 지난 분석 날짜부터.
 - 첫 분석 저장: 주간 할 일 1,912개 + 아이디어 7개 + Claude 대화 3,148마디(맥미니 39개 대화, 맥북 208개 대화) → 큰 주제 10 · 생각 107 · 세부 114 · 이어진 선 206. 운영 DB 표는 대표가 적용, 저장은 대표 허락 뒤 save.mjs 로.
 
+## 2026-11-15 🧠 뇌 분석 자료 넓히기 (화면 변경 없음 — 버전 그대로)
+- Claude 채팅(claude.ai)을 매주 자동으로: `scripts/brain/collect-chat.mjs` (맥미니 전용 로그인 프로필 `~/.cache/pallo-brain/chat-profile`, 대표가 쓴 말만·GET 만·바뀐 대화만 다시 읽음) → `claude-chat.json`. `collect.sh` 가 부르고, 로그인이 풀려도 멈추지 않고 지난 파일로 진행. 처음·풀렸을 때 `node scripts/brain/collect-chat.mjs login` (대표가 직접 로그인). 점검 `node scripts/brain/collect-chat.mjs selftest`.
+- 플래너는 대표 개인 칸만: 주간 할 일·아이디어 창구 + 시뮬레이터 개인 메모(my_notes)·주간 회고(weeks). 매니저 쪽 칸(맡긴 할 일·리포트 답글·팀 할 일 등)은 대표가 썼어도 읽지 않는다(대표 지시). 회의록은 대표가 만든 것만.
+- 운영 DB: `supabase/migrations/20261115090000_brain_read_grants.sql` (서비스 열쇠에 my_notes·weeks·team_tasks 읽기 권한) — 대표가 터미널에서 적용함.
+- 맥북 Claude Code 대화는 맥북 LaunchAgent(`com.pallo.brain-extract`, 매일 21시·로그인 때)가 뽑아 동기화 폴더에 둔다.
+- 분석 결과: Claude 채팅 91개 대화 404마디 반영, 생각 244개·선 228개.
+

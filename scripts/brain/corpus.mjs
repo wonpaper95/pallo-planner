@@ -25,6 +25,13 @@ for (const s of P.someday ?? []) {
   items.push({ w: "idea", d: String(s.created_at).slice(0, 10), text, done: !!s.done });
 }
 for (const g of P.month_goals ?? []) for (const k of ["my_goal", "strategy", "my_plan", "team_goal"]) if (g[k] && String(g[k]).trim()) items.push({ w: "goal", d: `${g.month}-01`, text: scrub(g[k]) });
+// 대표 개인 칸의 메모·회고·회의록·리포트 — 주간 할 일과 같은 무게(week)로 센다. done 은 "안 끝낸 할 일"로 세지 않게 true
+const flat = (v) => (v == null ? "" : typeof v === "string" ? v : Array.isArray(v) ? v.map(flat).filter(Boolean).join(" / ") : typeof v === "object" ? Object.values(v).map(flat).filter(Boolean).join(" / ") : "");
+const put = (d, label, ...parts) => { const body = parts.map(flat).filter((x) => x && x.trim()).join(" — ").trim(); if (!body || !d) return; items.push({ w: "week", d: String(d).slice(0, 10), text: scrub(`${label}: ${body}`).slice(0, 3000), done: true }); };
+for (const x of P.my_notes ?? []) put(x.day, "메모", x.body, x.plan);
+for (const x of P.weeks ?? []) put(x.start, "주간 회고", x.review);
+for (const x of P.meetings ?? []) put(x.held_on, "회의록", x.title, x.notes);
+for (const x of P.reports ?? []) put(x.day, "리포트", x.body);
 for (const f of readdirSync(DIR).filter((x) => /^claude-.*\.json$/.test(x)).sort()) {
   const C = JSON.parse(readFileSync(`${DIR}/${f}`, "utf8")), host = f.replace(/^claude-|\.json$/g, "");
   for (const s of C.sessions ?? []) for (const m of s.msgs ?? []) {
