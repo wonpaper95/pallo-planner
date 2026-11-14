@@ -208,16 +208,17 @@ function lrLayout(W, H, BOT) { // 점 자리: 큰 점부터, 자기 큰 주제 �
   const by = { L: [], R: [], B: [] }; for (const n of topics()) if (sideOf(n)) by[sideOf(n)].push(n);
   for (const l of Object.values(by)) l.sort((x, y) => y.heat - x.heat || x._i - y._i);
   const sum = (l) => l.reduce((t, n) => t + f(n) ** 2, 0);
+  const nLbl = Math.max(3, Math.floor((Math.PI * a * b) / 2 / 11000)), nB = Math.max(3, Math.round((by.B.length * nLbl) / Math.max(by.L.length, by.R.length, 1))); // 이름표 수: 온도 높은 순으로, 그림 넓이만큼 (넓은 화면일수록 많이)
   let k = Math.min(Math.min(W, H) / 13, Math.sqrt((0.36 * Math.PI * a * b) / 2 / (Math.PI * Math.max(sum(by.L), sum(by.R), 1e-9)))); // 양쪽 같은 배율 — 그래야 어느 쪽이 더 찼는지 눈으로 비교됨
   for (let tries = 0; tries < 16; tries++, k *= 0.9) {
-    const thr = Math.max(13, Math.min(k * 1.05, 21)),  step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
-    const size = (n, rank) => { const r = k * f(n), lbl = r >= thr || rank < (H < 420 ? 3 : 5); return { r, lbl, pad: (lbl ? Math.max(r, 30) : r) + 1.5 }; }; // 이름을 다는 점은 둘레를 넉넉히
-    const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n, i) => t + (2 * size(n, i).pad) ** 2, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
+    const step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
+    const size = (n, rank, s) => { const r = k * f(n), lbl = rank < (s === "B" ? nB : nLbl); return { r, lbl, pad: (lbl ? Math.max(r, 30) : r) + 1.5 }; }; // 이름을 다는 점은 둘레를 넉넉히
+    const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n, i) => t + (2 * size(n, i, "B").pad) ** 2, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
     const placed = []; // 가운데 띠부터 놓고 양쪽이 그 둘레를 피해 앉는다 (이름표가 경계 너머 점과 겹치지 않게 한데 모아 잼)
     for (const s of ["B", "L", "R"]) {
       by[s].forEach((n, rank) => {
         if (!ok) return;
-        const { r, lbl, pad } = size(n, rank);
+        const { r, lbl, pad } = size(n, rank, s);
         const phi = (-0.5 + ((ai.get(path(n)[1]?.id) ?? 0) + 0.5) / m) * Math.PI;
         const ax = s === "B" ? cx : cx + (s === "L" ? -1 : 1) * (g / 2 + (a - g / 2) * 0.55 * Math.cos(phi)), ay = cy + b * 0.6 * Math.sin(phi);
         for (let t = 0; t < 30000; t++) {
