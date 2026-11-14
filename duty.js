@@ -22,7 +22,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const S = { el: null, nodes: [], links: [], by: new Map(), kids: new Map(), rel: new Map(), root: null,
   sel: null, owner: null, mine: false, cycle: null, gap: null, q: "",
   mode: lsGet(MODE_KEY, "org"), tview: lsGet(TV_KEY, "area"), fit: lsGet(FIT_KEY, matchMedia("(min-width: 901px)").matches ? "1" : "0") === "1", info: lsGet(INFO_KEY, "0") === "1", deep: lsGet(DEEP_KEY, "0") === "1", open: new Set(),
-  edit: false, shared: false, pub: false, token: undefined, shareOpen: false, people: [], ownerList: [], ownerCount: new Map() };
+  edit: false, shared: false, pub: false, token: undefined, shareOpen: false, people: [], peopleBr: new Map(), ownerList: [], ownerCount: new Map() };
 if (!MODES.some(([m]) => m === S.mode)) S.mode = "org";
 const $ = (q) => S.el.querySelector(q);
 const kids = (n) => S.kids.get(n?.id ?? "") ?? [];
@@ -88,7 +88,9 @@ DUTY.load = async function () {
   if (!S.edit && !S.pub) return blank("아직 준비 중이에요. 대표님이 공개하면 여기서 볼 수 있어요.");
   if (!S.nodes.length && S.edit && window.DUTY_SEED) { if (!(await seed())) return; }
   if (!S.nodes.length) return blank("아직 준비 중이에요. 대표님이 열면 기본 업무분장이 채워져요.");
-  if (S.edit && !S.people.length) db().from("profiles").select("name, role").then(({ data }) => { S.people = [...new Set((data ?? []).filter((p) => p.role !== "assistant" && p.name?.trim()).map((p) => p.name.trim()))].slice(0, 60); if (S.sel && S.people.length && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName ?? "")) drawPanel(); });
+  if (S.edit && !S.people.length) db().from("contacts").select("name, branch, kind").neq("kind", "branch").order("kind").order("sort").then(({ data }) => { // 👥 담당에 넣을 사람 = 📇 연락처 탭의 대표·매니저 이름 (지점 매장 번호 줄은 제외)
+    S.people = []; S.peopleBr = new Map(); for (const p of data ?? []) { const nm = p.name?.trim(); if (!nm || S.peopleBr.has(nm)) continue; S.people.push(nm); S.peopleBr.set(nm, `${p.kind === "boss" ? "대표 · " : ""}${p.branch || ""}`.replace(/ · $/, "").trim()); }
+    if (S.sel && S.people.length && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName ?? "")) drawPanel(); });
   index(); shell(); draw();
 };
 // 공유 페이지 (duty-share.html): 주소의 k 로 읽기 전용
@@ -219,16 +221,23 @@ function drawOrg() {
       <div class="dtocols">${areas.map(col).join("")}</div></div></div>`;
   fitOrg(); if (keep) { const sc = $(".dtorgscroll"); sc.scrollLeft = keep[0]; sc.scrollTop = keep[1]; }
 }
-function fitOrg() { // 한 화면에 맞추기: 조직도 전체가 칸 안에 들어오는 가장 큰 배율을 찾는다 (줄이면 칸이 넓어져 줄바꿈이 줄어드니 재어 가며 찾음). 0.6~1.25 배 사이에서만
-  const sc = $(".dtorgscroll"), org = $(".dtorg"); if (!sc || !org) return;
-  org.style.zoom = "";
-  if (!S.fit || !sc.offsetWidth) return;
+function fitOrg() { // 한 화면에 맞추기: 영역 칸을 몇 줄·몇 칸으로 놓을지와 배율을 같이 골라, 칸 안(아래 빈 공간까지)에 들어오는 가장 큰 글씨를 찾는다. 배율 0.6~1.3
+  const sc = $(".dtorgscroll"), org = $(".dtorg"), cols = $(".dtocols"); if (!sc || !org || !cols) return;
+  org.style.zoom = ""; if (!sc.offsetWidth) return;
   const cs = getComputedStyle(sc), aw = sc.offsetWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = sc.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom); // 스크롤 막대가 생겼다 없어졌다 해도 흔들리지 않게 바깥 크기로 잰다
-  const fits = (z) => { org.style.zoom = z; const r = org.getBoundingClientRect(); return r.width <= aw + 1 && r.height <= ah + 1; };
-  let lo = $(".dtwrap").classList.contains("side") ? 0.85 : 0.6, hi = 1.25; // 오른쪽 칸이 열려 좁을 때는 글자가 너무 작아지지 않게 덜 줄이고 스크롤
-  if (fits(hi)) return; if (!fits(lo)) return; // 가장 작게 해도 안 들어가면 그 배율로 두고 스크롤
-  for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2; fits(mid) ? (lo = mid) : (hi = mid); }
-  org.style.zoom = Math.floor(lo * 100) / 100;
+  const n = cols.children.length, setC = (c) => cols.style.setProperty("--cols", c), dflt = Math.max(1, Math.min(n, Math.floor(aw / 250)));
+  if (!S.fit) return setC(dflt); // 원래 크기: 칸 하나 최소 250px, 모자라면 아래로 스크롤
+  let cc = 2; // 지금 재 보는 칸 수
+  const fits = (z) => { org.style.zoom = z; const r = org.getBoundingClientRect(); return r.width <= aw + 1 && r.height <= ah + 1 && aw / z / cc >= 215; }; // 칸 하나가 215px(배율 전) 아래로 찌그러지면 안 됨
+  const lo = $(".dtwrap").classList.contains("side") ? 0.85 : 0.6, hi = 1.3; // 오른쪽 칸이 열려 좁을 때는 글자가 너무 작아지지 않게 덜 줄이고 스크롤
+  let best = null;
+  for (let c = Math.min(n, 2); c <= n; c++) {
+    cc = c; setC(c); if (!fits(lo)) continue; let a = lo, b = hi;
+    if (fits(hi)) a = hi; else for (let i = 0; i < 7; i++) { const mid = (a + b) / 2; fits(mid) ? (a = mid) : (b = mid); }
+    if (!best || a > best.z + 0.004) best = { c, z: a };
+  }
+  if (!best) { setC(Math.max(1, Math.min(n, Math.floor(aw / lo / 230)))); org.style.zoom = lo; return; } // 가장 작게 해도 안 들어가면 그 배율로 두고 스크롤
+  setC(best.c); org.style.zoom = Math.floor(best.z * 100) / 100;
 }
 
 // ── 📊 분장표 ── 줄 = 업무, 칸 = 사람(역할). ● 주담당 ○ 함께
@@ -349,12 +358,12 @@ function drawPanel() {
   const ps = path(n), cs = kids(n), rel = [...(S.rel.get(n.id) ?? [])].map((id) => S.by.get(id)).filter(Boolean).sort((a, b) => a._i - b._i), os = owners(n), isRoot = n._d === 0;
   const sibs = S.kids.get(n.parent_id ?? "") ?? [], si = sibs.indexOf(n), sub = below(n);
   const skip = new Set([n.id, ...sub.map((x) => x.id)]), relSkip = new Set([n.id, ...rel.map((x) => x.id), ...(S.root ? [S.root.id] : [])]);
-  const pick = [...new Set([...OWNER_ORDER, ...S.ownerList])], ppl = S.people.filter((x) => !pick.includes(x)), tabs = S.edit ? navTabs() : [], isTab = n.link.startsWith("#"), go = linkBtn(n);
+  const pick = [...new Set([...OWNER_ORDER, ...S.ownerList])], ppl = S.people.filter((x) => !pick.includes(x) && !os.includes(x)), tabs = S.edit ? navTabs() : [], isTab = n.link.startsWith("#"), go = linkBtn(n);
   p.innerHTML = `<div class="dtcrumb">${ps.slice(0, -1).map((x) => `<button type="button" data-go="${x.id}">${esc(x.title)}</button>`).join("<i>›</i>") || "<span>맨 위</span>"}<button type="button" class="dtx" data-close aria-label="닫기">✕</button></div>
     <div class="dtphead" style="--c:${n._c}"><i class="dtdot"></i>${S.edit ? `<textarea class="dtptitle" rows="1" maxlength="80" aria-label="업무 이름">${esc(n.title)}</textarea>` : `<h3>${esc(n.title)}</h3>`}</div>
     ${isRoot ? "" : `<h4>담당${S.edit ? " <small>맨 앞이 주담당</small>" : ""}</h4>
     ${S.edit ? `<div class="dtpick">${pick.map((o) => `<button type="button" data-own="${esc(o)}" class="${os.includes(o) ? "on" : ""}" style="--oc:${ownerColor(o)}">${esc(o)}</button>`).join("")}</div>
-      <div class="dtrow2"><input class="dtowner" maxlength="120" value="${esc(n.owner)}" placeholder="직접 적기 (쉼표로 여럿)" aria-label="담당 직접 적기">${ppl.length ? `<select class="dtppl" aria-label="사람 이름으로 더하기"><option value="">＋ 사람</option>${ppl.map((x) => `<option>${esc(x)}</option>`).join("")}</select>` : ""}</div>`
+      <div class="dtrow2"><input class="dtowner" maxlength="120" value="${esc(n.owner)}" placeholder="직접 적기 (쉼표로 여럿)" aria-label="담당 직접 적기">${ppl.length ? `<select class="dtppl" aria-label="사람 이름으로 더하기"><option value="">＋ 연락처에서 사람</option>${ppl.map((x) => `<option value="${esc(x)}">${esc(x)}${S.peopleBr?.get(x) ? ` · ${esc(S.peopleBr.get(x))}` : ""}</option>`).join("")}</select>` : ""}</div>`
       : `<div class="dtchips big">${chips(os) || `<span class="dtmut">정해지지 않았어요</span>`}</div>`}
     ${S.edit ? `<h4>주기</h4><div class="dtpick cyc">${CYCLES.map((c) => `<button type="button" data-cyc="${c}" class="${n.cycle === c ? "on" : ""}">${c}</button>`).join("")}</div>
       <h4>대신할 사람 <small>담당이 빠질 때</small></h4><input class="dtbackup" maxlength="120" value="${esc(n.backup)}" placeholder="예: 다른 매니저, 대표" list="dtpplist" aria-label="대신할 사람"><datalist id="dtpplist">${[...pick, ...ppl].map((x) => `<option value="${esc(x)}">`).join("")}</datalist>`

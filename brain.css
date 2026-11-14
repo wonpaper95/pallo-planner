@@ -92,3 +92,22 @@ body:not(.bnv) #brainView { display: none; }
   .dtwrap.bn[data-mode="lr"]:not(.focus) .dtstage { height: 78vh; height: 78dvh; } /* 폰: 뇌 그림을 세로로 길게 — 점이 너무 작아지지 않게 */
   .bnlrfoot { font-size: 11px; } .bnlrfoot > span:first-child { display: none; }
 }
+
+/* 🌳 나무 그림 (나뭇가지 보기) */
+.bntree { display: block; margin: 0 auto; max-width: none; --bark: color-mix(in srgb, #8d6a47 78%, var(--text) 22%); }
+.bntree .bnbr { fill: none; stroke: var(--bark); stroke-linecap: round; opacity: .92; }
+.bntree .bnbr.hl { stroke: #ffb347; opacity: 1; }
+.bntree .bnbr.faint, .bntree .faint { opacity: .16; }
+.bntree .bntrunk { fill: var(--bark); } .bntree .bngrd { fill: color-mix(in srgb, var(--sub) 30%, transparent); }
+.bntree .bnbud { stroke: var(--bg); stroke-width: 2.5; }
+.bntree .bl { cursor: pointer; } .bntree .bl .hit { fill: transparent; }
+.bntree .bl path { stroke: color-mix(in srgb, var(--bg) 70%, transparent); stroke-width: 1; }
+.bntree .bl:hover path { stroke: var(--text); stroke-width: 1.6; }
+.bntree .bl.sel path { stroke: #ffb347; stroke-width: 3.2; }
+.bntree .bl.bnworry path { stroke: #ff6b6b; stroke-width: 1.8; }
+.bntree .bn1 { cursor: pointer; } .bntree .bn1 rect { fill: color-mix(in srgb, var(--c, #888) 24%, var(--panel)); stroke: var(--c, var(--line)); stroke-width: 1.6; }
+.bntree .bn1 text { fill: var(--text); font-size: 15px; font-weight: 800; pointer-events: none; }
+.bntree .bn1.sel rect { stroke: #ffb347; stroke-width: 3; }
+.bntree .bnroot rect { --c: var(--text); fill: color-mix(in srgb, var(--panel) 85%, var(--text)); stroke: var(--text); }
+.bntree .bnlab, .bntree .bnhov { fill: var(--text); font-size: 13px; font-weight: 600; paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.bntree .bnhov { font-size: 14.5px; font-weight: 800; }

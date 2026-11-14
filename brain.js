@@ -25,7 +25,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const S = { el: null, nodes: [], links: [], by: new Map(), kids: new Map(), rel: new Map(), why: new Map(), root: null,
   sel: null, hover: null, state: null, src: null, q: "",
   mode: lsGet(MODE_KEY, "3d"), colorBy: lsGet(CB_KEY, "area"), spin: lsGet(SPIN_KEY, "1") === "1", sort: lsGet(SORT_KEY, "heat"),
-  edit: false, fold: new Set(), run: null, prev: null };
+  edit: false, fold: new Set(), run: null, prev: null, tview: lsGet("brain-tview", "tree") === "list" ? "list" : "tree" };
 if (!["3d", "tree", "rank", "lr"].includes(S.mode)) S.mode = "3d";
 if (!SORTS[S.sort]) S.sort = "heat";
 try { S.fold = new Set(JSON.parse(lsGet(FOLD_KEY, "[]"))); } catch {}
@@ -135,10 +135,12 @@ function shell() {
   $("[data-fit]").addEventListener("click", () => { select(null); fit(800); });
   $(".dtstage").addEventListener("click", (e) => { if (!e.target.closest("[data-colorby]")) return; S.colorBy = S.colorBy === "state" ? "area" : "state"; lsSet(CB_KEY, S.colorBy); drawHud(); if (S.mode === "3d") { syncGraph(); relight(); } else drawStage(); });
   $(".dttreebox").addEventListener("click", (e) => {
+    const tv = e.target.closest("[data-tview]"); if (tv) { S.tview = tv.dataset.tview; lsSet("brain-tview", S.tview); drawTree(); return; }
     const fold = e.target.closest("[data-fold]"); if (fold) { const id = fold.dataset.fold; S.fold.has(id) ? S.fold.delete(id) : S.fold.add(id); lsSet(FOLD_KEY, JSON.stringify([...S.fold].slice(-400))); drawTree(); return; }
     const all = e.target.closest("[data-foldall]"); if (all) { S.fold = all.dataset.foldall === "1" ? new Set(S.nodes.filter((n) => n._d >= 1 && kids(n).length).map((n) => n.id)) : new Set(); lsSet(FOLD_KEY, JSON.stringify([...S.fold])); drawTree(); return; }
     const row = e.target.closest("[data-id]"); if (row) select(row.dataset.id === S.sel ? null : row.dataset.id);
   });
+  $(".dttreebox").addEventListener("mouseover", (e) => { const g = e.target.closest?.(".bl"), t = $("#bnhov"); if (!t) return; if (!g) { t.textContent = ""; return; } t.textContent = g.dataset.t; t.setAttribute("x", g.dataset.x); t.setAttribute("y", g.dataset.y); }); // 🍃 잎에 올리면 이름
   $(".bnrankbox").addEventListener("click", (e) => {
     const so = e.target.closest("[data-sort]")?.dataset.sort; if (so) { S.sort = so; lsSet(SORT_KEY, so); drawRank(); return; }
     const row = e.target.closest("[data-id]"); if (row) select(row.dataset.id === S.sel ? null : row.dataset.id);
@@ -167,8 +169,9 @@ function drawFilters() {
 function drawStage() { if (S.mode === "3d") return drawGraph(); pauseGraph(true); S.mode === "tree" ? drawTree() : S.mode === "rank" ? drawRank() : drawLR(); }
 const heatBar = (v, c) => `<i class="bnbar"><u style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></u></i>`;
 
-// ── 🌿 나뭇가지 ──
-function drawTree() {
+// ── 🌿 나뭇가지 ── 🌳 나무 그림(기본) / 📃 목록
+const drawTree = () => (S.tview === "list" ? drawTreeList() : drawTreeArt());
+function drawTreeList() {
   const filt = filtering(), keep = new Set();
   if (filt) for (const n of S.nodes) if (matches(n)) path(n).forEach((p) => keep.add(p.id));
   const row = (n) => {
@@ -181,8 +184,64 @@ function drawTree() {
       ${cs.length && !folded ? `<ul>${cs.map(row).join("")}</ul>` : ""}</li>`;
   };
   const body = (S.kids.get("") ?? []).map(row).join("");
-  $(".dttreebox").innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`}</span>${filt ? "" : `<button type="button" data-foldall="0">모두 펴기</button><button type="button" data-foldall="1">모두 접기</button>`}</div>
+  $(".dttreebox").innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`}</span>${filt ? "" : `<button type="button" data-foldall="0">모두 펴기</button><button type="button" data-foldall="1">모두 접기</button>`}<button type="button" data-tview="tree">🌳 나무로 보기</button></div>
     ${body ? `<ul class="dttree">${body}</ul>` : `<div class="dtmsg">맞는 생각이 없어요.</div>`}`;
+}
+
+// 🌳 실제 나무처럼: 아래 밑동 → 굵은 줄기 → 큰 주제마다 굵은 가지(부채꼴) → 잔가지 → 잎. 잎 크기 = 온도(요즘 자주 떠올린 정도), 색 = 주제 또는 상태, 이름은 큰 주제와 뜨거운 생각만(나머지는 올리면 보임)
+function drawTreeArt() {
+  const box = $(".dttreebox"), keep = [box.scrollLeft, box.scrollTop], root = S.root; if (!root) return;
+  const filt = filtering(), lit = litSet(), cw = box.clientWidth || 1100;
+  const W = Math.max(900, Math.min(1700, cw - 36)), H = Math.round(W * 0.8), cx = W / 2, rx = W * 0.38, ry = H * 0.62, topY = H * 0.72, baseY = H - 36, A = (88 * Math.PI) / 180;
+  const lc = new Map(), cnt = (n) => { const ks = kids(n), v = ks.length ? ks.reduce((t, k) => t + cnt(k), 0) : 1; lc.set(n.id, v); return v; }; cnt(root);
+  const maxD = Math.max(2, ...S.nodes.map((n) => n._d)), ring = (d) => (d <= 0 ? 0 : d === 1 ? 0.3 : 0.5 + (0.5 * (d - 1)) / (maxD - 1));
+  const pos = new Map([[root.id, { x: cx, y: topY, dx: 0, dy: -1, a: 0 }]]), edges = [];
+  const place = (n, a0, a1) => { // 가지마다 부채꼴 한 조각 (잎이 많은 가지가 더 넓게)
+    const ks = kids(n); if (!ks.length) return; const tot = ks.reduce((t, k) => t + lc.get(k.id) + 2, 0); let s0 = a0;
+    ks.forEach((k, i) => {
+      const e0 = s0 + ((a1 - a0) * (lc.get(k.id) + 2)) / tot, th = (s0 + e0) / 2; let r = ring(k._d); if (!kids(k).length && k._d >= 2) r += ((i % 3) - 1) * 0.045;
+      const x = cx + r * rx * Math.sin(th), y = topY - r * ry * Math.cos(th), p = pos.get(n.id), d = Math.hypot(x - p.x, y - p.y) || 1;
+      const qx = p.x + p.dx * d * 0.55, qy = p.y + p.dy * d * 0.55, el = Math.hypot(x - qx, y - qy) || 1; // 부모가 뻗던 방향으로 휘어 나가는 곡선
+      pos.set(k.id, { x, y, dx: (x - qx) / el, dy: (y - qy) / el, a: th }); edges.push([n, k, p, qx, qy, x, y]); place(k, s0, e0); s0 = e0;
+    });
+  };
+  place(root, -A, A);
+  const hl = new Set(S.sel && S.by.has(S.sel) ? path(S.by.get(S.sel)).map((p) => p.id) : []);
+  const col = (n) => (S.colorBy === "state" ? ST[n.state]?.[1] ?? "#8b90a8" : n._c);
+  const faint = (n) => (lit ? !lit.has(n.id) : false), maxLc = Math.max(1, ...kids(root).map((k) => lc.get(k.id)));
+  const fs = 13, tw = (t) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? 1 : 0.58), 0) * fs;
+  // 가지
+  const bw = (k) => (k._d === 1 ? 4 + Math.sqrt(lc.get(k.id) / maxLc) * 13 : kids(k).length ? 1.8 + Math.min(3, Math.sqrt(lc.get(k.id)) * 0.6) : 1.3);
+  const branch = edges.sort((a, b) => a[1]._d - b[1]._d).map(([n, k, p, qx, qy, x, y]) => `<path class="bnbr${hl.has(k.id) ? " hl" : ""}${faint(k) && faint(n) ? " faint" : ""}" d="M${p.x.toFixed(1)} ${p.y.toFixed(1)}Q${qx.toFixed(1)} ${qy.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}" style="stroke-width:${(bw(k) + (hl.has(k.id) ? 1.5 : 0)).toFixed(1)}"/>`).join("");
+  // 밑동·줄기
+  const trunk = `<ellipse class="bngrd" cx="${cx}" cy="${baseY + 6}" rx="${Math.round(W * 0.12)}" ry="9"/><path class="bntrunk" d="M${cx - 46} ${baseY}C${cx - 36} ${baseY - (baseY - topY) * 0.45} ${cx - 26} ${topY + 70} ${cx - 17} ${topY}L${cx + 17} ${topY}C${cx + 26} ${topY + 70} ${cx + 36} ${baseY - (baseY - topY) * 0.45} ${cx + 46} ${baseY}Z"/>
+    <g class="bn1 bnroot${root.id === S.sel ? " sel" : ""}" data-id="${root.id}"><rect x="${cx - 36}" y="${baseY - 62}" width="72" height="30" rx="15"/><text x="${cx}" y="${baseY - 41}" text-anchor="middle">${esc(root.title)}</text></g>`;
+  // 잎·큰 주제
+  const leaves = [], pills = [], boxes = [], cand = [];
+  for (const n of S.nodes) {
+    if (n._d < 1) continue; const p = pos.get(n.id); if (!p) continue;
+    if (n._d === 1) { // 큰 주제: 가지 끝(부채꼴 한가운데 바깥)에 이름표
+      const w = tw(n.title) + 24, lx = Math.max(w / 2 + 4, Math.min(W - w / 2 - 4, cx + 1.12 * rx * Math.sin(p.a))), ly = Math.min(H - 80, topY - 1.12 * ry * Math.cos(p.a)); boxes.push([lx - w / 2, ly - 14, lx + w / 2, ly + 14]);
+      pills.push(`<g class="bn1${n.id === S.sel ? " sel" : ""}${faint(n) ? " faint" : ""}" data-id="${n.id}" style="--c:${n._c}"><title>${esc(n.title)} · 생각 ${lc.get(n.id)}개</title><rect x="${(lx - w / 2).toFixed(1)}" y="${(ly - 14).toFixed(1)}" width="${w.toFixed(1)}" height="28" rx="14"/><text x="${lx.toFixed(1)}" y="${(ly + 5).toFixed(1)}" text-anchor="middle">${esc(n.title)}</text></g>`);
+      leaves.push(`<circle class="bnbud${faint(n) ? " faint" : ""}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(5 + Math.sqrt(lc.get(n.id)) * 0.9).toFixed(1)}" style="fill:${n._c}"/>`);
+      continue;
+    }
+    const len = 7 + Math.min(100, n.heat) * 0.12, wid = len * 0.52, deg = (Math.atan2(p.dx, -p.dy) * 180) / Math.PI, tip = [n.state && ST[n.state] ? `${ST[n.state][0]} ${n.state}` : "", n.heat ? `🔥 ${n.heat}` : "", n.worry >= 40 ? `😟 ${n.worry}` : ""].filter(Boolean).join(" · ");
+    const worry = n.worry >= 55 ? ` bnworry` : "";
+    leaves.push(`<g class="bl${n.id === S.sel ? " sel" : ""}${faint(n) ? " faint" : ""}${worry}" data-id="${n.id}" data-x="${p.x.toFixed(1)}" data-y="${(p.y - len - 7).toFixed(1)}" data-t="${esc(n.title)}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)}) rotate(${deg.toFixed(0)})"><title>${esc(n.title)}${tip ? "\n" + tip : ""}</title><circle r="${Math.max(11, len * 0.7).toFixed(1)}" class="hit"/><path d="M0 0C${wid.toFixed(1)} ${(-len * 0.3).toFixed(1)} ${wid.toFixed(1)} ${(-len * 0.75).toFixed(1)} 0 ${(-len).toFixed(1)}C${(-wid).toFixed(1)} ${(-len * 0.75).toFixed(1)} ${(-wid).toFixed(1)} ${(-len * 0.3).toFixed(1)} 0 0Z" style="fill:${col(n)}"/></g>`);
+    cand.push([n, p, len]);
+  }
+  // 이름: 고른 것·찾은 것 먼저, 그다음 뜨거운 순. 겹치면 건너뜀
+  const order = cand.sort((a, b) => (b[0].id === S.sel) - (a[0].id === S.sel) || (filt ? matches(b[0]) - matches(a[0]) : 0) || b[0].heat - a[0].heat), labels = []; let shown = 0;
+  for (const [n, p, len] of order) {
+    if (shown >= (filt ? 90 : 26)) break; if (filt && !matches(n) && n.id !== S.sel) continue; const w = tw(n.title), s = p.dx > 0.35 ? 1 : p.dx < -0.35 ? -1 : 0;
+    const x0 = s > 0 ? p.x + 8 : s < 0 ? p.x - 8 - w : p.x - w / 2, y0 = s ? p.y + 4 : p.dy < 0 ? p.y - len - 8 : p.y + len + 15, b = [x0 - 2, y0 - 12, x0 + w + 2, y0 + 4];
+    if (b[0] < 4 || b[2] > W - 4 || b[1] < 4 || b[3] > H - 4 || boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1])) continue;
+    boxes.push(b); shown++; labels.push(`<text class="bnlab${faint(n) ? " faint" : ""}" x="${(s > 0 ? x0 : s < 0 ? x0 + w : x0 + w / 2).toFixed(1)}" y="${y0.toFixed(1)}" text-anchor="${s > 0 ? "start" : s < 0 ? "end" : "middle"}">${esc(n.title)}</text>`);
+  }
+  box.innerHTML = `<div class="dttreebar"><span>${filt ? `맞는 생각 ${S.nodes.filter(matches).length}개` : `생각 ${S.nodes.length - 1}개`} · 🍃 잎이 클수록 요즘 자주 떠올린 생각 · 눌러서 내용 보기</span><button type="button" data-colorby></button><button type="button" data-tview="list">📃 목록으로 보기</button></div>
+    <svg class="bntree" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="생각 나무">${branch}${trunk}${leaves.join("")}${pills.join("")}${labels.join("")}<text id="bnhov" class="bnhov" text-anchor="middle"></text></svg>`;
+  drawHud(); box.scrollLeft = keep[0]; box.scrollTop = keep[1];
 }
 
 // ── 🔥 순위 ──
@@ -416,7 +475,7 @@ function select(id, reveal) {
   S.sel = id && S.by.has(id) ? id : null; S.hover = null;
   if (S.sel && reveal) { let open = false; for (const p of path(S.by.get(S.sel)).slice(0, -1)) if (S.fold.delete(p.id)) open = true; if (open) lsSet(FOLD_KEY, JSON.stringify([...S.fold])); }
   spinSync(); drawPanel();
-  if (S.mode === "tree") { drawTree(); if (S.sel) $(`.dtrow[data-id="${S.sel}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  if (S.mode === "tree") { drawTree(); if (S.sel) (S.tview === "list" ? $(`.dtrow[data-id="${S.sel}"]`) : $(".bl.sel, .bn1.sel"))?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); }
   else if (S.mode === "rank") { $(".bnrankbox").querySelectorAll("tr.sel").forEach((r) => r.classList.remove("sel")); const r = S.sel && $(`.bnrank tr[data-id="${S.sel}"]`); if (r) { r.classList.add("sel"); r.scrollIntoView({ block: "nearest", behavior: "smooth" }); } }
   else if (S.mode === "lr") lrSel();
   else { relight(); if (S.sel) fly(S.sel); }
