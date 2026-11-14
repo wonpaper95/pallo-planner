@@ -1,5 +1,5 @@
 // 🧠 [뇌] 탭 — 대표 머릿속 지도. 주간 할 일·아이디어 창구·Claude 대화를 매주 분석해(맥미니 pallo-brain-sync) 주제마다 온도(요즘 얼마나 자주 떠올리는지)와 고민 정도를 매기고,
-// 나뭇가지(위·아래)와 이어진 생각(연관 선)으로 잇는다. 🌌 입체 지도(3D, 옵시디언 그래프 느낌) / 🌿 나뭇가지 / 🔥 순위 세 가지로 본다. 직접 생각을 더하고 잇고 고칠 수 있다(내용에 [[제목]] 을 쓰면 그 생각과 이어짐).
+// 나뭇가지(위·아래)와 이어진 생각(연관 선)으로 잇는다. 🌌 입체 지도(3D, 옵시디언 그래프 느낌) / 🌿 나뭇가지 / 🔥 순위 / 🧠 좌뇌·우뇌(생각을 논리 쪽·감각 쪽으로 나눠 봄, stats.side) 네 가지로 본다. 직접 생각을 더하고 잇고 고칠 수 있다(내용에 [[제목]] 을 쓰면 그 생각과 이어짐).
 // 보기·고치기 = 대표 본인만 (brain_nodes·brain_links·brain_runs, RLS user_id). 분석이 만든 점을 지우면 '숨김'이라 다시 분석해도 안 돌아오고, 고친 점은 덮어쓰지 않는다. 설계 docs/brain/README.md
 // index.html 의 sb·toast 를 쓴다. 3D 라이브러리(vendor/duty-lib.js, 1.6MB)는 입체 지도를 처음 열 때만 받는다. 화면 틀(.dt*)은 duty.css 와 같이 쓰고, 뇌 전용은 brain.css → window.BRAIN
 (() => {
@@ -13,6 +13,8 @@ const db = () => sb;
 const PALETTE = ["#7c9cff", "#ff8fb1", "#ffd166", "#5eead4", "#c4a1ff", "#ff9f6e", "#8be28b", "#6ad4ff", "#f9a8d4", "#fca5a5", "#bef264", "#cbd5e1"];
 const STATES = ["관심", "고민", "실행", "루틴", "식음"];
 const ST = { "관심": ["💡", "#ffd166", "요즘 궁금해하고 알아보는 것"], "고민": ["😟", "#ff6b6b", "막혀 있거나 걱정이 걸린 것"], "실행": ["🏃", "#5eead4", "지금 밀고 있는 것"], "루틴": ["🔁", "#7c9cff", "늘 돌아가는 일"], "식음": ["💤", "#8b90a8", "예전엔 많이 생각했지만 요즘은 뜸한 것"] };
+const SIDE = { L: ["◐", "좌뇌", "논리·숫자·계획·규칙", "#7c9cff"], R: ["◑", "우뇌", "사람·감정·창의·이미지", "#ff8fb1"], B: ["◓", "둘 다", "양쪽에 걸친 생각", "#c4a1ff"] }; // 분석이 생각마다 매기고(stats.side), 화면에서 고르면 그대로 둠(stats.side_me)
+const sideOf = (n) => (SIDE[n.stats?.side] ? n.stats.side : "");
 const SRC = { week: ["✅", "주간 할 일"], claude: ["💬", "Claude 대화"], idea: ["💡", "아이디어 창구"], goal: ["🎯", "월간 목표"], me: ["✍️", "직접 넣음"] };
 const SORTS = { heat: ["🔥 관심순", (n) => n.heat], worry: ["😟 고민순", (n) => n.worry], last: ["🕒 최근순", (n) => Date.parse(n.stats.last || n.created_at || 0) || 0], rise: ["📈 뜨는 순", (n) => n.stats.rise ?? 0] };
 const FOLD_KEY = "brain-fold", MODE_KEY = "brain-mode", SPIN_KEY = "brain-spin", CB_KEY = "brain-colorby", SORT_KEY = "brain-sort";
@@ -24,7 +26,7 @@ const S = { el: null, nodes: [], links: [], by: new Map(), kids: new Map(), rel:
   sel: null, hover: null, state: null, src: null, q: "",
   mode: lsGet(MODE_KEY, "3d"), colorBy: lsGet(CB_KEY, "area"), spin: lsGet(SPIN_KEY, "1") === "1", sort: lsGet(SORT_KEY, "heat"),
   edit: false, fold: new Set(), run: null, prev: null };
-if (!["3d", "tree", "rank"].includes(S.mode)) S.mode = "3d";
+if (!["3d", "tree", "rank", "lr"].includes(S.mode)) S.mode = "3d";
 if (!SORTS[S.sort]) S.sort = "heat";
 try { S.fold = new Set(JSON.parse(lsGet(FOLD_KEY, "[]"))); } catch {}
 const $ = (q) => S.el.querySelector(q);
@@ -109,7 +111,7 @@ function shell() {
       <div class="dtsub">내가 요즘 무엇을 많이 생각하고 어디에 고민이 걸려 있는지 보는 지도예요. 주간 할 일·아이디어 창구·Claude 대화를 매주 읽어 새로 그려요. 나만 볼 수 있어요.</div></div>
       <div class="bnwhen"></div></div>
     <div class="dtbar">
-      <div class="dtseg" data-seg="mode"><button type="button" data-mode="3d">🌌 입체 지도</button><button type="button" data-mode="tree">🌿 나뭇가지</button><button type="button" data-mode="rank">🔥 순위</button></div>
+      <div class="dtseg" data-seg="mode"><button type="button" data-mode="3d">🌌 입체 지도</button><button type="button" data-mode="tree">🌿 나뭇가지</button><button type="button" data-mode="rank">🔥 순위</button><button type="button" data-mode="lr">🧠 좌뇌·우뇌</button></div>
       <input class="dtq" type="search" placeholder="생각 찾기 (예: 광고, 채용)" autocomplete="off" aria-label="생각 찾기">
     </div>
     <div class="dtfilters"></div>
@@ -118,6 +120,7 @@ function shell() {
         <div class="dtgraph"></div>
         <div class="dttreebox"></div>
         <div class="bnrankbox"></div>
+        <div class="bnlrbox"></div>
         <div class="dthud"><button type="button" data-colorby title="점 색을 주제별 / 상태별로 바꾸기"></button><button type="button" data-spin title="천천히 돌리기 켜기·끄기">⟳ 회전</button><button type="button" data-fit title="전체가 보이게">⤢ 전체 보기</button></div>
         <div class="dtlegend"><span><i class="l1"></i>나뭇가지 (위·아래)</span><span><i class="l2"></i>이어진 생각</span><span>점이 클수록 요즘 자주 떠올린 생각 · 붉은 빛 = 고민</span><span class="dthelp">끌기 = 돌리기 · 휠·두 손가락 = 확대 · 점 누르기 = 내용</span></div>
         <div class="dtgmsg" hidden></div>
@@ -130,7 +133,7 @@ function shell() {
   $(".dtfilters").addEventListener("click", (e) => { const f = e.target.closest("[data-f]")?.dataset.f; if (f) setFilter(f); });
   $("[data-spin]").addEventListener("click", () => { S.spin = !S.spin; lsSet(SPIN_KEY, S.spin ? "1" : "0"); spinSync(); });
   $("[data-fit]").addEventListener("click", () => { select(null); fit(800); });
-  $("[data-colorby]").addEventListener("click", () => { S.colorBy = S.colorBy === "state" ? "area" : "state"; lsSet(CB_KEY, S.colorBy); drawHud(); if (S.mode === "3d") { syncGraph(); relight(); } else drawStage(); });
+  $(".dtstage").addEventListener("click", (e) => { if (!e.target.closest("[data-colorby]")) return; S.colorBy = S.colorBy === "state" ? "area" : "state"; lsSet(CB_KEY, S.colorBy); drawHud(); if (S.mode === "3d") { syncGraph(); relight(); } else drawStage(); });
   $(".dttreebox").addEventListener("click", (e) => {
     const fold = e.target.closest("[data-fold]"); if (fold) { const id = fold.dataset.fold; S.fold.has(id) ? S.fold.delete(id) : S.fold.add(id); lsSet(FOLD_KEY, JSON.stringify([...S.fold].slice(-400))); drawTree(); return; }
     const all = e.target.closest("[data-foldall]"); if (all) { S.fold = all.dataset.foldall === "1" ? new Set(S.nodes.filter((n) => n._d >= 1 && kids(n).length).map((n) => n.id)) : new Set(); lsSet(FOLD_KEY, JSON.stringify([...S.fold])); drawTree(); return; }
@@ -140,10 +143,12 @@ function shell() {
     const so = e.target.closest("[data-sort]")?.dataset.sort; if (so) { S.sort = so; lsSet(SORT_KEY, so); drawRank(); return; }
     const row = e.target.closest("[data-id]"); if (row) select(row.dataset.id === S.sel ? null : row.dataset.id);
   });
+  $(".bnlrbox").addEventListener("click", (e) => { const d = e.target.closest("[data-id]"); if (d) select(d.dataset.id === S.sel ? null : d.dataset.id); else if (e.target.closest(".bnlr") && !e.target.closest("button")) select(null); });
+  let rt; new ResizeObserver(() => { if (S.mode !== "lr") return; clearTimeout(rt); rt = setTimeout(drawLR, 120); }).observe($(".dtstage")); // 칸 크기가 바뀌면 점 자리를 다시 잡음
   if (!shell.keyed) { shell.keyed = true; addEventListener("keydown", (e) => { if (e.key === "Escape" && S.sel && S.el?.isConnected && S.el.offsetParent !== null && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName ?? "")) select(null); }); }
 }
 function draw() { $(".dtwrap").dataset.mode = S.mode; S.el.querySelectorAll("[data-mode]").forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode)); drawWhen(); drawHud(); drawFilters(); drawStage(); drawPanel(); }
-function drawHud() { const b = $("[data-colorby]"); if (b) b.textContent = S.colorBy === "state" ? "🎨 색: 상태별" : "🎨 색: 주제별"; }
+function drawHud() { S.el.querySelectorAll("[data-colorby]").forEach((b) => (b.textContent = S.colorBy === "state" ? "🎨 색: 상태별" : "🎨 색: 주제별")); }
 function drawWhen() { const w = $(".bnwhen"); if (!w) return; w.innerHTML = S.run ? `<span title="매주 월요일 새벽에 새로 분석해요">🗓 ${esc(ymd(new Date(new Date(S.run.ran_at).getTime() + 9 * 3600e3).toISOString()))} 분석</span>` : `<span>아직 분석 전이에요</span>`; }
 function setFilter(f) {
   const [k, v] = f.split(/:(.*)/s);
@@ -159,7 +164,7 @@ function drawFilters() {
     + STATES.filter((s) => cnt((n) => n.state === s)).map((s) => `<button type="button" data-f="state:${s}" class="${S.state === s ? "on" : ""}" style="--oc:${ST[s][1]}" title="${ST[s][2]}">${ST[s][0]} ${s} <small>${cnt((n) => n.state === s)}</small></button>`).join("")
     + (srcs.length ? `<span class="dtfsep">어디서 나온 생각</span>` + srcs.map((w) => `<button type="button" data-f="src:${w}" class="cy ${S.src === w ? "on" : ""}">${SRC[w][0]} ${SRC[w][1]}</button>`).join("") : "");
 }
-function drawStage() { if (S.mode === "3d") return drawGraph(); pauseGraph(true); S.mode === "tree" ? drawTree() : drawRank(); }
+function drawStage() { if (S.mode === "3d") return drawGraph(); pauseGraph(true); S.mode === "tree" ? drawTree() : S.mode === "rank" ? drawRank() : drawLR(); }
 const heatBar = (v, c) => `<i class="bnbar"><u style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></u></i>`;
 
 // ── 🌿 나뭇가지 ──
@@ -188,6 +193,69 @@ function drawRank() {
       ${rows.map((n, i) => `<tr data-id="${n.id}" class="${n.id === S.sel ? "sel" : ""}"><td class="r">${i + 1}</td><td class="t" style="--c:${n._c}"><i class="dtdot"></i>${esc(n.title)}<small>${esc(where(n) || path(n)[1]?.title || "")}</small></td><td>${stChip(n)}</td>
         <td class="m">${heatBar(n.heat, "#ffb347")}<b>${n.heat}</b></td><td class="m">${heatBar(n.worry, "#ff6b6b")}<b>${n.worry}</b></td><td class="c">${n.stats.n30 ?? 0}번${(n.stats.rise ?? 0) > 1 ? ` <span class="up">▲</span>` : (n.stats.rise ?? 0) < -1 ? ` <span class="dn">▼</span>` : ""}</td><td class="c">${esc(md(n.stats.last))}</td></tr>`).join("")}</tbody></table></div>` : `<div class="dtmsg">${S.nodes.length > 1 ? "맞는 생각이 없어요." : "아직 생각이 없어요. 오른쪽에서 큰 주제를 넣거나, 첫 분석을 기다려 주세요."}</div>`}`;
 }
+
+// ── 🧠 좌뇌·우뇌 ──
+// 위에서 내려다본 뇌 그림: 왼쪽 = 좌뇌(논리·숫자·계획·규칙), 오른쪽 = 우뇌(사람·감정·창의·이미지), 가운데 띠 = 둘 다. 점 크기 = 온도, 붉은 빛 = 고민
+function lrShare() { // 좌:우 비율 — 온도를 무게로 (둘 다 = 반반, 아직 안 나눈 생각은 뺌)
+  let L = 0, R = 0; const c = { L: 0, R: 0, B: 0, "": 0 };
+  for (const n of topics()) { const s = sideOf(n), w = Math.max(1, n.heat); c[s]++; if (s === "L") L += w; else if (s === "R") R += w; else if (s === "B") { L += w / 2; R += w / 2; } }
+  return { c, pct: L + R ? Math.round((L / (L + R)) * 100) : null };
+}
+const lrBar = (sh) => `<b>◐ 좌뇌 ${sh.pct}%</b><i><u style="width:${sh.pct}%"></u></i><b>우뇌 ${100 - sh.pct}% ◑</b>`;
+function lrLayout(W, H, BOT) { // 점 자리: 큰 점부터, 자기 큰 주제 자리에서 해바라기 씨 모양으로 넓혀 가며 빈 곳에 놓는다 (같은 자료면 늘 같은 그림)
+  const TOP = 64, cx = W / 2, b = Math.max(60, (H - TOP - BOT) / 2), cy = TOP + b, a = Math.max(60, Math.min(W / 2 - 8, b * 1.9));
+  const f = (n) => 0.7 + (0.9 * n.heat) / 100, areas = kids(S.root), ai = new Map(areas.map((x, j) => [x.id, j])), m = Math.max(1, areas.length);
+  const by = { L: [], R: [], B: [] }; for (const n of topics()) if (sideOf(n)) by[sideOf(n)].push(n);
+  for (const l of Object.values(by)) l.sort((x, y) => y.heat - x.heat || x._i - y._i);
+  const sum = (l) => l.reduce((t, n) => t + f(n) ** 2, 0);
+  let k = Math.min(Math.min(W, H) / 13, Math.sqrt((0.36 * Math.PI * a * b) / 2 / (Math.PI * Math.max(sum(by.L), sum(by.R), 1e-9)))); // 양쪽 같은 배율 — 그래야 어느 쪽이 더 찼는지 눈으로 비교됨
+  for (let tries = 0; tries < 16; tries++, k *= 0.9) {
+    const thr = Math.max(13, k * 1.05), step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
+    const size = (n, rank) => { const r = k * f(n), lbl = r >= thr || rank < (H < 420 ? 3 : 5); return { r, lbl, pad: (lbl ? Math.max(r, 30) : r) + 1.5 }; }; // 이름을 다는 점은 둘레를 넉넉히
+    const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n, i) => t + (2 * size(n, i).pad) ** 2, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
+    const placed = []; // 가운데 띠부터 놓고 양쪽이 그 둘레를 피해 앉는다 (이름표가 경계 너머 점과 겹치지 않게 한데 모아 잼)
+    for (const s of ["B", "L", "R"]) {
+      by[s].forEach((n, rank) => {
+        if (!ok) return;
+        const { r, lbl, pad } = size(n, rank);
+        const phi = (-0.5 + ((ai.get(path(n)[1]?.id) ?? 0) + 0.5) / m) * Math.PI;
+        const ax = s === "B" ? cx : cx + (s === "L" ? -1 : 1) * (g / 2 + (a - g / 2) * 0.55 * Math.cos(phi)), ay = cy + b * 0.6 * Math.sin(phi);
+        for (let t = 0; t < 30000; t++) {
+          const d = step * Math.sqrt(t), x = ax + d * Math.cos(t * 2.39996), y = ay + d * Math.sin(t * 2.39996);
+          if (s === "L" ? x > cx - g / 2 - r : s === "R" ? x < cx + g / 2 + r : Math.abs(x - cx) > g / 2 - r) continue;
+          if (a <= r + 3 || b <= r + 3 || ((x - cx) / (a - r - 3)) ** 2 + ((y - cy) / (b - r - 3)) ** 2 > 1) continue;
+          if (placed.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 < (p.pad + pad) ** 2)) continue;
+          placed.push({ x, y, pad }); at.set(n.id, { x, y, r, lbl }); return;
+        }
+        ok = false; // 자리가 모자람 → 점을 조금 줄여 처음부터
+      });
+    }
+    if (ok) return { cx, cy, a, b, g, at };
+  }
+  return null;
+}
+function drawLR() {
+  const box = $(".bnlrbox"), W = box.clientWidth, H = box.clientHeight; if (!W || !H) return;
+  const sh = lrShare(), all = topics(), un = all.filter((n) => !sideOf(n)).sort((x, y) => y.heat - x.heat || x._i - y._i);
+  if (sh.pct == null) { box.innerHTML = `<div class="dtmsg">${all.length ? "아직 생각을 좌뇌·우뇌로 나누기 전이에요. 다음 분석 때 채워지고, 생각을 눌러 직접 고를 수도 있어요." : "아직 생각이 없어요. 첫 분석을 기다려 주세요."}</div>`; drawLR.sig = null; return; }
+  const sig = `${W}x${H}|${un.length}|` + all.map((n) => `${n.id}:${n.heat}:${sideOf(n)}:${n.parent_id}`).join();
+  if (sig !== drawLR.sig) { drawLR.sig = sig; drawLR.lay = lrLayout(W, H, W < 700 ? (un.length ? 92 : 50) : un.length ? 66 : 46); }
+  const lay = drawLR.lay; if (!lay) { box.innerHTML = `<div class="dtmsg">화면이 너무 작아 뇌 그림을 못 그렸어요. 창을 넓혀 주세요.</div>`; return; }
+  const filt = filtering(), dot = (n) => {
+    const p = lay.at.get(n.id); if (!p) return "";
+    return `<button type="button" class="bnlrdot${p.lbl ? " lbl" : ""}${n.state === "고민" ? " hot" : ""}${n.id === S.sel ? " sel" : ""}${filt && !matches(n) ? " faint" : ""}" data-id="${n.id}" title="${esc(`${n.title} — ${path(n)[1]?.title ?? ""}${n.state ? ` · ${n.state}` : ""} · 🔥 ${n.heat}`)}" style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${(p.r * 2).toFixed(1)}px;height:${(p.r * 2).toFixed(1)}px;--c:${colorOf(n)}"><span style="width:max-content;max-width:${Math.round(Math.max(p.r * 2 + 10, 68))}px;font-size:${Math.max(10.5, Math.min(13, p.r * 0.42)).toFixed(1)}px">${esc(n.title)}</span></button>`;
+  };
+  box.innerHTML = `<div class="bnlr">
+    <div class="bnlrtop"><div class="bnlrbar">${lrBar(sh)}</div>
+      <div class="bnlrcap"><span>${SIDE.L[2]} · ${sh.c.L}개</span>${sh.c.B ? `<span>둘 다 ${sh.c.B}개</span>` : ""}<span>${sh.c.R}개 · ${SIDE.R[2]}</span></div></div>
+    <div class="bnlrbrain" style="left:${(lay.cx - lay.a).toFixed(1)}px;top:${(lay.cy - lay.b).toFixed(1)}px;width:${(lay.a * 2).toFixed(1)}px;height:${(lay.b * 2).toFixed(1)}px"><i style="width:${lay.g.toFixed(1)}px"></i></div>
+    ${[...all].sort((x, y) => y.heat - x.heat || x._i - y._i).map(dot).join("")}
+    <div class="bnlrfoot"><span>점이 클수록 요즘 자주 떠올린 생각 · 붉은 빛 = 고민 · 가운데 = 둘 다 · 점 누르기 = 내용</span>
+      ${un.length ? `<span class="bnlrun">아직 안 나눈 생각 ${un.length}개 ${un.slice(0, W < 700 ? 2 : 6).map((n) => `<button type="button" data-id="${n.id}">${esc(n.title)}</button>`).join("")}${un.length > (W < 700 ? 2 : 6) ? ` 외 ${un.length - (W < 700 ? 2 : 6)}개` : ""}</span>` : ""}
+      <button type="button" class="bnlrcolor" data-colorby title="점 색을 주제별 / 상태별로 바꾸기"></button></div></div>`;
+  drawHud();
+}
+function lrSel() { const box = $(".bnlrbox"); box.querySelectorAll(".bnlrdot.sel").forEach((d) => d.classList.remove("sel")); if (S.sel) box.querySelector(`.bnlrdot[data-id="${S.sel}"]`)?.classList.add("sel"); }
 
 // ── 🌌 입체 지도 ──
 let G = null, gn = new Map(), raf = 0, lit = null, fitted = false, touched = false, fitD = 900, lblK = 1, mo = null, T = null;
@@ -330,6 +398,7 @@ function select(id, reveal) {
   spinSync(); drawPanel();
   if (S.mode === "tree") { drawTree(); if (S.sel) $(`.dtrow[data-id="${S.sel}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
   else if (S.mode === "rank") { $(".bnrankbox").querySelectorAll("tr.sel").forEach((r) => r.classList.remove("sel")); const r = S.sel && $(`.bnrank tr[data-id="${S.sel}"]`); if (r) { r.classList.add("sel"); r.scrollIntoView({ block: "nearest", behavior: "smooth" }); } }
+  else if (S.mode === "lr") lrSel();
   else { relight(); if (S.sel) fly(S.sel); }
 }
 const optTree = (skip, cur, deep) => { // 고르기 목록: 가지 모양 그대로 들여쓰기. deep = 뺄 점의 아래 가지도 같이 뺌(옮기기)
@@ -349,11 +418,13 @@ function drawPanel() {
   if (!n) { // 지금 내 머릿속
     const areas = kids(S.root), total = S.nodes.length - 1, sm = S.run?.summary ?? {}, c = sm.counts ?? {};
     const hot = pickTop((x) => x.heat, 1), wor = pickTop((x) => x.worry, 40), up = pickTop((x) => x.stats.rise ?? 0, 2, 5), cold = topics().filter((x) => x.state === "식음").sort((a, b) => (b.stats.n ?? 0) - (a.stats.n ?? 0)).slice(0, 5);
+    const sh = lrShare();
     const bars = (list, f, col) => `<div class="dtbars bnbars">${list.map((x) => `<button type="button" data-go="${x.id}" style="--oc:${col}"><span>${esc(x.title)}</span><i><u style="width:${Math.max(4, f(x))}%"></u></i><b>${f(x)}</b></button>`).join("")}</div>`;
     const list = (arr) => `<div class="dtlist">${arr.map((x) => `<button type="button" data-go="${x.id}" style="--c:${x._c}"><i class="dtdot"></i><span>${esc(x.title)}</span>${stChip(x)}</button>`).join("")}</div>`;
     p.innerHTML = `<h3>지금 내 머릿속</h3>
       ${sm.headline ? `<p class="bnheadline">${esc(sm.headline)}</p>` : ""}
       <div class="dtstats"><div><b>${areas.length}</b><span>큰 주제</span></div><div><b>${total}</b><span>생각</span></div><div><b>${S.links.length}</b><span>이어진 선</span></div></div>
+      ${sh.pct != null ? `<button type="button" class="bnlrbar mini" data-lr title="좌뇌·우뇌 보기로 — 요즘 생각이 논리 쪽(좌)·감각 쪽(우) 어디에 더 쏠려 있는지">${lrBar(sh)}</button>` : ""}
       ${hot.length ? `<h4>🔥 요즘 가장 많이 생각하는 것</h4>${bars(hot, (x) => x.heat, "#ffb347")}` : ""}
       ${wor.length ? `<h4>😟 고민이 걸려 있는 것</h4>${bars(wor, (x) => x.worry, "#ff6b6b")}` : ""}
       ${up.length ? `<h4>📈 요즘 새로 떠오른 것</h4>${list(up)}` : ""}
@@ -364,7 +435,7 @@ function drawPanel() {
       <div class="dtareas">${areas.map((a) => `<button type="button" data-go="${a.id}" style="--c:${a._c}"><i class="dtdot"></i><span>${esc(a.title)}</span>${a.heat ? `<em class="bnheat">🔥 ${a.heat}</em>` : ""}<b>${below(a).length}</b></button>`).join("") || `<div class="dtmut">아직 없어요.</div>`}</div>
       <form class="dtadd" data-addto="${S.root.id}"><input name="title" maxlength="80" placeholder="새 큰 주제 이름" autocomplete="off" required><button class="dtbtn pri">+ 큰 주제</button></form>
       <div class="dtmut">${S.run ? `주간 할 일 ${c.week ?? 0}개 · Claude 대화 ${c.claude ?? 0}마디${c.idea ? ` · 아이디어 ${c.idea}개` : ""}를 읽고 그렸어요${sm.period?.from ? ` (${esc(ymd(sm.period.from))}~${esc(ymd(sm.period.to))})` : ""}. ` : "첫 분석이 끝나면 여기에 주제와 온도가 채워져요. "}매주 월요일 새벽에 새로 분석해요. 직접 넣거나 고친 생각은 다시 분석해도 그대로 둬요.</div>`;
-    p.onclick = (e) => { const id = e.target.closest("[data-go]")?.dataset.go; if (id) select(id, true); };
+    p.onclick = (e) => { const id = e.target.closest("[data-go]")?.dataset.go; if (id) return select(id, true); if (e.target.closest("[data-lr]") && S.mode !== "lr") { S.mode = "lr"; lsSet(MODE_KEY, "lr"); draw(); } };
     bindAdd(p); return;
   }
   const ps = path(n), cs = kids(n), rel = [...(S.rel.get(n.id) ?? [])].map((id) => S.by.get(id)).filter(Boolean).sort((a, b) => b.heat - a.heat || a._i - b._i), isRoot = n._d === 0;
@@ -375,7 +446,8 @@ function drawPanel() {
     <div class="dtphead" style="--c:${n._c}"><i class="dtdot"></i><textarea class="dtptitle" rows="1" maxlength="80" aria-label="생각 이름">${esc(n.title)}</textarea></div>
     ${isRoot ? "" : `<div class="bnmeters"><div title="요즘 얼마나 자주 떠올리는지 (0~100)"><span>🔥 온도</span>${heatBar(n.heat, "#ffb347")}<b>${n.heat}</b></div><div title="막힘·미룸·걱정이 얼마나 드러나는지 (0~100)"><span>😟 고민</span>${heatBar(n.worry, "#ff6b6b")}<b>${n.worry}</b></div></div>
     ${st.n ? `<div class="bnfacts">최근 30일 <b>${st.n30 ?? 0}</b>번 · 전체 <b>${st.n}</b>번${st.first ? ` · 처음 ${esc(ymd(st.first))}` : ""}${st.last ? ` · 마지막 ${esc(ymd(st.last))}` : ""}${from ? `<br><span>${esc(from)}</span>` : ""}</div>${spark(n)}` : n.origin === "me" ? `<div class="bnfacts">✍️ 직접 넣은 생각이에요. 다음 분석 때 비슷한 글이 있으면 온도가 매겨져요.</div>` : ""}
-    <h4>상태</h4><div class="dtpick">${STATES.map((s) => `<button type="button" data-state="${s}" class="${n.state === s ? "on" : ""}" style="--oc:${ST[s][1]}" title="${ST[s][2]}">${ST[s][0]} ${s}</button>`).join("")}</div>`}
+    <h4>상태</h4><div class="dtpick">${STATES.map((s) => `<button type="button" data-state="${s}" class="${n.state === s ? "on" : ""}" style="--oc:${ST[s][1]}" title="${ST[s][2]}">${ST[s][0]} ${s}</button>`).join("")}</div>
+    ${n._d >= 2 ? `<h4>좌뇌·우뇌 <small>논리 쪽인지 감각 쪽인지</small></h4><div class="dtpick">${Object.entries(SIDE).map(([k, v]) => `<button type="button" data-side="${k}" class="${sideOf(n) === k ? "on" : ""}" style="--oc:${v[3]}" title="${v[2]}">${v[0]} ${v[1]}</button>`).join("")}</div>` : ""}`}
     <h4>내용 <small>[[다른 생각 이름]] 을 쓰면 그 생각과 이어져요</small></h4>
     <textarea class="dtnote" maxlength="6000" placeholder="이 생각에 대해 적어 두세요.">${esc(n.note)}</textarea><div class="dtsave"></div>
     ${n.src.length ? `<h4>근거 <small>이 생각이 나온 곳</small></h4><ul class="bnsrc">${n.src.map((x) => `<li><span title="${esc(SRC[x.w]?.[1] ?? "")}">${SRC[x.w]?.[0] ?? "•"}</span><time>${esc(md(x.d))}</time><p>${esc(x.t)}</p></li>`).join("")}</ul>` : ""}
@@ -396,6 +468,7 @@ function drawPanel() {
     const go = e.target.closest("[data-go]"); if (go) return select(go.dataset.go, true);
     if (e.target.closest("[data-close]")) return select(null);
     const stb = e.target.closest("[data-state]"); if (stb) return save(n, { state: n.state === stb.dataset.state ? "" : stb.dataset.state }, true);
+    const sd = e.target.closest("[data-side]"); if (sd) return saveSide(n, sideOf(n) === sd.dataset.side ? "" : sd.dataset.side);
     const un = e.target.closest("[data-unlink]"); if (un) return unlink(n.id, un.dataset.unlink);
     const col = e.target.closest("[data-color]"); if (col) return save(n, { color: col.dataset.color || null }, true);
     const ord = e.target.closest("[data-ord]"); if (ord) return reorder(n, +ord.dataset.ord);
@@ -429,6 +502,11 @@ async function save(n, patch, panel, quiet) {
   const { error } = await db().from("brain_nodes").update(patch).eq("id", n.id);
   if (error) { if (!quiet) bad(error); else console.error(error); if (panel !== false || !quiet) drawPanel(); return false; }
   Object.assign(n, patch); if (quiet) index(); else changed(panel ?? true); return true;
+}
+async function saveSide(n, side) { // stats 는 분석이 통째로 새로 쓰는 칸이라, 방금 값을 다시 읽어 좌·우만 바꿔 넣는다. side_me = 직접 골랐으니 다시 분석해도 그대로(brain-core keepSide)
+  const { data, error } = await db().from("brain_nodes").select("stats").eq("id", n.id).single(); if (bad(error)) return;
+  const { side: _old, ...rest } = data?.stats ?? {};
+  await save(n, { stats: { ...rest, ...(side ? { side } : {}), side_me: true } }, true);
 }
 async function move(n, parentId) {
   const sort = Math.max(-1, ...(S.kids.get(parentId) ?? []).map((c) => c.sort)) + 1;

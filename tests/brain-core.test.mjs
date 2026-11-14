@@ -57,3 +57,15 @@ test("달라진 점: 새 생각·뜨거워짐·식음", () => {
   assert.ok(ch.some((t) => t.includes("새것"))); assert.ok(ch.some((t) => t.includes("오름(40→80)"))); assert.ok(ch.some((t) => t.includes("내림(60→10)"))); assert.ok(ch.some((t) => t.startsWith("고민이 커진")));
   assert.deepEqual(C.changes([], after), []); // 첫 분석은 비교할 것이 없다
 });
+
+test("좌뇌·우뇌: 정의의 side 가 통계에 담기고, 화면에서 고른 것은 다시 분석해도 그대로", () => {
+  const B = C.build({ nodes: [{ key: "a", title: "A" }, { key: "a.l", parent: "a", title: "계약", side: "L", match: ["계약"] }, { key: "a.n", parent: "a", title: "미정", match: ["미정"] }] }, corpus([it("week", "2026-11-10", "계약 검토")]));
+  const r = Object.fromEntries(B.rows.map((x) => [x.key, x]));
+  assert.equal(r["a.l"].stats.side, "L"); assert.equal("side" in r["a.n"].stats, false);
+  assert.ok(C.build({ nodes: [{ key: "a", title: "A", side: "왼쪽" }] }, corpus([])).errors.length);
+  assert.deepEqual(C.keepSide({ side: "R", side_me: true, n: 1 }, { n: 5, side: "L" }), { n: 5, side: "R", side_me: true }); // 직접 고른 쪽이 이김
+  assert.deepEqual(C.keepSide({ side_me: true }, { n: 5, side: "L" }), { n: 5, side_me: true }); // 직접 비운 것도 그대로
+  assert.deepEqual(C.keepSide({ side: "L" }, { n: 5, side: "B" }), { n: 5, side: "B" }); // 분석이 매긴 것은 새 분석을 따름
+  assert.deepEqual(C.keepSide({ side: "L" }, { n: 5 }), { n: 5, side: "L" }); // 새 통계에 없으면 있던 것을 남김 (직접 넣은 생각)
+  assert.deepEqual(C.keepSide(undefined, { n: 5 }), { n: 5 });
+});

@@ -5,6 +5,9 @@
   const DAY = 86400e3, HALF = 45; // 온도 반감기: 45일 전 생각은 절반만 친다
   const W = { week: 1, claude: 1.2, idea: 2.5, goal: 2 }; // 어디서 나온 생각인지에 따른 무게
   const STATES = ["관심", "고민", "실행", "루틴", "식음"];
+  const SIDES = ["L", "R", "B"]; // 좌뇌(논리·숫자·계획·규칙) · 우뇌(사람·감정·창의·이미지) · 둘 다. stats.side 에 담는다
+  // 다시 분석해도 좌·우를 지킨다: 대표가 화면에서 고른 것(side_me)은 그대로, 새 통계에 좌·우가 없으면 있던 것을 남긴다
+  const keepSide = (old, next) => (old?.side_me ? (({ side, side_me, ...r }) => ({ ...r, ...(SIDES.includes(old.side) ? { side: old.side } : {}), side_me: true }))(next) : !next.side && SIDES.includes(old?.side) ? { ...next, side: old.side } : next);
   const days = (a, b) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / DAY);
 
   // 낱말 하나 → 판별 함수. "/정규식/" 은 정규식(대소문자 무시), 나머지는 글자 그대로(대소문자 무시)
@@ -54,7 +57,7 @@
   }
   const scale = (raw, max) => (max > 0 && raw > 0 ? Math.max(1, Math.min(100, Math.round(100 * Math.pow(raw / max, 0.6)))) : 0);
 
-  // 정의(def: {title, nodes:[{key,parent,title,state,worry,note,match,not,pin}], links}) + 조각 → 점마다 통계·온도·근거
+  // 정의(def: {title, nodes:[{key,parent,title,state,worry,side,note,match,not,pin}], links}) + 조각 → 점마다 통계·온도·근거
   function build(def, corpus) {
     const today = corpus.today, items = corpus.items.map((x) => ({ ...x, low: x.text.toLowerCase() }));
     const errors = [], byKey = new Map(), kids = new Map();
@@ -64,6 +67,7 @@
       else byKey.set(n.key, n);
       if (!n.title || n.title.length > 80) errors.push(`${n.key}: 제목은 1~80자`);
       if (n.state && !STATES.includes(n.state)) errors.push(`${n.key}: 상태는 ${STATES.join("·")} 중 하나`);
+      if (n.side && !SIDES.includes(n.side)) errors.push(`${n.key}: side 는 L(좌뇌)·R(우뇌)·B(둘 다) 중 하나`);
       if (String(n.note ?? "").length > 6000) errors.push(`${n.key}: 내용이 너무 길어요`);
     }
     for (const n of def.nodes ?? []) {
@@ -79,7 +83,7 @@
     const rows = [];
     for (const n of byKey.values()) {
       const its = [...gather(n)].sort((a, b) => a - b).map((i) => items[i]), st = stats(its, today), d = depth(n);
-      rows.push({ key: n.key, parent: n.parent ?? "root", depth: d, title: n.title, note: n.note ?? "", state: n.state ?? "", worry: Math.max(0, Math.min(100, Math.round(n.worry ?? 0))), _raw: st.raw, stats: (({ raw, ...r }) => r)(st), src: evidence(its, n.pin), sort: (kids.get(n.parent ?? "root") ?? []).indexOf(n) });
+      rows.push({ key: n.key, parent: n.parent ?? "root", depth: d, title: n.title, note: n.note ?? "", state: n.state ?? "", worry: Math.max(0, Math.min(100, Math.round(n.worry ?? 0))), _raw: st.raw, stats: { ...(({ raw, ...r }) => r)(st), ...(n.side ? { side: n.side } : {}) }, src: evidence(its, n.pin), sort: (kids.get(n.parent ?? "root") ?? []).indexOf(n) });
     }
     const maxA = Math.max(0, ...rows.filter((r) => r.depth === 1).map((r) => r._raw)), maxT = Math.max(0, ...rows.filter((r) => r.depth >= 2).map((r) => r._raw));
     const rk = new Map(rows.map((r) => [r.key, r]));
@@ -112,5 +116,5 @@
     const ok = t.filter((r) => old.has(r.key) && old.get(r.key).worry - r.worry >= 15).slice(0, 4); if (ok.length) out.push(`고민이 줄어든 생각: ${ok.map((r) => r.title).join(", ")}`);
     return out;
   }
-  return { term, matcher, units, stats, evidence, scale, build, changes, STATES, HALF };
+  return { term, matcher, units, stats, evidence, scale, build, changes, keepSide, STATES, SIDES, HALF };
 });

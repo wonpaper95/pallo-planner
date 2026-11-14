@@ -1,7 +1,7 @@
 // 🧠 뇌 탭 분석 저장 — 정의(brain.json: 주제·낱말·내용·연관)와 생각 조각(corpus.json)으로 온도·근거를 계산해 플래너 DB(brain_nodes·brain_links·brain_runs)에 넣는다.
 // 사용: node scripts/brain/save.mjs [--dry] [--def 경로]
 //   --dry : DB 에 닿지 않고 계산 결과만 보여 준다 (뜨거운 생각, 낱말에 안 걸린 최근 조각)
-// 지키는 것: 대표가 화면에서 고친 점(edited)은 이름·내용·상태·자리를 덮어쓰지 않고, 지운 점(hidden)은 되살리지 않고, 직접 넣은 점·선(origin=me)은 건드리지 않는다(온도만 매긴다).
+// 지키는 것: 대표가 화면에서 고친 점(edited)은 이름·내용·상태·자리를 덮어쓰지 않고, 화면에서 고른 좌뇌·우뇌(stats.side_me)도 그대로 두고, 지운 점(hidden)은 되살리지 않고, 직접 넣은 점·선(origin=me)은 건드리지 않는다(온도만 매긴다).
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { createRequire } from "node:module";
@@ -29,7 +29,7 @@ const { select, insert, patch, del, upsert, run } = dry ? {} : await import("../
 if (!dry) await run(async () => {
   const u = JSON.parse(readFileSync(`${DIR}/planner.json`, "utf8")).user_id; if (!/^[0-9a-f-]{36}$/.test(u ?? "")) throw new Error("planner.json 에 대표 계정이 없어요 — collect-planner.mjs 를 먼저");
   let have;
-  try { have = await select("brain_nodes", `select=id,parent_id,key,title,state,heat,worry,origin,edited,hidden&user_id=eq.${u}`, "created_at"); }
+  try { have = await select("brain_nodes", `select=id,parent_id,key,title,state,heat,worry,stats,origin,edited,hidden&user_id=eq.${u}`, "created_at"); }
   catch (e) { throw new Error(/PGRST205|brain_nodes/.test(e.message) ? "DB 에 뇌 표가 아직 없어요 — supabase/migrations/20261114200000_brain.sql 을 먼저 적용해야 해요" : e.message); }
   const before = have.map((r) => ({ ...r }));
   let root = have.find((r) => !r.parent_id);
@@ -44,7 +44,7 @@ if (!dry) await run(async () => {
       const pid = idOf.get(r.parent), e = ex.get(r.key); if (!pid) continue; // 위 가지가 없으면(숨겨져 지워진 경우 등) 건너뜀
       if (!e) add.push({ user_id: u, key: r.key, parent_id: pid, title: r.title, note: r.note, state: r.state, ...common(r), origin: "ai", sort: r.sort });
       else if (e.hidden) out.skipped_hidden++;
-      else { todo.push([e.id, { ...common(r), ...(e.edited ? {} : { title: r.title, note: r.note, state: r.state, parent_id: pid }) }]); e.edited ? out.kept_edited++ : out.updated++; }
+      else { todo.push([e.id, { ...common(r), stats: C.keepSide(e.stats, r.stats), ...(e.edited ? {} : { title: r.title, note: r.note, state: r.state, parent_id: pid }) }]); e.edited ? out.kept_edited++ : out.updated++; }
     }
     if (add.length) for (const row of await insert("brain_nodes", add)) { idOf.set(row.key, row.id); out.inserted++; }
     for (let i = 0; i < todo.length; i += 8) await Promise.all(todo.slice(i, i + 8).map(([id, body]) => patch("brain_nodes", `id=eq.${id}`, body)));
@@ -55,7 +55,7 @@ if (!dry) await run(async () => {
     const word = m.title.replace(/[^\p{L}\p{N} ]/gu, " ").replace(/\s+/g, " ").trim().toLowerCase(); if (word.length < 2) continue;
     const its = items.filter((x) => x.low.includes(word)); if (!its.length) continue;
     const st = C.stats(its, corpus.today);
-    await patch("brain_nodes", `id=eq.${m.id}`, { heat: C.scale(st.raw, topRaw), stats: (({ raw, ...r }) => r)(st), src: C.evidence(its) }); out.me++;
+    await patch("brain_nodes", `id=eq.${m.id}`, { heat: C.scale(st.raw, topRaw), stats: C.keepSide(m.stats, (({ raw, ...r }) => r)(st)), src: C.evidence(its) }); out.me++;
   }
   // 정의에서 빠진 분석 점: 아무도 안 고쳤고 아래에 남은 점이 없으면 지운다
   const now = await select("brain_nodes", `select=id,parent_id,key,origin,edited&user_id=eq.${u}`, "created_at"), keys = new Set(B.rows.map((r) => r.key));
