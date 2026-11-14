@@ -204,6 +204,11 @@ let booted = false;
 sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_OUT" || (ev === "SIGNED_IN" && !me && booted)) setTimeout(boot, 0); });
 addEventListener("focus", () => !me && boot()); // 플래너에서 로그인하고 돌아오면
 if (!globalThis.chrome?.runtime?.id && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+// 설치형 위젯 앱(PWA): 배포하면 열어 둔 채로도 새 버전으로 — version.txt 가 처음 본 값과 달라지면 새로고침 (확장 팝업은 열 때마다 새로 떠서 제외)
+if (!globalThis.chrome?.runtime?.id) { let v0 = null;
+  const vc = async () => { if (document.visibilityState !== "visible" || document.activeElement?.matches?.("input,textarea")) return;
+    try { const v = (await (await fetch("version.txt?" + Date.now(), { cache: "no-store" })).text()).trim(); if (!/^\d{12}$/.test(v)) return; if (v0 && v !== v0) return location.reload(); v0 = v; } catch {} };
+  vc(); setInterval(vc, 60000); document.addEventListener("visibilitychange", vc); addEventListener("focus", vc); addEventListener("online", vc); }
 $("#lform").onsubmit = async (e) => {
   e.preventDefault(); $("#lmsg").textContent = "";
   const { error } = await sb.auth.signInWithPassword({ email: $("#lemail").value.trim(), password: $("#lpw").value });

@@ -2426,7 +2426,10 @@ async function checkVer() {
     if (/^\d{12}$/.test(v) && v !== cur && sessionStorage.getItem("ver-reload") !== v && !(window.PS?.post || window.BL?.post || window.MT?.cur || window.MT?.show)) { sessionStorage.setItem("ver-reload", v); location.reload(); } // 블로그·게시물 글, 회의록을 열어 둔 동안은 새 버전으로 안 바꿈 (다음에 열 때)
   } catch {}
 }
+// 확인 시점을 늘림: 열 때·보일 때 + 창 포커스·뒤로가기 복원·인터넷 다시 연결·1분마다 (폰이 깨어난 직후 네트워크가 아직 안 붙어 한 번 실패해도 곧 다시 확인). 글 쓰는 중(입력칸에 커서)엔 새로고침 미룸
+const vcheck = () => document.visibilityState === "visible" && !document.activeElement?.matches?.("input:not([type=checkbox]):not([type=radio]):not([type=date]),textarea,[contenteditable=true]") && checkVer();
 checkVer(); document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && checkVer());
+addEventListener("focus", vcheck); addEventListener("pageshow", vcheck); addEventListener("online", vcheck); setInterval(vcheck, 60000);
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.replace(location.pathname)); // ?jo= 빼고 — 조교 기기는 boot 가 기억한 jo-token 으로 다시 들어감
 document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 다 돈 뒤 — 바로 부르면 데이터가 스크립트보다 빨리 온 첫 로드에 없는 전역(REF 등)을 씀 (뒤 스크립트들은 로드 시점에 me·myRole 안 씀)
 </script>
