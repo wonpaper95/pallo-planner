@@ -202,6 +202,11 @@ function lrShare() { // 좌:우 비율 — 온도를 무게로 (둘 다 = 반반
   return { c, pct: L + R ? Math.round((L / (L + R)) * 100) : null };
 }
 const lrBar = (sh) => `<b>◐ 좌뇌 ${sh.pct}%</b><i><u style="width:${sh.pct}%"></u></i><b>우뇌 ${100 - sh.pct}% ◑</b>`;
+const lrLblCss = (r) => `width:max-content;max-width:${Math.round(Math.max(r * 2 + 10, 68))}px;font-size:${Math.max(10.5, Math.min(13, r * 0.42)).toFixed(1)}px`;
+function lrHit(p, q) { // 점끼리, 이름표끼리, 이름표와 남의 점이 닿는지 (이름표는 실제로 잰 네모로 따짐)
+  const dx = Math.abs(p.x - q.x), dy = Math.abs(p.y - q.y), box = (l, c) => l.hw && Math.max(dx - l.hw, 0) ** 2 + Math.max(dy - l.hh, 0) ** 2 < (c.r + 2) ** 2;
+  return dx * dx + dy * dy < (p.r + q.r + 3) ** 2 || (p.hw && q.hw && dx < p.hw + q.hw + 3 && dy < p.hh + q.hh + 3) || box(p, q) || box(q, p);
+}
 function lrLayout(W, H, BOT) { // 점 자리: 큰 점부터, 자기 큰 주제 자리에서 해바라기 씨 모양으로 넓혀 가며 빈 곳에 놓는다 (같은 자료면 늘 같은 그림)
   const TOP = 64, cx = W / 2, b = Math.max(60, (H - TOP - BOT) / 2), cy = TOP + b, a = Math.max(60, Math.min(W / 2 - 8, b * 1.9));
   const f = (n) => 0.7 + (0.9 * n.heat) / 100, areas = kids(S.root), ai = new Map(areas.map((x, j) => [x.id, j])), m = Math.max(1, areas.length);
@@ -212,21 +217,25 @@ function lrLayout(W, H, BOT) { // 점 자리: 큰 점부터, 자기 큰 주제 �
   let k = Math.min(Math.min(W, H) / 13, Math.sqrt((0.36 * Math.PI * a * b) / 2 / (Math.PI * Math.max(sum(by.L), sum(by.R), 1e-9)))); // 양쪽 같은 배율 — 그래야 어느 쪽이 더 찼는지 눈으로 비교됨
   for (let tries = 0; tries < 16; tries++, k *= 0.9) {
     const step = Math.max(2, k * 0.3), at = new Map(); let ok = true;
-    const size = (n, rank, s) => { const r = k * f(n), lbl = rank < (s === "B" ? nB : nLbl); return { r, lbl, pad: (lbl ? Math.max(r, 30) : r) + 1.5 }; }; // 이름을 다는 점은 둘레를 넉넉히
-    const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n, i) => t + (2 * size(n, i, "B").pad) ** 2, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
+    const lbls = ["B", "L", "R"].flatMap((s) => by[s].slice(0, s === "B" ? nB : nLbl)), tmp = document.createElement("div"); // 이름표 크기는 어림하지 않고 화면에 한 번 놓아 잰다 (줄바꿈까지 그대로)
+    tmp.style.cssText = "position:absolute;visibility:hidden"; tmp.innerHTML = lbls.map((n) => `<button type="button" class="bnlrdot lbl"><span style="${lrLblCss(k * f(n))}">${esc(n.title)}</span></button>`).join("");
+    $(".bnlrbox").append(tmp); const wh = new Map(lbls.map((n, j) => { const e = tmp.children[j].firstChild; return [n.id, [e.offsetWidth / 2, e.offsetHeight / 2]]; })); tmp.remove();
+    const size = (n) => { const r = k * f(n), [hw, hh] = wh.get(n.id) ?? [0, 0]; return { r, lbl: wh.has(n.id), hw, hh }; };
+    const g = by.B.length ? Math.min(a * 0.5, Math.max(2 * k * f(by.B[0]) + 10, by.B.reduce((t, n) => { const z = size(n); return t + (2 * Math.max(z.r, z.hw) + 3) * (2 * Math.max(z.r, z.hh) + 3); }, 0) / (1.5 * b))) : 16; // 가운데 띠 너비: 둘 다 걸친 생각이 다 들어갈 만큼
     const placed = []; // 가운데 띠부터 놓고 양쪽이 그 둘레를 피해 앉는다 (이름표가 경계 너머 점과 겹치지 않게 한데 모아 잼)
     for (const s of ["B", "L", "R"]) {
-      by[s].forEach((n, rank) => {
+      by[s].forEach((n) => {
         if (!ok) return;
-        const { r, lbl, pad } = size(n, rank, s);
+        const { r, lbl, hw, hh } = size(n);
         const phi = (-0.5 + ((ai.get(path(n)[1]?.id) ?? 0) + 0.5) / m) * Math.PI;
         const ax = s === "B" ? cx : cx + (s === "L" ? -1 : 1) * (g / 2 + (a - g / 2) * 0.55 * Math.cos(phi)), ay = cy + b * 0.6 * Math.sin(phi);
         for (let t = 0; t < 30000; t++) {
           const d = step * Math.sqrt(t), x = ax + d * Math.cos(t * 2.39996), y = ay + d * Math.sin(t * 2.39996);
           if (s === "L" ? x > cx - g / 2 - r : s === "R" ? x < cx + g / 2 + r : Math.abs(x - cx) > g / 2 - r) continue;
           if (a <= r + 3 || b <= r + 3 || ((x - cx) / (a - r - 3)) ** 2 + ((y - cy) / (b - r - 3)) ** 2 > 1) continue;
-          if (placed.some((p) => (p.x - x) ** 2 + (p.y - y) ** 2 < (p.pad + pad) ** 2)) continue;
-          placed.push({ x, y, pad }); at.set(n.id, { x, y, r, lbl }); return;
+          if (hw && (x - hw < 4 || x + hw > W - 4 || y - hh < TOP - 6 || y + hh > H - BOT + 6)) continue; // 이름표가 그림 칸 밖으로 안 나가게
+          const me = { x, y, r, hw, hh }; if (placed.some((p) => lrHit(p, me))) continue;
+          placed.push(me); at.set(n.id, { x, y, r, lbl }); return;
         }
         ok = false; // 자리가 모자람 → 점을 조금 줄여 처음부터
       });
@@ -244,7 +253,7 @@ function drawLR() {
   const lay = drawLR.lay; if (!lay) { box.innerHTML = `<div class="dtmsg">화면이 너무 작아 뇌 그림을 못 그렸어요. 창을 넓혀 주세요.</div>`; return; }
   const filt = filtering(), dot = (n) => {
     const p = lay.at.get(n.id); if (!p) return "";
-    return `<button type="button" class="bnlrdot${p.lbl ? " lbl" : ""}${n.state === "고민" ? " hot" : ""}${n.id === S.sel ? " sel" : ""}${filt && !matches(n) ? " faint" : ""}" data-id="${n.id}" title="${esc(`${n.title} — ${path(n)[1]?.title ?? ""}${n.state ? ` · ${n.state}` : ""} · 🔥 ${n.heat}`)}" style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${(p.r * 2).toFixed(1)}px;height:${(p.r * 2).toFixed(1)}px;--c:${colorOf(n)}"><span style="width:max-content;max-width:${Math.round(Math.max(p.r * 2 + 10, 68))}px;font-size:${Math.max(10.5, Math.min(13, p.r * 0.42)).toFixed(1)}px">${esc(n.title)}</span></button>`;
+    return `<button type="button" class="bnlrdot${p.lbl ? " lbl" : ""}${n.state === "고민" ? " hot" : ""}${n.id === S.sel ? " sel" : ""}${filt && !matches(n) ? " faint" : ""}" data-id="${n.id}" title="${esc(`${n.title} — ${path(n)[1]?.title ?? ""}${n.state ? ` · ${n.state}` : ""} · 🔥 ${n.heat}`)}" style="left:${p.x.toFixed(1)}px;top:${p.y.toFixed(1)}px;width:${(p.r * 2).toFixed(1)}px;height:${(p.r * 2).toFixed(1)}px;--c:${colorOf(n)}"><span style="${lrLblCss(p.r)}">${esc(n.title)}</span></button>`;
   };
   box.innerHTML = `<div class="bnlr">
     <div class="bnlrtop"><div class="bnlrbar">${lrBar(sh)}</div>
