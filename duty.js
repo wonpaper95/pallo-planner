@@ -221,11 +221,22 @@ function drawOrg() {
       <div class="dtocols">${areas.map(col).join("")}</div></div></div>`;
   fitOrg(); if (keep) { const sc = $(".dtorgscroll"); sc.scrollLeft = keep[0]; sc.scrollTop = keep[1]; }
 }
-function fitOrg() { // 한 화면에 맞추기: 영역 칸을 몇 줄·몇 칸으로 놓을지와 배율을 같이 골라, 칸 안(아래 빈 공간까지)에 들어오는 가장 큰 글씨를 찾는다. 배율 0.6~1.3
+function fitOrg() { fitOrg0(); drawCon(); }
+function drawCon() { // 🔗 조직도 연결선: 맨 위 팔로 → 줄마다 가로 버스 → 카드마다 화살표. 줄 수·칸 수가 바뀔 때마다 다시 그림 (카드 위치를 재서)
+  const cols = $(".dtocols"); if (!cols) return; cols.querySelector(".dtcon")?.remove();
+  const cards = [...cols.querySelectorAll(":scope > .dtoc")]; if (!cards.length || !cols.clientWidth) return;
+  const W = cols.clientWidth, cx = W / 2, rows = [], G = 26, R = 10;
+  for (const c of cards) { const y = c.offsetTop; let r = rows.find((q) => Math.abs(q.y - y) < 4); if (!r) rows.push((r = { y, cards: [] })); r.cards.push(c); }
+  rows.sort((p, q) => p.y - q.y); let d = "", tri = "";
+  rows.forEach((r, i) => { const bus = r.y - G, from = i ? Math.max(...rows[i - 1].cards.map((c) => c.offsetTop + c.offsetHeight)) : 0; d += `M${cx} ${from}V${bus}`;
+    for (const c of r.cards) { const x = c.offsetLeft + c.offsetWidth / 2, dx = x - cx, rr = Math.min(R, Math.abs(dx)), top = r.y - 3; d += Math.abs(dx) < 2 ? `M${cx} ${bus}V${top - 6}` : `M${cx} ${bus}H${x - Math.sign(dx) * rr}Q${x} ${bus} ${x} ${bus + rr}V${top - 6}`; tri += `<path d="M${x - 6} ${top - 10}L${x + 6} ${top - 10}L${x} ${top}Z"/>`; } });
+  cols.insertAdjacentHTML("afterbegin", `<svg class="dtcon" width="${W}" height="${cols.scrollHeight}" aria-hidden="true"><path d="${d}"/>${tri}</svg>`);
+}
+function fitOrg0() { // 한 화면에 맞추기: 영역 칸을 몇 줄·몇 칸으로 놓을지와 배율을 같이 골라, 칸 안(아래 빈 공간까지)에 들어오는 가장 큰 글씨를 찾는다. 배율 0.6~1.3
   const sc = $(".dtorgscroll"), org = $(".dtorg"), cols = $(".dtocols"); if (!sc || !org || !cols) return;
   org.style.zoom = ""; if (!sc.offsetWidth) return;
   const cs = getComputedStyle(sc), aw = sc.offsetWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = sc.offsetHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom); // 스크롤 막대가 생겼다 없어졌다 해도 흔들리지 않게 바깥 크기로 잰다
-  const n = cols.children.length, setC = (c) => cols.style.setProperty("--cols", c), dflt = Math.max(1, Math.min(n, Math.floor(aw / 250)));
+  const n = cols.querySelectorAll(":scope > .dtoc").length, setC = (c) => cols.style.setProperty("--cols", c), dflt = Math.max(1, Math.min(n, Math.floor(aw / 250)));
   if (!S.fit) return setC(dflt); // 원래 크기: 칸 하나 최소 250px, 모자라면 아래로 스크롤
   let cc = 2; // 지금 재 보는 칸 수
   const fits = (z) => { org.style.zoom = z; const r = org.getBoundingClientRect(); return r.width <= aw + 1 && r.height <= ah + 1 && aw / z / cc >= 215; }; // 칸 하나가 215px(배율 전) 아래로 찌그러지면 안 됨

@@ -289,3 +289,30 @@ body.is-admin .dtwrap:not(.shared) .dtocb { padding-bottom: 28px; } /* 대표: �
   .dtlegend .dthelp { display: none; }
   .dtchips { max-width: 46%; }
 }
+
+/* 🏢 조직도 v2 (시안 1번): 채운 '팔로' 상자 → 연결선(JS 가 그림) → 머리띠 카드(이모지·큰 제목) → 담당 칩 → 줄무늬 업무 줄 */
+.dtocols { gap: 52px 18px; padding-top: 52px; }
+.dtocols .dtcon { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.dtocols .dtcon path { fill: none; stroke: color-mix(in srgb, var(--sub) 70%, transparent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dtocols .dtcon path[d$="Z"] { fill: color-mix(in srgb, var(--sub) 70%, transparent); stroke: none; }
+.dtotop { padding-bottom: 0; position: relative; z-index: 1; }
+.dtoroot { padding: 10px 46px; border: 0; border-radius: 16px; color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 80%, #1a0f40), var(--accent)); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 38%, transparent); }
+.dtoroot b { font-size: 26px; letter-spacing: .02em; } .dtoroot small { color: rgba(255, 255, 255, .82); font-size: 14px; }
+.dtoroot.sel { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 40%, transparent), 0 6px 18px color-mix(in srgb, var(--accent) 38%, transparent); background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 80%, #1a0f40), var(--accent)); }
+.dtoc { z-index: 1; border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line)); border-radius: 16px; background: var(--panel); box-shadow: 0 4px 14px rgba(40, 30, 90, .09); }
+.dtoch { padding: 0 0 8px; border: 0; background: none; border-radius: 16px 16px 0 0; }
+.dtoch > b { padding: 13px 10px 12px; font-size: 19px; background: color-mix(in srgb, var(--c) 28%, var(--panel)); border-radius: 15px 15px 0 0; }
+.dtoch .dtchips { margin: 11px 8px 0; gap: 6px; }
+.dtoch .dtchips b { font-size: 13.5px; padding: 2px 11px; font-weight: 700; background: color-mix(in srgb, var(--oc) 24%, var(--panel)); }
+.dtoch small { margin-top: 8px; }
+.dtocb { padding: 6px 10px 14px; gap: 6px; }
+.dtocb > .dtol, .dtocb > .dtog > .dtogr { background: color-mix(in srgb, var(--text) 5.5%, transparent); border-radius: 11px; }
+.dtocb > .dtol { padding: 7px 9px; }
+.dtocb > .dtog { margin: 0; }
+.dtogh { padding: 7px 8px 7px 2px; }
+.dtogl { margin: 4px 0 2px 10px; gap: 3px; }
+.dtoch > b { width: 100%; box-sizing: border-box; }
+.dtocb .dtol > span { margin-left: 3px; } .dtogh > span { margin-left: 2px; }
+.dtocols .dtoch > b { display: block; width: 100%; box-sizing: border-box; }
+.dtorgbar .dtoleg { gap: 6px 22px; } .dtorgbar .dtoleg > span { gap: 6px; }
+@media (max-width: 900px) { .dtotop { justify-content: center; position: relative; width: auto; left: auto; } .dtocols { gap: 44px 12px; } }
