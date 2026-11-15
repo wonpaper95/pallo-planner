@@ -2,13 +2,18 @@
 // 평일오전·평일오후·주말 페이지마다: 할일 × 이번 주(월~일) 칸에 담당 조교 이름표 + 메모장 2개. 지점 공용: 조교 이름(색)·대타 명단·링크 모음·사진 모음(0067, 비공개 버킷 jc-photos)
 // index.html 의 sb·me·myRole·isBoss·previewTeam·teams·myName·esc·toast·fail·today·W·view 를 씀 → window.JC
 (() => {
-const JC = (window.JC = { team: null, page: "am", names: [], tasks: [], cells: new Map(), memos: [], subs: [], links: [], photos: [], shell: "", editSub: null });
+const JC = (window.JC = { team: null, page: "am", names: [], tasks: [], cells: new Map(), memos: [], subs: [], links: [], photos: [], reads: [], readsDay: "", shell: "", editSub: null });
 const V = () => document.getElementById("jcView");
 const PAGES = [["am", "평일오전"], ["pm", "평일오후"], ["we", "주말"], ["links", "링크 모음"], ["photos", "사진 모음"]];
 const COLORS = ["#ffb3ba", "#ffdfba", "#ffffba", "#d9ffb3", "#baffc9", "#baffe0", "#baf4ff", "#bad7ff", "#c2baff", "#e0baff", "#ffbaf2", "#ffbad4"];
 const LANGS = ["일본어", "중국어"];
 const SLOTS = ["10:40~13:10", "10:40~16:10(휴게1시간)", "17:40~20:10", "18:40~22:10", "19:40~22:10"];
 const KD = ["일", "월", "화", "수", "목", "금", "토"];
+// 📖 리딩 확인(신고 은서 11-15): 페이지마다 시간대 — 일중점 기준 고정 (지점마다 다르면 시간대 표로 옮기기). 날짜 칸이라 밤 12시가 지나면 오늘 칸은 새로 비어 시작
+const READ_SLOTS = { am: ["11:00"], pm: ["18:00", "20:00"], we: ["11:00", "14:00"] };
+const LEVELS = ["1레벨", "2레벨", "3레벨", "4레벨"];
+const SECS = [["🔥 우선순위", "red"], ["⏰ 오늘 하루 끝낼 일", "yellow"]]; // 할일 칸 나누기(신고 은서 11-15): 새 칸 = ■ 구간 제목 줄 (기존 기능) + 강조 색
+const slotLabel = (s) => `${+s.split(":")[0]}시${s.endsWith(":00") ? "" : ` ${s.split(":")[1]}분`}`;
 const admin = () => myRole === "admin";
 const jo = () => myRole === "assistant";
 try { JC.page = localStorage.getItem("jc-page") || "am"; } catch {}
@@ -29,19 +34,21 @@ JC.load = async function () {
   else JC.team = previewTeam ?? (await sb.rpc("my_team")).data ?? (await sb.rpc("assistant_team")).data ?? null; // 매니저·미리보기: 우리 지점 · 조교: 링크 지점
   if (!JC.team) { JC.shell = ""; V().innerHTML = `<div class="jcbar"><h2>✅ 조교체크리스트</h2></div><div class="jcpanel mut">지점이 정해져야 볼 수 있어요 — 대표님께 말씀해 주세요</div>`; return; }
   const t = JC.team, mon = W.monday(today());
-  const [n, tk, me2, s, l, ph] = await Promise.all([
+  const [n, tk, me2, s, l, ph, rd] = await Promise.all([
     sb.from("jc_names").select("*").eq("team_id", t).order("sort").order("id"),
     sb.from("jc_tasks").select("*").eq("team_id", t).order("sort").order("id"),
     sb.from("jc_memos").select("*").eq("team_id", t).order("created_at", { ascending: false }).limit(900),
     sb.from("jc_subs").select("*").eq("team_id", t).order("created_at", { ascending: false }),
     sb.from("jc_links").select("*").eq("team_id", t).order("sort").order("id"),
-    sb.from("jc_photos").select("*").eq("team_id", t).order("created_at", { ascending: false }).limit(300)]);
+    sb.from("jc_photos").select("*").eq("team_id", t).order("created_at", { ascending: false }).limit(300),
+    sb.from("jc_reads").select("*").eq("team_id", t).eq("day", today()).order("created_at")]);
   if ([n, tk, me2, s, l, ph].some((r) => fail(r.error))) return;
+  if (rd.error) console.warn("리딩 확인", rd.error.message); // 0104 표가 아직 없는 서버면 이 칸만 비움 (다른 세션 배포가 먼저 나가도 체크리스트는 그대로 열리게)
   await signPhotos(ph.data);
   const c = tk.data.length ? await sb.from("jc_cells").select("*").in("task_id", tk.data.map((x) => x.id)).gte("day", mon).lte("day", W.add(mon, 6)) : { data: [] };
   if (fail(c.error)) return;
   if (t !== JC.team) return; // 그 사이 지점 바꿈
-  Object.assign(JC, { names: n.data, tasks: tk.data, memos: me2.data, subs: s.data, links: l.data, photos: ph.data, cells: new Map(c.data.map((x) => [`${x.task_id}|${x.day}`, x.names])) });
+  Object.assign(JC, { names: n.data, tasks: tk.data, memos: me2.data, subs: s.data, links: l.data, photos: ph.data, reads: rd.data ?? [], readsDay: today(), cells: new Map(c.data.map((x) => [`${x.task_id}|${x.day}`, x.names])) });
   render();
   listen();
 };
@@ -52,8 +59,9 @@ function listen() {
   if (chan) return;
   const soon = () => { clearTimeout(soon.t); soon.t = setTimeout(() => view === "jc" && !JC.editTask && JC.load(), 300); }; // 할일 고치는 중엔 표를 다시 안 그림 (끝날 때 다시 읽음)
   chan = sb.channel("jc");
-  for (const tb of ["jc_names", "jc_tasks", "jc_cells", "jc_memos", "jc_subs", "jc_links", "jc_photos"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
+  for (const tb of ["jc_names", "jc_tasks", "jc_cells", "jc_memos", "jc_subs", "jc_links", "jc_photos", "jc_reads"]) chan.on("postgres_changes", { event: "*", schema: "public", table: tb }, soon);
   chan.subscribe();
+  setInterval(() => view === "jc" && JC.readsDay && JC.readsDay !== today() && !JC.editTask && JC.load(), 60000); // 밤 12시를 넘겨 켜 둔 화면 → 오늘 리딩 확인이 새로 비어 시작
 }
 
 // 입력칸(폼)은 지점·페이지 바뀔 때만 새로 그림 → 실시간 새로고침에 적던 글자가 안 날아감
@@ -63,7 +71,7 @@ function render() {
   V().querySelectorAll("[data-pg]").forEach((b) => b.classList.toggle("on", b.dataset.pg === JC.page));
   if (JC.page === "links") return renderLinks();
   if (JC.page === "photos") return renderPhotos();
-  renderSubOpts(); renderSubs(); renderMemos(); renderNames(); renderGrid();
+  renderSubOpts(); renderSubs(); renderReads(); renderMemos(); renderNames(); renderGrid();
 }
 function shell() {
   const tabs = `<nav class="jctabs">${PAGES.map(([id, label]) => `<button data-pg="${id}">${label}</button>`).join("")}</nav>`;
@@ -81,6 +89,12 @@ function shell() {
       <span class="mut">시작일</span><input type="date" name="start" value="${now}"><span class="mut">종료일</span><input type="date" name="end" value="${now}">
       <select name="slot">${opts(SLOTS)}</select><select name="in"></select><button class="btn">추가</button></form>
     <div id="jcSubs" class="jclist"></div></section>
+  <section class="jcpanel jcreads"><h3>📖 리딩 확인 <span class="mut" id="jcReadDay"></span></h3>
+    <p class="mut jcrdhint">누가 리딩에 들어갔는지 시간대마다 적고, <b>들어감</b> → <b>확인</b> 두 번 체크해요 · 밤 12시가 지나면 새로 비워져요 (지난 기록은 남아요)</p>
+    <datalist id="jcNameDl"></datalist>
+    <div class="jcrgrid">${(READ_SLOTS[JC.page] ?? []).map((sl) => `<div class="jcrs" data-slot="${sl}"><h4>${slotLabel(sl)} <small class="mut"></small></h4>
+      <form class="jcform jcrdf" data-f="read" data-slot="${sl}"><input name="name" list="jcNameDl" maxlength="20" placeholder="이름" autocomplete="off"><select name="level" aria-label="레벨"><option value="">레벨</option>${opts(LEVELS)}</select><button class="btn">추가</button></form>
+      <div class="jcrlist" data-slot="${sl}"></div></div>`).join("")}</div></section>
   <section class="jcpanel"><h3>메모장</h3><div class="jcmemo">
     <div><h4>매니저 → 조교님 <span class="mut">(체크박스 = 조교 이행 확인)</span></h4>
       <form class="jcform" data-f="memo" data-kind="manager"><select name="who" class="jcwho" aria-label="보내는 사람"></select><textarea name="body" maxlength="600" placeholder="조교님께 전달할 내용을 적어주세요"></textarea><button class="btn">추가</button></form>
@@ -92,8 +106,52 @@ function shell() {
     <div id="jcNames" class="jcnames"></div>
     <form class="jcform" data-f="name"><input name="name" maxlength="20" placeholder="조교 이름 입력"><button class="btn">이름 추가</button></form></details></section>
   <section class="jcpanel"><div class="jcgbar"><h3>체크리스트</h3><button type="button" class="btn ghost" data-act="today">오늘로 이동</button></div>
-    <form class="jcform" data-f="task"><input name="body" maxlength="120" placeholder="할일 추가 (■ 로 시작하면 구간 제목 줄)"><button class="btn">추가</button></form>
+    <form class="jcform" data-f="task"><input name="body" maxlength="120" placeholder="할일 추가 (■ 로 시작하면 구간 제목 줄)"><select name="sec" class="jcsecsel" aria-label="넣을 칸" hidden></select><button class="btn">추가</button></form>
+    ${jo() ? "" : `<div class="jcsecq"><button type="button" class="btn ghost" data-act="mksec" title="맨 위에 두 칸 제목 줄을 만들어요. 지금 할일은 ⏰ 칸 아래에 들어가고, 중요한 건 ⇅ 눌러서 🔥 칸으로 옮겨요">＋ 칸 나누기 (🔥 우선순위 · ⏰ 오늘 하루 끝낼 일)</button><span class="mut">할일 줄의 ⇅ 로 칸을 옮겨요</span></div>`}
     <div id="jcGrid"></div></section>`;
+}
+
+// 📖 리딩 확인: 시간대 칸마다 이름·레벨 + 1차 들어감 · 2차 확인 (jc_reads, 날짜별 — 오늘 것만 읽음)
+const whoNow = () => { if (!jo()) return myName ?? "매니저"; try { return localStorage.getItem(whoKey()) || "조교"; } catch { return "조교"; } };
+const ckBtn = (r, n, label) => { const who = r[`chk${n}`], at = r[`chk${n}_at`];
+  return `<button type="button" class="jcck ${who ? "on" : ""}" data-act="rdck" data-n="${n}" title="${who ? `${esc(who)} · ${at ? ts(at) : ""} 체크 — 누르면 취소` : `${label} 했으면 누르기`}">${who ? "☑" : "☐"} ${label}${who ? ` <small>${esc(who)}</small>` : ""}</button>`; };
+const rdRow = (r) => `<div class="jcrd ${r.chk1 && r.chk2 ? "done" : ""}" data-id="${r.id}"><span class="jcrdn"><b>${esc(r.name)}</b>${r.level ? `<span class="jclv">${esc(r.level)}</span>` : ""}</span>${ckBtn(r, 1, "들어감")}${ckBtn(r, 2, "확인")}<button type="button" class="jcicon" data-del="read" title="지우기">✕</button></div>`;
+function renderReads() {
+  const day = V().querySelector("#jcReadDay"); if (!day) return;
+  const d = W.parse(JC.readsDay || today());
+  day.textContent = `오늘 ${d.getMonth() + 1}/${d.getDate()}(${KD[d.getDay()]})`;
+  V().querySelector("#jcNameDl").innerHTML = JC.names.map((n) => `<option value="${esc(n.name)}">`).join("");
+  for (const list of V().querySelectorAll(".jcrlist")) {
+    const rows = JC.reads.filter((r) => r.page === JC.page && r.slot === list.dataset.slot), ok = rows.filter((r) => r.chk1 && r.chk2).length;
+    list.closest(".jcrs").querySelector("h4 small").textContent = rows.length ? `${rows.length}명 · 확인 끝 ${ok}/${rows.length}` : "";
+    list.innerHTML = rows.length ? rows.map(rdRow).join("") : `<div class="mut jcempty">아직 적은 사람이 없어요</div>`;
+  }
+}
+// 🔥/⏰ 칸: 할일 추가칸의 '넣을 칸' 고르기 + 칸 나누기 버튼 (둘 다 있으면 버튼 숨김)
+function renderSecOpts() {
+  const sel = V().querySelector("select[name=sec]"); if (!sel) return;
+  const secs = JC.tasks.filter((t) => t.page === JC.page && t.body.startsWith("■")), cur = sel.value;
+  sel.hidden = !secs.length;
+  sel.innerHTML = `<option value="">칸: 맨 아래</option>` + secs.map((t) => `<option value="${t.id}" ${String(t.id) === cur ? "selected" : ""}>${esc(t.body.slice(1).trim())}</option>`).join("");
+  const q = V().querySelector(".jcsecq"); if (q) q.hidden = SECS.every(([t]) => secs.some((x) => x.body === `■ ${t}`));
+}
+const bySort = (a, b) => a.sort - b.sort || a.id - b.id;
+async function saveOrder(list) { // 이 페이지 할일 새 순서 → 바뀐 줄만 저장
+  const ch = []; list.forEach((x, i) => { if (x.sort !== i + 1) { x.sort = i + 1; ch.push(x); } });
+  JC.tasks.sort(bySort); renderGrid();
+  const rs = await Promise.all(ch.map((x) => sb.from("jc_tasks").update({ sort: x.sort }).eq("id", x.id))); rs.some((r) => fail(r.error));
+  JC.load();
+}
+async function moveTask(id, secId) { // 그 칸(구간 제목 줄 ~ 다음 구간 제목 줄 앞) 맨 끝으로 · secId 0 = 칸 밖 맨 위
+  const list = JC.tasks.filter((t) => t.page === JC.page).sort(bySort), t = list.find((x) => x.id === id); if (!t) return;
+  const rest = list.filter((x) => x.id !== id); let at = 0;
+  if (secId) { const i = rest.findIndex((x) => x.id === secId); if (i < 0) return; at = i + 1; while (at < rest.length && !rest[at].body.startsWith("■")) at++; }
+  rest.splice(at, 0, t); return saveOrder(rest);
+}
+async function makeSections() { // 맨 위에 🔥·⏰ 제목 줄 (이미 있는 건 건너뜀). 지금 할일은 그 아래 = ⏰ 칸
+  const mine = JC.tasks.filter((x) => x.page === JC.page).sort(bySort), add = SECS.filter(([t]) => !mine.some((x) => x.body === `■ ${t}`)); if (!add.length) return;
+  const { data, error } = await sb.from("jc_tasks").insert(add.map(([t, mark]) => ({ team_id: JC.team, page: JC.page, body: `■ ${t}`, mark, sort: nextSort(mine) }))).select(); if (fail(error)) return;
+  JC.tasks.push(...data); await saveOrder([...add.map(([t]) => data.find((x) => x.body === `■ ${t}`)), ...mine]);
 }
 
 function renderSubOpts() {
@@ -143,7 +201,8 @@ function renderNames() {
     : `<div class="mut jcempty">등록된 조교 이름이 없어요. 아래에서 추가해주세요.</div>`;
 }
 function renderGrid(toToday) {
-  const box = V().querySelector("#jcGrid"), tasks = JC.tasks.filter((t) => t.page === JC.page);
+  renderSecOpts();
+  const box = V().querySelector("#jcGrid"), tasks = JC.tasks.filter((t) => t.page === JC.page), hasSec = tasks.some((t) => t.body.startsWith("■")), mvBtn = hasSec ? `<button type="button" class="jcicon jcmvt" data-act="tomove" title="다른 칸으로 옮기기">⇅</button>` : "";
   if (!tasks.length) { box.innerHTML = `<div class="mut jcempty jccenter">아직 등록된 할일이 없어요. 위 입력창에서 추가해보세요.</div>`; return; }
   const days = week(), tk = today(), keep = box.querySelector(".jcscrollx")?.scrollLeft ?? null;
   const cell = (t, d) => {
@@ -152,7 +211,7 @@ function renderGrid(toToday) {
   };
   box.innerHTML = `<div class="jcscrollx"><table class="jcgrid"><thead><tr><th class="jctask">할일</th>${days.map((d) => `<th class="jcday ${d.tag?.cls ?? ""} ${d.k === tk ? "today" : ""}">${d.label}${d.tag ? `<em class="jctag">${d.tag.tag}</em>${d.tag.name ? `<small>${esc(d.tag.name)}</small>` : ""}` : ""}</th>`).join("")}</tr></thead>
     <tbody>${tasks.map((t) => t.body.startsWith("■") ? `<tr data-task="${t.id}" class="jcsec ${mk(t)}"><td colspan="8"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jctasktxt" data-act="taskedit" title="눌러서 내용 고치기"><b>${esc(t.body.slice(1).trim())}</b></button>${markBtn(t)}<button class="jcicon" data-del="task" title="삭제">✕</button></div></td></tr>` // ■ 로 시작 = 구간 제목 줄 (칸 없음)
-      : `<tr data-task="${t.id}" class="${mk(t)}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button>${markBtn(t)}<button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
+      : `<tr data-task="${t.id}" class="${mk(t)}"><td class="jctask"><div class="jcrow"><span class="jcdrag" draggable="true" title="드래그해서 순서 바꾸기 (PC)">⠿</span><button type="button" class="jcgrow jctasktxt" data-act="taskedit" title="눌러서 내용 고치기">${esc(t.body)}</button>${mvBtn}${markBtn(t)}<button class="jcicon" data-del="task" title="삭제">✕</button></div></td>${days.map((d) => cell(t, d)).join("")}</tr>`).join("")}</tbody></table></div>`;
   const sc = box.querySelector(".jcscrollx");
   if (toToday || keep === null) setTimeout(() => scrollToday(V().querySelector(".jcscrollx"), false)); else sc.scrollLeft = keep; // 그 사이 다시 그렸으면 새 표 기준
 }
@@ -211,7 +270,7 @@ async function uploadPhotos(f) {
 // ── 담당자 고르기·색 고르기 작은 창 (body 에 하나씩, 다시 그려도 안 닫힘) ──
 const pop = (id) => document.getElementById(id) ?? document.body.appendChild(Object.assign(document.createElement("div"), { id, className: "jcpop", hidden: true }));
 const place = (el, btn, w, h) => { const r = btn.getBoundingClientRect(); el.style.left = Math.max(16, Math.min(r.left, innerWidth - w - 16)) + "px"; el.style.top = (r.bottom + 6 + h > innerHeight ? Math.max(16, r.top - h - 6) : r.bottom + 6) + "px"; };
-let cellCtx = null, colorId = null, markId = null;
+let cellCtx = null, colorId = null, markId = null, moveId = null;
 function openCell(btn) {
   cellCtx = { task: +btn.dataset.task, day: btn.dataset.day };
   const sel = JC.cells.get(`${cellCtx.task}|${cellCtx.day}`) ?? [], el = pop("jcCellPop");
@@ -229,7 +288,12 @@ function openMark(btn, id) {
   el.innerHTML = `<div class="jcpt">강조 색</div><div class="jcmks">${MARKS.map(([v, l]) => `<button type="button" data-mark="${v}" class="mk-${v || "none"} ${v === cur ? "on" : ""}">${l}</button>`).join("")}</div>`;
   el.hidden = false; el.style.width = ""; place(el, btn, 150, 60);
 }
-const closePops = () => { for (const id of ["jcCellPop", "jcColorPop"]) { const el = document.getElementById(id); if (el) el.hidden = true; } cellCtx = colorId = markId = null; };
+function openMove(btn, id) { // ⇅ 다른 칸(구간 제목 줄 아래)으로 옮기기
+  moveId = id; const secs = JC.tasks.filter((t) => t.page === JC.page && t.body.startsWith("■")).sort(bySort), el = pop("jcMovePop");
+  el.innerHTML = `<div class="jcpt">어느 칸으로 옮길까요?</div><div class="jcmvl">${secs.map((t) => `<button type="button" data-sec="${t.id}">${esc(t.body.slice(1).trim())}</button>`).join("")}<button type="button" data-sec="0" class="jcmvtop">⬆ 칸 밖 맨 위로</button></div>`;
+  el.hidden = false; el.style.width = "230px"; place(el, btn, 230, 60 + secs.length * 40);
+}
+const closePops = () => { for (const id of ["jcCellPop", "jcColorPop", "jcMovePop"]) { const el = document.getElementById(id); if (el) el.hidden = true; } cellCtx = colorId = markId = moveId = null; };
 document.addEventListener("change", async (e) => {
   if (!e.target.closest("#jcCellPop") || !cellCtx) return;
   const { task, day } = cellCtx, ids = [...document.querySelectorAll("#jcCellPop input:checked")].map((c) => +c.value);
@@ -240,14 +304,16 @@ document.addEventListener("click", async (e) => {
   if (e.target.closest(".jcclose")) return closePops();
   const mkb = e.target.closest("#jcColorPop [data-mark]");
   if (mkb) { const id = markId; closePops(); if (id) { const t = JC.tasks.find((x) => x.id === id); t.mark = mkb.dataset.mark; renderGrid(); fail((await sb.from("jc_tasks").update({ mark: t.mark }).eq("id", id)).error); } return; }
+  const mvb = e.target.closest("#jcMovePop [data-sec]");
+  if (mvb) { const id = moveId; closePops(); if (id) moveTask(id, +mvb.dataset.sec); return; }
   const sw = e.target.closest("#jcColorPop [data-color]");
   if (sw) { const id = colorId; closePops(); if (id) { JC.names.find((n) => n.id === id).color = sw.dataset.color; render(); fail((await sb.from("jc_names").update({ color: sw.dataset.color }).eq("id", id)).error); } return; }
-  if (!e.target.closest(".jcpop") && !e.target.closest("[data-act=cell]") && !e.target.closest("[data-act=color]") && !e.target.closest("[data-act=mark]")) closePops();
+  if (!e.target.closest(".jcpop") && !e.target.closest("[data-act=cell]") && !e.target.closest("[data-act=color]") && !e.target.closest("[data-act=mark]") && !e.target.closest("[data-act=tomove]")) closePops();
 });
 
 // ── 지우기: 한 번 누르면 '확인?' 3초, 한 번 더 = 지움 ──
 const armed = {};
-const DEL = { task: "jc_tasks", name: "jc_names", memo: "jc_memos", link: "jc_links", sub: "jc_subs", photo: "jc_photos" };
+const DEL = { task: "jc_tasks", name: "jc_names", memo: "jc_memos", link: "jc_links", sub: "jc_subs", photo: "jc_photos", read: "jc_reads" };
 async function del(btn) {
   const row = btn.closest("[data-id],[data-task],[data-link]"), kind = btn.dataset.del, id = +(row.dataset.id ?? row.dataset.task ?? row.dataset.link), k = kind + id;
   if (!armed[k]) { const t = btn.textContent; btn.textContent = "확인?"; btn.classList.add("arm"); armed[k] = setTimeout(() => { delete armed[k]; btn.textContent = t; btn.classList.remove("arm"); }, 3000); return; }
@@ -274,7 +340,8 @@ function bind() {
   });
   v.addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target, t = JC.team; let r;
-    if (f.dataset.f === "task") { const body = f.body.value.trim(); if (!body) return; f.body.value = ""; r = await sb.from("jc_tasks").insert({ team_id: t, page: JC.page, body, sort: nextSort(JC.tasks.filter((x) => x.page === JC.page)) }); }
+    if (f.dataset.f === "task") { const body = f.body.value.trim(); if (!body) return; f.body.value = ""; const sec = +f.sec?.value || 0; r = await sb.from("jc_tasks").insert({ team_id: t, page: JC.page, body, sort: nextSort(JC.tasks.filter((x) => x.page === JC.page)) }).select().single(); if (!r.error && sec) { JC.tasks.push(r.data); return moveTask(r.data.id, sec); } }
+    if (f.dataset.f === "read") { const name = f.name.value.trim(); if (!name) return toast("이름을 적어 주세요"); const level = f.level.value; f.name.value = ""; f.level.value = ""; r = await sb.from("jc_reads").insert({ team_id: t, page: JC.page, day: today(), slot: f.dataset.slot, name, level, by_name: whoNow() }); }
     if (f.dataset.f === "name") { const name = f.name.value.trim(); if (!name) return; f.name.value = ""; r = await sb.from("jc_names").insert({ team_id: t, name, color: COLORS[JC.names.length % COLORS.length], sort: JC.names.length }); }
     if (f.dataset.f === "memo") { const body = f.body.value.trim(); if (!body) return; const who = jo() ? f.who.value : myName ?? ""; if (jo() && !who) return toast("✍️ 보내는 사람(내 이름)을 골라 주세요"); if (jo()) try { localStorage.setItem(whoKey(), who); } catch {} f.body.value = ""; r = await sb.from("jc_memos").insert({ team_id: t, page: JC.page, kind: f.dataset.kind, body, by_name: who }); }
     if (f.dataset.f === "link") {
@@ -297,6 +364,11 @@ function bind() {
     const act = b.dataset.act, id = +b.closest("[data-id]")?.dataset.id;
     if (act === "today") return scrollToday(v.querySelector(".jcscrollx"), true);
     if (act === "cell") return openCell(b);
+    if (act === "tomove") return openMove(b, +b.closest("tr[data-task]").dataset.task);
+    if (act === "mksec") return makeSections();
+    if (act === "rdck") { const r = JC.reads.find((x) => x.id === id), k = `chk${b.dataset.n}`; if (!r) return; // 📖 1차 들어감 · 2차 확인 — 다시 누르면 취소
+      const patch = r[k] ? { [k]: "", [`${k}_at`]: null } : { [k]: whoNow(), [`${k}_at`]: new Date().toISOString() };
+      Object.assign(r, patch); renderReads(); return fail((await sb.from("jc_reads").update(patch).eq("id", id)).error); }
     if (act === "color") return openColor(b, id);
     if (act === "mvl" || act === "mvr") { const i = JC.names.findIndex((x) => x.id === id), j = i + (act === "mvl" ? -1 : 1); if (j < 0 || j >= JC.names.length) return; return reorder("jc_names", JC.names, id, JC.names[j].id); }
     if (act === "mark") return openMark(b, +b.closest("tr[data-task]").dataset.task);

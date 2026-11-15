@@ -99,3 +99,23 @@ body:not(.jcv) #jcView { display: none; }
 .jcpop .jcmks .mk-none { background: var(--fill); color: var(--sub); } .jcpop .jcmks .mk-red { background: var(--red); } .jcpop .jcmks .mk-green { background: var(--green); } .jcpop .jcmks .mk-blue { background: var(--blue); } .jcpop .jcmks .mk-yellow { background: #d9a400; }
 
 #jcView button.jcmv { border: 0; background: transparent; color: var(--sub); font-size: 15px; line-height: 1; padding: 0 3px; cursor: pointer; }
+
+/* 📖 리딩 확인 (신고 은서 11-15): 시간대 칸마다 이름·레벨 + 들어감 · 확인 두 번 체크 */
+#jcView .jcrdhint { margin: 0 0 12px; font-size: 13px; }
+#jcView .jcrgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+#jcView .jcrs { background: var(--fill); border-radius: 10px; padding: 12px; min-width: 0; }
+#jcView .jcrs h4 { margin: 0 0 8px; font-size: 17px; } #jcView .jcrs h4 small { font-size: 13px; font-weight: 500; margin-left: 4px; }
+#jcView .jcrdf { margin-bottom: 4px; } #jcView .jcrdf select { flex: none; width: auto; }
+#jcView .jcrd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 10px; margin-top: 6px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 15px; }
+#jcView .jcrd.done { border-color: #1f9d55; background: rgba(31, 157, 85, .08); }
+#jcView .jcrdn { flex: 1 1 110px; min-width: 0; display: flex; align-items: center; gap: 6px; word-break: keep-all; }
+#jcView .jclv { flex: none; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+#jcView .jcck { border: 1px solid var(--line); background: var(--bg); color: var(--sub); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; }
+#jcView .jcck.on { border-color: #1f9d55; color: #1f9d55; background: rgba(31, 157, 85, .1); font-weight: 700; } #jcView .jcck small { font-weight: 400; color: var(--sub); }
+/* 할일 칸 나누기: 🔥 우선순위 · ⏰ 오늘 하루 끝낼 일 (■ 구간 제목 줄 + 강조 색) · 넣을 칸 고르기 · ⇅ 칸 옮기기 */
+#jcView .jcsecq { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; } #jcView .jcsecq[hidden], #jcView .jcsecsel[hidden] { display: none; }
+#jcView .jcsecsel { flex: none; width: auto; max-width: 200px; }
+#jcView .jcmvt { font-size: 14px; }
+.jcpop .jcmvl { display: flex; flex-direction: column; gap: 6px; }
+.jcpop .jcmvl button { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 8px; padding: 9px 12px; font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; } .jcpop .jcmvl button:hover { background: var(--hover); }
+.jcpop .jcmvl .jcmvtop { font-weight: 400; color: var(--sub); }

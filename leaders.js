@@ -249,24 +249,26 @@ const subLine = (ss, d, hint = "") => (ss.length ? `<div class="tdrow sbline"><b
 const MSG = { eve: ["전날", "✉️ 전날 문자"], ten: ["10분", "⏱ 10분 전"] }, msgOn = (id, d, k) => LD.msg?.get(`${id}:${d}:${k}`);
 const msgKinds = (d) => (d === today() ? ["eve", "ten"] : ["eve"]);
 const msgBox = (r, d, k) => { const m = msgOn(r.id, d, k); return `<button class="msgb ${m ? "on" : ""}" data-msg="${r.id}" data-day="${d}" data-k="${k}" title="${MSG[k][1]} — ${m ? `${hm(m.at)} ${esc(m.by_name)} 체크, 누르면 취소` : "보냈으면 누르기"}">${m ? "☑" : "☐"} ${MSG[k][0]}</button>`; };
-const msgAll = (rs, d) => { const ok = rs.filter((r) => r.status === "확정"); if (!ok.length) return "";
+const msgAll = (rs, d) => { const ok = rs.filter(onDuty); if (!ok.length) return "";
   return `<span class="msgall">${msgKinds(d).map((k) => { const n = ok.filter((r) => msgOn(r.id, d, k)).length; return `<button class="${n === ok.length ? "on" : ""}" data-msgall="${ok.map((r) => r.id).join(",")}" data-day="${d}" data-k="${k}" title="이 시간대 ${ok.length}명 한 번에 ${n === ok.length ? "취소" : "체크"}">${n === ok.length ? "☑" : "☐"} ${MSG[k][1]} 전체 <small>${n}/${ok.length}</small></button>`; }).join("")}</span>`; };
 // 오늘·내일 칩: ⬜/✅ 온다 확인 · 이름 · 레벨 · 언어 · 📞 · 🔁 대타 필요 → 🆘 구하는 중 → 🔁 대타 OOO (이름 넣으면 그날 출석 X + 대타 이름으로 남아 대타 해준 리더 출석 인정)
 // ⭕ 오늘 실제 출석 (리더 리스트 출석 칸과 같은 값 · 참 → 불참 → 비움) — 대타를 넣은 날은 이미 불참이라 안 보임
 const attTog = (r, d) => { const s = LD.att.get(r.id)?.get(d) ?? ""; return `<button class="batt ${s === "O" ? "atton" : s === "X" ? "attoff" : ""}" data-batt="${r.id}" data-day="${d}" title="실제 출석 — 누르면 참 → 불참 → 비움 (잘못 누르면 아래 되돌리기)">${s === "O" ? "⭕ 참" : s === "X" ? "❌ 불참" : "참·불참"}</button>`; };
+// 🧑‍🎓 빈자리 줄에 사람 이름(조교 등)을 적어 둔 칸 = 그 사람이 대신 들어옴 → 확정 리더 칩과 똑같이 온다 확인·문자·대타·참불참을 씀 (신고 은서 11-15). 상태는 그대로 '구해야 함'(이름만으론 확정 안 됨), '구해야됨 (유정)' 같은 안내 줄은 제외
+const covered = (r) => r.status !== "확정" && r.name !== VACANT && !/^구해야/.test(r.name), onDuty = (r) => r.status === "확정" || covered(r);
 const NEED = "대타 필요"; // ponytail: leader_confirm.note 로 표시 (칸 추가 없이) — 통계에 필요해지면 need_sub 칸으로 옮기기
 function chip(r, d) {
-  const td = d === today(), right = (x, y, z) => `<span class="cfr">${r.status === "확정" ? `<span class="msgs">${msgKinds(d).map((k) => msgBox(r, d, k)).join("")}</span>` : ""}${x}${td ? `${y || `<i class="sl1"></i>`}${z || `<i class="sl2"></i>`}` : ""}</span>`; // 대타 · 참불참(오늘만) · 지각(오늘만) — 없어도 자리는 비워 둠 (오와열)
-  if (r.status !== "확정") return `<span class="cfm vac ${r.name === VACANT ? "" : "named"}"><span class="vcn"><button data-vac="${r.id}" title="누르면 이 자리에 들어갈 사람 이름 적기 (조교 등) — 자리는 계속 구하는 중">${r.name === VACANT ? "빈자리" : `<b>${esc(r.name)}</b>`}</button>${tags(r)}</span><span class="tel"></span>${right(`<span class="subslot"></span>`)}${noteLine(r)}${r.need_note ? `<span class="cfnt">🔴 ${esc(r.need_note)}</span>` : ""}</span>`;
+  const td = d === today(), right = (x, y, z) => `<span class="cfr">${onDuty(r) ? `<span class="msgs">${msgKinds(d).map((k) => msgBox(r, d, k)).join("")}</span>` : ""}${x}${td ? `${y || `<i class="sl1"></i>`}${z || `<i class="sl2"></i>`}` : ""}</span>`; // 대타 · 참불참(오늘만) · 지각(오늘만) — 없어도 자리는 비워 둠 (오와열)
+  if (!onDuty(r)) return `<span class="cfm vac ${r.name === VACANT ? "" : "named"}"><span class="vcn"><button data-vac="${r.id}" title="누르면 이 자리에 들어갈 사람 이름 적기 (조교 등) — 자리는 계속 구하는 중">${r.name === VACANT ? "빈자리" : `<b>${esc(r.name)}</b>`}</button>${tags(r)}</span><span class="tel"></span>${right(`<span class="subslot"></span>`)}${noteLine(r)}${r.need_note ? `<span class="cfnt">🔴 ${esc(r.need_note)}</span>` : ""}</span>`;
   const c = LD.cfm?.get(`${r.id}:${d}`), sub = LD.subs.get(r.id)?.get(d) ?? "";
   const need = c?.note === NEED, on = c && !need;
-  return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${tel(r) || `<span class="tel"></span>`}`
-    + right(`<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>`, !sub && attTog(r, d), on && lateSel(r.id, c.note)) + `${noteLine(r)}</span>`;
+  return `<span class="cfm ${on ? "on" : ""} ${sub ? "hasub" : ""} ${need && !sub ? "needsub" : ""} ${covered(r) ? "cov" : ""}"><button data-cfm="${r.id}" data-day="${d}" title="${on ? `${hm(c.at)} ${esc(c.by_name)} 확인 — 누르면 취소` : "연락해서 온다고 하면 누르기"}">${on ? "✅" : "⬜"} <b>${esc(r.name)}</b>${tags(r)}${on && c.note ? ` <b class="cfnote">⏰ ${esc(c.note)}</b>` : ""}</button>${covered(r) ? `<button type="button" class="vcedit" data-vac="${r.id}" title="자리에 들어갈 사람 이름 고치기 (비우면 다시 빈자리) · 자리는 계속 구하는 중">✏️</button>` : ""}${tel(r) || `<span class="tel"></span>`}`
+    + right(`<button class="${sub ? "subtag" : need ? "subneed" : "subadd"}" data-sub="${r.id}" data-day="${d}" title="${sub ? "대타 고치기·지우기" : need ? `${hm(c.at)} ${esc(c.by_name)} 표시 — 구하면 눌러서 이름 넣기` : "못 온다고 하면 누르기"}">${sub ? `🔁 대타 ${esc(sub)}` : need ? "🆘 대타 구하는 중" : `🔁 ${NEED}`}</button>`, !sub && attTog(r, d), on && lateSel(r.id, c.note)) + `${noteLine(r)}${covered(r) ? `<span class="cfnt">🔴 정식 리더 구하는 중${r.need_note ? ` · ${esc(r.need_note)}` : ""}</span>` : ""}</span>`;
 }
 function dayCard(d, label) {
   const g = grpOn(d), head = (x = "") => `<h3>${label} <span class="dd">${md(d)}(${dw(d)})${g ? ` · ${g}` : ""}</span>${x}</h3>`;
   if (!g) return `<section class="ldday">${head()}<p class="mut">수업 없음</p></section>`;
-  const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && workOn(r, d)), ok = rs.filter((r) => r.status === "확정");
+  const rs = LD.rows.filter((r) => r.grp === g && isLeader(r) && workOn(r, d)), ok = rs.filter(onDuty);
   const attN = (st) => ok.filter((r) => LD.att.get(r.id)?.get(d) === st).length;
   const noteOf = (r) => LD.cfm?.get(`${r.id}:${d}`), hasSub = (r) => LD.subs.get(r.id)?.get(d);
   const done = ok.filter((r) => noteOf(r) && noteOf(r).note !== NEED).length, subs = ok.filter(hasSub).length, need = ok.filter((r) => noteOf(r)?.note === NEED && !hasSub(r)).length;

@@ -257,6 +257,8 @@ body.is-assist #ldView .ldday .tdc { grid-template-columns: repeat(auto-fill, mi
 #ldView .ldday .cfm .lv, #ldView .ldday .cfm .lg { flex: none; width: 44px; margin-left: 0; box-sizing: border-box; text-align: center; }
 #ldView .ldday .cfm .tel { flex: none; width: 24px; margin-left: 0; text-align: center; }
 #ldView .ldday .cfm > button.tel { padding: 0; }
+#ldView .ldday .cfm > button.vcedit { all: unset; cursor: pointer; flex: none; padding: 2px 4px; font-size: 12px; opacity: .55; } #ldView .ldday .cfm > button.vcedit:hover { opacity: 1; } /* 이름 적어 둔 빈자리 칩: 이름 옆 ✏️ (신고 은서 11-15) */
+#ldView .ldday .cfm.cov { border-style: dashed; } /* 정식 리더가 아니라 조교 등이 대신 들어온 칸 = 점선으로 구분만 */
 #ldView .ldday .cfm .tel.num { width: 112px; }
 #ldView .ldday .cfr { flex: none; display: flex; align-items: center; gap: 3px; margin-left: auto; }
 #ldView .ldday .cfm [data-sub], #ldView .ldday .cfm .subslot { min-width: 120px; box-sizing: border-box; }
