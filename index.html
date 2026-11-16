@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>팔로 플래너</title>
 <meta name="robots" content="noindex">
-<meta name="app-version" content="202611152051">
+<meta name="app-version" content="202611161354">
 <meta name="theme-color" content="#0b0a14" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f1f9" media="(prefers-color-scheme: light)">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="theme.js?v=202611152051"></script>
+<script src="theme.js?v=202611161354"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -74,6 +74,11 @@ main { padding: 20px 24px 120px; min-width: 0; }
 .mk.must.late { background: #8f1d21; border-color: #ff6b6b; }
 .mk.imp { color: #fff; background: #ff8c1a; border-color: #ff8c1a; }
 .row.done .mk { opacity: .45; }
+/* 📥 보고 받기 → 보라 (🔥·★ 가 같이 있으면 그 색이 이김) */
+.mk.rep { color: #fff; background: #7c5cff; border-color: #7c5cff; }
+.row.rep:not(.done) { box-shadow: inset 3px 0 #7c5cff; background: color-mix(in srgb, #7c5cff 8%, transparent); }
+.qb.rpb.on { border-color: #7c5cff; }
+#repbox { border-color: #7c5cff66 !important; margin-bottom: 10px !important; }
 /* 중요·오늘 꼭 → 밝은 빨간색 */
 .row.hot:not(.done) { box-shadow: inset 3px 0 #ff4d4f; background: color-mix(in srgb, #ff4d4f 9%, transparent); }
 .row.hot:not(.done) textarea { color: #ff4d4f; font-weight: 700; }
@@ -185,12 +190,13 @@ body.is-admin #assignbox { display: block; }
 #briefText, .briefText { margin: 4px 0 10px; margin-top: 10px; padding: 14px 16px; border-radius: 10px; background: var(--panel); border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--line)); white-space: pre-wrap; line-height: 1.65; font-size: 14.5px; }
 #briefText .at, .briefText .at { display: block; color: var(--sub); font-size: 12px; margin-top: 8px; }
 /* 데드라인 모아보기 */
-#mustbox, #duebox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
+#mustbox, #duebox, #repbox { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; background: var(--panel); }
 #mustbox { border-color: #e5484d66; margin-bottom: 10px; }
-#mustbox summary, #duebox summary { cursor: pointer; font-weight: 600; }
-#mustbox .dl-item, #duebox .dl-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; }
-#mustbox .dl-item:first-of-type, #duebox .dl-item:first-of-type { border-top: 0; }
+#mustbox summary, #duebox summary, #repbox summary { cursor: pointer; font-weight: 600; }
+#mustbox .dl-item, #duebox .dl-item, #repbox .dl-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; }
+#mustbox .dl-item:first-of-type, #duebox .dl-item:first-of-type, #repbox .dl-item:first-of-type { border-top: 0; }
 #mustbox .dl-item span:first-child, #duebox .dl-item span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#repbox .dl-item span:first-child { flex: 1; min-width: 0; word-break: keep-all; overflow-wrap: anywhere; } /* 보고 받을 일은 안 자르고 줄바꿈 */
 
 /* 요일 칸 (노션 MON~SUN) */
 .day { margin-bottom: 26px; scroll-margin-top: calc(var(--hh, 53px) + 7px); }
@@ -213,7 +219,7 @@ body.is-admin #assignbox { display: block; }
 .qb.empty { color: var(--sub); }
 /* 보기 설정: 끈 기능은 숨김 */
 body.off-start [data-act=start], body.off-est [data-act=est], body.off-timer .tm:not(.cd), body.off-dl .row .chip,
-body.off-routine #rtMini, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal { display: none !important; }
+body.off-routine #rtMini, body.off-teamrow .teamrow, body.off-brief .briefBtn, body.off-brief .briefText, body.off-must #mustbox, body.off-due #duebox, body.off-wcal #weekCal, body.off-rep [data-act=rep], body.off-rep #repbox { display: none !important; }
 body.off-drag { --gw: 0px; } body.off-star { --sw: 0px; }
 body.off-drag .grip, body.off-star .star { visibility: hidden; overflow: hidden; }
 .pop label.tg { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px; font-size: 14px; border-top: 1px solid var(--line); cursor: pointer; }
@@ -578,31 +584,31 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 }
 @media (min-width: 861px) { #weeksBtn { display: none; } }
 </style>
-<link rel="stylesheet" href="blog.css?v=202611152051">
-<link rel="stylesheet" href="photo.css?v=202611152051">
-<link rel="stylesheet" href="post.css?v=202611152051">
-<link rel="stylesheet" href="marketing.css?v=202611152051">
-<link rel="stylesheet" href="contacts.css?v=202611152051">
-<link rel="stylesheet" href="leaders.css?v=202611152051">
-<link rel="stylesheet" href="links.css?v=202611152051">
-<link rel="stylesheet" href="mt.css?v=202611152051">
-<link rel="stylesheet" href="le.css?v=202611152051">
-<link rel="stylesheet" href="reports.css?v=202611152051">
-<link rel="stylesheet" href="edu.css?v=202611152051">
-<link rel="stylesheet" href="idea.css?v=202611152051">
-<link rel="stylesheet" href="duty.css?v=202611152051">
-<link rel="stylesheet" href="brain.css?v=202611152051">
-<link rel="stylesheet" href="qna.css?v=202611152051">
-<link rel="stylesheet" href="jo-guide.css?v=202611152051">
-<link rel="stylesheet" href="jc.css?v=202611152051">
-<link rel="stylesheet" href="talkbot.css?v=202611152051">
-<link rel="stylesheet" href="work.css?v=202611152051">
-<link rel="stylesheet" href="fin.css?v=202611152051">
-<link rel="stylesheet" href="gx.css?v=202611152051">
-<link rel="stylesheet" href="att.css?v=202611152051">
-<link rel="stylesheet" href="glass.css?v=202611152051">
-<link rel="stylesheet" href="sidebar.css?v=202611152051">
-<link rel="stylesheet" href="skins.css?v=202611152051">
+<link rel="stylesheet" href="blog.css?v=202611161354">
+<link rel="stylesheet" href="photo.css?v=202611161354">
+<link rel="stylesheet" href="post.css?v=202611161354">
+<link rel="stylesheet" href="marketing.css?v=202611161354">
+<link rel="stylesheet" href="contacts.css?v=202611161354">
+<link rel="stylesheet" href="leaders.css?v=202611161354">
+<link rel="stylesheet" href="links.css?v=202611161354">
+<link rel="stylesheet" href="mt.css?v=202611161354">
+<link rel="stylesheet" href="le.css?v=202611161354">
+<link rel="stylesheet" href="reports.css?v=202611161354">
+<link rel="stylesheet" href="edu.css?v=202611161354">
+<link rel="stylesheet" href="idea.css?v=202611161354">
+<link rel="stylesheet" href="duty.css?v=202611161354">
+<link rel="stylesheet" href="brain.css?v=202611161354">
+<link rel="stylesheet" href="qna.css?v=202611161354">
+<link rel="stylesheet" href="jo-guide.css?v=202611161354">
+<link rel="stylesheet" href="jc.css?v=202611161354">
+<link rel="stylesheet" href="talkbot.css?v=202611161354">
+<link rel="stylesheet" href="work.css?v=202611161354">
+<link rel="stylesheet" href="fin.css?v=202611161354">
+<link rel="stylesheet" href="gx.css?v=202611161354">
+<link rel="stylesheet" href="att.css?v=202611161354">
+<link rel="stylesheet" href="glass.css?v=202611161354">
+<link rel="stylesheet" href="sidebar.css?v=202611161354">
+<link rel="stylesheet" href="skins.css?v=202611161354">
 </head>
 <body>
 
@@ -667,6 +673,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
         <div id="asgList"></div>
       </details>
       <details id="mustbox" open class="hidden"><summary>🔥 꼭 끝낼 일 <span id="mustCount"></span></summary><div id="mustList"></div></details>
+      <details id="repbox" open class="hidden"><summary>📥 보고 받을 일 <span id="repCount"></span> <small style="font-weight:400;color:var(--sub)">보고 받으면 체크(완료)하세요</small></summary><div id="repList"></div></details>
       <details id="duebox" open><summary>⏰ 데드라인 <span id="dueCount"></span></summary><div id="dueList"></div></details>
       <div id="days"></div>
       <section class="mview wcal" id="weekCal"></section>
@@ -739,7 +746,7 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
   <div id="sAsg" class="asgnote hidden"></div>
   <label><input type="checkbox" id="sDone"> 완료</label>
   <label>표시</label>
-  <div class="quick" id="sMarks"><button data-mk="must_do">🔥 그날 꼭 끝내기</button><button data-mk="important">⭐ 중요</button></div>
+  <div class="quick" id="sMarks"><button data-mk="must_do">🔥 그날 꼭 끝내기</button><button data-mk="important">⭐ 중요</button><button data-mk="report">📥 보고 받기</button></div>
   <label for="sDay">날짜 (다른 날로 옮기기)</label>
   <input type="date" id="sDay">
   <label for="sDl" id="sDlLabel">데드라인</label>
@@ -794,9 +801,9 @@ dialog .ttl { font-size: 17px; font-weight: 600; }
 <div id="toast" class="hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="config.js?v=202611152051"></script>
-<script src="week.js?v=202611152051"></script>
-<script src="pick.js?v=202611152051"></script>
+<script src="config.js?v=202611161354"></script>
+<script src="week.js?v=202611161354"></script>
+<script src="pick.js?v=202611161354"></script>
 <script>
 const sb = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
 { // 👀 매니저 화면 보기 중엔 그 사람 것을 못 바꾸게: tasks 쓰기·쓰기 rpc 를 앞에서 끊는다
@@ -813,7 +820,7 @@ const KDAY = ["일", "월", "화", "수", "목", "금", "토"];
 const today = () => W.ymd(new Date());
 
 let me = null, monday = W.monday(today()), year = W.isoWeek(today()).year;
-let tasks = [], dues = [], musts = [], openId = null, dirty = false;
+let tasks = [], dues = [], musts = [], reps = [], openId = null, dirty = false;
 let teamTasks = [], routine = [], routineChecks = new Map(), consultTarget = 8; // consultTarget: 📅 내일 상담 목표(지점마다, 대표가 바꿈)
 let cal = null, calTasks = []; // 달력에 보이는 달 { y, m }
 
@@ -837,7 +844,7 @@ async function loadProfile() {
   document.body.classList.toggle("is-admin", myRole === "admin");
   if (myRole === "admin") $("#weekCal").before($("#days")); else $("#simbox").before($("#days")); // 매니저: 체크리스트 한 줄 → 하루 일정 → 시뮬레이션 순
   document.body.classList.toggle("is-assist", myRole === "assistant"); // 🧑‍🎓 조교: 탭 4개만 (서버에서도 막힘, 조교 가이드는 DB 없음)
-  tabCols(); // 역할마다 보이는 탭 수가 달라서 두 줄 칸 수 다시
+  applyPrefs(); // 역할마다 보이는 탭 수가 달라서 두 줄 칸 수 다시 + 📥 보고 받기 기본값(대표만 켜짐)
   if (myRole === "assistant") joHome(); // 🧑‍🎓 아이폰 홈 화면 앱도 조교 링크로 열리게
   if (myRole === "admin") loadAssigned();
   if (isBoss) teams = (await sb.from("teams").select("*").order("sort")).data ?? [];
@@ -1040,16 +1047,18 @@ $("#outBtn").onclick = async () => { try { localStorage.removeItem("jo-token"); 
 async function loadAll(scrollToday) {
   const sun = W.add(monday, 6);
   const weeks = W.weeksOf(year);
-  const [t, d, s, m, tt] = await Promise.all([
+  const [t, d, s, m, tt, rp] = await Promise.all([
     sb.from("tasks").select("*").eq("user_id", uid()).gte("day", monday).lte("day", sun).order("sort").order("id"),
     sb.from("tasks").select("id, day, title, deadline, deadline_log").eq("user_id", uid()).eq("done", false).not("deadline", "is", null)
       .lte("deadline", new Date(Date.now() + 7 * 86400000).toISOString()).order("deadline").limit(30),
     sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser }),
     sb.from("tasks").select("id, day, title").eq("user_id", uid()).eq("must_do", true).eq("done", false).lte("day", today()).order("day").limit(30),
     myRole === "admin" ? { data: [] } : sb.rpc("team_tasks_between", { p_from: monday, p_to: sun }),
+    sb.from("tasks").select("id, day, title, report, done").eq("user_id", uid()).eq("report", true).eq("done", false).order("day").limit(50),
   ]);
   if (fail(t.error || d.error || s.error || m.error || tt.error)) return;
-  tasks = t.data; dues = d.data; musts = m.data; teamTasks = inTeam(tt.data);
+  if (rp.error) console.warn("📥 보고 받을 일 못 불러옴(0105 전?)", rp.error.message); // 칸 생기기 전에도 주간 탭은 떠야 함
+  tasks = t.data; dues = d.data; musts = m.data; reps = rp.data ?? []; teamTasks = inTeam(tt.data);
   loadRoutine();
   renderWeeks(Object.fromEntries(s.data.map((x) => [x.start, x])));
   renderWeek();
@@ -1907,10 +1916,11 @@ function openPop(anchor, t, kind) {
   popFor = { t, kind, at: Date.now() };
 }
 // ── 보기 설정 (계정에 저장 → 폰·노트북 같이) ──
-const FEATURES = [["routine", "📌 매니저체크리스트 한 줄(주간)"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"],
+const FEATURES = [["routine", "📌 매니저체크리스트 한 줄(주간)"], ["teamrow", "👥 팀 업무(하루 일정에)"], ["brief", "🧠 브리핑"], ["start", "🕐 업무 시작시간"], ["est", "⏳ 예상 소요시간"], ["timer", "▶ 수행시간 타이머"], ["dl", "📅 데드라인"], ["rep", "📥 보고 받기 (대표만 기본 켜짐)"],
   ["star", "★ 중요 버튼"], ["drag", "⠿ 끌어서 옮기기"], ["must", "🔥 꼭 끝낼 일 상자"], ["due", "⏰ 데드라인 상자"], ["wcal", "📆 주간 아래 월 달력"]];
 const prefs = () => me?.user_metadata?.prefs ?? {};
-function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, prefs()[k] === false); if (prefs().skin) plannerSkin.set(prefs().skin); applyTabOrder(); tabCols(); } // 🎨 계정에 저장된 디자인 → 이 기기에도
+const featOn = (k) => prefs()[k] ?? (k !== "rep" || isBoss); // 📥 보고 받기는 대표만 기본 켜짐, 나머지는 끄기가 기본
+function applyPrefs() { for (const [k] of FEATURES) document.body.classList.toggle("off-" + k, !featOn(k)); if (prefs().skin) plannerSkin.set(prefs().skin); applyTabOrder(); tabCols(); } // 🎨 계정에 저장된 디자인 → 이 기기에도
 async function savePrefs(next) {
   me = { ...me, user_metadata: { ...me.user_metadata, prefs: next } }; applyPrefs(); // 바로 반영
   const { data, error } = await sb.auth.updateUser({ data: { prefs: next } });
@@ -1957,7 +1967,7 @@ function openPrefs(anchor) {
   pop.innerHTML = `<h4>🎨 디자인</h4><div class="skins">${Object.entries(plannerSkin.SKINS).map(([k, [name, , c]]) =>
     `<button type="button" data-skin="${k}" class="${plannerSkin.get() === k ? "on" : ""}" title="${name}"><i style="background:linear-gradient(135deg,${c[0]} 50%,${c[1]} 50%)"><b style="background:${c[2]}"></b></i>${name.split(" · ")[0]}</button>`).join("")}</div>`
     + `<h4>⚙️ 보기 설정 — 쓰는 것만 켜세요</h4>` + FEATURES.map(([k, label]) =>
-    `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${prefs()[k] === false ? "" : "checked"}></label>`).join("")
+    `<label class="tg">${label}<input type="checkbox" data-pref="${k}" ${featOn(k) ? "checked" : ""}></label>`).join("")
     + (!KAKAO ? "" : `<label class="tg" style="flex-wrap:wrap;gap:4px">📱 카톡 알림 받을 번호<input id="myPhone" inputmode="numeric" placeholder="01012345678" value="${esc(myPhone)}" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"></label>`)
     + (!isBoss ? "" : `<label class="tg">👀 매니저 화면으로 보기<select id="previewSel" style="padding:4px 6px;border-radius:8px;border:1px solid var(--line);background:var(--bg)"><option value="">끄기 (대표 화면)</option><optgroup label="지점 매니저 화면(내 할 일 기준)">${(teams.length ? teams : []).map((x) => `<option value="${x.id}" ${!previewUser && previewTeam === x.id ? "selected" : ""}>${esc(x.name)} 매니저로</option>`).join("")}</optgroup><optgroup label="매니저 화면 그대로 (보기만)">${(pplCache ?? []).filter((x) => x.role !== "admin" && x.role !== "offboarded").map((x) => `<option value="u:${x.user_id}" ${previewUser === x.user_id ? "selected" : ""}>${esc(x.name)} · ${esc(teams.find((t) => t.id === x.team_id)?.name ?? "지점 없음")}</option>`).join("")}</optgroup></select></label>`)
     + (!isBoss ? "" : `<div class="tg" style="display:flex;justify-content:space-between;align-items:center;padding:7px 2px;border-top:1px solid var(--line);font-size:14px">💬 카톡으로도 받기${kakaoMe
@@ -2042,6 +2052,7 @@ async function toggleTimer(t) {
 function marks(t) {
   let h = assignedToMe(t) ? `<span class="mk asg" data-act="open" title="대표님이 배정한 일">📨 배정${t.assign_log?.length ? ` ↻${t.assign_log.length}` : ""}</span>` : "";
   if (t.must_do) h += `<span class="mk must ${!t.done && t.day < today() ? "late" : ""}" data-act="open" title="그날 꼭 끝내기">🔥 ${t.day === today() ? "오늘 꼭" : !t.done && t.day < today() ? "못 끝냄" : "꼭"}</span>`;
+  if (t.report) h += `<span class="mk rep" data-act="rep" title="누르면 보고 받기 표시를 꺼요">📥 보고 받기</span>`;
   return h;
 }
 // 👥 팀 태스크 줄: 누가 끝내도 팀 전체 완료
@@ -2059,11 +2070,11 @@ async function toggleTeamTask(id, done) {
   view === "team" ? loadTeam() : loadAll();
 }
 function rowHtml(t) {
-  return `<div class="row ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : ""} ${W.inFocus(t.start_time, focusOf()) ? "focus" : ""}" data-id="${t.id}">
+  return `<div class="row ${t.done ? "done" : ""} ${t.must_do ? "hot" : t.important ? "imp" : t.report ? "rep" : ""} ${W.inFocus(t.start_time, focusOf()) ? "focus" : ""}" data-id="${t.id}">
     <span class="grip" aria-label="끌어서 다른 날로 옮기기" title="끌어서 옮기기">⠿</span>
     <input type="checkbox" ${t.done ? "checked" : ""} aria-label="완료">
     <textarea rows="1" placeholder="할 일 입력" ${assignedToMe(t) ? "readonly" : ""}>${esc(t.title)}</textarea>
-    <div class="meta">${marks(t)}${quickBtns(t)}${timeBtn(t)}${REF.btn(t)}${chip(t)}</div>
+    <div class="meta">${marks(t)}${quickBtns(t)}${timeBtn(t)}${REF.btn(t)}${chip(t)}${t.report || t.done ? "" : `<button class="qb rpb empty" data-act="rep" title="보고 받을 일로 표시">📥</button>`}</div>
     <button class="star ${t.important ? "on" : ""}" data-act="star" aria-label="${t.important ? "중요 끄기" : "중요 표시"}" title="중요">${t.important ? "★" : "☆"}</button>
     <button class="more" data-act="open" aria-label="자세히">⋯</button></div>`;
 }
@@ -2134,6 +2145,9 @@ $("#focusClear").onclick = async () => { const { focus, ...rest } = prefs(); awa
 function renderDue() {
   $("#mustbox").classList.toggle("hidden", !musts.length);
   $("#mustCount").textContent = `(${musts.length})`;
+  $("#repbox").classList.toggle("hidden", !reps.length);
+  $("#repCount").textContent = `(${reps.length})`;
+  $("#repList").innerHTML = reps.map((t) => `<div class="dl-item" data-day="${t.day}"><span>${esc(t.title) || "(제목 없음)"}</span><span class="mk rep">${t.day === today() ? "오늘" : md(t.day)}</span></div>`).join("");
   $("#mustList").innerHTML = musts.map((t) => `<div class="dl-item" data-day="${t.day}"><span>${esc(t.title) || "(제목 없음)"}</span><span class="mk must ${t.day < today() ? "late" : ""}">${t.day === today() ? "오늘" : md(t.day) + " 못 끝냄"}</span></div>`).join("");
   $("#dueCount").textContent = dues.length ? `(${dues.length})` : "";
   $("#dueList").innerHTML = dues.length
@@ -2154,6 +2168,8 @@ async function save(id, patch) {
   if (cal) renderCal();
   musts = musts.filter((t) => t.id !== id);
   if (data.must_do && !data.done && data.day <= today()) { musts.push(data); musts.sort((a, b) => a.day.localeCompare(b.day)); }
+  reps = reps.filter((t) => t.id !== id);
+  if (data.report && !data.done) { reps.push(data); reps.sort((a, b) => a.day.localeCompare(b.day)); }
   const di = dues.findIndex((t) => t.id === id);
   const inDue = !data.done && data.deadline && new Date(data.deadline) <= Date.now() + 7 * 86400000;
   if (di >= 0 && !inDue) dues.splice(di, 1);
@@ -2179,6 +2195,7 @@ $("#days").addEventListener("click", async (e) => {
   if (act === "est" || act === "start") { const b = e.target.closest("[data-act]"); popFor?.t.id === taskOf(b).id && popFor.kind === act ? closePop() : openPop(b, taskOf(b), act); }
   if (act === "ref") REF.open(taskOf(e.target)); // 📎 참고 링크·파일
   if (act === "star") { const t = taskOf(e.target); if (await save(t.id, { important: !t.important })) renderWeek(); }
+  if (act === "rep") { const t = taskOf(e.target); if (await save(t.id, { report: !t.report })) { renderWeek(); toast(t.report ? "📥 보고 받을 일로 표시했어요" : "보고 받기 표시를 껐어요"); } }
 });
 $("#days").addEventListener("change", async (e) => {
   if (e.target.type !== "checkbox") return;
@@ -2204,7 +2221,7 @@ async function bumpStats() { // 주 목록 % 만 다시
   const { data } = await sb.rpc("week_stats", { from_day: weeks[0], to_day: W.add(weeks.at(-1), 6), p_user: previewUser });
   if (data) renderWeeks(Object.fromEntries(data.map((x) => [x.start, x])));
 }
-$("#mustList").onclick = $("#dueList").onclick = (e) => {
+$("#mustList").onclick = $("#dueList").onclick = $("#repList").onclick = (e) => {
   const it = e.target.closest(".dl-item"); if (!it) return;
   const m = W.monday(it.dataset.day);
   const go = () => document.getElementById("d-" + it.dataset.day)?.scrollIntoView({ behavior: "smooth" });
@@ -2443,49 +2460,49 @@ addEventListener("focus", vcheck); addEventListener("pageshow", vcheck); addEven
 sb.auth.onAuthStateChange((ev) => ev === "SIGNED_OUT" && location.replace(location.pathname)); // ?jo= 빼고 — 조교 기기는 boot 가 기억한 jo-token 으로 다시 들어감
 document.addEventListener("DOMContentLoaded", boot); // 아래 <script src> 가 다 돈 뒤 — 바로 부르면 데이터가 스크립트보다 빨리 온 첫 로드에 없는 전역(REF 등)을 씀 (뒤 스크립트들은 로드 시점에 me·myRole 안 씀)
 </script>
-<script src="sales.js?v=202611152051"></script>
-<script src="month-goal.js?v=202611152051"></script>
-<script src="sales-all.js?v=202611152051"></script>
-<script src="photo.js?v=202611152051"></script>
-<script src="blog.js?v=202611152051"></script>
-<script src="mk-core.js?v=202611152051"></script>
-<script src="mkc-core.js?v=202611152051"></script>
-<script src="mka-core.js?v=202611152051"></script>
-<script src="mkd-core.js?v=202611152051"></script>
-<script src="meetup-core.js?v=202611152051"></script>
-<script src="marketing.js?v=202611152051"></script>
-<script src="sns-core.js?v=202611152051"></script>
-<script src="post.js?v=202611152051"></script>
-<script src="someday.js?v=202611152051"></script>
-<script src="contacts.js?v=202611152051"></script>
-<script src="refs.js?v=202611152051"></script>
-<script src="sim-merge.js?v=202611152051"></script>
-<script src="simtb.js?v=202611152051"></script>
-<script src="leaders-core.js?v=202611152051"></script>
-<script src="leaders.js?v=202611152051"></script>
-<script src="links.js?v=202611152051"></script>
-<script src="mt.js?v=202611152051"></script>
-<script src="le.js?v=202611152051"></script>
-<script src="edu-data.js?v=202611152051"></script>
-<script src="edu.js?v=202611152051"></script>
-<script src="reports.js?v=202611152051"></script>
-<script src="jo-guide-hire.js?v=202611152051"></script>
-<script src="jo-guide.js?v=202611152051"></script>
-<script src="jc.js?v=202611152051"></script>
-<script src="talkbot.js?v=202611152051"></script>
-<script src="work-core.js?v=202611152051"></script>
-<script src="work.js?v=202611152051"></script>
-<script src="fin-core.js?v=202611152051"></script>
-<script src="fin.js?v=202611152051"></script>
-<script src="gx-core.js?v=202611152051"></script>
-<script src="gx.js?v=202611152051"></script>
-<script src="att.js?v=202611152051"></script>
-<script src="idea.js?v=202611152051"></script>
-<script src="duty-seed.js?v=202611152051"></script>
-<script src="duty.js?v=202611152051"></script>
-<script src="brain-tree3d.js?v=202611152051"></script>
-<script src="brain.js?v=202611152051"></script>
-<script src="qna.js?v=202611152051"></script>
-<script src="sidebar.js?v=202611152051"></script>
+<script src="sales.js?v=202611161354"></script>
+<script src="month-goal.js?v=202611161354"></script>
+<script src="sales-all.js?v=202611161354"></script>
+<script src="photo.js?v=202611161354"></script>
+<script src="blog.js?v=202611161354"></script>
+<script src="mk-core.js?v=202611161354"></script>
+<script src="mkc-core.js?v=202611161354"></script>
+<script src="mka-core.js?v=202611161354"></script>
+<script src="mkd-core.js?v=202611161354"></script>
+<script src="meetup-core.js?v=202611161354"></script>
+<script src="marketing.js?v=202611161354"></script>
+<script src="sns-core.js?v=202611161354"></script>
+<script src="post.js?v=202611161354"></script>
+<script src="someday.js?v=202611161354"></script>
+<script src="contacts.js?v=202611161354"></script>
+<script src="refs.js?v=202611161354"></script>
+<script src="sim-merge.js?v=202611161354"></script>
+<script src="simtb.js?v=202611161354"></script>
+<script src="leaders-core.js?v=202611161354"></script>
+<script src="leaders.js?v=202611161354"></script>
+<script src="links.js?v=202611161354"></script>
+<script src="mt.js?v=202611161354"></script>
+<script src="le.js?v=202611161354"></script>
+<script src="edu-data.js?v=202611161354"></script>
+<script src="edu.js?v=202611161354"></script>
+<script src="reports.js?v=202611161354"></script>
+<script src="jo-guide-hire.js?v=202611161354"></script>
+<script src="jo-guide.js?v=202611161354"></script>
+<script src="jc.js?v=202611161354"></script>
+<script src="talkbot.js?v=202611161354"></script>
+<script src="work-core.js?v=202611161354"></script>
+<script src="work.js?v=202611161354"></script>
+<script src="fin-core.js?v=202611161354"></script>
+<script src="fin.js?v=202611161354"></script>
+<script src="gx-core.js?v=202611161354"></script>
+<script src="gx.js?v=202611161354"></script>
+<script src="att.js?v=202611161354"></script>
+<script src="idea.js?v=202611161354"></script>
+<script src="duty-seed.js?v=202611161354"></script>
+<script src="duty.js?v=202611161354"></script>
+<script src="brain-tree3d.js?v=202611161354"></script>
+<script src="brain.js?v=202611161354"></script>
+<script src="qna.js?v=202611161354"></script>
+<script src="sidebar.js?v=202611161354"></script>
 </body>
 </html>
