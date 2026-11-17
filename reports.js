@@ -52,7 +52,8 @@ const ruleText = (name, s) => {
 const writes = (s) => (bossMode() ? [...RP.names.keys()] : [meName()]).some((n) => daysOf(n, s).includes(dow(s)));
 // 데일리는 쓰는 날끼리만 오감: n = -1 이전 · 1 다음
 const stepDaily = (s, n) => { for (let i = 0; i < 14; i++) if (writes((s = W.add(s, n)))) break; return s; };
-const thisDay = () => RP.kind === "daily" ? (writes(today()) ? today() : stepDaily(today(), -1)) : W.monday(today());
+// 주간 성장 = 가장 최근 일요일이 끝나는 주 (일요일 밤 자정 넘어·월요일에 써도 지난주 칸 — 11-17 채림 11/15 리포트가 다음 주로 간 버그)
+const thisDay = () => RP.kind === "daily" ? (writes(today()) ? today() : stepDaily(today(), -1)) : W.lastSunWeek(today());
 
 // 부팅 때 한 번: 대상자만 탭 보이기 + 오늘 쓸 것 배지
 RP.init = async function () {

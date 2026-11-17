@@ -7,6 +7,7 @@
 if (matchMedia("(min-width: 900px)").matches) {
   document.querySelector(".seg").append(document.getElementById("weeks"));
   document.body.classList.add("side-on");
+  document.querySelectorAll(".seg [data-v]").forEach((b) => b.insertAdjacentHTML("beforeend", `<span class="nw" data-nw title="이 탭을 새 창으로 열기">⧉</span>`)); // 🪟 클릭은 index.html openWin
   // ⇤ 왼쪽 메뉴 접기·펼치기 (기본 펼침, 기기에 기억 side-off) — 마야 요청 10-29
   const btn = document.getElementById("sideBtn"), set = (off) => { document.body.classList.toggle("side-off", off); btn.textContent = off ? "☰" : "⇤"; btn.title = off ? "왼쪽 메뉴 펼치기" : "왼쪽 메뉴 접기"; };
   try { set(localStorage.getItem("side-off") === "1"); } catch { set(false); }

@@ -26,3 +26,7 @@ body:is(.mv, .tv, .bv, .sv, .blv, .mkv, .psv, .lkv, .ctv, .qav, .idv, .dtv, .bnv
 .seg [data-v=links] { --ic: "↗"; } .seg [data-v=ct] { --ic: "☎"; } .seg [data-v=ld] { --ic: "☰"; } .seg [data-v=edu] { --ic: "◇"; }
 .seg [data-v=jg] { --ic: "◈"; } .seg [data-v=jc] { --ic: "✓"; } .seg [data-v=mc] { --ic: "☑"; } .seg [data-v=tk] { --ic: "✉"; } .seg [data-v=wr] { --ic: "◷"; } .seg [data-v=rp] { --ic: "▣"; }
 .seg [data-v=sim] { --ic: "◐"; } .seg [data-v=board] { --ic: "▥"; }
+/* 🪟 ⧉ 새 창으로 열기 (11-16): 마우스 올린 탭에만, 오른쪽 끝 */
+body.side-on .seg .nw { float: right; visibility: hidden; margin: -4px -6px -4px 6px; padding: 2px 7px; border-radius: 6px; font-size: 18px; line-height: 1.3; color: var(--text); opacity: .75; }
+body.side-on .seg button:hover .nw { visibility: visible; } body.side-on .seg .nw:hover { background: var(--hover); opacity: 1; }
+@media (hover: none) { .seg .nw { display: none; } }

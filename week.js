@@ -4,6 +4,8 @@ const W = {
   parse(s) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); },
   add(s, n) { const d = W.parse(s); d.setDate(d.getDate() + n); return W.ymd(d); },
   monday(s) { const d = W.parse(s); return W.add(s, -((d.getDay() + 6) % 7)); },
+  // 가장 최근 일요일(오늘 포함)이 끝나는 주의 월요일 — 주간 성장 리포트 칸 (월요일에 써도 지난주)
+  lastSunWeek(s) { return W.monday(W.add(s, -W.parse(s).getDay())); },
   // ISO 주차 (노션 'Week 43' 과 같은 번호)
   isoWeek(s) {
     const thu = W.parse(W.add(W.monday(s), 3));
