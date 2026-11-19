@@ -124,4 +124,4 @@ body:not(.fnv) #fnView { display: none; }
 #fnView .fntbl td.fnflip { outline: 1.5px dashed #e67e22; outline-offset: -3px; }
 #fnView .fntbl td.fnflip input { min-width: 0; }
 #fnView .fntbl td.fnflip button { flex: none; border: 1px solid #e67e22; background: #fff4e6; color: #a0460b; border-radius: 5px; font-size: 11px; font-weight: 700; padding: 1px 4px; cursor: pointer; }
-#fnView .fnfsel { padding: 3px 6px; font-size: 12px; border: 1px solid var(--line, #ccc); border-radius: 6px; background: transparent; color: inherit; } #fnView .fnfsel.on { background: #493087; color: #fff; border-color: #493087; }
+#fnView .fnfsel { padding: 4px 8px; font-size: 14px; border: 1px solid var(--line, #ccc); border-radius: 6px; background: transparent; color: inherit; } #fnView .fnfsel.on { background: #493087; color: #fff; border-color: #493087; }
