@@ -136,7 +136,7 @@ function helpHtml() {
     <li><b>범위 고르기</b> 칸을 누른 채 끌거나, 칸을 누르고 다른 칸을 ${k("Shift")}+클릭 → 그만큼 파랗게 골라져요 (${k("Esc")}로 풀기)</li>
     <li><b>복사</b> ${k(MK + "C")} → 고른 범위가 복사돼요 (안 골랐으면 누른 칸 하나, 점선 표시). 줄 전체는 그 줄 칸에서 ${k(MK + "Shift+C")}. 칸 글자 일부만은 마우스로 글자를 끌어서 고른 뒤 ${k(MK + "C")}</li>
     <li><b>붙이기</b> 붙일 칸에서 ${k(MK + "V")} → 그 칸부터 옆 칸·아래 줄로 채워져요 (▾ 고르는 칸도 돼요). 줄이 모자라면 새 줄을 넣고, 이미 적힌 칸을 여러 개 덮을 땐 먼저 물어봐요. 구글 시트에서 복사한 범위도 돼요 (줄 전체면 첫 칸부터)</li>
-    <li><b>줄 넣기</b> 줄 오른쪽 끝 ${k("＋")} = 바로 아래에 빈 줄 (칸에서 ${k(MK + "Enter")}) · ${k("⧉")} = 이 줄을 복사해서 바로 아래에 (${k(MK + "Shift+Enter")}) · ${k("🗑")} = 줄 지우기 (시트에서도 지워져요)</li>
+    <li><b>줄 넣기</b> 줄 오른쪽 끝 ${k("＋")} = 바로 아래에 빈 줄 (칸에서 ${k(MK + "Enter")}) · ${k("⧉")} = 이 줄을 복사해서 바로 아래에 (${k(MK + "Shift+Enter")}) · ${k("🗑")} = 줄 지우기 (시트에서도 지워져요). 여러 줄을 끌어서 고른 뒤 그 안의 ${k("🗑")} 를 누르면 고른 줄을 한 번에 지워요</li>
     <li><b>칸 옮기기</b> ${k("↑")}${k("↓")} 위아래 줄 · ${k("Enter")} 아래 줄 (${k("Shift+Enter")} 위) · ${k("←")}${k("→")} 글 끝에서 옆 칸</li>
     <li><b>저장</b> 칸을 고치면 바로 저장되고 몇 초 뒤 우리 재무 시트로 넘어가요. 시트에 적은 건 5분마다 들어와요</li>
     <li><b>🔀 시트와 플래너가 다를 때</b> 플래너가 기준이에요 — 시트에서 이미 적힌 칸을 고치면 5분 안에 플래너 값으로 자동으로 되돌아가요 (고치려면 플래너에서). 시트에서 빈 칸을 채운 건 플래너로 들어와요. 시트에서 새로 적은 줄·지운 줄만 위에 알려 줘요</li>
@@ -380,13 +380,17 @@ async function resolve(id, k, use) {
   if (r && k) { const { [k]: d, ...rest } = r.sheet_diff; if (use === "sheet" && d) r.vals = { ...r.vals, [k]: d.sheet }; r.sheet_diff = rest; } else if (r) r.sheet_flag = null;
   return true;
 }
+// 🗑 범위를 여러 줄 골라 둔 채 그 안의 🗑 를 누르면 고른 줄을 한 번에 지움 (제안 세연 #65)
 async function delRow(id) {
-  const r = FN.rows.find((x) => x.id === id); if (!r) return;
-  const what = r.kind === "sale" ? [r.vals.날짜, r.vals.이름, r.vals.매출].filter(Boolean).join(" · ") : [r.vals.사용처, r.vals.금액].filter(Boolean).join(" · ");
-  if (!confirm(`이 줄을 지울까요? 구글 시트에서도 지워져요.\n${what || "(빈 줄)"}`)) return;
-  const { error } = await sb.from("fin_rows").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  const b = boxOf(FN.sel), ids = b && b.rows.length > 1 && b.rows.some((tr) => tr.dataset.row === id) ? b.rows.map((tr) => tr.dataset.row) : [id];
+  const rs = ids.map((x) => FN.rows.find((r) => r.id === x)).filter(Boolean); if (!rs.length) return;
+  const what = (r) => (r.kind === "sale" ? [r.vals.날짜, r.vals.이름, r.vals.매출] : [r.vals.사용처, r.vals.금액]).filter(Boolean).join(" · ") || "(빈 줄)";
+  const list = rs.slice(0, 10).map(what).join("\n") + (rs.length > 10 ? `\n…외 ${rs.length - 10}줄` : "");
+  if (!confirm(`${rs.length > 1 ? `고른 ${rs.length}줄을` : "이 줄을"} 지울까요? 구글 시트에서도 지워져요.\n${list}`)) return;
+  const { error } = await sb.from("fin_rows").update({ deleted_at: new Date().toISOString() }).in("id", rs.map((r) => r.id));
   if (fail(error)) return;
-  edits++; FN.rows = FN.rows.filter((x) => x.id !== id); render(); queueSync();
+  const gone = new Set(rs.map((r) => r.id));
+  edits++; FN.rows = FN.rows.filter((x) => !gone.has(x.id)); FN.sel = null; render(); queueSync();
 }
 
 // 📎 첨부: 대표 = 목록·열기·올리기·지우기 / 매니저 = 올리기만 (올린 뒤에도 못 엶)
