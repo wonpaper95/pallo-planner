@@ -3,7 +3,7 @@
 // 칸을 고치면 바로 저장 → 2.5초 뒤 시트로. 시트에 적은 건 5분마다 들어옴: 새 줄·빈 칸은 플래너로, 플래너 값과 다른 칸은 양쪽에 표시하고 🔀 칸에서 정리. 다른 기기 실시간
 // index.html 의 sb·myRole·previewTeam·teams·esc·toast·fail·today·view 를 씀 → window.FN
 (() => {
-const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", miss: false, diffOnly: false, shell: "" });
+const FN = (window.FN = { team: null, month: null, rows: [], cfg: null, access: null, files: new Map(), q: "", f: {}, miss: false, diffOnly: false, shell: "" });
 const V = () => document.getElementById("fnView");
 const { OPTS, chip, missing, problems, SALE_H, COST_H, SECTIONS, DEPOSIT, isDeposit, BOOK, isBook, toNum, normDate, summary, daily, amt } = FNC;
 const admin = () => myRole === "admin";
@@ -81,7 +81,12 @@ const visible = () => {
   const q = FN.q.trim().toLowerCase();
   return q ? FN.rows.filter((r) => Object.values(r.vals).some((v) => String(v).toLowerCase().includes(q))) : FN.rows;
 };
-const sorted = (kind) => visible().filter((r) => r.kind === kind && (!FN.miss || missing(r).length) && (!FN.diffOnly || hasDiff(r))).sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); // 같은 순서 번호끼리는 id 로 — 고친 시각(updated_at)으로 하면 칸을 고칠 때마다 줄이 서로 자리를 바꿈 (신고 세연)
+// 🔽 매출 표 거래형태·멤버쉽 골라 보기 (제안 세연 #66) — 이 달 매출 줄에 있는 값으로 목록
+const FK = ["거래형태", "멤버쉽"];
+const fOk = (r) => r.kind !== "sale" || FK.every((k) => !FN.f[k] || String(r.vals[k] ?? "").trim() === FN.f[k]);
+const fSel = () => FK.map((k) => { const vs = [...new Set(FN.rows.filter((r) => r.kind === "sale").map((r) => String(r.vals[k] ?? "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")); if (FN.f[k] && !vs.includes(FN.f[k])) vs.push(FN.f[k]);
+  return `<select class="fnfsel ${FN.f[k] ? "on" : ""}" data-f="${k}" title="${k}만 골라 보기"><option value="">${k} 전체</option>${vs.map((v) => `<option ${v === FN.f[k] ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`; }).join("");
+const sorted = (kind) => visible().filter((r) => r.kind === kind && fOk(r) && (!FN.miss || missing(r).length) && (!FN.diffOnly || hasDiff(r))).sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)); // 같은 순서 번호끼리는 id 로 — 고친 시각(updated_at)으로 하면 칸을 고칠 때마다 줄이 서로 자리를 바꿈 (신고 세연)
 
 function render() {
   const sk = `${FN.team}|${FN.month}|${myRole}`;
@@ -205,9 +210,9 @@ function cellIn(r, k, need) {
 }
 function saleHtml() {
   const rows = sorted("sale"), s = summary(rows, 0);
-  return `<section class="fnpanel"><div class="fngbar"><h3>매출 <small class="mut">${rows.length}건 · ${won(s.net)}</small></h3>${missBtn(visible().filter((r) => r.kind === "sale" && missing(r).length).length)}${canEdit() ? `<button class="btn" data-act="add" data-kind="sale">+ 매출 줄</button>` : ""}</div>
+  return `<section class="fnpanel"><div class="fngbar"><h3>매출 <small class="mut">${rows.length}건 · ${won(s.net)}</small></h3>${fSel()}${missBtn(visible().filter((r) => r.kind === "sale" && missing(r).length).length)}${canEdit() ? `<button class="btn" data-act="add" data-kind="sale">+ 매출 줄</button>` : ""}</div>
     <div class="fnscroll fnfull"><table class="fntbl"><thead><tr>${SALE_H.map((k) => `<th>${k}</th>`).join("")}${jo() ? "" : "<th>📎</th>"}${canEdit() ? "<th></th>" : ""}</tr></thead>
-    <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${SALE_H.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.miss ? "덜 쓴 줄이 없어요 👍" : FN.q ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
+    <tbody>${rows.map((r) => { const [m, tr] = trOf(r); return `${tr}${SALE_H.map((k) => cellIn(r, k, m.includes(k))).join("")}${clip(r)}${del(r)}</tr>`; }).join("") || `<tr><td colspan="${SALE_H.length + 2}" class="mut fnnone">${FN.miss ? "덜 쓴 줄이 없어요 👍" : FN.q || FK.some((k) => FN.f[k]) ? "찾는 줄이 없어요" : "아직 없어요"}</td></tr>`}</tbody></table></div></section>`;
 }
 function costHtml() {
   const rows = sorted("cost").filter((r) => !isDeposit(r) && !isBook(r)), s = summary(rows, 0), fee = summary(visible(), FN.cfg?.fee_pct ?? 5).fee;
@@ -447,7 +452,7 @@ function cfgDlg() {
 document.addEventListener("click", async (e) => {
   const b = e.target.closest("#fnView [data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "prev" || a === "next" || a === "now") { if (pend.size) { clearTimeout(queueSync.t); for (const [t, m] of pend.values()) syncNow(false, t, m); pend.clear(); } FN.month = a === "now" ? ymNow() : ymAdd(FN.month, a === "prev" ? -1 : 1); FN.shell = ""; return FN.load(); }
+  if (a === "prev" || a === "next" || a === "now") { if (pend.size) { clearTimeout(queueSync.t); for (const [t, m] of pend.values()) syncNow(false, t, m); pend.clear(); } FN.f = {}; FN.month = a === "now" ? ymNow() : ymAdd(FN.month, a === "prev" ? -1 : 1); FN.shell = ""; return FN.load(); }
   if (a === "sync") return syncNow(true);
   if (a === "cfg") return cfgDlg();
   if (a === "add") return addRow(b.dataset.kind, b.dataset.sec);
@@ -466,6 +471,7 @@ document.addEventListener("click", async (e) => {
   }
 });
 document.addEventListener("change", (e) => {
+  if (e.target.matches("#fnView select[data-f]")) { FN.f[e.target.dataset.f] = e.target.value; return render(); }
   if (e.target.id === "fnTeam") { FN.team = +e.target.value; try { localStorage.setItem("fn-team", FN.team); } catch {} FN.shell = ""; return FN.load(); }
   if (e.target.matches("#fnView input[data-id], #fnView select[data-id]")) { saveCell(e.target); if (e.target.tagName === "SELECT") { e.target.className = `fnchip ${chip(e.target.dataset.k, e.target.value)}`; if (e.target.dataset.k === "결제수단") e.target.closest("tr")?.classList.toggle("fnstep", e.target.value === "스탭페이"); } }
 });
