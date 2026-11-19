@@ -1,9 +1,9 @@
-// 📣 마케팅 탭: 대표가 메타 CSV를 올리면(데이터) → 스킬 pallo-meta-analyze 가 전산 리드와 합쳐 주간 리포트·페르소나를 저장 → 여기서 본다.
-// 숫자 계산은 mk-core.js(MKCORE), 문장(notes·persona)은 스킬이 쓴다. 이 화면은 CSV 올리기와 보여주기만.
+// 📣 마케팅 탭: 메타 API·전산·매출 시트를 스킬(pallo-meta-analyze·pallo-daily-metrics 등)이 모아 저장 → 여기서 본다. 메타 소재 판정은 [주간 리포트] 한 곳.
+// 11-19 정리: 🌏 밋업(밋업 API 2회 거절, CS 보드가 대신)·데이터(CSV 입구, API 자동화로 불필요) 탭과 에이전트의 경쟁사 장기 소재 카드(경쟁사 탭과 중복) 삭제.
+// 숫자 계산은 mk-core.js(MKCORE), 문장(notes·persona)은 스킬이 쓴다.
 // index.html 의 sb·me·$·esc·toast·fail·isBoss·previewTeam·teams 를 씀 → window.MK
 (() => {
 const MK = (window.MK = { tab: "daily", team: null, week: null, grp: null, ctab: "today", cday: null, dteam: null });
-const KIND = { ads_daily: ["mk_ad_daily", "team_id,date,ad_name", "광고 일별"], ads_demo: ["mk_ad_demo", "team_id,period_from,period_to,ad_name,age,gender", "광고 연령·성별"], organic: ["mk_organic", "team_id,platform,post_id", "인스타·페북 게시물"] };
 const VERDICT = { keep: "🟢 계속", cut: "🔴 끄기", watch: "🟡 지켜보기", hold: "⚪ 보류" };
 const V = () => document.getElementById("mkView");
 const $m = (s) => V().querySelector(s);
@@ -11,8 +11,8 @@ const n = (v) => Number(v) || 0; // 리포트 JSON 은 스킬이 쓴 값이라, 
 const usd = (v) => (v === null || v === undefined ? "–" : "$" + (Math.round(n(v) * 100) / 100).toLocaleString("en-US"));
 const pct = (v) => (Math.round(n(v) * 1000) / 10) + "%";
 const won = (v) => (v === null || v === undefined ? "–" : (n(v) < 0 ? "-₩" : "₩") + Math.abs(Math.round(n(v))).toLocaleString("ko-KR"));
+const arrOf = (v) => (Array.isArray(v) ? v : v ? [v] : []); // 스킬이 목록 대신 글 한 덩어리로 쓴 날도 화면이 멈추지 않게 (11-19 경쟁사 [오늘] 멈춤)
 const rate = (v) => (v === null || v === undefined ? "–" : pct(v));
-let parsed = [];
 
 MK.load = async function () {
   if (MK.myTeam === undefined) MK.myTeam = (await sb.from("profiles").select("team_id").eq("user_id", me.id).single()).data?.team_id ?? null;
@@ -20,87 +20,21 @@ MK.load = async function () {
   if (admin) {
     try { MK.team = MK.team ?? (+localStorage.getItem("mk-team") || null); } catch {}
     if (!teams.some((t) => t.id === MK.team)) MK.team = teams[0]?.id ?? null;
-  } else { MK.team = previewTeam || MK.myTeam; if (MK.tab === "upload") MK.tab = "report"; }
+  } else { MK.team = previewTeam || MK.myTeam; }
   V().innerHTML = `<div class="mkbar"><h2>📣 마케팅</h2>
-    ${admin && MK.tab !== "daily" && MK.tab !== "meetup" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["monthly", "📊 월간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["meetup", "🌏 밋업"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"], ...(admin ? [["upload", "데이터"]] : [])].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
+    ${admin && MK.tab !== "daily" ? `<select id="mkTeam">${teams.map((t) => `<option value="${t.id}" ${t.id === MK.team ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
+    <div class="mktabs">${[["daily", "일일 현황"], ["report", "주간 리포트"], ["monthly", "📊 월간 리포트"], ["persona", "페르소나"], ["compet", "경쟁사"], ["agent", "🤖 에이전트"], ["trend", "📈 트렌드"]].map(([k, t]) => `<button data-t="${k}" class="${MK.tab === k ? "on" : ""}">${t}</button>`).join("")}</div></div>
     <div id="mkBody"></div>`;
   $m("#mkTeam")?.addEventListener("change", (e) => { MK.team = +e.target.value; MK.week = null; try { localStorage.setItem("mk-team", MK.team); } catch {} MK.load(); });
   V().querySelectorAll(".mktabs button").forEach((b) => b.addEventListener("click", () => { MK.tab = b.dataset.t; MK.load(); }));
   if (MK.tab === "compet") return renderCompet(admin);
-  if (MK.tab === "meetup") return renderMeetup(admin);
   if (MK.tab === "daily") return renderDaily(admin);
   if (MK.tab === "agent") return renderAgent(admin);
   if (MK.tab === "trend") return renderTrend();
   if (!MK.team) { $m("#mkBody").innerHTML = `<div class="card">아직 지점이 정해지지 않았어요. 대표님이 [팀] 탭에서 지점을 정해 주시면 볼 수 있어요.</div>`; return; }
-  if (MK.tab === "upload") return renderUpload();
   if (MK.tab === "monthly") return renderMonthly();
   return renderReport(MK.tab === "persona" ? "persona" : "weekly");
 };
-
-// ── 🌏 밋업: 맥미니(스킬 pallo-meetup-sync)가 매시간 공식 API로 읽어 쌓은 신청을 보여준다. 계산은 meetup-core.js(MEETUPCORE) ──
-// 매니저는 RLS 로 자기 지점 행만 받는다. 대표 미리보기(previewTeam)는 그 지점만 거른다. 새 회원은 대표만(RLS).
-async function renderMeetup(admin) {
-  const C = window.MEETUPCORE, body = $m("#mkBody");
-  const today = C.kst(new Date().toISOString()).date, from = C.addDays(C.weekStart(today), -21);
-  let rq = sb.from("meetup_rsvps").select("id,event_id,team_id,branch,event_title,starts_at,member_name,member_city,status,is_first_event,first_seen_at,cancelled_at,jeonsan_status,jeonsan_note")
-    .gte("starts_at", from + "T00:00:00+09:00").order("starts_at").limit(2000);
-  if (!admin && previewTeam) rq = rq.eq("team_id", previewTeam);
-  let iq = sb.from("meetup_inbox").select("id,source,kind,event_id,team_id,branch,event_title,member_name,text,link,created_at,answered,done_at")
-    .eq("answered", false).is("done_at", null).gte("created_at", new Date(Date.now() - 14 * 86400e3).toISOString()).order("created_at", { ascending: false }).limit(100);
-  if (!admin && previewTeam) iq = iq.eq("team_id", previewTeam);
-  const [rr, run, mem, ib] = await Promise.all([rq, sb.from("meetup_runs").select("ran_at,status,counts,error").order("id", { ascending: false }).limit(1).maybeSingle(),
-    admin ? sb.from("meetup_members").select("name,city,joined_at,first_seen_at").order("first_seen_at", { ascending: false }).limit(15) : Promise.resolve({ data: [] }), iq]);
-  if (!body.isConnected || MK.tab !== "meetup") return;
-  if (fail(rr.error) || fail(run.error) || fail(mem.error) || fail(ib.error)) return;
-  const rows = rr.data ?? [], r0 = run.data;
-  const RUN = { ok: "정상", partial: "일부 실패", failed: "실패", auth_failed: "밋업 인증 실패 — Claude에게 알려 주세요" };
-  const when = (iso) => { const k = C.kst(iso); return k ? `${k.date.slice(5).replace("-", "/")}(${"일월화수목금토"[k.dow]}) ${k.time}` : "–"; };
-  const tag = (st) => `<span class="vd ${st === "YES" || st === "ATTENDED" ? "keep" : st === "WAITLIST" ? "watch" : st === "NO" || st === "NO_SHOW" ? "cut" : "hold"}">${esc(C.STATUS_LABEL[st] ?? st ?? "–")}</span>`;
-  const jeon = (r) => {
-    // teams 배열은 대표만 채워지므로 지점 판단은 제목의 [지점] 으로 한다
-    if (!C.jeonsanCodeOf(C.teamKeyOfBranch(r.branch))) return `<span class="mut">전산 등록 안 함</span>`;
-    return { registered: "✅ 전산 등록", duplicate: "✅ 이미 있음", skipped: "⏭ 건너뜀", failed: "⚠️ 등록 실패" }[r.jeonsan_status] ?? (C.ACTIVE.includes(r.status) ? "⏳ 등록 대기" : "–");
-  };
-  const person = (p) => `${esc(p.name)}${p.first ? ` <span class="tag">첫 참석</span>` : ""}${p.status === "WAITLIST" ? ` <span class="tag">대기</span>` : ""}`;
-  const rosterCard = (ymd, label) => {
-    const list = C.rosterOf(rows, ymd);
-    return `<div class="card"><b>${label} ${esc(ymd.slice(5).replace("-", "/"))} 참석 예정 ${list.reduce((s, g) => s + g.people.length, 0)}명</b>${list.length
-      ? list.map((g) => `<div class="mu-row"><div class="mu-when">${esc(g.time)}</div><div><b>${esc(C.branchKo(g.branch))}</b><div>${g.people.map(person).join(", ")}</div></div></div>`).join("")
-      : `<div class="mut">없어요</div>`}</div>`;
-  };
-  const recent = rows.filter((r) => Date.parse(r.first_seen_at) >= Date.now() - 7 * 86400e3).sort((a, b) => b.first_seen_at.localeCompare(a.first_seen_at));
-  const upcoming = rows.filter((r) => C.ACTIVE.includes(r.status) && C.kst(r.starts_at).date > C.addDays(today, 1));
-  const weekly = C.weeklyStats(rows, 4, today);
-  const inbox = C.inboxOpen(ib.data ?? [], new Date().toISOString());
-  const safeLink = (u) => (/^https:\/\/(www\.)?meetup\.com\//.test(u ?? "") ? u : null);
-  const inboxCard = `<div class="card mu-inbox"><b>📬 답할 것 ${inbox.length}건</b>${inbox.length ? inbox.map((x) => {
-      const href = safeLink(x.link) ?? (x.event_id ? `https://www.meetup.com/${C.GROUP}/events/${encodeURIComponent(x.event_id)}/` : `https://www.meetup.com/${C.GROUP}/`);
-      return `<div class="mu-row"><div class="mu-when">${esc(x.created_at ? when(x.created_at) : "–")}</div><div class="mu-ib">
-        <div><span class="tag">${esc(C.INBOX_KINDS[x.kind] ?? x.kind)}</span>${x.branch ? ` <b>${esc(C.branchKo(x.branch))}</b>` : ""}${x.member_name ? ` · ${esc(x.member_name)}` : ""}</div>
-        <div class="mu-txt">${esc(x.text ?? "")}</div>
-        <div class="mu-act"><a href="${esc(href)}" target="_blank" rel="noopener">밋업에서 답하기 ↗</a> <button class="sm" data-mudone="${esc(x.id)}">처리함</button></div></div></div>`;
-    }).join("") : `<div class="mut">지금 답할 게 없어요.</div>`}
-    <div class="mut">이벤트 댓글과 밋업 알림(댓글·답글·가입 승인)이 매시간 모여요. 밋업에서 답글을 달거나 알림을 읽으면 다음 확인 때 저절로 빠져요. <b>개인 메시지는 여기 안 나와요 — 업무폰 밋업 앱에서 확인해 주세요.</b></div></div>`;
-  body.innerHTML = `<div class="mkbar"><span class="mut">${r0 ? `마지막 확인 ${esc(when(r0.ran_at))} · ${esc(RUN[r0.status] ?? r0.status)}${r0.status === "ok" ? ` · 새 신청 ${n(r0.counts?.fresh)} · 취소 ${n(r0.counts?.cancelled)}` : ""}` : "아직 확인 전이에요 (밋업 API 승인 후 맥미니가 매시간 읽어요)"}</span>
-      <a class="mut" href="https://www.meetup.com/${C.GROUP}/" target="_blank" rel="noopener">밋업 그룹 열기 ↗</a></div>
-    ${inboxCard}
-    <div class="mu-two">${rosterCard(today, "오늘")}${rosterCard(C.addDays(today, 1), "내일")}</div>
-    <div class="card"><b>새 신청 (최근 7일) ${recent.length}건</b>${recent.length ? `<div class="tw"><table><tr><th>참석자</th><th>지점</th><th>모임</th><th>상태</th><th>전산</th></tr>${recent.map((r) => `<tr>
-        <td>${esc(r.member_name)}${r.is_first_event ? ` <span class="tag">첫 참석</span>` : ""}${r.member_city ? `<div class="mut">${esc(r.member_city)}</div>` : ""}</td>
-        <td>${esc(C.branchKo(r.branch))}</td><td><a href="https://www.meetup.com/${C.GROUP}/events/${esc(r.event_id)}/" target="_blank" rel="noopener">${esc(when(r.starts_at))}</a></td>
-        <td>${tag(r.status)}</td><td>${jeon(r)}${r.jeonsan_status === "failed" && r.jeonsan_note ? `<div class="mut">${esc(r.jeonsan_note)}</div>` : ""}</td></tr>`).join("")}</table></div>` : `<div class="mut">최근 7일 동안 들어온 신청이 없어요.</div>`}</div>
-    <div class="card"><b>모레 이후 참석 예정 ${upcoming.length}명</b>${upcoming.length ? upcoming.map((r) => `<div class="mu-row"><div class="mu-when">${esc(when(r.starts_at))}</div><div>${esc(C.branchKo(r.branch))} · ${person({ name: r.member_name, status: r.status, first: r.is_first_event })}</div></div>`).join("") : `<div class="mut">없어요</div>`}</div>
-    <div class="card"><b>주간 요약 (모임 날짜 기준, 최근 4주)</b>${weekly.length ? `<div class="tw"><table><tr><th>주(월요일)</th><th>지점</th><th>신청</th><th>왔음</th><th>안 옴</th><th>취소</th></tr>${weekly.map((w) => `<tr><td>${esc(w.week.slice(5).replace("-", "/"))}</td><td>${esc(C.branchKo(w.branch))}</td><td>${w.rsvps}</td><td>${w.attended}</td><td>${w.noShow}</td><td>${w.cancelled}</td></tr>`).join("")}</table></div>
-      <div class="mut">왔음·안 옴은 밋업에서 출석 체크를 한 모임만 잡혀요.</div>` : `<div class="mut">아직 없어요</div>`}</div>
-    ${admin ? `<div class="card"><b>새 회원</b>${(mem.data ?? []).length ? mem.data.map((m) => `<div class="mu-row"><div class="mu-when">${esc(when(m.joined_at ?? m.first_seen_at))}</div><div>${esc(m.name)}${m.city ? ` <span class="mut">${esc(m.city)}</span>` : ""}</div></div>`).join("") : `<div class="mut">아직 없어요</div>`}</div>` : ""}`;
-  body.querySelectorAll("[data-mudone]").forEach((b) => b.addEventListener("click", async () => {
-    b.disabled = true;
-    const { error } = await sb.from("meetup_inbox").update({ done_at: new Date().toISOString(), done_by: me.id }).eq("id", b.dataset.mudone);
-    if (fail(error)) { b.disabled = false; return; }
-    toast("처리함으로 옮겼어요"); renderMeetup(admin);
-  }));
-}
 
 // ── 리포트·페르소나 보기 ──
 async function renderReport(kind) {
@@ -116,7 +50,7 @@ async function renderReport(kind) {
 
 function weeklyHtml(d) {
   const f = d.flags ?? {}, t = d.totals ?? {}, nt = d.notes ?? {};
-  const warns = [f.noAds && "광고 데이터 없음 — 이번 주 CSV가 안 올라왔어요", f.noLeads && "전산 리드 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noSales && "매출 시트 결제가 없어요 — 재무 탭 시트 동기화를 확인해 주세요", f.noOrganic && "오가닉 데이터 없음"].filter(Boolean);
+  const warns = [f.noAds && "광고 데이터 없음 — 메타 API 자동 적재가 안 됐어요", f.noLeads && "전산 리드 누락 — 전산 리드를 못 읽어서 소재 판정을 보류했어요", f.noSales && "매출 시트 결제가 없어요 — 재무 탭 시트 동기화를 확인해 주세요"].filter(Boolean);
   const ads = (d.ads ?? []).map((a) => `<tr><td>${esc(a.ad_name)}${nt.ads?.[a.ad_name] ? `<div class="mut">${esc(nt.ads[a.ad_name])}</div>` : ""}</td>
     <td><span class="vd ${esc(a.verdict)}">${VERDICT[a.verdict] ?? esc(a.verdict)}</span><div class="mut">${esc(a.reason)}</div></td>
     <td>${usd(a.spend)}</td><td>${n(a.leads)}</td><td>${usd(a.cpl)}</td><td>${n(a.leads4w)}</td><td>${n(a.booked4w)}</td><td>${usd(a.cpb4w)}</td></tr>`).join("");
@@ -125,14 +59,14 @@ function weeklyHtml(d) {
     <td>${n(p.reach).toLocaleString("ko-KR")}</td><td>${n(p.saves)}</td><td>${n(p.shares)}</td><td>${p.score == null ? "–" : pct(p.score)}</td></tr>`).join("");
   const ptable = (arr) => `<div class="tw"><table><tr><th>게시물</th><th>도달</th><th>저장</th><th>공유</th><th>저장+공유율</th></tr>${posts(arr)}</table></div>`;
   return warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
-    + (nt.summary || nt.caution ? `<div class="card">${nt.summary ? `<b>이번 주 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${nt.tests?.length ? `<b>새로 테스트할 방향</b><ul>${nt.tests.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
+    + (nt.summary || nt.caution ? `<div class="card">${nt.summary ? `<b>이번 주 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${arrOf(nt.tests).length ? `<b>새로 테스트할 방향</b><ul>${arrOf(nt.tests).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
     + `<div class="card kpis"><div class="kpi"><span class="mut">이번 주 지출</span><b>${usd(t.spend)}</b></div><div class="kpi"><span class="mut">이번 주 리드</span><b>${n(t.leads)}</b></div>
        <div class="kpi"><span class="mut">리드당 비용</span><b>${usd(t.cpl)}</b></div><div class="kpi"><span class="mut">4주 상담 예약</span><b>${n(t.booked4w)}</b></div><div class="kpi"><span class="mut">4주 예약당 비용</span><b>${usd(t.cpb4w)}</b></div></div>`
     + (s4 ? `<div class="card"><b>4주 결제 (매출 시트 '가입')</b> <span class="mut">결제 ${n(s4.payers)}명 · ${won(s4.paid)}</span>
        <div class="tw"><table><tr><th>매체</th><th>결제</th><th>결제금액</th><th>광고비</th><th>ROAS</th><th>결제당 광고비</th></tr>${(s4.channels ?? []).map((c) => `<tr><td>${esc(c.channel)}</td><td>${n(c.payers)}</td><td>${won(c.paid)}</td><td>${won(c.spend)}</td><td>${rate(c.roas)}</td><td>${won(c.cpp)}</td></tr>`).join("")}</table></div>
        <p class="mut">매체는 매출 시트 '가입경로'(인스타=메타). 메타 광고비는 달러를 원화로 바꾼 값${s4.coverage && s4.coverage.naver < s4.coverage.days ? ` · 네이버 광고비는 ${n(s4.coverage.naver)}/${n(s4.coverage.days)}일치만 있어요` : ""}. 소재별 결제는 시트에 광고명이 없어 못 세서, 소재 판정은 상담 예약 기준이에요.</p></div>` : "")
     + `<div class="card"><b>소재 판정</b><div class="tw"><table><tr><th>광고</th><th>판정</th><th>이번 주 지출</th><th>리드</th><th>리드당</th><th>4주 리드</th><th>4주 예약</th><th>예약당</th></tr>${ads || `<tr><td colspan="8">광고 없음</td></tr>`}</table></div></div>`
-    + `<div class="card"><b>오가닉 잘 된 게시물</b>${ptable(d.organic?.top)}</div><div class="card"><b>오가닉 아쉬운 게시물</b>${ptable(d.organic?.bottom)}</div>`;
+    + (d.organic?.top?.length || d.organic?.bottom?.length ? `<div class="card"><b>오가닉 잘 된 게시물</b>${ptable(d.organic?.top)}</div><div class="card"><b>오가닉 아쉬운 게시물</b>${ptable(d.organic?.bottom)}</div>` : ""); // 오가닉은 자료가 있을 때만 (11-19 정리: CSV 입구를 없애서 보통 비어 있음)
 }
 
 // ── 📊 월간 리포트 (mk_reports kind monthly_first=전반 1~15일 · monthly=한 달) ── 숫자는 buildMonthly, 문장(notes)은 스킬이 쓴다
@@ -440,7 +374,7 @@ async function renderToday(grp, head, wire) {
   const warns = [f.noRun && "이날 수집 기록이 없어요", f.failed && "이날 수집이 실패했어요 (라이브러리가 막혔거나 화면이 바뀜)", f.partial && "일부 검색어 수집이 실패했어요", f.firstDay && "첫 수집일이라 '처음 본 광고'가 전부예요"].filter(Boolean);
   $m("#mkBody").innerHTML = head + `<div class="mkbar"><select id="mkDay">${list.map((r) => `<option value="${r.day}" ${r.day === cur.day ? "selected" : ""}>${esc(r.day)}</option>`).join("")}</select><span class="mut">갱신 ${esc(new Date(cur.updated_at).toLocaleString("ko-KR"))}</span></div>`
     + warns.map((w) => `<div class="card warn">⚠️ ${esc(w)}</div>`).join("")
-    + (nt.summary || nt.trend?.length ? `<div class="card">${nt.summary ? `<b>오늘 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${nt.trend?.length ? `<b>읽히는 흐름</b><ul>${nt.trend.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
+    + (nt.summary || arrOf(nt.trend).length ? `<div class="card">${nt.summary ? `<b>오늘 한 줄</b><p>${esc(nt.summary)}</p>` : ""}${arrOf(nt.trend).length ? `<b>읽히는 흐름</b><ul>${arrOf(nt.trend).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${nt.caution ? `<p class="mut">${esc(nt.caution)}</p>` : ""}</div>` : "")
     + `<div class="card kpis"><div class="kpi"><span class="mut">활성 경쟁 광고</span><b>${n(t.active)}</b></div><div class="kpi"><span class="mut">처음 본 광고</span><b>${n(t.new)}</b></div><div class="kpi"><span class="mut">종료</span><b>${n(t.ended)}</b></div><div class="kpi"><span class="mut">켜진 경쟁사</span><b>${n(t.competitorsOn)}</b></div><div class="kpi"><span class="mut">우리 광고</span><b>${n(t.own)}</b></div></div>`
     + ((d.competitors ?? []).length ? `<div class="card"><b>켜진 경쟁사</b><div class="tw"><table><tr><th>경쟁사</th><th>활성</th><th>오늘 신규</th><th>오늘 종료</th><th>🏆 30일+</th><th>가장 오래</th></tr>${d.competitors.map((c) => `<tr><td>${esc(c.page_name)}</td><td>${n(c.active)}</td><td>${n(c.new_today)}</td><td>${n(c.ended_today)}</td><td>${n(c.core)}</td><td>${c.oldest_days != null ? `${n(c.oldest_days)}일` : "–"}</td></tr>`).join("")}</table></div></div>` : "")
     + section("🆕 처음 본 광고", d.new, "없어요")
@@ -488,77 +422,6 @@ async function renderCreative(grp, head, wire) {
   $m("#mkBody").querySelectorAll("button[data-target]").forEach((b) => b.addEventListener("click", () => copy(targetText(ideas[+b.dataset.target]))));
 }
 
-// ── CSV 올리기 (대표) ──
-// 광고는 계정 하나를 4개 지점이 같이 써서, 행마다 mk-core 가 캠페인 이름으로 판별한 team_key 를 지점 id 로 바꾼다.
-// 게시물(오가닉)은 지점 인스타·페북 계정별 파일이라 위에서 고른 지점으로 올린다.
-const teamIdOf = (key) => teams.find((t) => MKCORE.teamKeyOfTeamName(t.name) === key)?.id ?? null;
-const teamName = (id) => teams.find((t) => t.id === +id)?.name ?? "";
-const dateOf = (r) => r.date ?? r.period_from ?? r.published_at;
-function assign(p) {
-  if (p.kind === "organic") return { byTeam: { [MK.team]: p.rows }, unknown: [] };
-  const byTeam = {}, unknown = [];
-  for (const { team_key, ...r } of p.rows) { const id = teamIdOf(team_key); if (id) (byTeam[id] ??= []).push(r); else unknown.push(r); }
-  return { byTeam, unknown };
-}
-const usable = (p) => p.kind && !p.missing.length && p.currency !== "KRW";
-
-async function renderUpload() {
-  const { data: ups } = await sb.from("mk_uploads").select("team_id, kind, filename, rows, date_from, date_to, created_at").order("created_at", { ascending: false }).limit(12);
-  $m("#mkBody").innerHTML = `<div class="card"><b>광고 데이터는 자동이에요</b>
-      <p class="mut">매주 월요일 아침 메타 API로 광고 일별·연령+성별 데이터를 자동으로 받아 와요. 아래 CSV 올리기는 필요할 때만 쓰세요.</p></div>
-    <div class="card"><b>CSV 올리기 (선택)</b>
-      <p class="mut">광고관리자 CSV(광고 일별 · 연령+성별, <b>캠페인 이름 열 포함</b>)는 캠페인 이름으로 지점을 자동으로 나눠요. 게시물(인사이트) CSV는 위에서 고른 <b>${esc(teamName(MK.team))}</b>으로 올라가요. 같은 줄은 덮어써서 여러 번 올려도 안전해요.</p>
-      <input type="file" id="mkFiles" accept=".csv,text/csv" multiple><div id="mkPrev"></div></div>
-    <div class="card"><b>최근 올린 파일</b>${(ups ?? []).map((u) => `<div class="mut">${esc(new Date(u.created_at).toLocaleString("ko-KR"))} · ${esc(teamName(u.team_id))} · ${esc(KIND[u.kind]?.[2] ?? u.kind)} · ${esc(u.filename)} · ${esc(u.rows)}줄 · ${esc(u.date_from ?? "")}~${esc(u.date_to ?? "")}</div>`).join("") || `<div class="mut">아직 없어요</div>`}</div>`;
-  $m("#mkFiles").addEventListener("change", async (e) => {
-    parsed = await Promise.all([...e.target.files].map(async (f) => ({ name: f.name, ...MKCORE.normalize(MKCORE.decode(await f.arrayBuffer())) })));
-    $m("#mkPrev").innerHTML = parsed.map((p) => {
-      if (!p.kind) return `<div class="card warn">❌ ${esc(p.name)}: 어떤 파일인지 모르겠어요. 광고 이름 / 게시물 ID 열이 있는 CSV인지 확인해 주세요.</div>`;
-      if (p.currency === "KRW") return `<div class="card warn">❌ ${esc(p.name)}: 원화 파일이에요. 광고 계정 통화(달러)로 내보내 주세요.</div>`;
-      const d = p.rows.map(dateOf).filter(Boolean).sort(), a = assign(p);
-      const per = Object.entries(a.byTeam).map(([id, rows]) => `${esc(teamName(id))} ${rows.length}줄${p.kind === "organic" ? "" : ` ($${Math.round(rows.reduce((s, r) => s + r.spend, 0)).toLocaleString("en-US")})`}`).join(" · ");
-      const unk = [...new Set(a.unknown.map((r) => r.campaign || r.ad_name))].slice(0, 5);
-      return `<div class="card ${p.missing.length || a.unknown.length ? "warn" : ""}">✅ ${esc(p.name)} → ${KIND[p.kind][2]} ${p.rows.length}줄 (${esc(d[0] ?? "")}~${esc(d.at(-1) ?? "")})<div>${per}</div>
-        ${a.unknown.length ? `<div>⚠️ 지점을 모르는 ${a.unknown.length}줄은 빼고 올려요 (예: ${unk.map(esc).join(", ")}). 캠페인 이름 열이 빠졌거나 이름에 지역이 없어요.</div>` : ""}
-        ${p.missing.length ? `<div>⚠️ 못 찾은 열: ${esc(p.missing.join(", "))} — 광고관리자에서 이 열을 추가해 다시 내보내 주세요.</div>` : ""}</div>`;
-    }).join("") + (parsed.some(usable) ? `<button class="btn" id="mkSend">올리기</button>` : "");
-    $m("#mkSend")?.addEventListener("click", send);
-  });
-}
-
-// 같은 광고 이름이 광고세트 여러 개에 걸쳐 CSV에 여러 줄 나오면 한 upsert 안에서 키가 겹쳐 Postgres 가 거부한다 → 키가 같은 줄을 먼저 합친다.
-const NUM = ["impressions", "reach", "clicks", "leads", "spend"];
-function mergeByKey(rows, onConflict, kind) {
-  const keys = onConflict.split(","), map = new Map();
-  for (const r of rows) {
-    const k = JSON.stringify(keys.map((c) => r[c] ?? null)), prev = map.get(k);
-    if (!prev) { map.set(k, { ...r }); continue; }
-    if (kind === "organic") map.set(k, { ...r }); // 오가닉은 마지막 줄 우선
-    else for (const f of NUM) if (f in r || f in prev) prev[f] = (prev[f] ?? 0) + (r[f] ?? 0); // 광고는 숫자 합산, 글자 칸은 첫 줄 유지
-  }
-  return [...map.values()];
-}
-
-async function send() {
-  const btn = $m("#mkSend"); btn.disabled = true; btn.textContent = "올리는 중…";
-  let excluded = 0;
-  for (const p of parsed.filter(usable)) {
-    const [table, onConflict] = KIND[p.kind], a = assign(p);
-    excluded += a.unknown.length;
-    for (const [id, list] of Object.entries(a.byTeam)) {
-      const rows = mergeByKey(list.map((r) => ({ team_id: +id, ...r })), onConflict, p.kind);
-      for (let i = 0; i < rows.length; i += 500) {
-        const { error } = await sb.from(table).upsert(rows.slice(i, i + 500), { onConflict });
-        if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
-      }
-      const d = list.map(dateOf).filter(Boolean).sort();
-      const { error } = await sb.from("mk_uploads").insert({ team_id: +id, kind: p.kind, filename: p.name, rows: rows.length, date_from: d[0] ?? null, date_to: d.at(-1) ?? null });
-      if (fail(error)) { btn.disabled = false; btn.textContent = "다시 올리기"; return; }
-    }
-  }
-  toast(`올렸어요${excluded ? ` (지점 모르는 ${excluded}줄 제외)` : ""}. Claude에게 \"메타 주간 분석 돌려줘\"라고 하면 리포트가 만들어져요.`);
-  renderUpload();
-}
 // ── 📈 트렌드 (mka_items kind=trend: 맥북 ad-agent/trend.py 가 월요일마다 광고 라이브러리에서 모은 업종 밖 광고, 조교 빼고 모두 읽기) ──
 const IG_VIDEO = /^https:\/\/[\w.-]+\.(?:cdninstagram\.com|fbcdn\.net)\/[^\s"'<>]+$/;  // build_feed.py IG_VIDEO 와 같음(인스타·페이스북 CDN 영상)
 async function renderTrend() {
@@ -637,13 +500,9 @@ function propBtns(r) {
   return "";
 }
 async function renderAgent(admin) {
-  const [ir, cr, onr] = await Promise.all([
-    sb.from("mka_items").select("kind, key, data, status, updated_at").order("updated_at", { ascending: false }).limit(300),
-    sb.from("mkc_ads").select("library_id, grp, page_name, competitor_id, headline, body, start_date, media_type, n_ads, thumb_path").eq("active", true).not("start_date", "is", null).lte("start_date", new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)).order("start_date", { ascending: true }).limit(1000),
-    sb.from("mkc_competitors").select("id").eq("status", "on"),
-  ]);
-  if (fail(ir.error) || fail(cr.error) || fail(onr.error)) return;
-  const rows = ir.data ?? [], today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const ir = await sb.from("mka_items").select("kind, key, data, status, updated_at").order("updated_at", { ascending: false }).limit(300);
+  if (fail(ir.error)) return;
+  const rows = ir.data ?? [];
   const kill = rows.some((r) => r.kind === "control" && r.key === "kill" && r.status === "on");
   const top = MKACORE.freshTop(rows);
   const props = rows.filter((r) => r.kind === "proposal").map((r) => ({ ...r, st: MKACORE.propStage(r.status, r.data ?? {}) }))
@@ -654,10 +513,6 @@ async function renderAgent(admin) {
   const link = (u, t) => (MKACORE.safeUrl(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t));
   const img = (src, cls) => (MKACORE.safeImg(src) ? `<img class="${cls}" src="${src}" alt="" loading="lazy">` : `<div class="${cls} agimg-no"></div>`);
   const age = rows.length ? Math.max(...rows.filter((r) => r.kind !== "control").map((r) => new Date(r.updated_at).getTime()), 0) : 0;
-  const comp = MKACORE.pickCompetitorAds((cr.data ?? []).filter((a) => !MKCCORE.isOwnPage(a.page_name)), (onr.data ?? []).map((c) => c.id), today);
-  // 경쟁사 카드 스크린샷(비공개 버킷) → 1시간짜리 서명 주소 (경쟁사 탭과 같은 방식)
-  const signed = {}, paths = comp.map((a) => a.thumb_path).filter(Boolean);
-  if (paths.length) { const { data } = await sb.storage.from("mkc-thumbs").createSignedUrls(paths, 3600); (data ?? []).forEach((x, i) => { if (x.signedUrl && !x.error) signed[x.path ?? paths[i]] = x.signedUrl; }); }
 
   const killCard = `<div class="card ${kill ? "warn" : ""}"><div class="mkbar"><b>${kill ? "🛑 에이전트 멈춤 (스레드 자동 게시 중단)" : "🟢 에이전트 켜짐"}</b>
     ${admin ? `<button class="btn" id="agKill" style="${kill ? "" : "background:#a3201a"}">${kill ? "다시 켜기" : "🛑 전부 멈추기"}</button>` : ""}</div>
@@ -672,8 +527,6 @@ async function renderAgent(admin) {
       ${d.draft_name ? `<div class="mut">광고관리자 이름: ${esc(d.draft_name)}</div>` : ""}
       ${admin ? propBtns(r) : ""}</div></div>`; }).join("") : `<div class="mut">대기 중인 제안이 없어요.</div>`;
 
-  const compHtml = comp.length ? comp.map((a) => `<div class="cmp">${signed[a.thumb_path] ? `<img class="agthumb" src="${esc(signed[a.thumb_path])}" alt="" loading="lazy">` : ""}<div class="cmp-b"><div>${link(MKCCORE.libraryUrl(a.library_id), a.page_name)} ${a.on ? `<span class="tag">켜진 경쟁사</span> ` : ""}<span class="mut">${n(a.days)}일째${n(a.n_ads) > 1 ? ` · 광고 ${n(a.n_ads)}개로 돌림` : ""} · ${esc(a.media_type || "?")} · ${a.grp === "en" ? "영어" : "일본어·중국어"}</span></div>
-      <div>${esc(MKACORE.adText(a).slice(0, 90))}</div></div></div>`).join("") : `<div class="mut">조건에 맞는 경쟁사 광고가 아직 없어요.</div>`;
 
   const postedHtml = posted.length ? posted.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div>${link(d.permalink, String(d.text ?? "").split("\n")[0].slice(0, 60))} <span class="mut">${esc(BR[d.branch] ?? d.branch ?? "")} · ${esc(String(d.posted_at ?? "").slice(0, 16).replace("T", " "))}</span></div></div></div>`; }).join("") : `<div class="mut">아직 올라간 글이 없어요.</div>`;
   const readyHtml = ready.length ? ready.map((r) => { const d = r.data ?? {}; return `<div class="cmp"><div class="cmp-b"><div class="mut">${esc(BR[d.branch] ?? d.branch ?? "")} · ${esc(d.angle ?? "")}</div><div>${esc(String(d.text ?? "").slice(0, 120))}…</div></div></div>`; }).join("") : `<div class="mut">대기 중인 글이 없어요.</div>`;
@@ -681,7 +534,6 @@ async function renderAgent(admin) {
   $m("#mkBody").innerHTML = killCard
     + `<div class="card"><b>🔥 조회·반응 좋은 우리 광고 TOP</b>${topHtml}</div>`
     + `<div class="card"><b>📣 추천 광고 — 에이전트 제안${admin ? " (승인 → Claude가 꺼진 광고로 만들어 둠 → [켜줘] 누르면 30분 안에 게시)" : ""}</b>${propHtml}</div>`
-    + `<div class="card"><b>🔭 추천 광고 — 경쟁사에서 오래 도는 소재 (눌러서 광고 라이브러리 원문)</b><p class="mut">기준: 한국어 문구가 있는 광고 · 30일 넘게 도는 것만 · 페이지당 1개 · 켜 둔 경쟁사 → 여러 광고로 돌리는 소재 → 오래 도는 순</p>${compHtml}<p class="mut">오래 돌수록 성과가 났을 가능성이 높아요. 문구는 베끼지 말고 구조만 참고해요.</p></div>`
     + `<div class="card"><b>🧵 스레드 — 올라간 글</b>${postedHtml}</div><div class="card"><b>🧵 스레드 — 대기 ${ready.length}</b>${readyHtml}</div>`;
   $m("#agKill")?.addEventListener("click", async () => {
     const { error } = await sb.from("mka_items").update({ status: kill ? "off" : "on", updated_at: new Date().toISOString() }).eq("kind", "control").eq("key", "kill");
